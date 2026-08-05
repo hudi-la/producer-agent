@@ -43,8 +43,10 @@ export async function sendMessage(pursuitId, text) {
 // 好处：sidecar 开不开、是不是最新的，都不影响你整理看板。
 
 /**
- * 手动标「球在谁那边」：'me' 待处理 / 'them' 等回复 / null 回到自动判断。
- * 自动判断在库的视图里算（ball_auto），这里只写手动覆盖。
+ * 改「球在谁那边」那个标：'me' 待处理 / 'them' 等回复（null 是给 Fairwind 留的，
+ * 界面上没有这个选项）。写进去的同时库里盖一个时间戳 ball_at ——
+ * 之后来了新信号（对外通信、跟进日到期），Fairwind 就重新接管这个标。
+ * 最终显示哪个由视图算（ball_eff），这里只负责写。
  */
 export async function setBall(pursuitId, ball) {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')

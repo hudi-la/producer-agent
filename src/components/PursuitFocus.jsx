@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { fetchMessages, sendMessage } from '../lib/chat.js'
-import { BALL_LABEL } from '../lib/ball.js'
+import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { doneAction } from '../lib/nextAction.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -86,8 +86,9 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
   const [thinking, setThinking] = useState(false)
   const [err, setErr] = useState(null)
   const [stage, setStageLocal] = useState(p.stage)
-  // 手动球权本地先动，写库由 App 负责回滚。null = 交还给自动判断。
-  const [ball, setBallLocal] = useState(p.ball ?? null)
+  // 球权本地先动，写库由 App 负责回滚。装的是「球在谁那边」这个答案本身，
+  // 不是「你有没有手动改过」——后者不是你要看的东西。
+  const [ball, setBallLocal] = useState(ballOf(p))
   const done = doneAction(p)
   const endRef = useRef(null)
 
@@ -102,6 +103,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
     let alive = true
     setMsgs(messages || [])
     setStageLocal(p.stage)
+    setBallLocal(ballOf(p))
     setErr(null)
     fetchMessages(p.id).then((rows) => {
       if (alive && rows) setMsgs(rows)
@@ -166,19 +168,18 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
       <div className="focus-top">
         <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
         <span style={{ flex: 1 }} />
-        {/* 球在谁那边。默认自动（看最后是谁说的话 / 跟进日到没到），觉得判错了就手动钉住。 */}
+        {/* 球在谁那边。Fairwind 自己贴一个，贴错了直接改掉——没有「谁来判断」这个选项。
+            两个都不亮 = 还没有依据（既没往来也没跟进日），你可以自己定一个。 */}
         <div className="ballsw" role="group" aria-label="球在谁那边">
-          {[[null, '自动'], ['me', '待处理'], ['them', '等回复']].map(([v, label]) => (
+          {BALL_STATES.map(([v, label]) => (
             <button
-              key={label}
+              key={v}
               type="button"
-              className={'bsw' + (ball === v ? ' on' : '') + (v ? ' ' + v : '')}
-              onClick={() => { setBallLocal(v); onSetBall?.(p.id, v) }}
+              className={'bsw ' + v + (ball === v ? ' on' : '')}
+              aria-pressed={ball === v}
+              onClick={() => { if (ball === v) return; setBallLocal(v); onSetBall?.(p.id, v) }}
             >
               {label}
-              {v === null && !ball && p.ball_auto && (
-                <span className="bsw-auto">（{BALL_LABEL[p.ball_auto]}）</span>
-              )}
             </button>
           ))}
         </div>

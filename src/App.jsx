@@ -151,10 +151,12 @@ export default function App() {
     }
   }
 
-  // 手动钉住球权（null = 交还自动）。同样先乐观更新，写失败回滚 + 提示。
+  // 改球权那个标。同样先乐观更新，写失败回滚 + 提示。
+  // ball_eff 是库算出来的「球在谁那边」，界面读的就是它——乐观更新得连它一起改，
+  // 不然点完标不动，看着像没生效。
   const markBall = async (id, ball) => {
     const prev = pl.pursuits
-    setPl({ ...pl, pursuits: prev.map((p) => (p.id === id ? { ...p, ball } : p)) })
+    setPl({ ...pl, pursuits: prev.map((p) => (p.id === id ? { ...p, ball, ball_eff: ball } : p)) })
     try {
       await setBall(id, ball)
     } catch (e) {

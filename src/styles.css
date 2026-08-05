@@ -278,7 +278,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .bsw.on { color: var(--ink); background: var(--paper-3); font-weight: 600; }
 .bsw.on.me { color: var(--accent); }
 .bsw:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.bsw-auto { color: var(--ink-3); font-weight: 400; margin-left: 3px; }
 
 /* ── 一叠：同一次造卡任务的一批，默认折着。首页只递一件事——「这儿有一叠」。 ── */
 .stack { position: relative; margin-bottom: 10px; }

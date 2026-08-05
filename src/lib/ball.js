@@ -1,10 +1,17 @@
-// 球在谁那边。自动判断在库里算（v_pa_pursuits.ball_auto），这里只负责
-// 「手动优先于自动」这一条规则和文案，让卡片和详情页说的是同一句话。
+// 球在谁那边。只有两个答案：待处理 / 等回复。
+//
+// 「谁判断的」不是你要操作的东西，所以界面上没有第三个叫「自动」的选项——
+// Fairwind 自己贴一个标，你觉得贴错了直接改掉。你的修改管到下一件真事发生为止
+// （新的对外通信、跟进日到期），之后 Fairwind 重新接管。这条规则在库里算
+// （v_pa_pursuits.ball_eff），前端不重复实现，免得两处说的不是一句话。
 export const BALL_LABEL = { me: '待处理', them: '等回复' }
 
-/** 实际生效的球权：手动设了就听手动，没设就听自动。都没有则返回 null（没球可打）。 */
+/** 界面上摆出来的两个标，顺序固定。 */
+export const BALL_STATES = [['me', BALL_LABEL.me], ['them', BALL_LABEL.them]]
+
+/** 球到底在谁那边。null = 还没有依据（0017：宁可不说，也不猜）。 */
 export function ballOf(p) {
-  return p.ball || p.ball_auto || null
+  return p.ball_eff || null
 }
 
 // 原来这儿有个 isManual()，卡上据此画一个「钉」角标，表示球权是手动定的。
