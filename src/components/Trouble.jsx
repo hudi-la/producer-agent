@@ -11,7 +11,7 @@ import { FELL_BACK } from '../lib/backends.js'
 //
 // 两档严重程度，别混为一谈：
 //   danger —— 你看到的数据是假的。基于它做的任何判断都不作数。
-//   warn   —— 数据是真的，但渡不干活了。
+//   warn   —— 数据是真的，但 Fairwind 不干活了。
 
 const DANGER = {
   [FELL_BACK.NO_CONFIG]: {
@@ -47,9 +47,9 @@ export default function Trouble({ fellBack, detail, brainDown }) {
         <div className="tr-row warn">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
-            <b>渡的脑子没开</b>
+            <b>Fairwind 的脑子没开</b>
             <span className="tr-fix">
-              待批准的卡不会被自动读透，也没法和渡对话。数据是真的，只是它不干活。
+              待批准的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。
               另开一个终端跑 <code>npm run brain</code>
             </span>
           </span>

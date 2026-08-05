@@ -58,7 +58,7 @@ export default function App() {
     return () => { alive = false; clearInterval(iv) }
   }, [])
 
-  // 看板每 8 秒刷一次机会线——渡在后台想完的回复、别处的改动都会自动进来，
+  // 看板每 8 秒刷一次机会线——Fairwind 在后台想完的回复、别处的改动都会自动进来，
   // 不用你手动刷新。
   useEffect(() => {
     const iv = setInterval(() => { loadPursuits().then((r) => { if (r) setPl(r) }) }, 8000)
@@ -108,7 +108,7 @@ export default function App() {
     window.history.replaceState(null, '', window.location.pathname)
     setView({ name: 'home' })
   }
-  // 你离开期间渡回了的卡：最后一条是渡发的、且比你上次看它更新。当前打开的那张不算。
+  // 你离开期间 Fairwind 回了的卡：最后一条是 Fairwind 发的、且比你上次看它更新。当前打开的那张不算。
   const unseen = new Set(
     pl.pursuits.filter((p) => {
       if (view.name === 'pursuit' && view.pursuit.id === p.id) return false

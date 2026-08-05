@@ -2,6 +2,8 @@
   --paper:#E8E3D9; --paper-2:#F1ECE3; --paper-3:#DED8CB; --ink:#241F1B; --ink-2:#5C5347;
   --ink-3:#8E8474; --line:#D6CDBE; --line-2:#C9BFAD; --accent:#A76A24; --accent-soft:#A76a2418;
   --good:#5E7A4E; --wait:#9A7A2E; --g1:#D89A3C; --g2:#C46A55; --g3:#6A5A86;
+  /* 标里那支主枝蓝（Mark.jsx 第一组 fill）。深浅色都用同一支——标本身就是两边同色。 */
+  --mark-blue:#7FA3C4;
   --grad:linear-gradient(150deg,var(--g1),var(--g2) 55%,var(--g3));
   --serif:"Iowan Old Style","Charter","Palatino","Songti SC",Georgia,serif;
   --sans:"Avenir Next","Segoe UI",system-ui,"PingFang SC","Hiragino Sans GB",sans-serif;
@@ -101,8 +103,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pc-badge { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--g2); box-shadow: 0 0 0 3px var(--paper-2); }
 .stack-head { position: relative; }
 .stack-head .pc-badge { top: 12px; right: 12px; }
-/* open call（投申请的正式机会）：暮色紫左竖条，区别于 workshop 冷外联 */
-.pcard.opencall::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; background: var(--g3); }
+/* open call（投申请的正式机会）：左竖条用标里那支蓝，区别于 workshop 冷外联 */
+.pcard.opencall::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; background: var(--mark-blue); }
 
 /* ── pursuit focus ── */
 .focus { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }

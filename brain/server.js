@@ -1,10 +1,10 @@
-// 渡的脑子 —— 跑在本机的 sidecar，挂 Claude 订阅（不烧 API）。
+// Fairwind 的脑子 —— 跑在本机的 sidecar，挂 Claude 订阅（不烧 API）。
 //
 // 前端 POST /chat → ①你的话先落库 ②读这条线的全部往来拼成上下文
 // ③交给 Agent SDK 去想（可以联网搜/读网页）④回复写回同一张表。
 //
 // 护栏：这个进程是唯一能写库的地方，且只写 pursuit_messages。
-// 渡本人只拿到 WebSearch / WebFetch —— 它碰不到数据库，改不了 stage、改不了盒子。
+// Fairwind 本人只拿到 WebSearch / WebFetch —— 它碰不到数据库，改不了 stage、改不了盒子。
 // 这是结构上的限制，不是嘱咐它别做。
 
 import http from 'node:http'
@@ -25,12 +25,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 // producer schema 没进 Supabase 的 Exposed schemas（共用项目，不动全局设置），
 // 所以读写都走 public 里那两个 security definer 函数（见 0009_brain_rpc.sql）。
 // 那两个函数只 grant 给 service_role，而且只开了「读上下文 / 写一条消息」两个口——
-// 渡改不了 stage、改不了盒子，是结构上做不到，不是被嘱咐别做。
+// Fairwind 改不了 stage、改不了盒子，是结构上做不到，不是被嘱咐别做。
 const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
 
-// ── 上下文：渡开工前先想起这条线的一切 ──────────────────────────
+// ── 上下文：Fairwind 开工前先想起这条线的一切 ──────────────────────────
 
 async function loadContext(pursuitId) {
   const { data, error } = await db.rpc('pa_brain_context', { p_pursuit_id: pursuitId })
@@ -48,11 +48,11 @@ async function addMessage(pursuitId, role, content, kind = 'message') {
   const { data, error } = await db.rpc('pa_add_message', {
     p_pursuit_id: pursuitId, p_role: role, p_content: content, p_kind: kind,
   })
-  if (error) throw new Error(`存${role === 'artist' ? '你的话' : '渡的回复'}失败：` + error.message)
+  if (error) throw new Error(`存${role === 'artist' ? '你的话' : 'Fairwind 的回复'}失败：` + error.message)
   return data
 }
 
-const SYSTEM = `你是「渡」，一位艺术家的 producer / 外联搭档。你服务的艺术家是 Hu Di，作品站 https://hudiworks.com/。
+const SYSTEM = `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。你服务的艺术家是 Hu Di，作品站 https://hudiworks.com/。
 
 你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
 
@@ -102,7 +102,7 @@ function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
   if (history.length) {
     lines.push('## 你们之前的往来（从早到晚）')
     for (const m of history) {
-      const who = m.role === 'artist' ? 'Hu Di' : m.role === 'producer' ? '你（渡）' : m.role
+      const who = m.role === 'artist' ? 'Hu Di' : m.role === 'producer' ? '你（Fairwind）' : m.role
       const tag = m.kind && m.kind !== 'message' ? `〔${m.kind}〕` : ''
       lines.push(`${who}${tag}：${m.content}`)
     }
@@ -118,7 +118,7 @@ function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
   return lines.join('\n')
 }
 
-// 「讲懂」：新卡进来，渡去官方渠道核实并写一段大致了解。
+// 「讲懂」：新卡进来，Fairwind 去官方渠道核实并写一段大致了解。
 function buildBriefPrompt({ p, entries, profile }) {
   const fact = (k, v) => (v ? `${k}：${v}\n` : '')
   const lines = []
@@ -159,7 +159,7 @@ function buildBriefPrompt({ p, entries, profile }) {
   return lines.join('\n')
 }
 
-// 从渡的回复尾部摘出机器读的事实行，并把它从展示文本里去掉。
+// 从 Fairwind 的回复尾部摘出机器读的事实行，并把它从展示文本里去掉。
 function extractFacts(text) {
   const m = text.match(/\[\[FACTS\]\]\s*(\{[\s\S]*?\})\s*$/)
   if (!m) return { clean: text.trim(), facts: null }
@@ -187,11 +187,11 @@ async function think(prompt) {
     }
     if (m.type === 'result') {
       usage = { ms: m.duration_ms, turns: m.num_turns, subtype: m.subtype }
-      if (m.subtype !== 'success') throw new Error('渡没想完：' + m.subtype)
+      if (m.subtype !== 'success') throw new Error('Fairwind 没想完：' + m.subtype)
     }
   }
   const text = out.join('\n').trim()
-  if (!text) throw new Error('渡没说话（空回复）')
+  if (!text) throw new Error('Fairwind 没说话（空回复）')
   return { text, usage }
 }
 
@@ -207,13 +207,13 @@ async function handleChat(body) {
   const ctx = await loadContext(pursuit_id)
   console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库`)
   const { text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id))
-  console.log(`  ↳ 渡想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
+  console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
 
   const theirs = await addMessage(pursuit_id, 'producer', reply)
   return { mine, reply: theirs }
 }
 
-// 用户移卡：改这条线的阶段。这是「你」的动作，不是渡的——渡只有 WebSearch/WebFetch，
+// 用户移卡：改这条线的阶段。这是「你」的动作，不是 Fairwind 的——Fairwind 只有 WebSearch/WebFetch，
 // 到不了这个入口。用同一个 service_role，但只调 pa_set_stage（只能改 stage）。
 async function handleStage(body) {
   const { pursuit_id, stage } = body
@@ -224,7 +224,7 @@ async function handleStage(body) {
 }
 
 // 用户手动标「球在谁那边」：me = 待处理 / them = 等回复 / null = 回到自动判断。
-// 同样只是「你」的动作——渡够不到这个口，它只有 WebSearch/WebFetch。
+// 同样只是「你」的动作——Fairwind 够不到这个口，它只有 WebSearch/WebFetch。
 async function handleBall(body) {
   const { pursuit_id, ball } = body
   if (!pursuit_id) throw new Error('要有 pursuit_id')
@@ -234,7 +234,7 @@ async function handleBall(body) {
   return { ok: true, pursuit_id, ball: ball ?? null }
 }
 
-// 讲懂：渡去官方渠道核实，写一段 brief 进这条线，并把核实到的
+// 讲懂：Fairwind 去官方渠道核实，写一段 brief 进这条线，并把核实到的
 // 链接/截止/资格回填到卡上。幂等——已经有 brief 就不重做。
 async function handleBrief(body) {
   const { pursuit_id } = body
@@ -263,7 +263,7 @@ async function handleBrief(body) {
 }
 
 // ── 后台先读 ───────────────────────────────────────────────────
-// 「待批准」这个列名承诺的是「渡已经读透了，就等你点头」。所以读这件事
+// 「待批准」这个列名承诺的是「 Fairwind 已经读透了，就等你点头」。所以读这件事
 // 不能等你点开卡才现做——脑子自己扫，卡进来就读，你看见它时 brief 已在库里。
 //
 // handleBrief 本来就幂等（有 brief 就 skipped），所以重复扫是安全的；
@@ -390,7 +390,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, () => {
-  console.log(`\n🔥 渡的脑子醒着  http://localhost:${PORT}`)
+  console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
   console.log(`   放行来源：${ORIGIN}`)
   console.log(`   后台先读：每 ${Math.round(SWEEP_MS / 1000)} 秒扫一次「待批准」`)
   console.log(`   计费：走你的 Claude 订阅用量（没用 API key）\n`)

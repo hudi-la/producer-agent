@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL } from '../data/entriesSeed.js'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
-// 这里是渡判断匹配、写「为什么是我」、填申请字段的全部弹药，
+// 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
 // 59 条事实不该藏在一个划出来又划回去的侧栏里。
 
 const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
@@ -108,7 +108,7 @@ export default function Library({ entries, concerns }) {
       <div className="page-inner">
         <header className="page-head">
           <h1>我的档案</h1>
-          <p className="note">渡懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>hudiworks.com</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
+          <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>hudiworks.com</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
         {ordered.map((k) => (
           <KindSection key={k.key} label={k.label} items={k.items} sub={k.sub} concerns={concerns} />

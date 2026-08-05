@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { BALL_LABEL, ballOf, isManual } from '../lib/ball.js'
 
-// 顺序：卡进来先等你批（渡已在后台读透），批了就一起挑作品/写，
+// 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
 // 然后发出去、等回信；末尾两个收尾去处——成了 = 谈成，停了 = 暂停处理。
 const STAGES = [
   ['pending', '待批准'],
@@ -58,7 +58,7 @@ function PCard({ p, onOpen, onDragStart, unseen }) {
       onDragStart={(e) => onDragStart(e, p)}
       onClick={() => onOpen(p)}
     >
-      {unseen && <span className="pc-badge" aria-label="渡回复了" />}
+      {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
       {/* 球在谁那边——stage 说的是走到哪一格，这个说的是现在该谁动。 */}
       {ball && (
         <div className={'pc-ball ' + ball + (isManual(p) ? ' pinned' : '')}>
@@ -91,7 +91,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, unseen }) {
     <div className={'stack' + (open ? ' open' : '')}>
       <button className="stack-head" onClick={onToggle}>
         <span className="stack-pile" aria-hidden="true" />
-        {anyUnseen && !open && <span className="pc-badge" aria-label="渡回复了" />}
+        {anyUnseen && !open && <span className="pc-badge" aria-label="Fairwind 回复了" />}
         <span className="stack-txt">
           <span className="stack-n">{name || '一批机构'}</span>
           <span className="stack-c">

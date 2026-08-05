@@ -1,7 +1,7 @@
 // 分工：
 //  · 读 + 「你自己改自己卡上的字段」(stage / ball) —— 浏览器直连，走 anon。
 //    后者靠 security definer 函数，能改的列是写死的，anon 拿不到别的写权限。
-//  · 「渡去想」(chat / brief) —— 走本机 sidecar，因为那需要 service_role
+//  · 「 Fairwind 去想」(chat / brief) —— 走本机 sidecar，因为那需要 service_role
 //    往往来历史里写消息，且要跑 agent。
 import { supa, BRAIN } from './backends.js'
 
@@ -17,7 +17,7 @@ export async function fetchMessages(pursuitId) {
   return data
 }
 
-/** 说一句话给渡。你的话先落库，然后等它想完 —— 联网查资料时可能要几十秒。 */
+/** 说一句话给 Fairwind 。你的话先落库，然后等它想完 —— 联网查资料时可能要几十秒。 */
 export async function sendMessage(pursuitId, text) {
   let res
   try {
@@ -27,7 +27,7 @@ export async function sendMessage(pursuitId, text) {
       body: JSON.stringify({ pursuit_id: pursuitId, text }),
     })
   } catch (_) {
-    throw new Error('渡的脑子没开 —— 另开一个终端跑 npm run brain')
+    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error || `脑子出错了（${res.status}）`)

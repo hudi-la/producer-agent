@@ -46,7 +46,7 @@ function Message({ m }) {
     return (
       <div className="msg-row">
         <div className="briefcard">
-          <div className="byline"><span className="pdot" aria-hidden="true" /><span className="pname">渡 <span>· 讲懂这个机会</span></span></div>
+          <div className="byline"><span className="pdot" aria-hidden="true" /><span className="pname">Fairwind <span>· 讲懂这个机会</span></span></div>
           <div className="md"><Md>{m.content}</Md></div>
         </div>
       </div>
@@ -65,7 +65,7 @@ function Message({ m }) {
   const mine = m.role === 'artist'
   return (
     <div className={'msg' + (mine ? ' you' : ' producer')}>
-      <span className="who">{mine ? '你' : '渡'}</span>
+      <span className="who">{mine ? '你' : 'Fairwind'}</span>
       <div className="bubble md"><Md>{m.content}</Md></div>
     </div>
   )
@@ -73,7 +73,7 @@ function Message({ m }) {
 
 function emptyText(stage) {
   // 待批准的卡本该在后台就读透了。还空着 = 脑子没开，或刚进来还没轮到。
-  if (stage === 'pending') return '渡还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。'
+  if (stage === 'pending') return 'Fairwind 还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。'
   if (stage === 'matching') return '你批准了——接下来我们一起挑用哪件作品，再往下写。'
   return '这条机会线还没有往来。我这就开始。'
 }
@@ -88,7 +88,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
   const [ball, setBallLocal] = useState(p.ball ?? null)
   const endRef = useRef(null)
 
-  // 「渡在想」从消息推导：最后一条是你发的 = 渡还欠你一条回复。
+  // 「 Fairwind 在想」从消息推导：最后一条是你发的 = Fairwind 还欠你一条回复。
   // 这样即使你离开再回来，也照样显示在想——状态不靠本地内存的临时 flag。
   const lastIsArtist = msgs.length > 0 && msgs[msgs.length - 1].role === 'artist'
   const busy = thinking || lastIsArtist
@@ -110,7 +110,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [msgs.length, thinking])
 
-  // 实时兜底：开着这条线时每 3 秒拉一次库。渡在后台想完的回复会自动出现——
+  // 实时兜底：开着这条线时每 3 秒拉一次库。 Fairwind 在后台想完的回复会自动出现——
   // 你不必守着这个页面。离开再回来也一样，因为回复本就落在库里，不在你的屏幕上。
   useEffect(() => {
     const iv = setInterval(async () => {
@@ -151,7 +151,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
         setText((cur) => cur || t)   // 期间你要是又打了别的，就别覆盖
         setErr(e.message + '（你的话还在框里，没丢）')
       } else {
-        setErr(e.message + '（你的话存下了，渡没想完 —— 再说一次让它重想）')
+        setErr(e.message + '（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）')
       }
     } finally {
       setThinking(false)
@@ -205,7 +205,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
               {msgs.map((m, i) => <Message m={m} key={m.id || i} />)}
               {busy && (
                 <div className="msg producer">
-                  <span className="who">渡</span>
+                  <span className="who">Fairwind</span>
                   <div className="bubble thinking"><i /><i /><i /></div>
                 </div>
               )}
@@ -221,7 +221,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
           className="ph"
           value={text}
           disabled={busy}
-          placeholder={busy ? '渡在想……（想完会自动出现，你不用守着）' : '一起想点什么…… 渡带着这条线的全部往来，你不用重讲'}
+          placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）' : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }}
         />

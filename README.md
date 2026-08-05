@@ -1,4 +1,4 @@
-# 渡 · Producer Agent（工作名）
+# Fairwind · Producer Agent（工作名）
 
 一个替艺术家跑外联的 producer agent。名字、视觉都是工作值，随时可改。
 
