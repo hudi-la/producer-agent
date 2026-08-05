@@ -1,0 +1,14 @@
+{
+  "name": "producer-agent-brain",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "渡的脑子 —— 跑在本机的 sidecar，挂 Claude 订阅",
+  "scripts": {
+    "start": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.220",
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

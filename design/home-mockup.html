@@ -1,0 +1,389 @@
+<style>
+  :root {
+    --paper:#E8E3D9; --paper-2:#F1ECE3; --paper-3:#DED8CB; --ink:#241F1B; --ink-2:#5C5347;
+    --ink-3:#8E8474; --line:#D6CDBE; --line-2:#C9BFAD; --accent:#A76A24; --accent-soft:#A76a2418;
+    --good:#5E7A4E; --wait:#9A7A2E;
+    --g1:#D89A3C; --g2:#C46A55; --g3:#6A5A86;
+    --grad:linear-gradient(150deg,var(--g1),var(--g2) 55%,var(--g3));
+    --serif:"Iowan Old Style","Charter","Palatino","Songti SC",Georgia,serif;
+    --sans:"Avenir Next","Segoe UI",system-ui,"PingFang SC","Hiragino Sans GB",sans-serif;
+    --shadow:0 1px 2px #241f1b0c,0 12px 34px -20px #241f1b2b;
+  }
+  @media (prefers-color-scheme: dark){:root{
+    --paper:#17141A;--paper-2:#211D25;--paper-3:#100E13;--ink:#EBE3D4;--ink-2:#A99E8B;--ink-3:#6F6556;
+    --line:#2B2731;--line-2:#39343F;--accent:#D69A48;--accent-soft:#D69a481f;--good:#8FA97A;--wait:#C7A24E;
+    --g1:#E0A64A;--g2:#D07862;--g3:#8A79A8;--shadow:0 1px 2px #0000004d,0 16px 44px -24px #000000a0;}}
+  :root[data-theme="light"]{--paper:#E8E3D9;--paper-2:#F1ECE3;--paper-3:#DED8CB;--ink:#241F1B;--ink-2:#5C5347;--ink-3:#8E8474;--line:#D6CDBE;--line-2:#C9BFAD;--accent:#A76A24;--accent-soft:#A76a2418;--good:#5E7A4E;--wait:#9A7A2E;--g1:#D89A3C;--g2:#C46A55;--g3:#6A5A86;--shadow:0 1px 2px #241f1b0c,0 12px 34px -20px #241f1b2b;}
+  :root[data-theme="dark"]{--paper:#17141A;--paper-2:#211D25;--paper-3:#100E13;--ink:#EBE3D4;--ink-2:#A99E8B;--ink-3:#6F6556;--line:#2B2731;--line-2:#39343F;--accent:#D69A48;--accent-soft:#D69a481f;--good:#8FA97A;--wait:#C7A24E;--g1:#E0A64A;--g2:#D07862;--g3:#8A79A8;--shadow:0 1px 2px #0000004d,0 16px 44px -24px #000000a0;}
+
+  * { box-sizing: border-box; }
+  .wrap {
+    min-height: 100vh; display: flex; flex-direction: column;
+    background-color: var(--paper);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  .btn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: 9px; border: 1px solid var(--line-2); background: transparent; color: var(--ink); cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: dark){ .btn.go{ color:#1c1710; } }
+  :root[data-theme="dark"] .btn.go{ color:#1c1710; }
+  .eyebrow { font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+
+  /* ---- top bar ---- */
+  .top { display: flex; align-items: center; gap: 18px; padding: 12px 22px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .brand .mark { width: 11px; height: 21px; border-radius: 6px 6px 6px 1px; background: var(--grad); box-shadow: 0 0 13px -2px var(--g2); }
+  .brand .name { font-family: var(--serif); font-size: 18px; }
+  .tabs { display: flex; gap: 3px; }
+  .tab { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink-3); cursor: pointer; }
+  .tab.on { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
+  .tab:hover:not(.on) { color: var(--ink-2); }
+  .top .sp { flex: 1; }
+  .recpill { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+  .recpill:hover { border-color: var(--accent); }
+  .recpill .d { width: 7px; height: 7px; border-radius: 50%; background: var(--grad); }
+  .recpill b { color: var(--accent); }
+
+  /* ---- today strip ---- */
+  .today { display: flex; align-items: center; gap: 14px; padding: 15px 24px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 55%, var(--paper-3)); flex: none; cursor: pointer; }
+  .today:hover { background: color-mix(in srgb, var(--paper) 40%, var(--paper-3)); }
+  .today .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--grad); flex: none; box-shadow: 0 0 12px -3px var(--g2); }
+  .today .txt { font-family: var(--serif); font-size: 15px; color: var(--ink); flex: 1; }
+  .today .txt .lbl { color: var(--ink-3); font-size: 12px; letter-spacing: .04em; margin-right: 8px; font-family: var(--sans); text-transform: uppercase; }
+  .today .txt b { font-weight: 600; }
+  .today .arw { color: var(--accent); font-weight: 600; font-size: 13px; }
+
+  /* ---- board (pipeline as home) ---- */
+  .board { flex: 1; overflow: auto; display: flex; gap: 18px; padding: 26px 24px 40px; align-items: flex-start; }
+  .col { flex: 0 0 216px; display: flex; flex-direction: column; }
+  .col-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 13px; padding: 0 2px; }
+  .col-h .cn { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; font-weight: 600; color: var(--ink-2); }
+  .col-h .cc { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .col.now .col-h .cn { color: var(--accent); }
+  .pcard { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 13px 14px; margin-bottom: 10px; box-shadow: var(--shadow); cursor: pointer; transition: transform .14s, border-color .14s; text-align: left; width: 100%; font: inherit; color: inherit; display: block; }
+  .pcard:hover { transform: translateY(-2px); border-color: var(--line-2); }
+  .pcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .col.now .pcard { border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
+  .pcard .pc-t { font-family: var(--serif); font-size: 14px; font-weight: 600; line-height: 1.28; }
+  .pcard .pc-p { font-size: 11px; color: var(--accent); margin-top: 5px; }
+  .pcard .pc-p.ghost { color: var(--ink-3); }
+  .pcard .pc-m { font-size: 11px; color: var(--ink-2); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .pcard .src { width: 6px; height: 6px; border-radius: 50%; background: var(--line-2); flex: none; }
+  .pcard .src.scout { background: var(--g1); }
+
+  /* ---- generic overlay scrim ---- */
+  .ov-scrim { position: fixed; inset: 0; background: #0000; pointer-events: none; transition: background .28s; z-index: 25; }
+  .wrap.rec-open .ov-scrim, .wrap.lib-open .ov-scrim { background: #241f1b40; pointer-events: auto; }
+
+  /* ---- focus overlay: one pursuit (calm single column) ---- */
+  .focus-ov { position: fixed; inset: 0; z-index: 45; background-color: var(--paper); transform: translateY(16px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.4,0,.2,1), opacity .26s; display: flex; flex-direction: column; }
+  .wrap.focus-open .focus-ov { transform: none; opacity: 1; pointer-events: auto; }
+  .focus-top { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); flex: none; }
+  .focus-top .back { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .focus-top .back:hover { color: var(--ink); }
+  .focus-top .ttl { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+  .focus-top .stg { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .focus-scroll { flex: 1; overflow-y: auto; }
+  .focus-inner { max-width: 560px; margin: 0 auto; padding: 30px 26px 130px; }
+  .fh h1 { font-family: var(--serif); font-weight: 600; font-size: 25px; line-height: 1.2; margin: 0 0 10px; letter-spacing: .005em; text-wrap: balance; }
+  .fh .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 26px; }
+  .fh .facts b { color: var(--ink); }
+  .fh .facts .warn { color: var(--wait); font-weight: 600; }
+
+  .thread { display: flex; flex-direction: column; }
+  .stage { display: grid; grid-template-columns: 24px 1fr; column-gap: 15px; }
+  .rail-col { display: flex; flex-direction: column; align-items: center; }
+  .node { width: 14px; height: 14px; border-radius: 50%; flex: none; margin-top: 3px; border: 2px solid var(--line-2); background: var(--paper); }
+  .stage.done .node { background: var(--accent); border-color: var(--accent); }
+  .stage.active .node { border: none; background: var(--grad); box-shadow: 0 0 0 4px var(--accent-soft), 0 0 14px -2px var(--g2); width: 16px; height: 16px; margin-top: 2px; }
+  .rail-line { width: 2px; flex: 1; margin: 4px 0; border-radius: 2px; background: var(--line-2); }
+  .stage.done .rail-line { background: linear-gradient(180deg, var(--accent), var(--g2)); }
+  .stage.active .rail-line { background: linear-gradient(180deg, var(--g2), var(--line) 85%); }
+  .stage:last-child .rail-line { display: none; }
+  .stage-body { padding-bottom: 26px; min-width: 0; }
+  .stage-name { font-family: var(--serif); font-size: 15.5px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 9px; }
+  .stage-name .tag { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .stage.active .stage-name .tag { color: var(--accent); }
+
+  .card { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 15px 16px; box-shadow: var(--shadow); }
+  .byline { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .pdot { width: 17px; height: 17px; border-radius: 50%; background: var(--grad); flex: none; box-shadow: 0 0 9px -3px var(--g2); }
+  .pname { font-size: 12px; font-weight: 600; }
+  .pname span { color: var(--ink-3); font-weight: 400; }
+  .brief p { margin: 0 0 9px; font-size: 13.5px; line-height: 1.6; }
+  .brief p:last-child { margin-bottom: 0; }
+  .brief .kf { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); display: grid; gap: 7px; }
+  .brief .kf li { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: 12.5px; }
+  .brief .kf .k { color: var(--ink-3); } .brief .kf .v { color: var(--ink); } .brief .kf .v.warn { color: var(--wait); font-weight: 600; }
+
+  .msg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 13px; }
+  .msg .who { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .bubble { font-size: 13.5px; line-height: 1.58; border-radius: 10px; padding: 11px 14px; }
+  .msg.producer .bubble { background: var(--paper-2); border: 1px solid var(--line); }
+  .msg.you { align-items: flex-end; }
+  .msg.you .bubble { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); max-width: 84%; }
+  .bubble em { font-style: normal; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--g1) 40%, transparent) 0); padding: 0 1px; }
+  .bubble .lk { color: var(--accent); font-weight: 600; }
+
+  .draft { border: 1px solid var(--line-2); border-radius: 12px; background: var(--paper-2); box-shadow: var(--shadow); overflow: hidden; }
+  .draft-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper-2) 55%, var(--paper-3)); }
+  .draft-top .lang { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .draft-body { padding: 15px 16px; }
+  .draft-body .en { font-family: var(--serif); font-size: 14.5px; line-height: 1.62; }
+  .draft-body .en p { margin: 0 0 11px; }
+  .draft-note { margin: 12px 0 0; padding-top: 11px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); display: flex; gap: 8px; align-items: flex-start; }
+  .draft-note .pdot { width: 14px; height: 14px; margin-top: 2px; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+  .composer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 22px; width: min(560px, calc(100% - 52px)); display: flex; align-items: center; gap: 12px; background: color-mix(in srgb, var(--paper-2) 92%, transparent); border: 1px solid var(--line-2); border-radius: 999px; padding: 11px 12px 11px 20px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+  .composer .ph { flex: 1; font-size: 14px; color: var(--ink-3); }
+  .composer .send { width: 34px; height: 34px; border-radius: 50%; flex: none; background: var(--grad); border: none; display: grid; place-items: center; cursor: pointer; }
+
+  /* ---- rec modal ---- */
+  .rec-modal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(540px,92vw); max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 24px 24px 26px; }
+  .wrap.rec-open .rec-modal { transform: translate(-50%,-50%) scale(1); opacity: 1; pointer-events: auto; }
+  .rm-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .rec-modal h3 { font-family: var(--serif); font-size: 19px; margin: 0; font-weight: 600; }
+  .rec-modal .lead2 { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; margin: 0 0 18px; font-family: var(--serif); }
+  .rec { border: 1px solid var(--line); border-radius: 13px; background: var(--paper-2); padding: 15px 16px; margin-bottom: 12px; }
+  .rec .r-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .rec .r-t { font-family: var(--serif); font-size: 16px; font-weight: 600; }
+  .rec .stars { font-size: 12px; color: var(--accent); letter-spacing: 1px; flex: none; }
+  .rec .r-org { font-size: 11.5px; color: var(--ink-3); margin: 2px 0 9px; }
+  .rec .r-why { font-size: 13px; color: var(--ink); line-height: 1.55; margin: 0 0 11px; }
+  .rec .r-facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--ink-2); margin-bottom: 13px; }
+  .rec .r-act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .rec .r-act .note { font-size: 11px; color: var(--ink-3); }
+  .more-line { font-size: 12.5px; color: var(--ink-3); text-align: center; padding: 9px; border: 1px dashed var(--line-2); border-radius: 10px; margin: 4px 0 16px; }
+  .held-note { display: flex; gap: 11px; padding: 13px 15px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: 12px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+  .held-note b { color: var(--ink); font-weight: 600; }
+  .add-own { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .add-own h4 { font-family: var(--serif); font-size: 14px; margin: 0 0 9px; color: var(--ink); font-weight: 600; }
+  .add-own p { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; margin: 0 0 12px; }
+  .add-own p b { color: var(--ink); font-weight: 600; }
+  .add-box { display: flex; align-items: center; gap: 10px; border: 1px dashed var(--line-2); border-radius: 10px; padding: 10px 14px; color: var(--ink-3); font-size: 13px; }
+  .add-box .plus { width: 26px; height: 26px; border-radius: 7px; background: var(--grad); display: grid; place-items: center; flex: none; }
+
+  /* ---- works drawer ---- */
+  .lib-handle { position: fixed; right: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; text-orientation: mixed; background: var(--paper-2); border: 1px solid var(--line-2); border-right: none; border-radius: 12px 0 0 12px; padding: 18px 9px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: .14em; color: var(--ink-2); box-shadow: var(--shadow); z-index: 20; display: flex; align-items: center; gap: 9px; }
+  .lib-handle:hover { color: var(--ink); border-color: var(--accent); }
+  .lib-handle .d { width: 7px; height: 7px; border-radius: 50%; background: var(--grad); }
+  .wrap.lib-open .lib-handle, .wrap.focus-open .lib-handle, .wrap.rec-open .lib-handle { opacity: 0; pointer-events: none; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100vh; width: min(430px,92vw); background: var(--paper); border-left: 1px solid var(--line-2); box-shadow: -24px 0 60px -34px #241f1b80; z-index: 30; transform: translateX(100%); transition: transform .32s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; }
+  .wrap.lib-open .drawer { transform: translateX(0); }
+  .drawer-head { padding: 22px 22px 15px; border-bottom: 1px solid var(--line); }
+  .dh-top { display: flex; align-items: center; justify-content: space-between; }
+  .dh-top h3 { font-family: var(--serif); font-size: 17px; margin: 0; font-weight: 600; }
+  .drawer-head .note { margin: 9px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.55; }
+  .drawer-head .note b { color: var(--ink-2); font-weight: 600; } .drawer-head .note .bx { color: var(--accent); }
+  .drawer-body { overflow-y: auto; padding: 6px 22px 48px; flex: 1; }
+  .concern { margin-top: 22px; } .concern .cn-h { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 10px; }
+  .work { border: 1px solid var(--line); border-radius: 11px; background: var(--paper-2); padding: 12px 13px; margin-bottom: 8px; }
+  .work .w-t { font-family: var(--serif); font-size: 14.5px; font-weight: 600; } .work .w-d { font-size: 12px; color: var(--ink-2); margin-top: 3px; line-height: 1.45; }
+  .work .w-foot { display: flex; align-items: center; gap: 9px; margin-top: 9px; }
+  .boxchip { font-size: 11px; padding: 2px 8px; border-radius: 5px; border: 1px dashed var(--line-2); color: var(--ink-3); }
+  .boxchip.filled { border-style: solid; border-color: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .src-tag { font-size: 10.5px; color: var(--ink-3); letter-spacing: .05em; }
+  .box { margin-top: 11px; padding-top: 11px; border-top: 1px dashed var(--line); display: grid; gap: 7px; }
+  .box .bx-h { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .box .field { font-size: 12px; line-height: 1.5; } .box .field .k { color: var(--ink-3); } .box .field .v { color: var(--ink); }
+  .box .add { font-size: 11.5px; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 8px; padding: 7px 10px; text-align: center; margin-top: 2px; }
+
+  @media (prefers-reduced-motion: reduce){ .focus-ov, .rec-modal, .drawer, .ov-scrim { transition: none; } }
+  @media (max-width: 620px){ .focus-inner { padding: 24px 20px 130px; } .today .txt { font-size: 14px; } }
+</style>
+
+<div class="wrap">
+
+  <!-- top bar -->
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><span class="name">渡</span></div>
+    <div class="tabs">
+      <button class="tab on">按阶段</button>
+      <button class="tab">按截止</button>
+      <button class="tab">按作品</button>
+      <button class="tab">按来源</button>
+    </div>
+    <span class="sp"></span>
+    <button class="recpill" id="open-rec"><span class="d" aria-hidden="true"></span>本周推荐 <b>3</b></button>
+  </header>
+
+  <!-- today: the one gentle focus -->
+  <button class="today" id="open-focus">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="txt"><span class="lbl">今天需要你的</span>Eyebeam 驻地的开头我写好了，<b>你过一眼？</b></span>
+    <span class="arw" aria-hidden="true">看看 →</span>
+  </button>
+
+  <!-- pipeline = home -->
+  <main class="board">
+    <div class="col">
+      <div class="col-h"><span class="cn">待批准</span><span class="cc">2</span></div>
+      <button class="pcard"><div class="pc-t">Prix Ars Electronica</div><div class="pc-p ghost">候选 · Echo Chamber Realms</div><div class="pc-m"><span class="src scout" aria-hidden="true"></span>scout · 截止约 6 周</div></button>
+      <button class="pcard"><div class="pc-t">某画廊群展</div><div class="pc-p ghost">待定作品</div><div class="pc-m"><span class="src" aria-hidden="true"></span>你丢的 · 朋友转的</div></button>
+    </div>
+    <div class="col">
+      <div class="col-h"><span class="cn">讲懂</span><span class="cc">1</span></div>
+      <button class="pcard"><div class="pc-t">Rijksakademie 驻地</div><div class="pc-p ghost">待定作品</div><div class="pc-m"><span class="src scout" aria-hidden="true"></span>我在替你读透它</div></button>
+    </div>
+    <div class="col">
+      <div class="col-h"><span class="cn">挑作品</span><span class="cc">1</span></div>
+      <button class="pcard"><div class="pc-t">transmediale 征件</div><div class="pc-p ghost">在两个作品间挑</div><div class="pc-m"><span class="src scout" aria-hidden="true"></span>Echo Chamber / Persona</div></button>
+    </div>
+    <div class="col now">
+      <div class="col-h"><span class="cn">一起写</span><span class="cc">1</span></div>
+      <button class="pcard" id="card-focus"><div class="pc-t">Eyebeam 驻地 2027</div><div class="pc-p">Echo Chamber Realms</div><div class="pc-m"><span class="src scout" aria-hidden="true"></span>开头写好了，等你看</div></button>
+    </div>
+    <div class="col">
+      <div class="col-h"><span class="cn">已提交</span><span class="cc">1</span></div>
+      <button class="pcard"><div class="pc-t">NEW INC</div><div class="pc-p">The Garden of Digital Delights</div><div class="pc-m"><span class="src" aria-hidden="true"></span>你丢的 · 已交</div></button>
+    </div>
+    <div class="col">
+      <div class="col-h"><span class="cn">等回信</span><span class="cc">1</span></div>
+      <button class="pcard"><div class="pc-t">某 AI 艺术 grant</div><div class="pc-p">The Persona Commodity</div><div class="pc-m"><span class="src scout" aria-hidden="true"></span>第 5 天，还早</div></button>
+    </div>
+    <div class="col">
+      <div class="col-h"><span class="cn">谈成 · 搁置</span><span class="cc">2</span></div>
+      <button class="pcard"><div class="pc-t">某 group show</div><div class="pc-p">Peace Talk</div><div class="pc-m" style="color:var(--good)"><span class="src" aria-hidden="true"></span>谈成 ✓</div></button>
+      <button class="pcard" style="opacity:.58"><div class="pc-t">某影像节</div><div class="pc-p ghost">The Wheels Never Go Backward</div><div class="pc-m"><span class="src" aria-hidden="true"></span>搁着 · 你说不急</div></button>
+    </div>
+  </main>
+
+  <!-- ============ FOCUS: one pursuit ============ -->
+  <section class="focus-ov" role="dialog" aria-label="Eyebeam 驻地 机会线">
+    <div class="focus-top">
+      <button class="back" id="focus-back"><span aria-hidden="true">←</span> 全部机会线</button>
+      <span class="sp" style="flex:1"></span>
+      <span class="stg">一起写</span>
+    </div>
+    <div class="focus-scroll">
+      <div class="focus-inner">
+        <div class="fh">
+          <h1>Eyebeam 驻地 2027</h1>
+          <div class="facts"><span><b>主打</b> · Echo Chamber Realms</span><span><b>来源</b> · scout</span><span class="warn">截止还有 8 周</span></div>
+        </div>
+
+        <div class="thread">
+          <section class="stage done">
+            <div class="rail-col"><span class="node" aria-hidden="true"></span><span class="rail-line"></span></div>
+            <div class="stage-body">
+              <div class="stage-name">讲懂 <span class="tag">它替你做的功课</span></div>
+              <div class="card brief">
+                <div class="byline"><span class="pdot" aria-hidden="true"></span><span class="pname">渡 <span>· 已替你把这个机会读透</span></span></div>
+                <p>Eyebeam 是纽约老牌的艺术与技术驻地，不要成品、要过程与公共性——正合你"观众即共同作者"的做法。评审偏爱把技术当<strong>批评对象</strong>、带社会性的创作者，这几乎是照着你写的。</p>
+                <ul class="kf">
+                  <li><span class="k">提供</span><span class="v">stipend + 工作空间 + 公共项目支持</span></li>
+                  <li><span class="k">资格</span><span class="v">国际可申（你 O-1 没问题）</span></li>
+                  <li><span class="k">交什么</span><span class="v">项目陈述 · 作品集 · 驻地设想</span></li>
+                  <li><span class="k">截止</span><span class="v warn">还有 8 周</span></li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage done">
+            <div class="rail-col"><span class="node" aria-hidden="true"></span><span class="rail-line"></span></div>
+            <div class="stage-body">
+              <div class="stage-name">一起挑 <span class="tag">哪个作品对味</span></div>
+              <div class="msg producer"><span class="who">渡</span><div class="bubble">主打 <span class="lk">Echo Chamber Realms</span>——多智能体 AI、参与式，正中他们对技术批评 + 社会性的偏好。<br><br>他们也吃"AI 如何重塑人的价值"这类议题，而你 <span class="lk">The Persona Commodity</span> 正是讲这个。要不要让陈述里 <em>带一条 Persona 的线</em>，把批判的份量压上去？</div></div>
+              <div class="msg you"><span class="who">你</span><div class="bubble">主打 Echo Chamber Realms。Persona 那条线保留，别丢。</div></div>
+              <div class="msg producer"><span class="who">渡</span><div class="bubble">记下了 ✎ 主打 Echo Chamber Realms，保留 Persona Commodity 线。往下我按这个写。</div></div>
+            </div>
+          </section>
+
+          <section class="stage active">
+            <div class="rail-col"><span class="node" aria-hidden="true"></span><span class="rail-line"></span></div>
+            <div class="stage-body">
+              <div class="stage-name">一起写 <span class="tag">进行中</span></div>
+              <div class="draft">
+                <div class="draft-top"><span class="pname">项目陈述 · 开头</span><span class="lang">EN 草稿</span></div>
+                <div class="draft-body">
+                  <div class="en">
+                    <p>My installations begin from a physicist's habit: to take an invisible structure and make it something you can stand inside. In <em>Echo Chamber Realms</em>, I let multi-agent AI systems talk until patterns of attachment, competition, and care surface on their own — then I stage the encounter so a visitor doesn't just watch the pattern, but meets it in themselves.</p>
+                    <p>At Eyebeam I want to push this from a scene one witnesses toward one the visitor co-authors…</p>
+                  </div>
+                  <div class="draft-note"><span class="pdot" aria-hidden="true"></span><span>我把"物理学家→做装置"的转折放最前面——对 art-tech 评审这是你最强的钩子，也是真的你。语气压得克制，他们要方法和问题，不要自谦。这个开头对味吗？</span></div>
+                  <div class="actions"><button class="btn go">对味，接着写</button><button class="btn">语气再暖一点</button><button class="btn">我自己改改</button></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage" style="opacity:.6">
+            <div class="rail-col"><span class="node" aria-hidden="true"></span><span class="rail-line"></span></div>
+            <div class="stage-body">
+              <div class="stage-name">跟进 <span class="tag">还没到</span></div>
+              <div class="card" style="border-style:dashed;background:transparent;box-shadow:none"><p style="margin:0;font-size:12.5px;color:var(--ink-2)">提交后我替你记着截止，两周没消息就提醒你要不要礼貌 nudge——日期你不用记。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div class="composer"><span class="ph">一起想点什么…… 比如"陈述里我想强调声音这条线"</span><button class="send" aria-label="发送"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+  </section>
+
+  <!-- ============ REC modal ============ -->
+  <div class="ov-scrim" aria-hidden="true"></div>
+  <div class="rec-modal" role="dialog" aria-label="本周推荐">
+    <div class="rm-head"><h3>本周最推荐</h3><button class="btn" id="rec-close" style="padding:5px 12px">收起</button></div>
+    <p class="lead2">我扫了一圈，这 3 个最值得你花时间。每个写成一张卡——看中哪个就按「批准」，用哪个作品批准后我俩再一起定。</p>
+    <div class="rec"><div class="r-h"><span class="r-t">Prix Ars Electronica</span><span class="stars">★★★</span></div><div class="r-org">林茨 · 奖项（AI / 数字艺术）</div><p class="r-why">你的多智能体 AI 装置正中他们对 AI/新媒体的偏好。是奖不是驻地，国际开放，不卡签证。</p><div class="r-facts"><span>资助 · 奖金</span><span>截止 · 约 6 周</span><span>国际 · 可申</span></div><div class="r-act"><button class="btn go" style="padding:7px 16px">批准 →</button><button class="btn" style="padding:7px 14px">跳过</button><span class="note">点开先聊聊 · 批准后一起挑作品</span></div></div>
+    <div class="rec"><div class="r-h"><span class="r-t">transmediale · 征件</span><span class="stars">★★★</span></div><div class="r-org">柏林 · 艺术与数字文化</div><p class="r-why">"技术作为批评对象" + 社会介入，跟你几乎同频；国际，含制作费。</p><div class="r-facts"><span>资助 · 含制作费</span><span>截止 · 约 4 周</span><span>国际 · 可申</span></div><div class="r-act"><button class="btn go" style="padding:7px 16px">批准 →</button><button class="btn" style="padding:7px 14px">跳过</button></div></div>
+    <div class="rec"><div class="r-h"><span class="r-t">Rijksakademie · 驻地</span><span class="stars">★★★</span></div><div class="r-org">阿姆斯特丹 · 两年研究驻地</div><p class="r-why">顶级研究型驻地，国际、带资助，重实验与方法——跟你物理+计算的路子对味。竞争大，值得一搏。</p><div class="r-facts"><span>资助 · 生活费+工作室</span><span>截止 · 约 8 周</span><span>国际 · 可申</span></div><div class="r-act"><button class="btn go" style="padding:7px 16px">批准 →</button><button class="btn" style="padding:7px 14px">跳过</button></div></div>
+    <div class="more-line">还有 4 个 ★★ 的，想看点这里 →</div>
+    <div class="held-note"><span aria-hidden="true" style="width:8px;height:8px;border-radius:50%;background:var(--grad);flex:none;margin-top:4px"></span><span>有个很强的我替你搁了——<b>Creative Capital</b> 限美国公民/绿卡，你 O-1 现在申不了。放到「待身份变化」，有变动我再提。</span></div>
+    <div class="add-own">
+      <h4>或者——你自己碰到一个机会？</h4>
+      <p>朋友转的 open call、你刷到的驻地、收到的邀约……贴给我就行，链接、截图、一句话都成。我照样<b>写成一张卡</b>、查好资格，咱们讨论、批准——跟推荐来的走同一条路。</p>
+      <div class="add-box"><span style="flex:1">+ 丢一个机会给我……</span><span class="plus"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg></span></div>
+    </div>
+  </div>
+
+  <!-- ============ works drawer ============ -->
+  <button class="lib-handle" id="open-lib" aria-label="打开作品库"><span class="d" aria-hidden="true"></span>作品库</button>
+  <aside class="drawer" aria-label="作品库">
+    <div class="drawer-head"><div class="dh-top"><h3>作品库</h3><button class="btn" id="lib-close" style="padding:6px 14px">收起</button></div><p class="note">渡从 <b>hudiworks.com</b> 读来的 · 11 件，按你站上的三条关切分好。作品是只读镜像；每件下面的<span class="bx">盒子</span>，是你补"网站装不下"的地方。</p></div>
+    <div class="drawer-body">
+      <div class="concern"><div class="cn-h">爱与亲密的痴望</div>
+        <div class="work"><div class="w-t">Echo Chamber Realms</div><div class="w-d">多智能体 AI 对话，直到依恋、竞争、关怀自己浮现。</div><div class="w-foot"><span class="boxchip filled">盒子 · 已补 3 条</span><span class="src-tag">读自网站</span></div>
+          <div class="box"><div class="bx-h">盒子 · 网站装不下的</div><div class="field"><span class="k">为什么是现在 · </span><span class="v">模型能力今年到位，多智能体涌现终于稳定可展。</span></div><div class="field"><span class="k">想触达 · </span><span class="v">做 AI / 社会性的策展人、art-tech 驻地。</span></div><div class="field"><span class="k">隐线 · </span><span class="v">跟 The Persona Commodity 共享"AI 重塑人的价值"。</span></div><div class="add">+ 丢进高清图 / 过程文档 / 旧申请稿</div></div>
+        </div>
+        <div class="work"><div class="w-t">Beloved Charlie</div><div class="w-d">过度殷勤的乖顺。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">Find Hu Di</div><div class="w-d">百日自我广播（行为）。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">Too on the Nose</div><div class="w-d">对自我与身份的防御。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">Make a Friend and Have Hotpot</div><div class="w-d">共食的姿态被搬演。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+      </div>
+      <div class="concern"><div class="cn-h">社会系统结构里的超现实</div>
+        <div class="work"><div class="w-t">On the Back of Silver Dragon</div><div class="w-d">技术与阶层等级带来的异化。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">Peace Talk</div><div class="w-d">民主程序的失效。</div><div class="w-foot"><span class="boxchip filled">盒子 · 1 条</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">The Wheels Never Go Backward</div><div class="w-d">技术发展与社会变迁。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">The Persona Commodity</div><div class="w-d">写作项目 · AI 如何重塑普通人的机会与价值。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+      </div>
+      <div class="concern"><div class="cn-h">身体 / 空间 / 时间的方法实验</div>
+        <div class="work"><div class="w-t">The Garden of Digital Delights</div><div class="w-d">尺度与空间激起的身体参与。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+        <div class="work"><div class="w-t">Pi</div><div class="w-d">在场与地方。</div><div class="w-foot"><span class="boxchip">盒子 · 空</span><span class="src-tag">读自网站</span></div></div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+<script>
+  (function () {
+    var wrap = document.querySelector('.wrap');
+    var on = function (id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    var openFocus = function () { wrap.classList.add('focus-open'); };
+    on('open-focus', openFocus);
+    on('card-focus', openFocus);
+    on('focus-back', function () { wrap.classList.remove('focus-open'); });
+    on('open-rec', function () { wrap.classList.add('rec-open'); });
+    on('rec-close', function () { wrap.classList.remove('rec-open'); });
+    on('open-lib', function () { wrap.classList.add('lib-open'); });
+    on('lib-close', function () { wrap.classList.remove('lib-open'); });
+    document.querySelector('.ov-scrim').addEventListener('click', function () { wrap.classList.remove('rec-open'); wrap.classList.remove('lib-open'); });
+    // any pipeline card opens the focused pursuit (demo)
+    document.querySelectorAll('.pcard').forEach(function (c) { c.addEventListener('click', openFocus); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { wrap.classList.remove('focus-open'); wrap.classList.remove('rec-open'); wrap.classList.remove('lib-open'); } });
+  })();
+</script>
