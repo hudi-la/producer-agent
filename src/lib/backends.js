@@ -26,11 +26,19 @@ export const FELL_BACK = {
  * 它没醒 = 待批准的卡不会被自动读透，也没法对话——但数据仍是真的，
  * 所以这跟「看到假数据」是两种严重程度，界面上要分开说。
  */
+// 脑子是你手动 `npm run brain` 起的常驻进程。改了它的代码不重启，它就一直跑旧的，
+// 而界面完全看不出来——这已经害过一次：把「讲懂」改成后台扫之后，前端触发器删了、
+// 后台扫描没跑起来，整整一天没有一张新卡被读过，谁也没发现。
+// 所以两边各存一个日期，对不上就提示重启。改 brain/server.js 的行为时两处一起改。
+export const BRAIN_BUILD = '2026-08-05'
+
 export async function checkBrain() {
   try {
     const res = await fetch(`${BRAIN}/health`, { method: 'GET' })
-    return res.ok
+    if (!res.ok) return { up: false, stale: false }
+    const body = await res.json().catch(() => ({}))
+    return { up: true, stale: body.build !== BRAIN_BUILD }
   } catch (_) {
-    return false
+    return { up: false, stale: false }
   }
 }

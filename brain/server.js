@@ -13,6 +13,15 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 
 // 默认值必须和前端 backends.js 里的 BRAIN 对得上。两边默认值不一致的话，
 // brain/.env 一丢，脑子听一个端口、界面敲另一个，结果是永远误报「脑子没开」。
+// 改了这个文件里任何「界面依赖的行为」，就把这个日期往前挪一格，同时改
+// src/lib/backends.js 里的 BRAIN_BUILD。两边对不上界面会提示你重启脑子。
+//
+// 为什么需要它：脑子是你手动 `npm run brain` 起的一个常驻进程。改了代码不重启，
+// 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
+// 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
+// 谁也没发现。和「迁移写了没跑」是同一个病。
+export const BRAIN_BUILD = '2026-08-05'
+
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 
@@ -282,11 +291,14 @@ async function handleBrief(body) {
 // briefed 只是省掉那次白跑的 loadContext，不是正确性的依赖。
 const SWEEP_MS = Number(process.env.BRAIN_SWEEP_MS || 60_000)
 const briefed = new Set()
+const failed = new Map()        // 卡 id → 连续失败次数，用来退避
 let sweeping = false
+let sweeps = 0
 
 async function sweepBriefs() {
   if (sweeping) return          // 上一轮还在读（联网研究一张要 30–60 秒），跳过这次
   sweeping = true
+  sweeps++
   try {
     const { data, error } = await db
       .from('v_pa_pursuits')
@@ -297,12 +309,18 @@ async function sweepBriefs() {
 
     for (const p of data || []) {
       if (briefed.has(p.id)) continue
+      // 一直失败的卡不能每分钟重试一次——那会没完没了地烧订阅额度，
+      // 而且日志被同一条报错刷屏，真问题反而看不见。失败一次退避一轮。
+      const n = failed.get(p.id) || 0
+      if (n > 0 && sweeps % Math.min(2 ** n, 60) !== 0) continue
       try {
         const { skipped } = await handleBrief({ pursuit_id: p.id })
         briefed.add(p.id)
+        failed.delete(p.id)
         if (!skipped) console.log(`  ✓ 读透了：${p.title}`)
       } catch (err) {
-        console.warn(`  ⚠️ 读「${p.title}」失败：${err.message}`)   // 不记进 briefed，下轮重试
+        failed.set(p.id, n + 1)
+        console.warn(`  ⚠️ 读「${p.title}」失败（第 ${n + 1} 次）：${err.message}`)
       }
     }
   } finally {
@@ -331,7 +349,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
-  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true })
+  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, build: BRAIN_BUILD })
 
   if (req.method === 'POST' && req.url === '/chat') {
     let raw = ''

@@ -28,9 +28,9 @@ const DANGER = {
   },
 }
 
-export default function Trouble({ fellBack, detail, brainDown }) {
+export default function Trouble({ fellBack, detail, brainDown, brainStale }) {
   const bad = fellBack ? DANGER[fellBack] : null
-  if (!bad && !brainDown) return null      // 一切正常 → 闭嘴
+  if (!bad && !brainDown && !brainStale) return null      // 一切正常 → 闭嘴
 
   return (
     <div className="trouble">
@@ -51,6 +51,20 @@ export default function Trouble({ fellBack, detail, brainDown }) {
             <span className="tr-fix">
               待批准的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。
               另开一个终端跑 <code>npm run brain</code>
+            </span>
+          </span>
+        </div>
+      )}
+      {/* 脑子开着，但跑的是旧代码。这个最阴：一切看着都正常，只是新加的行为
+          （比如后台读卡）根本没生效，而且没有任何迹象。 */}
+      {brainStale && !brainDown && (
+        <div className="tr-row warn">
+          <span className="tr-dot" aria-hidden="true" />
+          <span className="tr-txt">
+            <b>脑子跑的是旧代码</b>
+            <span className="tr-fix">
+              它开着，但启动之后代码又改过——新加的行为不会生效，而且看不出来。
+              到跑 brain 的那个终端按 Ctrl-C，再 <code>npm run brain</code>
             </span>
           </span>
         </div>

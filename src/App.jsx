@@ -30,7 +30,7 @@ export default function App() {
   const [area, setArea] = useState('pursue')
   const [tasksOpen, setTasksOpen] = useState(false)
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
-  const [brainOk, setBrainOk] = useState(null)
+  const [brain, setBrain] = useState(null)
   const [seen, setSeen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pa_seen') || '{}') } catch (_) { return {} }
   })
@@ -52,7 +52,7 @@ export default function App() {
   // 关了就报警、开回来就自动消失——不用刷新页面。
   useEffect(() => {
     let alive = true
-    const ping = () => checkBrain().then((ok) => { if (alive) setBrainOk(ok) })
+    const ping = () => checkBrain().then((r) => { if (alive) setBrain(r) })
     ping()
     const iv = setInterval(ping, 20000)
     return () => { alive = false; clearInterval(iv) }
@@ -222,7 +222,12 @@ export default function App() {
       </header>
 
       {/* 一切正常时这里什么都不渲染 */}
-      <Trouble fellBack={fellBack} detail={fellBackDetail} brainDown={brainOk === false} />
+      <Trouble
+        fellBack={fellBack}
+        detail={fellBackDetail}
+        brainDown={brain ? !brain.up : false}
+        brainStale={brain ? brain.stale : false}
+      />
 
       {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
       {area === 'pursue' && !paged && (
@@ -245,6 +250,10 @@ export default function App() {
         <Library entries={lib.entries} concerns={lib.concerns} />
       ) : paged ? (
         <PursuitFocus
+          // key：换一条线就换一个实例。不加的话 React 复用同一个，thinking / text /
+          // 在飞的请求会跨卡片留着——你在 A 卡问完立刻点开 B 卡，B 卡会凭空转起点点，
+          // 而 A 的回复回来时还会塞进你正看着的 B 卡里。
+          key={view.pursuit.id}
           variant="page"
           pursuit={view.pursuit}
           messages={pl.messagesByPursuit[view.pursuit.id]}
@@ -263,6 +272,7 @@ export default function App() {
           {drawered && (
             <aside className="drawer" aria-label={view.pursuit.title}>
               <PursuitFocus
+                key={view.pursuit.id}
                 variant="drawer"
                 pursuit={view.pursuit}
                 messages={pl.messagesByPursuit[view.pursuit.id]}
