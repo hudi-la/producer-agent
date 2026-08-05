@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, actionLine } from '../lib/nextAction.js'
 
@@ -17,7 +17,58 @@ const STAGES = [
 // 一次造卡任务造出来的卡，够多就折成一叠——首页恒静，想看才展开。
 const STACK_MIN = 3
 
-const PAYOFF = { paid: '给钱', access: '给圈子', both: '钱 + 圈子' }
+// 「钱还是圈子」不在卡上了——它是决定要不要推的依据，不是每天扫看板要看的东西。
+// 移到了详情页的事实区（PursuitFocus 的 Facts）。
+
+// 随手记的几个字。就地写，不用点进卡里——「记一笔」这件事一旦要跳页就不会发生。
+function Jot({ p, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(p.jot || '')
+
+  // 别人改了这张卡（Fairwind 后台、或另一个标签页），没在编辑就跟着更新
+  useEffect(() => { if (!editing) setText(p.jot || '') }, [p.jot, editing])
+
+  const commit = () => {
+    setEditing(false)
+    const t = text.trim()
+    if (t !== (p.jot || '')) onSave?.(p, t)
+  }
+
+  const stop = (e) => e.stopPropagation()   // 卡整体可点，这一小块不能连带触发
+
+  if (editing) {
+    return (
+      <textarea
+        className="pc-jot-in"
+        value={text}
+        autoFocus
+        rows={2}
+        placeholder="记几个字……"
+        onClick={stop}
+        onMouseDown={stop}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          e.stopPropagation()
+          // Enter 存，Shift+Enter 换行，Esc 放弃这次修改
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); commit() }
+          if (e.key === 'Escape') { setText(p.jot || ''); setEditing(false) }
+        }}
+      />
+    )
+  }
+
+  return (
+    <button
+      className={'pc-jot' + (p.jot ? ' has' : '')}
+      onClick={(e) => { stop(e); setEditing(true) }}
+      onMouseDown={stop}
+      title={p.jot ? '点一下改' : '记几个字'}
+    >
+      {p.jot || '＋ 记一笔'}
+    </button>
+  )
+}
 
 function statusText(p) {
   if (!p.eligible && (p.stage === 'pending' || p.stage === 'matching')) return 'O-1 · 资格搁置'
@@ -34,7 +85,7 @@ function statusText(p) {
   }
 }
 
-function PCard({ p, onOpen, onDragStart, onTick, unseen }) {
+function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen }) {
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
   const ball = ballOf(p)
@@ -90,8 +141,8 @@ function PCard({ p, onOpen, onDragStart, onTick, unseen }) {
       ) : (
         <div className="pc-ddl none">无固定截止</div>
       )}
-      {p.payoff && <div className="pc-payoff">{PAYOFF[p.payoff]}</div>}
       {p.work_title && <div className="pc-p">{p.work_title}</div>}
+      <Jot p={p} onSave={onJot} />
       <div className="pc-m" style={p.stage === 'won' ? { color: 'var(--good)' } : undefined}>
         <span className={'src' + (p.source === 'manual' ? '' : ' scout')} aria-hidden="true" />
         {p.contact_name ? p.contact_name + ' · ' : ''}{statusText(p)}
@@ -101,7 +152,7 @@ function PCard({ p, onOpen, onDragStart, onTick, unseen }) {
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, unseen }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot, unseen }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
@@ -119,13 +170,13 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, unsee
         <span className="stack-chev" aria-hidden="true">{open ? '收起' : '展开'}</span>
       </button>
       {open && items.map((p) => (
-        <PCard p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} unseen={unseen?.has(p.id)} />
+        <PCard p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} onJot={onJot} unseen={unseen?.has(p.id)} />
       ))}
     </div>
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, unseen = new Set() }) {
+export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, onJot, unseen = new Set() }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -193,10 +244,11 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick,
                   onOpen={onOpen}
                   onDragStart={onDragStart}
                   onTick={onTick}
+                  onJot={onJot}
                   unseen={unseen}
                 />
               ) : (
-                <PCard p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} unseen={unseen.has(row.card.id)} />
+                <PCard p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} onJot={onJot} unseen={unseen.has(row.card.id)} />
               )
             )}
           </div>

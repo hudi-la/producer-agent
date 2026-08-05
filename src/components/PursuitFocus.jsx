@@ -4,11 +4,15 @@ import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { doneAction } from '../lib/nextAction.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 
+// remark-breaks：单个换行就换行。标准 markdown 里单换行等于空格，
+// 可 Fairwind 和 scout 写进库的东西是按行分的（「**流程**：…\n**判断**：…」），
+// 不加这个插件，三行会被粘成一坨——你截图里看到的就是这个。
 function Md({ children }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkBreaks]}
       components={{ a: (props) => <a target="_blank" rel="noreferrer" {...props} /> }}
     >
       {children || ''}
@@ -23,6 +27,7 @@ const STAGE_LABELS = {
 const STAGE_ORDER = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused']
 
 const srcLabel = (s) => (s === 'manual' ? '你丢的' : 'scout')
+const PAYOFF = { paid: '给钱', access: '给圈子', both: '钱 + 圈子' }
 
 function Facts({ p }) {
   const stars = p.match_stars ? '★'.repeat(p.match_stars) : null
@@ -34,6 +39,8 @@ function Facts({ p }) {
       {p.org && <span className="pf"><i>机构</i>{p.org}</span>}
       {p.location && <span className="pf"><i>地点</i>{p.location}</span>}
       {p.funding && <span className="pf"><i>资助</i>{p.funding}</span>}
+      {/* 从卡面撤下来的——它是决定要不要推的依据，该在这儿而不是天天占卡上一行 */}
+      {p.payoff && <span className="pf"><i>回报</i>{PAYOFF[p.payoff] || p.payoff}</span>}
       {stars && <span className="pf"><i>匹配</i>{stars}</span>}
       <span className="pf"><i>来源</i>{srcLabel(p.source)}</span>
       <span className="pf"><i>主打作品</i>{p.work_title || '待定'}</span>
@@ -80,7 +87,13 @@ function emptyText(stage) {
   return '这条机会线还没有往来。我这就开始。'
 }
 
-export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onSetBall }) {
+// 两种装法，同一套内容：
+//   drawer —— 从右边划出来盖在看板上，看板还在旁边，可以一张接一张点过去
+//   page   —— 整页（新标签页里 ?p=<id> 打开的就是这个），留给你要长时间写东西的时候
+// 现在两者装的东西一样，只差宽度。等作品链、文档、邮件单独成栏做出来，
+// 整页才会长出抽屉装不下的部分。
+export default function PursuitFocus({ pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall }) {
+  const inDrawer = variant === 'drawer'
   const [msgs, setMsgs] = useState(messages || [])
   const [text, setText] = useState('')
   const [thinking, setThinking] = useState(false)
@@ -164,9 +177,13 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
   }
 
   return (
-    <div className="focus">
+    <div className={'focus ' + variant}>
       <div className="focus-top">
-        <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
+        {inDrawer ? (
+          <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+        ) : (
+          <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
+        )}
         <span style={{ flex: 1 }} />
         {/* 球在谁那边。Fairwind 自己贴一个，贴错了直接改掉——没有「谁来判断」这个选项。
             两个都不亮 = 还没有依据（既没往来也没跟进日），你可以自己定一个。 */}
@@ -192,6 +209,11 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
             {STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
           </select>
         </label>
+        {inDrawer && (
+          <button className="expand" onClick={() => onExpand?.(p)} title="在新标签页里整页打开">
+            整页 <span aria-hidden="true">↗</span>
+          </button>
+        )}
       </div>
       <div className="focus-scroll">
         <div className="focus-inner">
@@ -201,8 +223,10 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
             {/* 勾掉的待办不从卡面消失就完事——这条线上你做过什么，得留得住。 */}
             {done && <p className="pf-done">✓ {done.text} <span>· {done.at}完成</span></p>}
             {p.last_touch_at && <p className="pf-done">✓ 已碰过 <span>· {p.last_touch_at}</span></p>}
-            {p.why && <p className="pf-why">{p.why}</p>}
-            {p.notes && <p className="pf-notes">{p.notes}</p>}
+            {/* why / notes 库里存的就是 markdown（带加粗、按行分段），
+                原来直接当纯文本塞进 <p>，所以星号露在外面、几行被压成一坨。 */}
+            {p.why && <div className="pf-why md"><Md>{p.why}</Md></div>}
+            {p.notes && <div className="pf-notes md"><Md>{p.notes}</Md></div>}
           </div>
 
           {msgs.length === 0 && !busy ? (

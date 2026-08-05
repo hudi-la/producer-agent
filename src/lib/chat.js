@@ -67,6 +67,14 @@ export async function setActionDone(pursuitId, done) {
   return { ok: true, done }
 }
 
+/** 卡上随手记的几个字。传空字符串 = 清掉。 */
+export async function setJot(pursuitId, jot) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { error } = await supa.rpc('pa_set_jot', { p_pursuit_id: pursuitId, p_jot: jot ?? '' })
+  if (error) throw new Error(error.message)
+  return { ok: true }
+}
+
 /** 「碰过了」：记下今天碰的，并把待碰日清掉。没有撤销。 */
 export async function markTouched(pursuitId) {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')

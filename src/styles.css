@@ -8,6 +8,8 @@
   --serif:"Iowan Old Style","Charter","Palatino","Songti SC",Georgia,serif;
   --sans:"Avenir Next","Segoe UI",system-ui,"PingFang SC","Hiragino Sans GB",sans-serif;
   --shadow:0 1px 2px #241f1b0c,0 12px 34px -20px #241f1b2b;
+  /* 机会线抽屉的宽度。看板的右内边距也吃这个值，改一处两边一起动。 */
+  --drawer-w:max(400px, 33vw);
 }
 @media (prefers-color-scheme: dark){:root{
   --paper:#17141A; --paper-2:#211D25; --paper-3:#100E13; --ink:#EBE3D4; --ink-2:#A99E8B; --ink-3:#6F6556;
@@ -80,7 +82,18 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tr-fix code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; background: color-mix(in srgb, var(--ink) 9%, transparent); padding: 1px 6px; border-radius: 4px; }
 
 /* ── pipeline board ── */
-.board { flex: 1; min-height: 0; overflow: auto; display: flex; gap: 18px; padding: 26px 24px 40px; align-items: stretch; }
+.board { flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; gap: 18px; padding: 26px 24px 40px; align-items: stretch; }
+/* 给看板补一段右内边距，末尾那几列才滑得出抽屉底下——
+   不补的话「谈成」「暂停处理」两列就永远够不着了。 */
+.wrap.drawered .board { padding-right: calc(var(--drawer-w) + 24px); }
+
+/* 从右侧贴边落下来的一整条，顶到窗口最上沿（连顶栏一起盖住）。
+   宽度就是一句 --drawer-w：33vw，窄窗口不低于 400px。嫌窄改这一个数。 */
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: var(--drawer-w); max-width: 100%;
+  display: flex; z-index: 20; background: var(--paper);
+  border-left: 1px solid var(--line-2); box-shadow: -20px 0 50px -30px #241f1b8c;
+  animation: drawer-in .22s cubic-bezier(.4,0,.2,1); }
+@keyframes drawer-in { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
 .col { flex: 0 0 216px; display: flex; flex-direction: column; }
 .col-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 13px; padding: 0 2px; }
 .col-h .cn { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; font-weight: 600; color: var(--ink-2); }
@@ -107,8 +120,25 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pcard.opencall::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; background: var(--mark-blue); }
 
 /* ── pursuit focus ── */
-.focus { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+/* 一条机会线有两种装法，内容完全一样，只差正文宽度和「看板还在不在旁边」：
+     .focus.page   整页（新标签页 ?p=<id>）—— 留给你要长时间写东西的时候
+     .focus.drawer 右边划出来的抽屉 —— 看一眼、回一句，看完接着点下一张
+   --focus-col / --focus-pad 让正文列和输入框始终对齐，不用两处各写一遍宽度。 */
+.focus { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative;
+         --focus-col: 720px; --focus-pad: 26px; }
+.focus.drawer { --focus-col: 100%; --focus-pad: 22px; }
 .focus-top { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); flex: none; }
+/* 三分之一宽里塞四个控件（收起 / 球权 / 阶段 / 整页），横向很紧：
+   「收起」只留 ✕、「阶段」两个字省掉（下拉自己就写着「待批准」，不用再标一遍）。
+   还是挤不下就换行——宁可多一行，也别让下拉和开关被压变形。 */
+.focus.drawer .focus-top { padding: 12px 14px; gap: 10px; flex-wrap: wrap; row-gap: 8px; }
+.focus.drawer .back { font-size: 15px; }
+.focus.drawer .back .t { display: none; }
+.focus.drawer .stg-lbl { font-size: 0; gap: 0; }
+/* 「整页 ↗」：抽屉里唯一一个把你送出去的出口，所以给它边框、跟旁边的开关区分开 */
+.expand { font: inherit; font-size: 12px; color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 5px 10px; cursor: pointer; flex: none; }
+.expand:hover { color: var(--ink); border-color: var(--accent); }
+.expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .focus-top .back { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .focus-top .back:hover { color: var(--ink); }
 .focus-top .stg { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
@@ -116,7 +146,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .stg-sel { font: inherit; font-size: 12.5px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--accent); background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
 .stg-sel:hover { border-color: var(--accent); }
 .focus-scroll { flex: 1; min-height: 0; overflow-y: auto; }
-.focus-inner { max-width: 560px; margin: 0 auto; padding: 30px 26px 120px; }
+.focus-inner { max-width: var(--focus-col); margin: 0 auto; padding: 30px var(--focus-pad) 120px; }
 .fh h1 { font-family: var(--serif); font-weight: 600; font-size: 25px; line-height: 1.2; margin: 0 0 10px; letter-spacing: .005em; }
 .fh .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 26px; }
 .fh .facts b { color: var(--ink); }
@@ -145,7 +175,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .draft-body { padding: 15px 16px; }
 .draft-body p { margin: 0; font-family: var(--serif); font-size: 14.5px; line-height: 1.62; }
 
-.composer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; width: min(560px, calc(100% - 52px)); display: flex; align-items: center; gap: 12px; background: color-mix(in srgb, var(--paper-2) 92%, transparent); border: 1px solid var(--line-2); border-radius: 999px; padding: 11px 12px 11px 20px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+.composer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; width: min(var(--focus-col), calc(100% - 2 * var(--focus-pad))); display: flex; align-items: center; gap: 12px; background: color-mix(in srgb, var(--paper-2) 92%, transparent); border: 1px solid var(--line-2); border-radius: 999px; padding: 11px 12px 11px 20px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
 .composer .ph { flex: 1; font-size: 13px; color: var(--ink); font-family: inherit; background: none; border: none; outline: none; min-width: 0; }
 .composer .ph::placeholder { color: var(--ink-3); }
 .composer .ph:disabled { color: var(--ink-3); }
@@ -244,7 +274,20 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pc-ddl.none { color: var(--ink-3); font-weight: 400; }
 /* 主动外联没有截止推着走，唯一的引擎是「该碰了」——所以这一行要比截止更醒目。 */
 .pc-ddl.due { color: var(--accent); }
-.pc-payoff { font-size: 10.5px; color: var(--ink-3); margin-top: 5px; letter-spacing: .04em; }
+/* ── 随手记的几个字 ──
+   空的时候是一行几乎看不见的「＋ 记一笔」，只在鼠标扫过卡片时才浮出来——
+   33 张卡上挂 33 个提示是噪音。写了字就一直显示，那是你自己的话。 */
+.pc-jot { display: block; width: 100%; text-align: left; font: inherit; font-size: 11.5px;
+  line-height: 1.5; background: none; border: none; padding: 0; margin-top: 7px;
+  cursor: text; white-space: pre-wrap; word-break: break-word; }
+.pc-jot:not(.has) { color: var(--ink-3); opacity: 0; transition: opacity .14s; }
+.pcard:hover .pc-jot:not(.has), .pc-jot:not(.has):focus-visible { opacity: .7; }
+.pc-jot.has { color: var(--ink-2); font-style: italic;
+  border-left: 2px solid var(--line-2); padding-left: 8px; }
+.pc-jot:hover { color: var(--ink); }
+.pc-jot-in { display: block; width: 100%; font: inherit; font-size: 11.5px; line-height: 1.5;
+  margin-top: 7px; padding: 6px 8px; resize: vertical; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--accent); border-radius: 7px; outline: none; }
 
 /* ── 「该干什么」那一行 ──
    一张卡只说一句，说的时候必须有确切依据。能勾的做成勾选框——
@@ -316,8 +359,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pf.held { color: var(--ink-3); border-style: dashed; }
 .pf-done { font-size: 12.5px; color: var(--good); font-weight: 600; margin: 0 0 10px; }
 .pf-done span { color: var(--ink-3); font-weight: 400; }
-.pf-why { font-family: var(--serif); font-size: 14.5px; line-height: 1.55; color: var(--ink); margin: 0 0 10px; }
-.pf-notes { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin: 0 0 12px; }
+.pf-why { font-family: var(--serif); font-size: 14.5px; color: var(--ink); margin: 0 0 14px; }
+/* notes 是正文，不是脚注——跟对话气泡同号。加粗的小标题靠 .md strong 提到 --ink，
+   比周围的 --ink-2 深一档，扫的时候一眼能找到「流程」「判断」在哪儿。 */
+.pf-notes { font-size: 13.5px; color: var(--ink-2); margin: 0 0 16px; }
 .pf-a { color: var(--accent); text-decoration: none; }
 .pf-a:hover { border-color: var(--accent); }
 .pfacts { margin-bottom: 18px; }
@@ -325,7 +370,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* ── markdown in messages ── */
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
-.md p { margin: 0 0 8px; }
+/* 段间距 16px + 行高 1.65：同段内两行隔 22px，跨段隔 38px，1.7 倍，眼睛读得出来。
+   原来是 8px + 继承来的行高，跨段只比同段多 8px（1.37 倍）——一屏字看着是均匀的一片，
+   分不出哪儿是一段的结束。 */
+.md p { margin: 0 0 16px; line-height: 1.65; }
 .md strong { font-weight: 700; color: var(--ink); }
 .md em { font-style: italic; }
 .md a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }

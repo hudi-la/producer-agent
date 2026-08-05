@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
-import { setStage, setBall, setActionDone, markTouched } from './lib/chat.js'
+import { setStage, setBall, setActionDone, markTouched, setJot } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -71,7 +71,9 @@ export default function App() {
     const pid = new URLSearchParams(window.location.search).get('p')
     if (!pid) { focusedOnceRef.current = true; return }
     const p = pl.pursuits.find((x) => x.id === pid)
-    if (p) { focusedOnceRef.current = true; markSeen(pid); setView({ name: 'pursuit', pursuit: p }) }
+    // 带 ?p= 打开的标签页是「整页」那一档——你专门为这条线开了个标签页，
+    // 就别再给它旁边塞半个看板。
+    if (p) { focusedOnceRef.current = true; markSeen(pid); setView({ name: 'pursuit', pursuit: p, mode: 'page' }) }
   }, [pl])
 
   // 别的标签页把某张卡标成「已看」时，这个标签页的小红点也跟着清掉。
@@ -87,7 +89,13 @@ export default function App() {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
       if (tasksOpen) setTasksOpen(false)
-      else if (view.name === 'pursuit') setView({ name: 'home' })
+      // Esc 是关抽屉最顺手的动作，所以它得跟点「收起」做一样的事——
+      // 也标已看、也把 ?p= 从地址栏抹掉。原来它只换了 view，小红点会赖着不走。
+      else if (view.name === 'pursuit') {
+        markSeen(view.pursuit.id)
+        window.history.replaceState(null, '', window.location.pathname)
+        setView({ name: 'home' })
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -98,7 +106,11 @@ export default function App() {
   // 哪个 loader 先出的问题就报哪个——机会线优先，那是主战场。
   const fellBack = pl.reason || lib.reason || tk.reason || null
   const fellBackDetail = pl.reason ? pl.detail : lib.reason ? lib.detail : tk.detail
-  const openPursuit = (p) => {
+  // 点卡片：右边划出抽屉，看板留在左边——大多数时候你只是想看一眼这条线怎么样了，
+  // 看完接着看下一张。整页换掉太重。
+  const openPursuit = (p) => setView({ name: 'pursuit', pursuit: p, mode: 'drawer' })
+  // 「整页」：还是新开一个标签页（?p=<id>）。好处是几条线可以各占一个标签页并排看。
+  const expandPursuit = (p) => {
     const url = new URL(window.location.href)
     url.searchParams.set('p', p.id)
     window.open(url.toString(), '_blank')
@@ -151,6 +163,18 @@ export default function App() {
     }
   }
 
+  // 卡上随手记的几个字。写失败要把原文还回去——你刚打的字不能因为网络就没了。
+  const jotCard = async (p, jot) => {
+    const prev = pl.pursuits
+    setPl({ ...pl, pursuits: prev.map((x) => (x.id === p.id ? { ...x, jot: jot || null } : x)) })
+    try {
+      await setJot(p.id, jot)
+    } catch (e) {
+      setPl({ ...pl, pursuits: prev })
+      alert('这一笔没记上：' + e.message + '\n\n你写的是：' + jot)
+    }
+  }
+
   // 改球权那个标。同样先乐观更新，写失败回滚 + 提示。
   // ball_eff 是库算出来的「球在谁那边」，界面读的就是它——乐观更新得连它一起改，
   // 不然点完标不动，看着像没生效。
@@ -165,8 +189,12 @@ export default function App() {
     }
   }
 
+  const onPursuit = area === 'pursue' && view.name === 'pursuit'
+  const paged = onPursuit && view.mode === 'page'     // 整页：看板让位
+  const drawered = onPursuit && !paged                // 抽屉：看板留着
+
   return (
-    <div className="wrap">
+    <div className={'wrap' + (drawered ? ' drawered' : '')}>
       <header className="app-top">
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label="主区">
@@ -186,8 +214,8 @@ export default function App() {
       {/* 一切正常时这里什么都不渲染 */}
       <Trouble fellBack={fellBack} detail={fellBackDetail} brainDown={brainOk === false} />
 
-      {/* 一条机会线是全屏的，进去了就不该还看见看板的工具条 */}
-      {area === 'pursue' && view.name === 'home' && (
+      {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
+      {area === 'pursue' && !paged && (
         <div className="subbar">
           {/* 这四个筛选还没接上，先占位——怎么筛你还在想。 */}
           <div className="tabs">
@@ -205,19 +233,37 @@ export default function App() {
         <People tasks={tk.tasks.filter(isPeopleTask)} pursuits={pl.pursuits} />
       ) : area === 'profile' ? (
         <Library entries={lib.entries} concerns={lib.concerns} />
-      ) : view.name === 'home' ? (
-        // 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
-        // 「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
-        // 不能挂在某个列名上——否则用户一改列，提示就跟着错。
-        <Pipeline pursuits={pl.pursuits} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} unseen={unseen} />
-      ) : (
+      ) : paged ? (
         <PursuitFocus
+          variant="page"
           pursuit={view.pursuit}
           messages={pl.messagesByPursuit[view.pursuit.id]}
           onBack={closePursuit}
           onMove={moveCard}
           onSetBall={markBall}
         />
+      ) : (
+        <>
+          {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
+              「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
+              不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
+          <Pipeline pursuits={pl.pursuits} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} onJot={jotCard} unseen={unseen} />
+          {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
+          {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
+          {drawered && (
+            <aside className="drawer" aria-label={view.pursuit.title}>
+              <PursuitFocus
+                variant="drawer"
+                pursuit={view.pursuit}
+                messages={pl.messagesByPursuit[view.pursuit.id]}
+                onBack={closePursuit}
+                onExpand={expandPursuit}
+                onMove={moveCard}
+                onSetBall={markBall}
+              />
+            </aside>
+          )}
+        </>
       )}
 
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
