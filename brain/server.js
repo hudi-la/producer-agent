@@ -11,7 +11,9 @@ import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
-const PORT = Number(process.env.BRAIN_PORT || 8787)
+// 默认值必须和前端 backends.js 里的 BRAIN 对得上。两边默认值不一致的话，
+// brain/.env 一丢，脑子听一个端口、界面敲另一个，结果是永远误报「脑子没开」。
+const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env

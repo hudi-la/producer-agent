@@ -1,15 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-
 // 分工：
 //  · 读 + 「你自己改自己卡上的字段」(stage / ball) —— 浏览器直连，走 anon。
 //    后者靠 security definer 函数，能改的列是写死的，anon 拿不到别的写权限。
 //  · 「渡去想」(chat / brief) —— 走本机 sidecar，因为那需要 service_role
 //    往往来历史里写消息，且要跑 agent。
-const url = import.meta.env.VITE_SUPABASE_URL
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supa = url && anon ? createClient(url, anon) : null
-
-const BRAIN = import.meta.env.VITE_BRAIN_URL || 'http://localhost:8788'
+import { supa, BRAIN } from './backends.js'
 
 /** 拉这条机会线最新的往来。没连库时返回 null（保留调用方手上的种子数据）。 */
 export async function fetchMessages(pursuitId) {

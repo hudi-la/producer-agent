@@ -1,18 +1,16 @@
-import { createClient } from '@supabase/supabase-js'
+import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
 import { TASKS_SEED } from '../data/tasksSeed.js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supa = url && anon ? createClient(url, anon) : null
+const seed = (reason, detail) => ({ tasks: TASKS_SEED, source: 'seed', reason, detail })
 
 export async function loadTasks() {
-  if (supa) {
-    try {
-      const { data, error } = await supa.from('v_pa_tasks').select('*').order('sort')
-      if (!error && data && data.length) return { tasks: data, source: 'live' }
-    } catch (_) {
-      // fall through
-    }
+  if (!DB_CONFIGURED) return seed(FELL_BACK.NO_CONFIG)
+  try {
+    const { data, error } = await supa.from('v_pa_tasks').select('*').order('sort')
+    if (error) return seed(FELL_BACK.QUERY_FAILED, error.message)
+    if (!data || !data.length) return seed(FELL_BACK.EMPTY)
+    return { tasks: data, source: 'live', reason: null }
+  } catch (e) {
+    return seed(FELL_BACK.QUERY_FAILED, e.message)
   }
-  return { tasks: TASKS_SEED, source: 'seed' }
 }

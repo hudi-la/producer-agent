@@ -9,7 +9,9 @@ import Library from './components/Library.jsx'
 import People from './components/People.jsx'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
+import Trouble from './components/Trouble.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
+import { checkBrain } from './lib/backends.js'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -27,6 +29,8 @@ export default function App() {
   const [view, setView] = useState({ name: 'home' })
   const [area, setArea] = useState('pursue')
   const [tasksOpen, setTasksOpen] = useState(false)
+  // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
+  const [brainOk, setBrainOk] = useState(null)
   const [seen, setSeen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pa_seen') || '{}') } catch (_) { return {} }
   })
@@ -42,6 +46,16 @@ export default function App() {
     loadLibrary().then(setLib)
     loadPursuits().then(setPl)
     loadTasks().then(setTk)
+  }, [])
+
+  // 脑子是本机进程，你随时会把那个终端关掉。每 20 秒探一次，
+  // 关了就报警、开回来就自动消失——不用刷新页面。
+  useEffect(() => {
+    let alive = true
+    const ping = () => checkBrain().then((ok) => { if (alive) setBrainOk(ok) })
+    ping()
+    const iv = setInterval(ping, 20000)
+    return () => { alive = false; clearInterval(iv) }
   }, [])
 
   // 看板每 8 秒刷一次机会线——渡在后台想完的回复、别处的改动都会自动进来，
@@ -81,7 +95,9 @@ export default function App() {
 
   if (!lib || !pl || !tk) return <div className="wrap"><div className="loading">载入中……</div></div>
 
-  const source = pl.source === 'live' && lib.source === 'live' ? 'live' : 'seed'
+  // 哪个 loader 先出的问题就报哪个——机会线优先，那是主战场。
+  const fellBack = pl.reason || lib.reason || tk.reason || null
+  const fellBackDetail = pl.reason ? pl.detail : lib.reason ? lib.detail : tk.detail
   const openPursuit = (p) => {
     const url = new URL(window.location.href)
     url.searchParams.set('p', p.id)
@@ -145,8 +161,10 @@ export default function App() {
           ))}
         </nav>
         <span className="sp" />
-        <span className={'srcbadge ' + source}>{source === 'live' ? '已连 Supabase' : '种子数据'}</span>
       </header>
+
+      {/* 一切正常时这里什么都不渲染 */}
+      <Trouble fellBack={fellBack} detail={fellBackDetail} brainDown={brainOk === false} />
 
       {/* 一条机会线是全屏的，进去了就不该还看见看板的工具条 */}
       {area === 'pursue' && view.name === 'home' && (
