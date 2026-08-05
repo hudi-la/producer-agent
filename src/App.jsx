@@ -58,6 +58,16 @@ export default function App() {
     return () => { alive = false; clearInterval(iv) }
   }, [])
 
+  // 正看着的这张，随时算已看。
+  //
+  // 原来只在「关掉详情」时标一次，可抽屉是开着不关、一张接一张过的——
+  // 从 A 卡直接点 B 卡，A 从来没被标记过，于是它一不再是「当前这张」，
+  // 小红点立刻就回来了：你明明读过了，它还说你没读。
+  // 跟着 pl 走（每 8 秒一刷），所以你读着的时候进来的新回复也算读过了。
+  useEffect(() => {
+    if (view.name === 'pursuit' && view.pursuit?.id) markSeen(view.pursuit.id)
+  }, [view.name, view.pursuit?.id, pl])
+
   // 看板每 8 秒刷一次机会线——Fairwind 在后台想完的回复、别处的改动都会自动进来，
   // 不用你手动刷新。
   useEffect(() => {

@@ -105,10 +105,23 @@ export default function PursuitFocus({ pursuit: p, messages, variant = 'page', o
   const done = doneAction(p)
   const endRef = useRef(null)
 
-  // 「 Fairwind 在想」从消息推导：最后一条是你发的 = Fairwind 还欠你一条回复。
-  // 这样即使你离开再回来，也照样显示在想——状态不靠本地内存的临时 flag。
-  const lastIsArtist = msgs.length > 0 && msgs[msgs.length - 1].role === 'artist'
-  const busy = thinking || lastIsArtist
+  // 「在想」不能靠猜。
+  //
+  // 原来的判断是「最后一条是你发的 = 它欠你一条回复」，于是只要有一次没想完
+  // （脑子崩了 / 超时 / 你关了页面），那条线就永远显示三个点——而且输入框跟着
+  // 永久禁用，你连再说一遍都做不到，整条线就此锁死。三个点是猜的，不是真有东西在跑。
+  //
+  // 现在：只有「刚发出去、还在合理等待窗口内」才算在想。超过这个窗口就承认
+  // 它没回，把输入框还给你。另外限定 kind='message'——你发给机构的真实邮件
+  // （role='artist', kind='email'）不是在跟 Fairwind 说话，不该触发「在想」。
+  const STALE_MS = 3 * 60 * 1000   // 联网研究最久见过 30–60 秒，3 分钟还没回就是死了
+  const lastMsg = msgs.length ? msgs[msgs.length - 1] : null
+  const awaiting = !!lastMsg && lastMsg.role === 'artist' && (lastMsg.kind || 'message') === 'message'
+  const waitedMs = awaiting && lastMsg.created_at
+    ? Date.now() - new Date(lastMsg.created_at).getTime()
+    : 0   // 乐观插入的临时消息还没有 created_at，当作刚发出
+  const busy = thinking || (awaiting && waitedMs < STALE_MS)
+  const stalled = awaiting && !thinking && waitedMs >= STALE_MS
 
   // 换一条线：先用手上的，再从库里拉最新（别的地方写进来的卡也能看见）。
   // 「讲懂」不在这儿触发了——脑子在后台把待批准的卡先读好，你点开时它已经在库里。
@@ -234,6 +247,13 @@ export default function PursuitFocus({ pursuit: p, messages, variant = 'page', o
           ) : (
             <div className="thread">
               {msgs.map((m, i) => <Message m={m} key={m.id || i} />)}
+              {/* 没在想、又确实欠着一条回复——说实话，别拿三个点糊弄过去 */}
+              {stalled && (
+                <div className="stalled">
+                  Fairwind 没回这条（多半是当时脑子没开，或者那次想崩了）。
+                  <b>再说一次就行</b>——它带着这条线的全部往来，你不用重讲。
+                </div>
+              )}
               {busy && (
                 <div className="msg producer">
                   <span className="who">Fairwind</span>
