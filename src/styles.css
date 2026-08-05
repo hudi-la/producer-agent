@@ -246,6 +246,17 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pc-ddl.due { color: var(--accent); }
 .pc-payoff { font-size: 10.5px; color: var(--ink-3); margin-top: 5px; letter-spacing: .04em; }
 
+/* ── 「该干什么」那一行 ──
+   一张卡只说一句，说的时候必须有确切依据。能勾的做成勾选框——
+   提醒只会烦你，待办能被划掉，划掉是有快感的。 */
+.pc-act { display: flex; align-items: flex-start; gap: 7px; margin-top: 7px; font-size: 12px; line-height: 1.45; color: var(--ink-2); text-align: left; }
+.pc-act.urgent { color: var(--accent); font-weight: 600; }
+.pc-act.tickable { width: 100%; font-family: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+.pc-act .tick { width: 13px; height: 13px; border-radius: 4px; border: 1.5px solid currentColor; flex: none; margin-top: 2px; opacity: .55; transition: opacity .14s, background .14s; }
+.pc-act.tickable:hover .tick { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
+.pc-act.tickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.pc-act-t { min-width: 0; }
+
 /* ── 球在谁那边 ──
    放在标题上方、当卡片的第一行——因为「现在该谁动」比标题更早需要被看见。
    待处理用暖色（要你动），等回复用灰（不用管）。手动钉住的加一个小点区分。 */
@@ -256,8 +267,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pc-ball.me .bd { background: var(--accent); }
 .pc-ball.them { color: var(--ink-3); }
 .pc-ball.them .bd { background: var(--line-2); }
-.pc-ball.pinned::after { content: '钉'; font-size: 9px; color: var(--ink-3); font-weight: 400;
-  border: 1px solid var(--line-2); border-radius: 4px; padding: 0 3px; margin-left: 2px; }
 
 /* 详情页顶栏的手动开关：三档 自动 / 待处理 / 等回复 */
 .ballsw { display: inline-flex; border: 1px solid var(--line-2); border-radius: 9px;
@@ -306,6 +315,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pf.warn { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 35%, transparent); }
 .pf.warn i { color: color-mix(in srgb, var(--wait) 70%, var(--ink-3)); }
 .pf.held { color: var(--ink-3); border-style: dashed; }
+.pf-done { font-size: 12.5px; color: var(--good); font-weight: 600; margin: 0 0 10px; }
+.pf-done span { color: var(--ink-3); font-weight: 400; }
 .pf-why { font-family: var(--serif); font-size: 14.5px; line-height: 1.55; color: var(--ink); margin: 0 0 10px; }
 .pf-notes { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin: 0 0 12px; }
 .pf-a { color: var(--accent); text-decoration: none; }

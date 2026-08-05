@@ -53,6 +53,26 @@ export async function setBall(pursuitId, ball) {
   return { ok: true, ball: ball ?? null }
 }
 
+/**
+ * 勾掉 / 取消勾「下一步」。
+ * 勾掉只写时间戳，next_action 的原文一个字不动——所以取消勾还能回来，
+ * 详情页也仍看得到你做过这件事。
+ */
+export async function setActionDone(pursuitId, done) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { error } = await supa.rpc('pa_set_action_done', { p_pursuit_id: pursuitId, p_done: done })
+  if (error) throw new Error(error.message)
+  return { ok: true, done }
+}
+
+/** 「碰过了」：记下今天碰的，并把待碰日清掉。没有撤销。 */
+export async function markTouched(pursuitId) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { error } = await supa.rpc('pa_mark_touched', { p_pursuit_id: pursuitId })
+  if (error) throw new Error(error.message)
+  return { ok: true }
+}
+
 /** 移卡：改这条线的阶段。 */
 export async function setStage(pursuitId, stage) {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')

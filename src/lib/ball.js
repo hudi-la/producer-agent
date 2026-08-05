@@ -7,7 +7,7 @@ export function ballOf(p) {
   return p.ball || p.ball_auto || null
 }
 
-/** 这条线的球权是手动钉住的吗（用来在详情页显示「自动 / 手动」）。 */
-export function isManual(p) {
-  return !!p.ball
-}
+// 原来这儿有个 isManual()，卡上据此画一个「钉」角标，表示球权是手动定的。
+// 撤了：它回答的是「这个判断从哪来」，而你扫看板时要的是「球在谁那边」——
+// 来源不改变你的动作。而且 33 张里只有 3 张显示球权、其中 2 张是手动的，
+// 这个角标已经区分不出任何东西了。

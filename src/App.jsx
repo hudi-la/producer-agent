@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
-import { setStage, setBall } from './lib/chat.js'
+import { setStage, setBall, setActionDone, markTouched } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -133,6 +133,24 @@ export default function App() {
     }
   }
 
+  // 勾掉「下一步」。做完一件事该立刻看见它被划掉，所以先动界面再写库。
+  //   action —— 只写完成时间戳，next_action 原文留着（详情页仍看得见，也能取消勾）
+  //   touch  —— 记下今天碰过了，把待碰日清掉。这个没有撤销。
+  const tickAction = async (p, what) => {
+    const prev = pl.pursuits
+    const patch = what === 'touch'
+      ? { last_touch_at: new Date().toISOString().slice(0, 10), next_touch_at: null }
+      : { next_action_done_at: new Date().toISOString() }
+    setPl({ ...pl, pursuits: prev.map((x) => (x.id === p.id ? { ...x, ...patch } : x)) })
+    try {
+      if (what === 'touch') await markTouched(p.id)
+      else await setActionDone(p.id, true)
+    } catch (e) {
+      setPl({ ...pl, pursuits: prev })
+      alert('没勾上：' + e.message)
+    }
+  }
+
   // 手动钉住球权（null = 交还自动）。同样先乐观更新，写失败回滚 + 提示。
   const markBall = async (id, ball) => {
     const prev = pl.pursuits
@@ -189,7 +207,7 @@ export default function App() {
         // 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
         // 「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
         // 不能挂在某个列名上——否则用户一改列，提示就跟着错。
-        <Pipeline pursuits={pl.pursuits} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} unseen={unseen} />
+        <Pipeline pursuits={pl.pursuits} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} unseen={unseen} />
       ) : (
         <PursuitFocus
           pursuit={view.pursuit}

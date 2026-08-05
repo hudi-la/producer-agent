@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { BALL_LABEL, ballOf, isManual } from '../lib/ball.js'
+import { BALL_LABEL, ballOf } from '../lib/ball.js'
+import { deadlineLine, actionLine } from '../lib/nextAction.js'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
 // 然后发出去、等回信；末尾两个收尾去处——成了 = 谈成，停了 = 暂停处理。
@@ -33,57 +34,74 @@ function statusText(p) {
   }
 }
 
-// 主动外联没有截止逼你，唯一的引擎是「这条该碰了」。
-function touch(p) {
-  if (!p.next_touch_at) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const at = new Date(p.next_touch_at + 'T00:00:00')
-  const days = Math.round((at - today) / 86400000)
-  if (days <= 0) return { text: '该跟进了', due: true }
-  if (days === 1) return { text: '明天跟进', due: false }
-  return { text: days + ' 天后跟进', due: false }
-}
-
-function PCard({ p, onOpen, onDragStart, unseen }) {
+function PCard({ p, onOpen, onDragStart, onTick, unseen }) {
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
-  const t = touch(p)
   const ball = ballOf(p)
+  const ddl = deadlineLine(p)
+  const act = actionLine(p)
+
+  // 卡整体是个可点的东西，但里面还嵌了个勾选框——button 套 button 是非法的，
+  // 所以外层用 div + role，键盘操作自己接。
+  const open = () => onOpen(p)
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() }
+  }
+
   return (
-    <button
+    <div
       className={'pcard' + (opencall ? ' opencall' : '')}
       style={dim ? { opacity: 0.58 } : undefined}
+      role="button"
+      tabIndex={0}
       draggable
       onDragStart={(e) => onDragStart(e, p)}
-      onClick={() => onOpen(p)}
+      onClick={open}
+      onKeyDown={onKey}
     >
       {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
       {/* 球在谁那边——stage 说的是走到哪一格，这个说的是现在该谁动。 */}
       {ball && (
-        <div className={'pc-ball ' + ball + (isManual(p) ? ' pinned' : '')}>
+        <div className={'pc-ball ' + ball}>
           <span className="bd" aria-hidden="true" />{BALL_LABEL[ball]}
         </div>
       )}
       <div className="pc-t">{p.title}</div>
       {p.match_stars ? <div className="pc-stars">{'★'.repeat(p.match_stars)}</div> : null}
-      {/* 截止和跟进是两回事，可以同时挂着（CultureHub：合同等对方回，但营销素材 8/11 到期、球在你这边）。
-          两个都有就都显示——只显示一个会藏掉真正该做的那件事。 */}
-      {p.deadline && <div className="pc-ddl">截止 {p.deadline}</div>}
-      {t && <div className={'pc-ddl' + (t.due ? ' due' : '')}>{t.text}</div>}
-      {!p.deadline && !t && <div className="pc-ddl none">无固定截止</div>}
+
+      {/* 该干什么——一张卡只说一句，而且每句都有确切依据。能勾的就勾掉。 */}
+      {act && (
+        act.tick ? (
+          <button
+            className={'pc-act tickable' + (act.urgent ? ' urgent' : '')}
+            onClick={(e) => { e.stopPropagation(); onTick?.(p, act.tick) }}
+            title="做完了？勾掉"
+          >
+            <span className="tick" aria-hidden="true" />
+            <span className="pc-act-t">{act.text}</span>
+          </button>
+        ) : (
+          <div className={'pc-act' + (act.urgent ? ' urgent' : '')}>{act.text}</div>
+        )
+      )}
+
+      {ddl ? (
+        <div className={'pc-ddl' + (ddl.urgent ? ' due' : '')}>{ddl.text}</div>
+      ) : (
+        <div className="pc-ddl none">无固定截止</div>
+      )}
       {p.payoff && <div className="pc-payoff">{PAYOFF[p.payoff]}</div>}
       {p.work_title && <div className="pc-p">{p.work_title}</div>}
       <div className="pc-m" style={p.stage === 'won' ? { color: 'var(--good)' } : undefined}>
         <span className={'src' + (p.source === 'manual' ? '' : ' scout')} aria-hidden="true" />
         {p.contact_name ? p.contact_name + ' · ' : ''}{statusText(p)}
       </div>
-    </button>
+    </div>
   )
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, unseen }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, unseen }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
@@ -101,13 +119,13 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, unseen }) {
         <span className="stack-chev" aria-hidden="true">{open ? '收起' : '展开'}</span>
       </button>
       {open && items.map((p) => (
-        <PCard p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} unseen={unseen?.has(p.id)} />
+        <PCard p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} unseen={unseen?.has(p.id)} />
       ))}
     </div>
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, unseen = new Set() }) {
+export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, unseen = new Set() }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -174,10 +192,11 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, unseen 
                   onToggle={() => toggleStack(row.stack)}
                   onOpen={onOpen}
                   onDragStart={onDragStart}
+                  onTick={onTick}
                   unseen={unseen}
                 />
               ) : (
-                <PCard p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart} unseen={unseen.has(row.card.id)} />
+                <PCard p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} unseen={unseen.has(row.card.id)} />
               )
             )}
           </div>

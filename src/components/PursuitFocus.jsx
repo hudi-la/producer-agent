@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { fetchMessages, sendMessage } from '../lib/chat.js'
 import { BALL_LABEL } from '../lib/ball.js'
+import { doneAction } from '../lib/nextAction.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -28,6 +29,7 @@ function Facts({ p }) {
   return (
     <div className="pfacts">
       {p.kind && <span className="pf"><i>类型</i>{p.kind}</span>}
+      {p.opens_at && <span className="pf"><i>开放</i>{p.opens_at}</span>}
       {p.deadline && <span className="pf warn"><i>截止</i>{p.deadline}</span>}
       {p.org && <span className="pf"><i>机构</i>{p.org}</span>}
       {p.location && <span className="pf"><i>地点</i>{p.location}</span>}
@@ -86,6 +88,7 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
   const [stage, setStageLocal] = useState(p.stage)
   // 手动球权本地先动，写库由 App 负责回滚。null = 交还给自动判断。
   const [ball, setBallLocal] = useState(p.ball ?? null)
+  const done = doneAction(p)
   const endRef = useRef(null)
 
   // 「 Fairwind 在想」从消息推导：最后一条是你发的 = Fairwind 还欠你一条回复。
@@ -194,6 +197,9 @@ export default function PursuitFocus({ pursuit: p, messages, onBack, onMove, onS
           <div className="fh">
             <h1>{p.title}</h1>
             <Facts p={p} />
+            {/* 勾掉的待办不从卡面消失就完事——这条线上你做过什么，得留得住。 */}
+            {done && <p className="pf-done">✓ {done.text} <span>· {done.at}完成</span></p>}
+            {p.last_touch_at && <p className="pf-done">✓ 已碰过 <span>· {p.last_touch_at}</span></p>}
             {p.why && <p className="pf-why">{p.why}</p>}
             {p.notes && <p className="pf-notes">{p.notes}</p>}
           </div>

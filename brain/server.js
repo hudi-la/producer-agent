@@ -155,7 +155,12 @@ function buildBriefPrompt({ p, entries, profile }) {
 然后用简洁中文写一段「讲懂」给 ta 看——像个熟这行的搭档在讲，不是复述资料。一次只递这一件事：说清楚"这机会到底是什么、关键事实、能不能申、值不值得"，最后给一句"要不要批准往下走"。别写前言。
 
 写完，另起一行，在**最后只输出一行**机器读的事实（查不到就填 null，绝不编造）：
-[[FACTS]]{"url":"官方页面URL或null","deadline":"YYYY-MM-DD或null","eligible":true或false}`)
+[[FACTS]]{"url":"官方页面URL或null","deadline":"截止的原文或null","deadline_at":"YYYY-MM-DD或null","opens_at":"YYYY-MM-DD或null","eligible":true或false}
+
+关于这几个日期：
+- deadline 填**官方的原话**（"March 15, 2027"、"spring 2027"、"rolling" 都照抄）
+- deadline_at 只在能定到具体某一天时才填；"spring 2027" 这种定不下来就填 null，别猜一个
+- opens_at 是**开始接受申请**的日子。已经开放了就填 null——已经开的门不用再报开门时间`)
   return lines.join('\n')
 }
 
@@ -247,12 +252,19 @@ async function handleBrief(body) {
   const { text, usage } = await think(buildBriefPrompt(ctx))
   const { clean, facts } = extractFacts(text)
 
-  if (facts && (facts.url || facts.deadline || typeof facts.eligible === 'boolean')) {
+  // 日期只认 YYYY-MM-DD。模型偶尔会把 "spring 2027" 塞进日期字段，
+  // 那种塞进 date 列会直接报错——挡在这儿，宁可不填。
+  const asDate = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+
+  if (facts && (facts.url || facts.deadline || facts.deadline_at || facts.opens_at ||
+                typeof facts.eligible === 'boolean')) {
     const { error } = await db.rpc('pa_set_fields', {
       p_pursuit_id: pursuit_id,
       p_url: facts.url || null,
       p_deadline: facts.deadline || null,
       p_eligible: typeof facts.eligible === 'boolean' ? facts.eligible : null,
+      p_opens_at: asDate(facts.opens_at),
+      p_deadline_at: asDate(facts.deadline_at),
     })
     if (error) console.warn('  ⚠️ 回填字段失败：' + error.message)
     else console.log(`  ↳ 回填：${JSON.stringify(facts)}`)
