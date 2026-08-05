@@ -5,16 +5,26 @@ import { loadTasks } from './lib/loadTasks.js'
 import { setStage, setBall } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
-import LibraryDrawer from './components/LibraryDrawer.jsx'
+import Library from './components/Library.jsx'
+import People from './components/People.jsx'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
+
+// 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
+// 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
+// 无 proposal 压力的关系进人际管理；关于你自己的事实进我的档案。
+const AREAS = [
+  ['pursue', '项目争取'],
+  ['people', '人际管理'],
+  ['profile', '我的档案'],
+]
 
 export default function App() {
   const [lib, setLib] = useState(null)
   const [pl, setPl] = useState(null)
   const [tk, setTk] = useState(null)
   const [view, setView] = useState({ name: 'home' })
-  const [drawer, setDrawer] = useState(false)
+  const [area, setArea] = useState('pursue')
   const [tasksOpen, setTasksOpen] = useState(false)
   const [seen, setSeen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pa_seen') || '{}') } catch (_) { return {} }
@@ -61,13 +71,12 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
-      if (drawer) setDrawer(false)
-      else if (tasksOpen) setTasksOpen(false)
+      if (tasksOpen) setTasksOpen(false)
       else if (view.name === 'pursuit') setView({ name: 'home' })
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [drawer, tasksOpen, view])
+  }, [tasksOpen, view])
 
   if (!lib || !pl || !tk) return <div className="wrap"><div className="loading">载入中……</div></div>
 
@@ -123,19 +132,41 @@ export default function App() {
     <div className="wrap">
       <header className="app-top">
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
-        <div className="tabs">
-          <button className="tab on">按阶段</button>
-          <button className="tab">按截止</button>
-          <button className="tab">按作品</button>
-          <button className="tab">按来源</button>
-        </div>
+        <nav className="areas" aria-label="主区">
+          {AREAS.map(([key, label]) => (
+            <button
+              key={key}
+              className={'area' + (area === key ? ' on' : '')}
+              onClick={() => { setArea(key); if (view.name !== 'home') closePursuit() }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
         <span className="sp" />
-        <button className="wbtn" onClick={() => setTasksOpen(true)}>造卡任务</button>
-        <button className="wbtn" onClick={() => setDrawer(true)}>战绩信息库</button>
         <span className={'srcbadge ' + source}>{source === 'live' ? '已连 Supabase' : '种子数据'}</span>
       </header>
 
-      {view.name === 'home' ? (
+      {/* 一条机会线是全屏的，进去了就不该还看见看板的工具条 */}
+      {area === 'pursue' && view.name === 'home' && (
+        <div className="subbar">
+          {/* 这四个筛选还没接上，先占位——怎么筛你还在想。 */}
+          <div className="tabs">
+            <button className="tab on">按阶段</button>
+            <button className="tab">按截止</button>
+            <button className="tab">按作品</button>
+            <button className="tab">按来源</button>
+          </div>
+          <span className="sp" />
+          <button className="wbtn" onClick={() => setTasksOpen(true)}>造卡任务</button>
+        </div>
+      )}
+
+      {area === 'people' ? (
+        <People />
+      ) : area === 'profile' ? (
+        <Library entries={lib.entries} concerns={lib.concerns} />
+      ) : view.name === 'home' ? (
         // 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
         // 「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
         // 不能挂在某个列名上——否则用户一改列，提示就跟着错。
@@ -150,7 +181,6 @@ export default function App() {
         />
       )}
 
-      <LibraryDrawer entries={lib.entries} concerns={lib.concerns} open={drawer} onClose={() => setDrawer(false)} />
       <TasksPanel tasks={tk.tasks} open={tasksOpen} onClose={() => setTasksOpen(false)} />
     </div>
   )

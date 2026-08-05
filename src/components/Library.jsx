@@ -1,6 +1,10 @@
 import React, { useState } from 'react'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL } from '../data/entriesSeed.js'
 
+// 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
+// 这里是渡判断匹配、写「为什么是我」、填申请字段的全部弹药，
+// 59 条事实不该藏在一个划出来又划回去的侧栏里。
+
 const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
 const BOX_LABELS = { why_now: '为什么是现在', reach_out: '想触达', hidden_links: '隐线', materials: '材料', note: '备注' }
 
@@ -83,7 +87,7 @@ function KindSection({ label, items, sub, concerns }) {
   )
 }
 
-export default function LibraryDrawer({ entries, concerns, open, onClose }) {
+export default function Library({ entries, concerns }) {
   const byKind = new Map()
   for (const e of entries) {
     if (!byKind.has(e.kind)) byKind.set(e.kind, [])
@@ -100,19 +104,16 @@ export default function LibraryDrawer({ entries, concerns, open, onClose }) {
   }
 
   return (
-    <>
-      <div className={'ov-scrim' + (open ? ' on' : '')} onClick={onClose} aria-hidden="true" />
-      <aside className={'drawer' + (open ? ' open' : '')} aria-label="战绩信息库" aria-hidden={!open}>
-        <div className="drawer-head">
-          <div className="dh-top"><h3>战绩信息库</h3><button className="btn" onClick={onClose}>收起</button></div>
+    <div className="page">
+      <div className="page-inner">
+        <header className="page-head">
+          <h1>我的档案</h1>
           <p className="note">渡懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>hudiworks.com</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
-        </div>
-        <div className="drawer-body">
-          {ordered.map((k) => (
-            <KindSection key={k.key} label={k.label} items={k.items} sub={k.sub} concerns={concerns} />
-          ))}
-        </div>
-      </aside>
-    </>
+        </header>
+        {ordered.map((k) => (
+          <KindSection key={k.key} label={k.label} items={k.items} sub={k.sub} concerns={concerns} />
+        ))}
+      </div>
+    </div>
   )
 }

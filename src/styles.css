@@ -40,6 +40,17 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    阅读陪伴的 .home-title）。故意不跟 --serif（Iowan Old Style）——那是 app 正文的字，
    品牌字归家族。字号取 19px 而不是它们的 26px：那两个是首页 hero，这里是常驻顶栏。 */
 .brand .name { font-family: Georgia, "Songti SC", serif; font-size: 19px; font-weight: 700; letter-spacing: .5px; }
+/* 一级：三个主区。比二级的筛选重——它们是三个去处，不是三个筛法。 */
+.areas { display: flex; gap: 2px; margin-left: 8px; }
+.area { font: inherit; font-size: 13.5px; padding: 7px 15px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-3); cursor: pointer; transition: color .14s, background .14s; }
+.area:hover:not(.on) { color: var(--ink-2); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.area.on { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
+.area:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 二级：某个主区自己的工具条（筛选、造卡任务）。 */
+.subbar { display: flex; align-items: center; gap: 12px; padding: 9px 22px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
+.subbar .sp { flex: 1; }
+
 .tabs { display: flex; gap: 3px; }
 .tab { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink-3); cursor: pointer; }
 .tab.on { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
@@ -49,15 +60,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .wbtn:hover { border-color: var(--accent); }
 .srcbadge { font-size: 11px; letter-spacing: .04em; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-3); }
 .srcbadge.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
-
-/* ── today strip ── */
-.today { display: flex; align-items: center; gap: 14px; padding: 15px 24px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 55%, var(--paper-3)); flex: none; cursor: pointer; width: 100%; text-align: left; font: inherit; color: inherit; border-left: none; border-right: none; border-top: none; }
-.today:hover { background: color-mix(in srgb, var(--paper) 40%, var(--paper-3)); }
-.today .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--grad); flex: none; box-shadow: 0 0 12px -3px var(--g2); }
-.today .txt { font-family: var(--serif); font-size: 15px; color: var(--ink); flex: 1; }
-.today .txt .lbl { color: var(--ink-3); font-size: 12px; letter-spacing: .04em; margin-right: 8px; font-family: var(--sans); text-transform: uppercase; }
-.today .txt b { font-weight: 600; }
-.today .arw { color: var(--accent); font-weight: 600; font-size: 13px; }
 
 /* ── pipeline board ── */
 .board { flex: 1; min-height: 0; overflow: auto; display: flex; gap: 18px; padding: 26px 24px 40px; align-items: stretch; }
@@ -140,18 +142,27 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .bubble.thinking i:nth-child(3) { animation-delay: .36s; }
 @keyframes bth { 0%, 60%, 100% { opacity: .28; transform: translateY(0); } 30% { opacity: .85; transform: translateY(-3px); } }
 
-/* ── works drawer ── */
+/* ── 一级页面（我的档案 / 人际管理）──
+   原来「战绩信息库」是右边划出来的抽屉。抽屉的毛病是：它默认你只是来瞄一眼。
+   但这里是渡判断匹配、写申请的全部弹药，值得一整页。 */
 .ov-scrim { position: fixed; inset: 0; background: #0000; pointer-events: none; transition: background .28s; z-index: 25; }
 .ov-scrim.on { background: #241f1b40; pointer-events: auto; }
-.drawer { position: fixed; top: 0; right: 0; height: 100vh; width: min(680px,94vw); background: var(--paper); border-left: 1px solid var(--line-2); box-shadow: -24px 0 60px -34px #241f1b80; z-index: 30; transform: translateX(100%); transition: transform .32s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; }
-.drawer.open { transform: translateX(0); }
-.drawer-head { padding: 22px 22px 15px; border-bottom: 1px solid var(--line); }
-.dh-top { display: flex; align-items: center; justify-content: space-between; }
-.dh-top h3 { font-family: var(--serif); font-size: 17px; margin: 0; font-weight: 600; }
-.drawer-head .note { margin: 9px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.55; }
-.drawer-head .note b { color: var(--ink-2); font-weight: 600; }
-.drawer-head .note .bx { color: var(--accent); }
-.drawer-body { overflow-y: auto; padding: 6px 22px 40px; flex: 1; }
+
+.page { flex: 1; min-height: 0; overflow-y: auto; }
+.page-inner { max-width: 720px; margin: 0 auto; padding: 34px 26px 80px; }
+.page-head { margin-bottom: 8px; }
+.page-head h1 { font-family: var(--serif); font-size: 26px; font-weight: 600; margin: 0 0 10px; letter-spacing: .005em; }
+.page-head .note { margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.6; }
+.page-head .note b { color: var(--ink-2); font-weight: 600; }
+.page-head .note .bx { color: var(--accent); }
+
+/* 还没做的页面：说清楚将来是什么，别假装这儿有东西 */
+.soon { margin-top: 26px; border: 1px dashed var(--line-2); border-radius: 14px; padding: 20px 22px 18px; }
+.soon-h { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin-bottom: 14px; }
+.soon-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; }
+.soon-list li { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.soon-list b { color: var(--ink); font-weight: 600; }
+.soon-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); line-height: 1.6; }
 
 .kind { margin-top: 26px; }
 .kind:first-child { margin-top: 14px; }
