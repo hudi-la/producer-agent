@@ -1,4 +1,5 @@
 import React from 'react'
+import { TASK_DESC } from '../data/tasksSeed.js'
 
 // 「人际管理」——还没建，这页先占着位置。
 //
@@ -13,7 +14,11 @@ import React from 'react'
 //
 // 这也是为什么现在这页是空的：这些人从来没进过系统，不是系统里没有他们。
 
-export default function People() {
+export default function People({ tasks = [], pursuits = [] }) {
+  // 库里现有的联系人全是外联对象（挂在机会线上），不是这页要装的那种「朋友」。
+  // 把这个数如实说出来，免得空页看起来像出了故障。
+  const linked = new Set(pursuits.map((p) => p.contact_name).filter(Boolean)).size
+
   return (
     <div className="page">
       <div className="page-inner">
@@ -30,9 +35,25 @@ export default function People() {
             <li><b>「该联系了」</b> —— 唯一的引擎。隔多久碰一次由你定，到点了提醒你。</li>
             <li><b>上次聊到哪</b> —— 他关心什么、答应过什么、上回说了什么好玩的。</li>
           </ul>
+
+          {tasks.length > 0 && (
+            <>
+              <div className="soon-h" style={{ marginTop: 22 }}>归这儿的任务</div>
+              <ul className="soon-list">
+                {tasks.map((t) => (
+                  <li key={t.id || t.type}>
+                    <b>{t.name}</b> —— {TASK_DESC[t.type] || t.type}
+                    <span className="soon-state">{t.enabled ? '已开' : '未接'}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           <p className="soon-note">
-            库里现在有 4 个联系人，但他们全都挂在机会线上（是外联对象，不是这个意思的"朋友"）。
-            真正要放进来的那些人还散在各个聊天软件里——所以这页空着是对的，不是漏了什么。
+            库里现在有 {linked} 个联系人，但他们全都挂在机会线上——是外联对象，
+            不是这页说的那种「朋友」。真正要放进来的那些人还散在各个聊天软件里。
+            所以这页空着是对的，不是漏了什么。
           </p>
         </div>
       </div>

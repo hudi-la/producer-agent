@@ -9,6 +9,7 @@ import Library from './components/Library.jsx'
 import People from './components/People.jsx'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
+import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -163,7 +164,7 @@ export default function App() {
       )}
 
       {area === 'people' ? (
-        <People />
+        <People tasks={tk.tasks.filter(isPeopleTask)} pursuits={pl.pursuits} />
       ) : area === 'profile' ? (
         <Library entries={lib.entries} concerns={lib.concerns} />
       ) : view.name === 'home' ? (
@@ -181,7 +182,8 @@ export default function App() {
         />
       )}
 
-      <TasksPanel tasks={tk.tasks} open={tasksOpen} onClose={() => setTasksOpen(false)} />
+      {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
+      <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)} />
     </div>
   )
 }
