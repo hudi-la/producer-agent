@@ -7,7 +7,7 @@
 // 这两个不冲突：七列照旧，只是变稀。而且它们可以**同时按下去**——
 // 真正有用的恰恰是交叉（球在我这边、而且快到期）。
 import { ballOf } from './ball.js'
-import { deadlineLine, daysFromToday } from './nextAction.js'
+import { deadlineLine, daysFromToday, MD } from './nextAction.js'
 
 /** 界面上摆出来的两个开关，顺序固定。 */
 export const FILTERS = [
@@ -38,17 +38,39 @@ export function applyFilters(pursuits, on) {
 }
 
 /**
- * 行动时间到了没——过卡队列判据 2（「现在需要你」的时间那一半）。
+ * 行动时间到了没，以及**哪个日子到了**——过卡队列判据 2。
  * 到日子的卡自己进队，不用你扫看板，也不用等你按「更新最新信息」。
+ *
+ * 返回一句人话（进队理由）或 null。**必须说得出理由才算到日子**：
+ * 卡在队里却说不出为什么，正是这两刀一直在治的病。
  *
  * 两种「到了」：该碰日 ≤ 今天；或截止进了 14 天窗口**而且**球在你这边
  * （对方压着的紧急线该催，但那是判据 1/3 的事——信来了或该碰日到了才吵你，
  *  光是截止近而球在对方，进队只会让你干瞪眼）。
  * 收尾列（谈成/暂停）不算——那两列躺着的日期是历史，不是待办。
  */
-export function dueNow(p) {
-  if (p.stage === 'won' || p.stage === 'paused') return false
+export function dueReason(p) {
+  if (p.stage === 'won' || p.stage === 'paused') return null
   const touch = daysFromToday(p.next_touch_at)
-  if (touch !== null && touch <= 0) return true
-  return Boolean(deadlineLine(p)?.urgent && ballOf(p) === 'me')
+  if (touch !== null && touch <= 0) {
+    const when = MD(p.next_touch_at)
+    return touch === 0 ? `该碰一下 · ${when} 定的就是今天`
+      : `该碰一下 · ${when} 定的，过了 ${-touch} 天`
+  }
+  // 「急不急」这个门槛只认 deadlineLine 一处，不另写一套——两处算同一件事，
+  // 各写各的迟早对不上（0019 那个病）。
+  //
+  // 但话要自己组：deadlineLine.text 里带着**截止原文**，而原文可能是一整段
+  // （Stanford 那条是「We are now accepting proposals for Spring Quarter 2027.
+  // Submissions are due by…」），塞进理由行就成了一堵墙。原文在卡上和事实区
+  // 本来就看得见，这行只回答「为什么现在轮到你」。
+  if (!deadlineLine(p)?.urgent || ballOf(p) !== 'me') return null
+  const n = daysFromToday(p.deadline_at)      // urgent 为真时它必然是个数
+  const when = n < 0 ? `截止过了 ${-n} 天` : n === 0 ? '今天截止' : `截止还剩 ${n} 天`
+  return `${when} · 球在你`
+}
+
+/** 只问要不要进队时用这个。理由要显示就用 dueReason。 */
+export function dueNow(p) {
+  return dueReason(p) !== null
 }

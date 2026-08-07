@@ -13,7 +13,7 @@ import Trouble from './components/Trouble.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
-import { NO_FILTERS, anyOn, applyFilters, dueNow } from './lib/filters.js'
+import { NO_FILTERS, anyOn, applyFilters, dueNow, dueReason } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
 import QueueRest from './components/QueueRest.jsx'
@@ -338,9 +338,14 @@ export default function App() {
     n: queue.items.length,
     // '2026-08-06' → '8/6'。你什么时候放过它的，得看得见。
     skippedAt: mdOf(qItem?.skippedAt),
-    // 这张卡怎么进队的：'pick' 你自己勾的 / 'update' 更新最新信息送来的。
-    // 抽屉靠它决定要不要摆「这次发生了什么」。
+    // 这张卡怎么进队的：'pick' 你自己勾的 / 'update' 更新最新信息送来的 /
+    // 'due' 到日子了。抽屉靠它决定要不要摆「这次发生了什么」。
     via: qItem?.via || null,
+    // 'due' 那种得说得出**哪个**日子到了。现算不存——存下来的理由不会跟着
+    // 库变（你把该碰日往后挪了，存的那句还在喊「过了 3 天」）。
+    // 算出来是 null（日子被改远了 / 卡进了收尾列）说明它已经不该在队里，
+    // 抽屉就什么都不摆——宁可不说，也不说过期的话。
+    dueWhy: qItem?.via === 'due' ? dueReason(view.pursuit) : null,
   } : null
   // 剩下的全放过了：抽屉不再摆卡，改摆一句话然后停手。
   //

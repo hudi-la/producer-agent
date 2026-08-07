@@ -76,3 +76,27 @@ test('收尾列不算——那些日期是历史，不是待办', () => {
 test('什么日子都没有 → 不 due', () => {
   assert.equal(dueNow({}), false)
 })
+
+// ── dueReason：进队得说得出理由 ──
+import { dueReason } from './filters.js'
+
+test('该碰日到了，说得出是哪个日子定的', () => {
+  assert.match(dueReason({ next_touch_at: day(0) }), /该碰一下 · .*定的就是今天/)
+  assert.match(dueReason({ next_touch_at: day(-3) }), /该碰一下 · .*过了 3 天/)
+})
+
+test('截止那句自己组，绝不把截止原文（可能是一整段）拖进理由行', () => {
+  assert.equal(dueReason({ deadline_at: day(3), ball_eff: 'me' }), '截止还剩 3 天 · 球在你')
+  assert.equal(dueReason({ deadline_at: day(0), ball_eff: 'me' }), '今天截止 · 球在你')
+  assert.equal(dueReason({ deadline_at: day(-2), ball_eff: 'me' }), '截止过了 2 天 · 球在你')
+  // Stanford 那条：deadline 原文是一整段，理由行必须不受影响
+  const wall = { deadline_at: day(11), ball_eff: 'me',
+    deadline: 'We are now accepting proposals for Spring Quarter 2027. Submissions are due by August 18th at 11:59 pm (PT).' }
+  assert.equal(dueReason(wall), '截止还剩 11 天 · 球在你')
+})
+
+test('不进队的一律返回 null —— 没理由就不该在队里', () => {
+  assert.equal(dueReason({ deadline_at: day(3), ball_eff: 'them' }), null)
+  assert.equal(dueReason({ stage: 'paused', next_touch_at: day(-5) }), null)
+  assert.equal(dueReason({}), null)
+})

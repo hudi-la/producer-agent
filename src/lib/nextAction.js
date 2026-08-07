@@ -24,7 +24,8 @@ export function daysFromToday(dateStr) {
   return Math.round((d - startOfToday()) / 86400000)
 }
 
-const MD = (dateStr) => {
+/** 'YYYY-MM-DD' → '8月12日'。导出是给过卡队列说「哪个日子到了」用的。 */
+export const MD = (dateStr) => {
   const d = asDate(dateStr)
   return d ? `${d.getMonth() + 1}月${d.getDate()}日` : ''
 }

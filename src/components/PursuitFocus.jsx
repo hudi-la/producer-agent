@@ -279,7 +279,15 @@ export default function PursuitFocus({
             {p.notes && <div className="pf-notes md"><Md>{p.notes}</Md></div>}
           </div>
 
-          {/* 这张卡是「更新最新信息」送进队的：先交代这次发生了什么，再看对话 */}
+          {/* 你为什么在队里。
+              一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
+              「到日子了」和「更新最新信息送来的」都要交代，只有你自己勾进来的
+              （via='pick'）不用：那是你亲手放的，不用它讲给你听。 */}
+          {queue?.dueWhy && (
+            <div className="qwhat">
+              <span>到日子了 · {queue.dueWhy}</span>
+            </div>
+          )}
           {viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
             <div className="qwhat">
               {lastMail && <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}</span>}
