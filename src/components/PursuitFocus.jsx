@@ -223,6 +223,26 @@ export default function PursuitFocus({
             <button className="btn" onClick={onQueueLater}>再等一等</button>
           </div>
         )}
+
+        {/* 你为什么在队里。
+            一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
+            「到日子了」和「更新最新信息送来的」都要交代，只有你自己勾进来的
+            （via='pick'）不用：那是你亲手放的，不用它讲给你听。
+          **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
+          effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
+          跟两个出口挪上来是同一个理由。 */}
+        {queue?.dueWhy && (
+          <div className="qwhat">
+            <span>到日子了 · {queue.dueWhy}</span>
+          </div>
+        )}
+        {queue && viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
+          <div className="qwhat">
+            {lastMail && <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}</span>}
+            {voided && <span>作废了 · <s>{voided.text}</s></span>}
+            {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
+          </div>
+        )}
         {inDrawer ? (
           <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
         ) : (
@@ -279,22 +299,6 @@ export default function PursuitFocus({
             {p.notes && <div className="pf-notes md"><Md>{p.notes}</Md></div>}
           </div>
 
-          {/* 你为什么在队里。
-              一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
-              「到日子了」和「更新最新信息送来的」都要交代，只有你自己勾进来的
-              （via='pick'）不用：那是你亲手放的，不用它讲给你听。 */}
-          {queue?.dueWhy && (
-            <div className="qwhat">
-              <span>到日子了 · {queue.dueWhy}</span>
-            </div>
-          )}
-          {viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
-            <div className="qwhat">
-              {lastMail && <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}</span>}
-              {voided && <span>作废了 · <s>{voided.text}</s></span>}
-              {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
-            </div>
-          )}
 
           {msgs.length === 0 && !busy ? (
             <div className="empty-thread">{emptyText(p.stage)}</div>
