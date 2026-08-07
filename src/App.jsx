@@ -290,7 +290,11 @@ export default function App() {
     skippedAt: mdOf(qItem?.skippedAt),
   } : null
   // 剩下的全放过了：抽屉不再摆卡，改摆一句话然后停手。
-  const resting = atQueue && allSkipped(queue)
+  //
+  // 但只在你**刚按完那下「再等一等」**的时候（view.rest 是 laterCard 立的标）。
+  // 光看 allSkipped 的话，之后你从看板点开任何一张恰好在队里的卡，
+  // 抽屉都会拿这句话把卡顶掉——你明确要看的东西变得不可见，那就是丢了。
+  const resting = atQueue && allSkipped(queue) && Boolean(view.rest)
 
   const queueGo = (d) => {
     const q = queueGoto({ ...queue, at: view.pursuit.id }, d)
@@ -306,8 +310,9 @@ export default function App() {
   const laterCard = () => {
     const q = queueLater(queue, view.pursuit.id)
     setQueue(q)
-    // 全放过了的时候不换卡——App 会改摆停手面板。
+    // 全放过了：不换卡，在 view 上立个 rest 标——停手面板只在这一刻出现。
     if (!allSkipped(q)) openQueueCard(q.at)
+    else setView((v) => ({ ...v, rest: true }))
   }
 
   const onPursuit = area === 'pursue' && view.name === 'pursuit'
