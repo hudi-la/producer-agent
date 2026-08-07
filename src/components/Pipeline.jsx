@@ -176,7 +176,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, onJot, unseen = new Set() }) {
+export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, onJot, unseen = new Set(), emptyNote = null }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -218,6 +218,11 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick,
       }
     }
     return out
+  }
+
+  // 筛得一张不剩的时候，别摆七个空列——那看着像卡全丢了。
+  if (emptyNote) {
+    return <div className="board board-empty">{emptyNote}</div>
   }
 
   return (

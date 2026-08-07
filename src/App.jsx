@@ -12,6 +12,8 @@ import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
+import Subbar from './components/Subbar.jsx'
+import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -29,6 +31,8 @@ export default function App() {
   const [view, setView] = useState({ name: 'home' })
   const [area, setArea] = useState('pursue')
   const [tasksOpen, setTasksOpen] = useState(false)
+  // 看哪些。两个开关都关 = 全部。切镜头只改看得见什么，不改任何数据。
+  const [filters, setFilters] = useState(NO_FILTERS)
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
   const [brain, setBrain] = useState(null)
   const [seen, setSeen] = useState(() => {
@@ -199,6 +203,19 @@ export default function App() {
     }
   }
 
+  // 当前镜头里看得见的卡。Pipeline 拿这一份画，所以列头的计数天然就是
+  // 「当前视图里的张数」——不是总数。（不然你筛完看见「新机会 26」下面只有
+  // 3 张，那个 26 在骗人。）
+  const shown = applyFilters(pl.pursuits, filters)
+  const toggleFilter = (key) => setFilters((f) => ({ ...f, [key]: !f[key] }))
+  // 筛出来一张都没有，说人话。「待处理」大概率就是很稀——0017 撤掉「从 stage
+  // 猜球权」之后，有依据的待处理从 28 张掉到 1 张。那是真的，不是筛坏了。
+  const emptyNote = !shown.length && anyOn(filters)
+    ? (filters.mine && filters.urgent ? '没有既该你动、又快到期的线。'
+      : filters.mine ? '现在没有球在你这边的线。'
+      : '没有 14 天内到期的线。')
+    : null
+
   const onPursuit = area === 'pursue' && view.name === 'pursuit'
   const paged = onPursuit && view.mode === 'page'     // 整页：看板让位
   const drawered = onPursuit && !paged                // 抽屉：看板留着
@@ -231,17 +248,11 @@ export default function App() {
 
       {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
       {area === 'pursue' && !paged && (
-        <div className="subbar">
-          {/* 这四个筛选还没接上，先占位——怎么筛你还在想。 */}
-          <div className="tabs">
-            <button className="tab on">按阶段</button>
-            <button className="tab">按截止</button>
-            <button className="tab">按作品</button>
-            <button className="tab">按来源</button>
-          </div>
-          <span className="sp" />
-          <button className="wbtn" onClick={() => setTasksOpen(true)}>造卡任务</button>
-        </div>
+        <Subbar
+          filters={filters}
+          onToggleFilter={toggleFilter}
+          onOpenTasks={() => setTasksOpen(true)}
+        />
       )}
 
       {area === 'people' ? (
@@ -266,7 +277,7 @@ export default function App() {
           {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
               「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
               不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
-          <Pipeline pursuits={pl.pursuits} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} onJot={jotCard} unseen={unseen} />
+          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} onJot={jotCard} unseen={unseen} />
           {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (
