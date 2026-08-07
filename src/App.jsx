@@ -14,7 +14,8 @@ import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
-import { loadQueue, saveQueue, normalize, enqueue } from './lib/queue.js'
+import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
+import QueueRest from './components/QueueRest.jsx'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -24,6 +25,14 @@ const AREAS = [
   ['people', '人际管理'],
   ['profile', '我的档案'],
 ]
+
+// '2026-08-06' → '8/6'。两位数的月日都要去掉前导零，
+// 直接 slice + 一次 replace 只去得掉月份那个，会写出「8/06」。
+const mdOf = (s) => {
+  if (!s) return null
+  const [, m, d] = s.split('-')
+  return `${Number(m)}/${Number(d)}`
+}
 
 export default function App() {
   const [lib, setLib] = useState(null)
@@ -271,6 +280,36 @@ export default function App() {
     openQueueCard(q.at)
   }
 
+  // 抽屉正看的这张在不在队里。在 = 显示队头和两个出口。
+  const atQueue = view.name === 'pursuit' && inQueue(queue, view.pursuit.id)
+  const qItem = atQueue ? queue.items.find((x) => x.id === view.pursuit.id) : null
+  const qInfo = atQueue ? {
+    i: queue.items.findIndex((x) => x.id === view.pursuit.id),
+    n: queue.items.length,
+    // '2026-08-06' → '8/6'。你什么时候放过它的，得看得见。
+    skippedAt: mdOf(qItem?.skippedAt),
+  } : null
+  // 剩下的全放过了：抽屉不再摆卡，改摆一句话然后停手。
+  const resting = atQueue && allSkipped(queue)
+
+  const queueGo = (d) => {
+    const q = queueGoto({ ...queue, at: view.pursuit.id }, d)
+    setQueue(q)
+    openQueueCard(q.at)
+  }
+  const finishCard = () => {
+    const q = queueDone(queue, view.pursuit.id)
+    setQueue(q)
+    if (!q.items.length) closePursuit()
+    else openQueueCard(q.at)
+  }
+  const laterCard = () => {
+    const q = queueLater(queue, view.pursuit.id)
+    setQueue(q)
+    // 全放过了的时候不换卡——App 会改摆停手面板。
+    if (!allSkipped(q)) openQueueCard(q.at)
+  }
+
   const onPursuit = area === 'pursue' && view.name === 'pursuit'
   const paged = onPursuit && view.mode === 'page'     // 整页：看板让位
   const drawered = onPursuit && !paged                // 抽屉：看板留着
@@ -348,17 +387,26 @@ export default function App() {
           {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (
-            <aside className="drawer" aria-label={view.pursuit.title}>
-              <PursuitFocus
-                key={view.pursuit.id}
-                variant="drawer"
-                pursuit={view.pursuit}
-                messages={pl.messagesByPursuit[view.pursuit.id]}
-                onBack={closePursuit}
-                onExpand={expandPursuit}
-                onMove={moveCard}
-                onSetBall={markBall}
-              />
+            <aside className="drawer" aria-label={resting ? '过卡' : view.pursuit.title}>
+              {resting ? (
+                <QueueRest n={queue.items.length} onClose={closePursuit} />
+              ) : (
+                <PursuitFocus
+                  key={view.pursuit.id}
+                  variant="drawer"
+                  pursuit={view.pursuit}
+                  messages={pl.messagesByPursuit[view.pursuit.id]}
+                  onBack={closePursuit}
+                  onExpand={expandPursuit}
+                  onMove={moveCard}
+                  onSetBall={markBall}
+                  queue={qInfo}
+                  onQueuePrev={() => queueGo(-1)}
+                  onQueueNext={() => queueGo(1)}
+                  onQueueDone={finishCard}
+                  onQueueLater={laterCard}
+                />
+              )}
             </aside>
           )}
         </>

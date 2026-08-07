@@ -92,7 +92,10 @@ function emptyText(stage) {
 //   page   —— 整页（新标签页里 ?p=<id> 打开的就是这个），留给你要长时间写东西的时候
 // 现在两者装的东西一样，只差宽度。等作品链、文档、邮件单独成栏做出来，
 // 整页才会长出抽屉装不下的部分。
-export default function PursuitFocus({ pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall }) {
+export default function PursuitFocus({
+  pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall,
+  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater,
+}) {
   const inDrawer = variant === 'drawer'
   const [msgs, setMsgs] = useState(messages || [])
   const [text, setText] = useState('')
@@ -192,6 +195,16 @@ export default function PursuitFocus({ pursuit: p, messages, variant = 'page', o
   return (
     <div className={'focus ' + variant}>
       <div className="focus-top">
+        {/* 队头。翻页什么都不改——翻回来那张原样在那儿，所以 ‹ › 旁边
+            没有任何「已处理」的标记，只有位置。 */}
+        {queue && (
+          <div className="qnav">
+            <button className="qarrow" onClick={onQueuePrev} disabled={queue.i <= 0} aria-label="上一张">‹</button>
+            <span className="qcount">{queue.i + 1} / {queue.n}</span>
+            <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
+            {queue.skippedAt && <span className="qskip">{queue.skippedAt} 你先放着了</span>}
+          </div>
+        )}
         {inDrawer ? (
           <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
         ) : (
@@ -280,6 +293,14 @@ export default function PursuitFocus({ pursuit: p, messages, variant = 'page', o
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
       </div>
+      {/* 两个出口。**只有「做完了」让顶栏那个数字降下去**——
+          「再等一等」把这张留在队里挪到队尾，它还欠着。 */}
+      {queue && (
+        <div className="qexits">
+          <button className="wbtn" onClick={onQueueDone}>做完了</button>
+          <button className="btn" onClick={onQueueLater}>再等一等</button>
+        </div>
+      )}
     </div>
   )
 }

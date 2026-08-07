@@ -173,6 +173,28 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .focus.drawer .back { font-size: 15px; }
 .focus.drawer .back .t { display: none; }
 .focus.drawer .stg-lbl { font-size: 0; gap: 0; }
+/* ── 过卡：队头 + 两个出口 ── */
+/* 队头只报位置。翻页什么都不改，所以这儿没有任何「已处理」的记号。 */
+.qnav { display: flex; align-items: center; gap: 8px; padding: 0 0 9px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--line); }
+.qarrow { font: inherit; font-size: 16px; line-height: 1; width: 26px; height: 26px; border-radius: 7px;
+  border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
+.qarrow:hover:not(:disabled) { border-color: var(--accent); }
+.qarrow:disabled { opacity: .35; cursor: default; }
+.qarrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qcount { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+/* 你什么时候放过它的。放过 ≠ 翻过去，所以得留个痕。 */
+.qskip { font-size: 11.5px; color: var(--ink-3); margin-left: auto; }
+
+/* 两个出口。「做完了」是唯一让顶栏数字降下去的路，所以它是实心那个。 */
+.qexits { flex: none; display: flex; gap: 9px; padding: 11px 14px;
+  border-top: 1px solid var(--line); background: var(--paper-2); }
+
+/* 剩下的全放过了。不无限转圈。 */
+.qrest { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+  gap: 9px; padding: 0 26px; }
+.qrest-t { font-family: var(--serif); font-size: 15px; font-weight: 600; margin: 0; }
+.qrest-s { font-size: 12.5px; color: var(--ink-3); margin: 0 0 6px; }
 /* 「整页 ↗」：抽屉里唯一一个把你送出去的出口，所以给它边框、跟旁边的开关区分开 */
 .expand { font: inherit; font-size: 12px; color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 5px 10px; cursor: pointer; flex: none; }
 .expand:hover { color: var(--ink); border-color: var(--accent); }
