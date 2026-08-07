@@ -196,13 +196,19 @@ export default function PursuitFocus({
     <div className={'focus ' + variant}>
       <div className="focus-top">
         {/* 队头。翻页什么都不改——翻回来那张原样在那儿，所以 ‹ › 旁边
-            没有任何「已处理」的标记，只有位置。 */}
+            没有任何「已处理」的标记，只有位置。
+            两个出口也在这排——原来在抽屉底部，跟输入框叠在一起被盖住了；
+            而且「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */}
         {queue && (
           <div className="qnav">
             <button className="qarrow" onClick={onQueuePrev} disabled={queue.i <= 0} aria-label="上一张">‹</button>
             <span className="qcount">{queue.i + 1} / {queue.n}</span>
             <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
             {queue.skippedAt && <span className="qskip">{queue.skippedAt} 你先放着了</span>}
+            <span className="qsp" />
+            {/* 只有「做完了」让顶栏那个数字降下去——「再等一等」留在队里挪队尾，它还欠着。 */}
+            <button className="wbtn" onClick={onQueueDone}>做完了</button>
+            <button className="btn" onClick={onQueueLater}>再等一等</button>
           </div>
         )}
         {inDrawer ? (
@@ -293,14 +299,6 @@ export default function PursuitFocus({
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
       </div>
-      {/* 两个出口。**只有「做完了」让顶栏那个数字降下去**——
-          「再等一等」把这张留在队里挪到队尾，它还欠着。 */}
-      {queue && (
-        <div className="qexits">
-          <button className="wbtn" onClick={onQueueDone}>做完了</button>
-          <button className="btn" onClick={onQueueLater}>再等一等</button>
-        </div>
-      )}
     </div>
   )
 }
