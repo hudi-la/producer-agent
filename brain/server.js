@@ -20,7 +20,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-05'
+export const BRAIN_BUILD = '2026-08-06d'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -283,6 +283,90 @@ async function handleBrief(body) {
   return { brief, facts, usage }
 }
 
+// ── 更新最新信息：收信 → （收到了才）消化 ─────────────────────
+//
+// 只消化事实，不主动巡逻：added=0 就一个字不写。
+// 在没变化的线上编一句凑数的话，哪怕只发生一次，这个按钮就不可信了。
+//
+// 消化 = 两问：① 新信让现在的待办作废了吗 ② 现在该干什么。
+// 答案落库走 0029 的两个口子——闸在库里（你的活待办拒绝覆盖、
+// 作废必须指认哪封信），prompt 只是第一道，不是唯一一道。
+async function handleRefresh(body) {
+  const { pursuit_id } = body
+  if (!pursuit_id) throw new Error('要有 pursuit_id')
+
+  const sync = await handleSync({ pursuit_id })
+  if (!sync.added) {
+    // 没有新信 = 没有新事实 = 不惊动任何东西
+    return { ...sync, voided: false, proposed: false }
+  }
+
+  // 重新拉上下文——刚收的信要在里面。
+  // loadContext 返回的键叫 p（不是 pursuit）；0029 之后 pa_brain_context 的
+  // select p.* 自动带上三列新字段，msgs 是整行（含库内 id）。
+  const ctx = await loadContext(pursuit_id)
+  const p = ctx.p
+  const fresh = ctx.msgs.filter((m) => m.kind === 'email').slice(-sync.added - 3)
+  const cur = p.next_action && !p.next_action_done_at && !p.next_action_void_at
+    ? p.next_action : null
+
+  const { text } = await think(
+    `这条机会线刚收到 ${sync.added} 封新信。两个问题，只答有依据的：
+
+【现在卡上的待办】${cur ? `「${cur}」` : '（没有）'}
+【近期往来（含新信）】
+${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ? 'HuDi' : (m.meta?.from_name || '对方')}：${m.content}`).join('\n')}
+【截止】${p.deadline_at || p.deadline || '无'}　【该碰日】${p.next_touch_at || '无'}
+
+问题一：新信有没有让卡上那条待办**过期**？（比如「没回就催」而对方回了。）
+过期了就指认是哪封信，说一句人话的理由。没过期、或根本没待办，就 null。
+
+问题二：读完新信，这条线**现在**该干什么？必须能指着某封信或某个日期说出依据。
+说不出依据就 null——宁可不说，也不猜。凑数的话比空着更坏。
+如果该干的事有明确日子（比如信里约了 8/12 回复），给 touch 一个 YYYY-MM-DD。
+
+**最后一行**单独输出，别的什么都不要加：
+[[DIGEST]] {"void": {"msg_id": "<作废依据那封信的库内 id，从上面往来里没有就用最新那封的 gmail id 对应行>", "reason": "…"} | null, "next": {"action": "一句话，20 字内", "basis": "依据（哪封信/哪个日期）", "touch": "YYYY-MM-DD 或 null"} | null}`,
+    READ_TOOLS,
+  )
+
+  const m = text.match(/\[\[DIGEST\]\]\s*(\{[\s\S]*\})\s*$/)
+  let digest = null
+  try { digest = m ? JSON.parse(m[1]) : null } catch (_) { digest = null }
+  if (!digest) {
+    // 消化失败不吞掉收信成果——信已经在库里了，只是没消化。说实话。
+    return { ...sync, voided: false, proposed: false, note: '信收下了，但这次没消化成（格式不对）' }
+  }
+
+  let voided = false
+  if (digest.void?.reason) {
+    // msg_id 由库校验（必须是这条线上的消息）。模型给的 id 不可靠时，
+    // 退回「这次新收的最后一封」——作废的依据就是这批新信。
+    const fallback = ctx.msgs.filter((x) => x.kind === 'email').at(-1)?.id || null
+    const msgId = ctx.msgs.some((x) => x.id === digest.void.msg_id) ? digest.void.msg_id : fallback
+    const { data } = await db.rpc('pa_void_next_action', {
+      p_pursuit_id: pursuit_id, p_msg_id: msgId, p_reason: digest.void.reason,
+    })
+    voided = Boolean(data?.voided)
+    if (voided) await addMessage(pursuit_id, 'producer',
+      `卡上那条「${cur}」作废了——${digest.void.reason}`)
+  }
+
+  let proposed = false
+  if (digest.next?.action && digest.next?.basis) {   // 没依据的提案连库都不碰
+    const { data } = await db.rpc('pa_propose_next_action', {
+      p_pursuit_id: pursuit_id,
+      p_action: digest.next.action,
+      p_touch: digest.next.touch || null,
+    })
+    proposed = Boolean(data?.written)
+    if (proposed) await addMessage(pursuit_id, 'producer',
+      `我看下一步该：${digest.next.action}（依据：${digest.next.basis}）——不对就改掉，认了就勾。`)
+  }
+
+  return { ...sync, voided, proposed }
+}
+
 // ── 后台先读 ───────────────────────────────────────────────────
 // 「待批准」这个列名承诺的是「 Fairwind 已经读透了，就等你点头」。所以读这件事
 // 不能等你点开卡才现做——脑子自己扫，卡进来就读，你看见它时 brief 已在库里。
@@ -408,6 +492,26 @@ const server = http.createServer(async (req, res) => {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 讲懂 ${body.pursuit_id}`)
         send(res, 200, await handleBrief(body))
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
+  if (req.method === 'POST' && (req.url === '/gmail-draft' || req.url === '/sync' || req.url === '/refresh')) {
+    const isDraft = req.url === '/gmail-draft'
+    const isRefresh = req.url === '/refresh'
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(raw || '{}')
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} ${isDraft ? '放草稿箱' : isRefresh ? '更新' : '收信'} ${body.pursuit_id}`)
+        const out = isDraft ? await handleGmailDraft(body) : isRefresh ? await handleRefresh(body) : await handleSync(body)
+        console.log(`  ↳ ${JSON.stringify(out)}`)
+        send(res, 200, out)
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })
