@@ -20,7 +20,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-06d'
+export const BRAIN_BUILD = '2026-08-06e'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -364,7 +364,9 @@ ${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ?
       `我看下一步该：${digest.next.action}（依据：${digest.next.basis}）——不对就改掉，认了就勾。`)
   }
 
-  return { ...sync, voided, proposed }
+  // touch = 提案自带的行动日。前端拿它判断「现在就能动」还是「到日子再说」——
+  // 带未来日子的提案只写卡不进队（Paperbark 那次 8-6 就吵 8-12 的事，就是缺这个）。
+  return { ...sync, voided, proposed, touch: (proposed && digest.next?.touch) || null }
 }
 
 // ── 后台先读 ───────────────────────────────────────────────────

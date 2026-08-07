@@ -13,7 +13,7 @@ import Trouble from './components/Trouble.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
-import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
+import { NO_FILTERS, anyOn, applyFilters, dueNow } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
 import QueueRest from './components/QueueRest.jsx'
@@ -53,8 +53,27 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(null)      // {i, n} | null
   const [refreshFailed, setRefreshFailed] = useState(0)   // 上一轮挂了几条，Trouble 用
 
-  // 串行逐线。40 条里多数没邮件，brain 秒回；有信的那几条各要十几秒。
-  // 收到东西的线当场进队（via: 'update'）——不等整轮跑完，先到先过。
+  // 进队的判据是「现在需要你」，不是「库里多了行数据」。
+  // 第一次真跑就吃过亏：提了个 8-12 才要做的事，8-6 就吵人。
+  //   ① 对方来信（addedIn）——你自己发的信被收录不惊动你，你知道你发过
+  //   ③ 有话跟你说——待办被作废；提案只有现在就能动的（无日期或到了）才算
+  const needsMe = (out) => {
+    if (out.addedIn > 0 || out.voided) return true
+    if (!out.proposed) return false
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return !out.touch || new Date(out.touch + 'T00:00:00') <= today
+  }
+
+  // ② 行动时间到了——到日子的卡自己进队，不用你扫看板。
+  // 只在开页面和整轮更新后扫；**永不碰已在队里的卡**，你放过的记号才留得住。
+  const enqueueDue = (pursuits) =>
+    setQueue((q) => {
+      const fresh = pursuits.filter((p) => dueNow(p) && !inQueue(q, p.id))
+      return fresh.length ? enqueue(q, fresh.map((p) => ({ id: p.id, via: 'due' }))) : q
+    })
+
+  // 串行逐线。几十条里多数没邮件，brain 秒回；有信的那几条各要十几秒。
+  // 需要你的线当场进队（via: 'update'）——不等整轮跑完，先到先过。
   const runRefresh = async () => {
     if (refreshing) return
     const list = pl.pursuits
@@ -64,7 +83,7 @@ export default function App() {
       setRefreshing({ i: i + 1, n: list.length })
       try {
         const out = await refreshPursuit(list[i].id)
-        if (out.added || out.voided || out.proposed) {
+        if (needsMe(out)) {
           setQueue((q) => enqueue(q, [{ id: list[i].id, via: 'update' }]))
         }
       } catch (_) {
@@ -73,7 +92,8 @@ export default function App() {
     }
     setRefreshing(null)
     setRefreshFailed(failed)
-    loadPursuits().then((r) => { if (r) setPl(r) })   // 立刻把新状态拉回来，不等 8 秒轮询
+    const r = await loadPursuits()          // 立刻把新状态拉回来，不等 8 秒轮询
+    if (r) { setPl(r); enqueueDue(r.pursuits) }
   }
 
   // 这一行必须待在这儿（状态旁边），不能挪到组件下半截去。
@@ -86,6 +106,7 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('pa_seen') || '{}') } catch (_) { return {} }
   })
   const focusedOnceRef = useRef(false)
+  const dueScannedRef = useRef(false)
 
   const markSeen = (id) => setSeen((s) => {
     const next = { ...s, [id]: new Date().toISOString() }
@@ -110,6 +131,9 @@ export default function App() {
       const items = q.items.filter((x) => live.has(x.id))
       return items.length === q.items.length ? q : normalize({ items, at: q.at })
     })
+    // 开页面时扫一次「到日子的」（判据 2）。只扫这一次，不跟着 8 秒轮询反复扫——
+    // 「做完了」出队的卡这个会话里不再回来；真没办的话，下次开页面它还在，那是对的。
+    if (!dueScannedRef.current) { dueScannedRef.current = true; enqueueDue(pl.pursuits) }
   }, [pl])
 
   // 脑子是本机进程，你随时会把那个终端关掉。每 20 秒探一次，

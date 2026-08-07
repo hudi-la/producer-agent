@@ -52,3 +52,27 @@ test('deadline 只有原文、没有可算的日期，也不算紧急', () => {
   const vague = { id: 'v', deadline: 'spring 2027' }
   assert.equal(matches(vague, { mine: false, urgent: true }), false)
 })
+
+// ── dueNow：过卡队列判据 2 ──
+import { dueNow } from './filters.js'
+
+test('该碰日到了 → due；还没到 → 不 due', () => {
+  assert.equal(dueNow({ next_touch_at: day(0) }), true)
+  assert.equal(dueNow({ next_touch_at: day(-2) }), true)
+  assert.equal(dueNow({ next_touch_at: day(3) }), false)
+})
+
+test('截止进 14 天窗口且球在我 → due；球在对方 → 不 due（光近不吵你）', () => {
+  assert.equal(dueNow({ deadline_at: day(5), ball_eff: 'me' }), true)
+  assert.equal(dueNow({ deadline_at: day(5), ball_eff: 'them' }), false)
+  assert.equal(dueNow({ deadline_at: day(60), ball_eff: 'me' }), false)
+})
+
+test('收尾列不算——那些日期是历史，不是待办', () => {
+  assert.equal(dueNow({ stage: 'paused', next_touch_at: day(-5) }), false)
+  assert.equal(dueNow({ stage: 'won', deadline_at: day(3), ball_eff: 'me' }), false)
+})
+
+test('什么日子都没有 → 不 due', () => {
+  assert.equal(dueNow({}), false)
+})

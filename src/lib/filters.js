@@ -7,7 +7,7 @@
 // 这两个不冲突：七列照旧，只是变稀。而且它们可以**同时按下去**——
 // 真正有用的恰恰是交叉（球在我这边、而且快到期）。
 import { ballOf } from './ball.js'
-import { deadlineLine } from './nextAction.js'
+import { deadlineLine, daysFromToday } from './nextAction.js'
 
 /** 界面上摆出来的两个开关，顺序固定。 */
 export const FILTERS = [
@@ -35,4 +35,20 @@ export function matches(p, on) {
 export function applyFilters(pursuits, on) {
   if (!anyOn(on)) return pursuits
   return pursuits.filter((p) => matches(p, on))
+}
+
+/**
+ * 行动时间到了没——过卡队列判据 2（「现在需要你」的时间那一半）。
+ * 到日子的卡自己进队，不用你扫看板，也不用等你按「更新最新信息」。
+ *
+ * 两种「到了」：该碰日 ≤ 今天；或截止进了 14 天窗口**而且**球在你这边
+ * （对方压着的紧急线该催，但那是判据 1/3 的事——信来了或该碰日到了才吵你，
+ *  光是截止近而球在对方，进队只会让你干瞪眼）。
+ * 收尾列（谈成/暂停）不算——那两列躺着的日期是历史，不是待办。
+ */
+export function dueNow(p) {
+  if (p.stage === 'won' || p.stage === 'paused') return false
+  const touch = daysFromToday(p.next_touch_at)
+  if (touch !== null && touch <= 0) return true
+  return Boolean(deadlineLine(p)?.urgent && ballOf(p) === 'me')
 }
