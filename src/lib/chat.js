@@ -83,6 +83,12 @@ export async function markTouched(pursuitId) {
   return { ok: true }
 }
 
+/** 你认了 Fairwind 提的下一步：记号消失。 */
+export async function acceptNextAction(pursuitId) {
+  const { error } = await supa.rpc('pa_accept_next_action', { p_pursuit_id: pursuitId })
+  if (error) throw new Error(error.message)
+}
+
 /** 移卡：改这条线的阶段。 */
 export async function setStage(pursuitId, stage) {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')

@@ -135,6 +135,8 @@ function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked
           >
             <span className="tick" aria-hidden="true" />
             <span className="pc-act-t">{act.text}</span>
+            {/* 它提的、你还没认的。认了（做完了/自己改过）记号就消失。 */}
+            {act.by === 'fairwind' && <span className="pc-by">它提的</span>}
           </button>
         ) : (
           <div className={'pc-act' + (act.urgent ? ' urgent' : '')}>{act.text}</div>

@@ -369,6 +369,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pc-act.tickable:hover .tick { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
 .pc-act.tickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .pc-act-t { min-width: 0; }
+/* 它提的、你还没认的待办。认了记号就消失（next_action_by → you）。 */
+.pc-by { font-size: 10px; color: var(--accent); border: 1px solid var(--accent-soft); background: var(--accent-soft); border-radius: 5px; padding: 0 5px; margin-left: 6px; flex: none; }
 
 /* ── 球在谁那边 ──
    放在标题上方、当卡片的第一行——因为「现在该谁动」比标题更早需要被看见。
@@ -429,6 +431,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pf.held { color: var(--ink-3); border-style: dashed; }
 .pf-done { font-size: 12.5px; color: var(--good); font-weight: 600; margin: 0 0 10px; }
 .pf-done span { color: var(--ink-3); font-weight: 400; }
+/* 被新信作废的待办：划掉留痕，不删掉。旁边那个「因为这封信 →」点得回去。 */
+.pf-void { font-size: 12px; color: var(--ink-3); }
+.pf-void s { text-decoration-color: var(--g2); }
+/* 「这次发生了什么」：更新最新信息送进队的卡，对话上方先交代这轮动了什么 */
+.qwhat { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 10px 13px; margin-bottom: 12px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
 .pf-why { font-family: var(--serif); font-size: 14.5px; color: var(--ink); margin: 0 0 14px; }
 /* notes 是正文，不是脚注——跟对话气泡同号。加粗的小标题靠 .md strong 提到 --ink，
    比周围的 --ink-2 深一档，扫的时候一眼能找到「流程」「判断」在哪儿。 */

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { fetchMessages, sendMessage } from '../lib/chat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
-import { doneAction } from '../lib/nextAction.js'
+import { doneAction, voidedAction, actionLine } from '../lib/nextAction.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
@@ -106,6 +106,7 @@ export default function PursuitFocus({
   // 不是「你有没有手动改过」——后者不是你要看的东西。
   const [ball, setBallLocal] = useState(ballOf(p))
   const done = doneAction(p)
+  const voided = voidedAction(p)
   const endRef = useRef(null)
 
   // 「在想」不能靠猜。
@@ -192,6 +193,17 @@ export default function PursuitFocus({
     }
   }
 
+  // 「这次发生了什么」：更新最新信息把这张卡送进队，先交代它动了什么再让你过。
+  // 内容全部从库里读（最新的信、作废行、它提的那句）——队列只存 id 和 via，
+  // 不背内容：背了的那份不会跟着库变，迟早说谎。
+  const viaUpdate = queue?.via === 'update'
+  const lastMail = viaUpdate ? [...msgs].reverse().find((m) => m.kind === 'email') : null
+  const proposal = viaUpdate ? actionLine(p) : null
+  const mailWhen = (m) => {
+    const d = m?.created_at ? new Date(m.created_at) : null
+    return d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
+  }
+
   return (
     <div className={'focus ' + variant}>
       <div className="focus-top">
@@ -254,12 +266,27 @@ export default function PursuitFocus({
             <Facts p={p} />
             {/* 勾掉的待办不从卡面消失就完事——这条线上你做过什么，得留得住。 */}
             {done && <p className="pf-done">✓ {done.text} <span>· {done.at}完成</span></p>}
+            {/* 被新信作废的待办：划掉留痕，说得出因为哪封信。不是它凭空没了。 */}
+            {voided && (
+              <p className="pf-void">✗ <s>{voided.text}</s> <span>· {voided.at}作废</span>
+                {voided.byMsg && <span> · 因为这封信</span>}
+              </p>
+            )}
             {p.last_touch_at && <p className="pf-done">✓ 已碰过 <span>· {p.last_touch_at}</span></p>}
             {/* why / notes 库里存的就是 markdown（带加粗、按行分段），
                 原来直接当纯文本塞进 <p>，所以星号露在外面、几行被压成一坨。 */}
             {p.why && <div className="pf-why md"><Md>{p.why}</Md></div>}
             {p.notes && <div className="pf-notes md"><Md>{p.notes}</Md></div>}
           </div>
+
+          {/* 这张卡是「更新最新信息」送进队的：先交代这次发生了什么，再看对话 */}
+          {viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
+            <div className="qwhat">
+              {lastMail && <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}</span>}
+              {voided && <span>作废了 · <s>{voided.text}</s></span>}
+              {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
+            </div>
+          )}
 
           {msgs.length === 0 && !busy ? (
             <div className="empty-thread">{emptyText(p.stage)}</div>

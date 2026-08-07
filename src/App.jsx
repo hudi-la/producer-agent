@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
-import { setStage, setBall, setActionDone, markTouched, setJot } from './lib/chat.js'
+import { setStage, setBall, setActionDone, markTouched, setJot, acceptNextAction } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -314,6 +314,9 @@ export default function App() {
     n: queue.items.length,
     // '2026-08-06' → '8/6'。你什么时候放过它的，得看得见。
     skippedAt: mdOf(qItem?.skippedAt),
+    // 这张卡怎么进队的：'pick' 你自己勾的 / 'update' 更新最新信息送来的。
+    // 抽屉靠它决定要不要摆「这次发生了什么」。
+    via: qItem?.via || null,
   } : null
   // 剩下的全放过了：抽屉不再摆卡，改摆一句话然后停手。
   //
@@ -328,7 +331,16 @@ export default function App() {
     openQueueCard(q.at)
   }
   const finishCard = () => {
-    const q = queueDone(queue, view.pursuit.id)
+    // 「更新最新信息」送进来的卡，点「做完了」= 你认了它提的那句：
+    // 记号消失（next_action_by → you）。先乐观更新再写库；写失败不拦出队——
+    // 「做完了」这个动作本身不能因为一次认领没写上就卡住，但要说一声。
+    const id = view.pursuit.id
+    const cur = pl.pursuits.find((x) => x.id === id)
+    if (qItem?.via === 'update' && cur?.next_action_by === 'fairwind') {
+      setPl((cl) => ({ ...cl, pursuits: cl.pursuits.map((x) => (x.id === id ? { ...x, next_action_by: 'you' } : x)) }))
+      acceptNextAction(id).catch((e) => alert('认领没写上（下次更新它还会带记号）：' + e.message))
+    }
+    const q = queueDone(queue, id)
     setQueue(q)
     if (!q.items.length) closePursuit()
     else openQueueCard(q.at)
