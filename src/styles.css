@@ -70,6 +70,20 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .app-top .sp { flex: 1; }
 .wbtn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
 .wbtn:hover { border-color: var(--accent); }
+.wbtn:disabled { opacity: .4; cursor: default; border-color: var(--line); }
+.wbtn:disabled:hover { border-color: var(--line); }
+/* 勾了几张 —— 不在当前视图里的照实说。 */
+.pickinfo { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.pickinfo em { font-style: normal; color: var(--ink-3); }
+
+/* 顶栏的过卡入口。像一叠东西，不像一个通知。 */
+.qbtn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2);
+  color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
+.qbtn:hover { border-color: var(--accent); }
+.qbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qpile { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); flex: none;
+  box-shadow: 2px -2px 0 -1px var(--paper-2), 3px -3px 0 0 var(--accent); }
 /* ── 出事了才说话 ──
    正常状态不渲染任何东西。两档：danger = 你看到的是假数据；warn = 数据真，
    但渡不干活。危险那档用醒目的暖色铺底——它必须刺眼，看漏了会让你在假数据上做决定。 */
@@ -124,6 +138,24 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .stack-head .pc-badge { top: 12px; right: 12px; }
 /* open call（投申请的正式机会）：左竖条用标里那支蓝，区别于 workshop 冷外联 */
 .pcard.opencall::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; background: var(--mark-blue); }
+/* 批量操作开着的时候，整张卡就是个勾选框。角上那个方块只是给你看的。 */
+.pcard.pickable { cursor: pointer; padding-left: 36px; }
+.pcard.pickable:active { cursor: pointer; }
+.pcard.pickable.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
+.pc-check { position: absolute; left: 13px; top: 14px; width: 15px; height: 15px; border-radius: 4px;
+  border: 1.5px solid var(--line-2); background: var(--paper); flex: none; padding: 0; cursor: pointer; }
+.pcard.on > .pc-check, .pc-check.on { background: var(--accent); border-color: var(--accent); }
+.pcard.on > .pc-check::after, .pc-check.on::after {
+  content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
+  border: solid var(--paper-2); border-width: 0 1.7px 1.7px 0; transform: rotate(42deg); }
+/* 半选：这一叠勾了几张但没勾全 */
+.pc-check.half { border-color: var(--accent); }
+.pc-check.half::after { content: ''; position: absolute; left: 3px; top: 6px; width: 7px; height: 0;
+  border-top: 1.7px solid var(--accent); }
+/* 叠头上那个跟着排版走，不绝对定位。但仍要 relative——
+   里面那个勾（::after）是绝对定位的，没有它就会跑到 .stack-head 的角上去。 */
+.pc-check.st { position: relative; left: auto; top: auto; margin-right: 2px; }
+.pc-check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── pursuit focus ── */
 /* 一条机会线有两种装法，内容完全一样，只差正文宽度和「看板还在不在旁边」：

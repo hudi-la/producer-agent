@@ -85,7 +85,7 @@ function statusText(p) {
   }
 }
 
-function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen }) {
+function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked, onPick }) {
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
   const ball = ballOf(p)
@@ -94,22 +94,27 @@ function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen }) {
 
   // 卡整体是个可点的东西，但里面还嵌了个勾选框——button 套 button 是非法的，
   // 所以外层用 div + role，键盘操作自己接。
-  const open = () => onOpen(p)
+  //
+  // 批量操作开着的时候，整张卡改成「勾/取消勾」——不在卡上另开一个小热区，
+  // 那种一按就按歪。角上那个方块只是给你看的，不单独接点击。
+  const open = () => (picking ? onPick([p.id], !checked) : onOpen(p))
   const onKey = (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() }
   }
 
   return (
     <div
-      className={'pcard' + (opencall ? ' opencall' : '')}
+      className={'pcard' + (opencall ? ' opencall' : '') + (picking ? ' pickable' : '') + (checked ? ' on' : '')}
       style={dim ? { opacity: 0.58 } : undefined}
-      role="button"
+      role={picking ? 'checkbox' : 'button'}
+      aria-checked={picking ? checked : undefined}
       tabIndex={0}
-      draggable
+      draggable={!picking}
       onDragStart={(e) => onDragStart(e, p)}
       onClick={open}
       onKeyDown={onKey}
     >
+      {picking && <span className="pc-check" aria-hidden="true" />}
       {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
       {/* 球在谁那边——stage 说的是走到哪一格，这个说的是现在该谁动。 */}
       {ball && (
@@ -152,31 +157,55 @@ function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen }) {
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot, unseen }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot, unseen, picking, picked, onPick }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
+  // 「找 workshop 机构 · 15 张」那种场景，冷邮件本来就是一批一批起的——
+  // 所以叠头上要能一次勾全叠。不展开也能勾。
+  const hit = items.filter((p) => picked?.has(p.id)).length
+  const allOn = hit === items.length && hit > 0
+  const ids = items.map((p) => p.id)
+
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() }
+  }
+
   return (
     <div className={'stack' + (open ? ' open' : '')}>
-      <button className="stack-head" onClick={onToggle}>
+      <div className="stack-head" role="button" tabIndex={0} onClick={onToggle} onKeyDown={onKey}>
+        {picking && (
+          <button
+            type="button"
+            className={'pc-check st' + (allOn ? ' on' : hit ? ' half' : '')}
+            role="checkbox"
+            aria-checked={allOn ? 'true' : hit ? 'mixed' : 'false'}
+            aria-label={`勾选这一叠 ${items.length} 张`}
+            onClick={(e) => { e.stopPropagation(); onPick(ids, !allOn) }}
+          />
+        )}
         <span className="stack-pile" aria-hidden="true" />
         {anyUnseen && !open && <span className="pc-badge" aria-label="Fairwind 回复了" />}
         <span className="stack-txt">
           <span className="stack-n">{name || '一批机构'}</span>
           <span className="stack-c">
             {items.length} 张{mine ? ` · ${mine} 张待处理` : ''}
+            {picking && hit ? ` · 已选 ${hit}` : ''}
           </span>
         </span>
         <span className="stack-chev" aria-hidden="true">{open ? '收起' : '展开'}</span>
-      </button>
+      </div>
       {open && items.map((p) => (
-        <PCard p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} onJot={onJot} unseen={unseen?.has(p.id)} />
+        <PCard
+          p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} onJot={onJot}
+          unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(p.id)} onPick={onPick}
+        />
       ))}
     </div>
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, onJot, unseen = new Set(), emptyNote = null }) {
+export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -251,9 +280,16 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick,
                   onTick={onTick}
                   onJot={onJot}
                   unseen={unseen}
+                  picking={picking}
+                  picked={picked}
+                  onPick={onPick}
                 />
               ) : (
-                <PCard p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} onJot={onJot} unseen={unseen.has(row.card.id)} />
+                <PCard
+                  p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
+                  onTick={onTick} onJot={onJot} unseen={unseen.has(row.card.id)}
+                  picking={picking} checked={picked.has(row.card.id)} onPick={onPick}
+                />
               )
             )}
           </div>

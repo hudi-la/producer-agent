@@ -14,6 +14,7 @@ import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
+import { loadQueue, saveQueue, normalize, enqueue } from './lib/queue.js'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -33,6 +34,17 @@ export default function App() {
   const [tasksOpen, setTasksOpen] = useState(false)
   // 看哪些。两个开关都关 = 全部。切镜头只改看得见什么，不改任何数据。
   const [filters, setFilters] = useState(NO_FILTERS)
+  // 批量操作：你勾出来的那一批。切镜头不清空 —— 切一下就无声无息没了，
+  // 那是「看不见 = 丢了」的近亲。
+  const [picking, setPicking] = useState(false)
+  const [picked, setPicked] = useState(() => new Set())
+  // 手头这摊活。存 localStorage，不上库（见 lib/queue.js 开头）。
+  const [queue, setQueue] = useState(loadQueue)
+
+  // 这一行必须待在这儿（状态旁边），不能挪到组件下半截去。
+  // 下面那个 Esc 的 useEffect 会用它，而那个 effect 在「载入中」的早退 return
+  // **上面**——定义写在早退下面的话，数据还没到时按 Esc 就是 TDZ 报错。
+  const cancelPick = () => { setPicking(false); setPicked(new Set()) }
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
   const [brain, setBrain] = useState(null)
   const [seen, setSeen] = useState(() => {
@@ -51,6 +63,19 @@ export default function App() {
     loadPursuits().then(setPl)
     loadTasks().then(setTk)
   }, [])
+
+  useEffect(() => { saveQueue(queue) }, [queue])
+
+  // 库换过之后（seed ↔ live，id 完全是两套），localStorage 里可能躺着一批
+  // 已经不存在的 id。不清掉的话顶栏会显示一个点了没反应的数字——那是在说谎。
+  useEffect(() => {
+    if (!pl) return
+    const live = new Set(pl.pursuits.map((p) => p.id))
+    setQueue((q) => {
+      const items = q.items.filter((x) => live.has(x.id))
+      return items.length === q.items.length ? q : normalize({ items, at: q.at })
+    })
+  }, [pl])
 
   // 脑子是本机进程，你随时会把那个终端关掉。每 20 秒探一次，
   // 关了就报警、开回来就自动消失——不用刷新页面。
@@ -94,6 +119,8 @@ export default function App() {
   useEffect(() => {
     const onStorage = (e) => {
       if (e.key === 'pa_seen') { try { setSeen(JSON.parse(e.newValue || '{}')) } catch (_) {} }
+      // 别的标签页把一张卡结掉了，这个标签页顶栏的数字也跟着降。
+      if (e.key === 'pa_queue') { try { setQueue(normalize(JSON.parse(e.newValue || 'null'))) } catch (_) {} }
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -102,7 +129,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
-      if (tasksOpen) setTasksOpen(false)
+      if (picking) cancelPick()
+      else if (tasksOpen) setTasksOpen(false)
       // Esc 是关抽屉最顺手的动作，所以它得跟点「收起」做一样的事——
       // 也标已看、也把 ?p= 从地址栏抹掉。原来它只换了 view，小红点会赖着不走。
       else if (view.name === 'pursuit') {
@@ -113,7 +141,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [tasksOpen, view])
+  }, [tasksOpen, view, picking])
 
   if (!lib || !pl || !tk) return <div className="wrap"><div className="loading">载入中……</div></div>
 
@@ -216,6 +244,33 @@ export default function App() {
       : '没有 14 天内到期的线。')
     : null
 
+  // 勾了但当前镜头看不见的那几张。照实说出来，不假装它们都在眼前。
+  const shownIds = new Set(shown.map((p) => p.id))
+  const hiddenPicked = [...picked].filter((id) => !shownIds.has(id)).length
+
+  const pick = (ids, on) => setPicked((s) => {
+    const next = new Set(s)
+    for (const id of ids) on ? next.add(id) : next.delete(id)
+    return next
+  })
+
+  // 打开队里的某一张。队列和 view 是两件事：view 说「抽屉现在看哪张」，
+  // 队列说「你还欠着哪几件」。收起抽屉不动队列。
+  const openQueueCard = (id) => {
+    const p = pl.pursuits.find((x) => x.id === id)
+    if (p) { markSeen(id); setView({ name: 'pursuit', pursuit: p, mode: 'drawer' }) }
+  }
+
+  // 过一遍：不跑任何东西，直接把勾中的端上工作台。
+  const pickAll = () => {
+    const entries = [...picked].map((id) => ({ id, via: 'pick' }))
+    if (!entries.length) return
+    const q = enqueue(queue, entries)
+    setQueue(q)
+    cancelPick()
+    openQueueCard(q.at)
+  }
+
   const onPursuit = area === 'pursue' && view.name === 'pursuit'
   const paged = onPursuit && view.mode === 'page'     // 整页：看板让位
   const drawered = onPursuit && !paged                // 抽屉：看板留着
@@ -236,6 +291,12 @@ export default function App() {
           ))}
         </nav>
         <span className="sp" />
+        {/* 队空的时候整个按钮不渲染。不显示「过卡 · 0」——这一刀刚撤掉四个占位的。 */}
+        {queue.items.length > 0 && (
+          <button className="qbtn" onClick={() => openQueueCard(queue.at)}>
+            <span className="qpile" aria-hidden="true" />过卡 · {queue.items.length}
+          </button>
+        )}
       </header>
 
       {/* 一切正常时这里什么都不渲染 */}
@@ -251,6 +312,12 @@ export default function App() {
         <Subbar
           filters={filters}
           onToggleFilter={toggleFilter}
+          picking={picking}
+          pickedCount={picked.size}
+          hiddenPickedCount={hiddenPicked}
+          onStartPick={() => setPicking(true)}
+          onCancelPick={cancelPick}
+          onPickAll={pickAll}
           onOpenTasks={() => setTasksOpen(true)}
         />
       )}
@@ -277,7 +344,7 @@ export default function App() {
           {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
               「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
               不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
-          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} onJot={jotCard} unseen={unseen} />
+          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
           {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (
