@@ -15,6 +15,7 @@ import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
+import { refreshPursuit } from './lib/refresh.js'
 import QueueRest from './components/QueueRest.jsx'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
@@ -49,6 +50,31 @@ export default function App() {
   const [picked, setPicked] = useState(() => new Set())
   // 手头这摊活。存 localStorage，不上库（见 lib/queue.js 开头）。
   const [queue, setQueue] = useState(loadQueue)
+  const [refreshing, setRefreshing] = useState(null)      // {i, n} | null
+  const [refreshFailed, setRefreshFailed] = useState(0)   // 上一轮挂了几条，Trouble 用
+
+  // 串行逐线。40 条里多数没邮件，brain 秒回；有信的那几条各要十几秒。
+  // 收到东西的线当场进队（via: 'update'）——不等整轮跑完，先到先过。
+  const runRefresh = async () => {
+    if (refreshing) return
+    const list = pl.pursuits
+    setRefreshFailed(0)
+    let failed = 0
+    for (let i = 0; i < list.length; i++) {
+      setRefreshing({ i: i + 1, n: list.length })
+      try {
+        const out = await refreshPursuit(list[i].id)
+        if (out.added || out.voided || out.proposed) {
+          setQueue((q) => enqueue(q, [{ id: list[i].id, via: 'update' }]))
+        }
+      } catch (_) {
+        failed++
+      }
+    }
+    setRefreshing(null)
+    setRefreshFailed(failed)
+    loadPursuits().then((r) => { if (r) setPl(r) })   // 立刻把新状态拉回来，不等 8 秒轮询
+  }
 
   // 这一行必须待在这儿（状态旁边），不能挪到组件下半截去。
   // 下面那个 Esc 的 useEffect 会用它，而那个 effect 在「载入中」的早退 return
@@ -349,6 +375,7 @@ export default function App() {
         detail={fellBackDetail}
         brainDown={brain ? !brain.up : false}
         brainStale={brain ? brain.stale : false}
+        refreshFailed={refreshFailed}
       />
 
       {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
@@ -364,6 +391,8 @@ export default function App() {
           onCancelPick={cancelPick}
           onPickAll={pickAll}
           onOpenTasks={() => setTasksOpen(true)}
+          onRefresh={runRefresh}
+          refreshing={refreshing}
         />
       )}
 

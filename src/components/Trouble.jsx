@@ -28,9 +28,9 @@ const DANGER = {
   },
 }
 
-export default function Trouble({ fellBack, detail, brainDown, brainStale }) {
+export default function Trouble({ fellBack, detail, brainDown, brainStale, refreshFailed }) {
   const bad = fellBack ? DANGER[fellBack] : null
-  if (!bad && !brainDown && !brainStale) return null      // 一切正常 → 闭嘴
+  if (!bad && !brainDown && !brainStale && !refreshFailed) return null      // 一切正常 → 闭嘴
 
   return (
     <div className="trouble">
@@ -65,6 +65,20 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale }) {
             <span className="tr-fix">
               它开着，但启动之后代码又改过——新加的行为不会生效，而且看不出来。
               到跑 brain 的那个终端按 Ctrl-C，再 <code>npm run brain</code>
+            </span>
+          </span>
+        </div>
+      )}
+      {/* 「更新最新信息」上一轮有线没跑成。数据是真的，只是有几条这轮没更新到——
+          静默失败是最坏的，所以哪怕只挂一条也要在这儿说话。 */}
+      {refreshFailed > 0 && (
+        <div className="tr-row warn">
+          <span className="tr-dot" aria-hidden="true" />
+          <span className="tr-txt">
+            <b>有 {refreshFailed} 条线这轮没更新到</b>
+            <span className="tr-fix">
+              信没丢——它们只是这轮没收到。brain 的终端里有每条的报错，
+              再按一次「更新最新信息」会重试。
             </span>
           </span>
         </div>

@@ -7,13 +7,12 @@ import { FILTERS, NO_FILTERS, anyOn } from '../lib/filters.js'
 // 它们说的是「怎么排」，而看板已经按阶段排了，天生互相打架。
 // 空着可以，假着不行。
 //
-// 这一刀右边只有两个真按钮。「更新最新信息」是第二刀的，那时候再加——
-// 现在放一个还不能用的，就是刚撤掉的那个病。
+// 右边全是真按钮，没有占位的——放一个还不能用的，就是刚撤掉的那个病。
 export default function Subbar({
   filters, onToggleFilter, onSetFilters,
   picking, pickedCount, hiddenPickedCount,
   onStartPick, onCancelPick, onPickAll,
-  onOpenTasks,
+  onOpenTasks, onRefresh, refreshing,
 }) {
   return (
     <div className="subbar">
@@ -51,6 +50,11 @@ export default function Subbar({
         </span>
       )}
 
+      {/* 系统在报，不能点——所以不进按钮组，灰字带转圈 */}
+      {refreshing && (
+        <span className="refreshing"><i className="spin" aria-hidden="true" />更新中 {refreshing.i}/{refreshing.n}</span>
+      )}
+
       <span className="sp" />
 
       {picking ? (
@@ -60,6 +64,7 @@ export default function Subbar({
         </>
       ) : (
         <>
+          <button className="wbtn" disabled={Boolean(refreshing)} onClick={onRefresh}>更新最新信息</button>
           <button className="wbtn" onClick={onStartPick}>批量操作</button>
           <button className="wbtn" onClick={onOpenTasks}>造卡任务</button>
         </>
