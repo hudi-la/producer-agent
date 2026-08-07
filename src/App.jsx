@@ -356,6 +356,7 @@ export default function App() {
         <Subbar
           filters={filters}
           onToggleFilter={toggleFilter}
+          onSetFilters={setFilters}
           picking={picking}
           pickedCount={picked.size}
           hiddenPickedCount={hiddenPicked}

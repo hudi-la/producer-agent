@@ -1,5 +1,5 @@
 import React from 'react'
-import { FILTERS } from '../lib/filters.js'
+import { FILTERS, NO_FILTERS, anyOn } from '../lib/filters.js'
 
 // 二级工具条：**左边镜头（看哪些），右边动作（干什么）。**
 //
@@ -10,7 +10,7 @@ import { FILTERS } from '../lib/filters.js'
 // 这一刀右边只有两个真按钮。「更新最新信息」是第二刀的，那时候再加——
 // 现在放一个还不能用的，就是刚撤掉的那个病。
 export default function Subbar({
-  filters, onToggleFilter,
+  filters, onToggleFilter, onSetFilters,
   picking, pickedCount, hiddenPickedCount,
   onStartPick, onCancelPick, onPickAll,
   onOpenTasks,
@@ -18,8 +18,17 @@ export default function Subbar({
   return (
     <div className="subbar">
       {/* 两个开关，可以同时按下去 —— 真正有用的恰恰是交叉。
-          所以没有「全部」那个按钮：它就是"什么都不按"。 */}
+          「全部」不是第三个开关，是一键清零：开着筛选想回全景，
+          得一个个关太啰嗦。都关着的时候它亮着，表示你看的就是全部。 */}
       <div className="tabs" role="group" aria-label="看哪些">
+        <button
+          type="button"
+          className={'tab' + (!anyOn(filters) ? ' on' : '')}
+          aria-pressed={!anyOn(filters)}
+          onClick={() => onSetFilters(NO_FILTERS)}
+        >
+          全部
+        </button>
         {FILTERS.map(([key, label]) => (
           <button
             key={key}
