@@ -20,7 +20,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-08a'
+export const BRAIN_BUILD = '2026-08-08b'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -56,9 +56,11 @@ async function loadContext(pursuitId) {
   }
 }
 
-async function addMessage(pursuitId, role, content, kind = 'message') {
+async function addMessage(pursuitId, role, content, kind = 'message', meta = null) {
   const { data, error } = await db.rpc('pa_add_message', {
     p_pursuit_id: pursuitId, p_role: role, p_content: content, p_kind: kind,
+    // 不传就完全不带这个键，走函数默认值（0031）——现有那几处 4 参调用一处都不用改。
+    ...(meta ? { p_meta: meta } : {}),
   })
   if (error) throw new Error(`存${role === 'artist' ? '你的话' : 'Fairwind 的回复'}失败：` + error.message)
   return data
@@ -278,11 +280,13 @@ async function think(prompt, tools = READ_TOOLS, profile = null) {
 // ── HTTP ────────────────────────────────────────────────────
 
 async function handleChat(body) {
-  const { pursuit_id, text } = body
+  const { pursuit_id, text, meta } = body
   if (!pursuit_id || !text?.trim()) throw new Error('要有 pursuit_id 和 text')
 
-  // 先落库：哪怕后面想崩了，你说的话也不会丢
-  const mine = await addMessage(pursuit_id, 'artist', text.trim())
+  // 先落库：哪怕后面想崩了，你说的话也不会丢。
+  // meta 只贴在**你这条**上——它记的是「你这句是怎么发出来的」（群发/单发），
+  // 不是这条线的属性，更不是 Fairwind 回复的属性。
+  const mine = await addMessage(pursuit_id, 'artist', text.trim(), 'message', meta || null)
 
   const ctx = await loadContext(pursuit_id)
   console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库`)
