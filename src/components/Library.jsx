@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL } from '../data/entriesSeed.js'
+import Identity from './Identity.jsx'
+import { useProfile } from '../lib/profile.js'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
@@ -87,7 +89,8 @@ function KindSection({ label, items, sub, concerns }) {
   )
 }
 
-export default function Library({ entries, concerns }) {
+export default function Library({ entries, concerns, onProfileSaved }) {
+  const profile = useProfile()
   const byKind = new Map()
   for (const e of entries) {
     if (!byKind.has(e.kind)) byKind.set(e.kind, [])
@@ -108,8 +111,9 @@ export default function Library({ entries, concerns }) {
       <div className="page-inner">
         <header className="page-head">
           <h1>我的档案</h1>
-          <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>hudiworks.com</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
+          <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
+        <Identity onSaved={onProfileSaved} />
         {ordered.map((k) => (
           <KindSection key={k.key} label={k.label} items={k.items} sub={k.sub} concerns={concerns} />
         ))}

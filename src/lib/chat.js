@@ -34,7 +34,7 @@ export async function sendMessage(pursuitId, text) {
   return body
 }
 
-// 「讲懂」没有前端入口了：脑子自己在后台扫「待批准里还没读的卡」去读，
+// 「讲懂」没有前端入口了：脑子自己在后台扫「新机会里还没读的卡」去读，
 // 你点开卡时 brief 已经在库里。sidecar 那边的 POST /brief 还留着（手动补一张时用）。
 
 // ── 你自己的动作：不经过 sidecar ────────────────────────────────
@@ -81,6 +81,21 @@ export async function markTouched(pursuitId) {
   const { error } = await supa.rpc('pa_mark_touched', { p_pursuit_id: pursuitId })
   if (error) throw new Error(error.message)
   return { ok: true }
+}
+
+/**
+ * 「读到这儿了」。
+ *
+ * 原来这件事存在 localStorage 里，于是它只活在某一个浏览器里 —— 换个窗口、
+ * 换台机器，你读过的每一条线都重新变红。它是事实，该跟卡走。
+ *
+ * at 传值只有一个用处：把旧的 localStorage 记录搬上来（见 App.jsx 的一次性搬迁）。
+ * 平时不传 = 现在。库里那边只前进不后退，并发的标签页不会把进度往回拨。
+ */
+export async function markSeen(pursuitId, at = null) {
+  if (!supa) return
+  const { error } = await supa.rpc('pa_mark_seen', { p_pursuit_id: pursuitId, p_at: at })
+  if (error) throw new Error(error.message)
 }
 
 /** 你认了 Fairwind 提的下一步：记号消失。 */

@@ -119,7 +119,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
   border-left: 1px solid var(--line-2); box-shadow: -20px 0 50px -30px #241f1b8c;
   animation: drawer-in .22s cubic-bezier(.4,0,.2,1); }
 @keyframes drawer-in { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
-.col { flex: 0 0 216px; display: flex; flex-direction: column; }
+/* min-width:0 不能省。flex 项的自动最小宽度 = 内容的最小宽度，所以只要某张卡里
+   有一段断不开的长东西（待办里的网址、邮箱），这一列就会被它撑宽——
+   而卡是折在叠里的，你一展开列宽就跳。写死 0，列永远是 216。 */
+.col { flex: 0 0 216px; min-width: 0; display: flex; flex-direction: column; }
 .col-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 13px; padding: 0 2px; }
 .col-h .cn { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; font-weight: 600; color: var(--ink-2); }
 .col-h .cc { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
@@ -137,6 +140,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pcard { cursor: grab; }
 .pcard:active { cursor: grabbing; }
 .col.drop { background: color-mix(in srgb, var(--accent) 7%, transparent); outline: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: -2px; border-radius: 12px; }
+/* 列宽写死之后，断不开的长东西（beallcenter.uci.edu/submissions/blackbox 这种）
+   就得在卡里自己折行，否则它会横着捅出卡片。用 anywhere 而不是 break-word：
+   前者同时把最小内容宽度也算小，这才是让上面那句 min-width:0 真正生效的另一半。 */
+.pcard, .stack-head { overflow-wrap: anywhere; }
 .pcard { position: relative; }
 .pc-badge { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--g2); box-shadow: 0 0 0 3px var(--paper-2); }
 .stack-head { position: relative; }
@@ -170,11 +177,22 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .focus { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative;
          --focus-col: 720px; --focus-pad: 26px; }
 .focus.drawer { --focus-col: 100%; --focus-pad: 22px; }
-.focus-top { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); flex: none; }
-/* 三分之一宽里塞四个控件（收起 / 球权 / 阶段 / 整页），横向很紧：
-   「收起」只留 ✕、「阶段」两个字省掉（下拉自己就写着「待批准」，不用再标一遍）。
-   还是挤不下就换行——宁可多一行，也别让下拉和开关被压变形。 */
-.focus.drawer .focus-top { padding: 12px 14px; gap: 10px; flex-wrap: wrap; row-gap: 8px; }
+/* 顶条分两块：ft-head（返回 + 标题 + 整页）和 ft-ctl（球权 + 阶段）。
+   整页宽，两块并排一行；抽屉窄，各占一行。 */
+.focus-top { display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-bottom: 1px solid var(--line); flex: none; }
+.ft-head { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.ft-ctl { display: flex; align-items: center; gap: 12px; flex: none; }
+/* min-width:0 是关键：不写这句，flex 子项的最小宽度是内容宽度，标题就不肯截断，
+   会把球权和阶段挤出条外。 */
+.ft-title { font-family: var(--serif); font-size: 16px; font-weight: 600; line-height: 1.3; letter-spacing: .005em;
+  margin: 0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 三分之一宽里横向很紧：「收起」只留 ✕、「阶段」两个字省掉
+   （下拉自己就写着「待批准」，不用再标一遍）。标题放不下就走两行，再多截断。 */
+.focus.drawer .focus-top { flex-direction: column; align-items: stretch; gap: 9px; padding: 12px 14px; }
+.focus.drawer .ft-title { font-size: 15px; white-space: normal;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.focus.drawer .ft-ctl { flex-wrap: wrap; gap: 10px; row-gap: 8px; }
 .focus.drawer .back { font-size: 15px; }
 .focus.drawer .back .t { display: none; }
 .focus.drawer .stg-lbl { font-size: 0; gap: 0; }
@@ -193,6 +211,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .qcount { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 /* 你什么时候放过它的。放过 ≠ 翻过去，所以得留个痕。 */
 .qskip { font-size: 11.5px; color: var(--ink-3); }
+/* 「到日子了 · 为什么」提到顶排里，用琥珀色（原来那条单独的 .qwhat 琥珀框合并到这）。 */
+.qwhy { font-size: 12.5px; color: var(--accent); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 剩下的全放过了。不无限转圈。 */
 .qrest { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
@@ -210,8 +230,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .stg-sel { font: inherit; font-size: 12.5px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--accent); background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
 .stg-sel:hover { border-color: var(--accent); }
 .focus-scroll { flex: 1; min-height: 0; overflow-y: auto; }
-.focus-inner { max-width: var(--focus-col); margin: 0 auto; padding: 30px var(--focus-pad) 120px; }
-.fh h1 { font-family: var(--serif); font-weight: 600; font-size: 25px; line-height: 1.2; margin: 0 0 10px; letter-spacing: .005em; }
+/* 上边距从 30 收到 22：标题搬去顶条了，这儿第一眼看到的是事实标签，不用留那么多气 */
+.focus-inner { max-width: var(--focus-col); margin: 0 auto; padding: 22px var(--focus-pad) 120px; }
 .fh .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 26px; }
 .fh .facts b { color: var(--ink); }
 .fh .facts .warn { color: var(--wait); font-weight: 600; }
@@ -282,6 +302,27 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .soon-list b { color: var(--ink); font-weight: 600; }
 .soon-state { font-size: 11px; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 7px; margin-left: 8px; white-space: nowrap; }
 .soon-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); line-height: 1.6; }
+
+/* ── 关于你：档案页最上面那块，库里那份 profile 的编辑面 ──
+   点一下改、失焦存，跟卡上「记一笔」同一套手感。 */
+.identity .idbox { margin-top: 12px; display: grid; gap: 2px; }
+.idrow { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--line); }
+.idrow:last-child { border-bottom: 0; }
+.idk { font-size: 12px; color: var(--ink-3); }
+.idv { min-width: 0; }
+.idval { display: block; width: 100%; text-align: left; padding: 2px 6px; margin-left: -6px;
+  background: none; border: 0; border-radius: 5px; cursor: text;
+  font: inherit; font-size: 13px; color: var(--ink); line-height: 1.55; white-space: pre-wrap; }
+.idval:hover { background: var(--paper-3); }
+.idval.empty { color: var(--ink-3); }
+.idin { display: block; width: 100%; padding: 2px 6px; margin-left: -6px;
+  font: inherit; font-size: 13px; color: var(--ink); line-height: 1.55;
+  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 5px; resize: vertical; }
+.idin:focus { outline: none; }
+.idhint { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.5; }
+.idhint.bad { color: var(--g2); }
+.idnote { margin-top: 10px; font-size: 11.5px; color: var(--ink-3); }
 
 .kind { margin-top: 26px; }
 .kind:first-child { margin-top: 14px; }
@@ -474,3 +515,224 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .md th { background: color-mix(in srgb, var(--paper-3) 60%, transparent); font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce){ .chev, .drawer, .ov-scrim, .pcard, .taskmodal, .toggle, .toggle .knob { transition: none; } }
+
+/* ══════════════════════════════════════════════════════════════
+   整页三栏：卷宗 / 商量 / 交付
+   设计稿 docs/specs/2026-08-05-focus-three-column-and-email-design.md
+
+   三栏三种性质，别混：
+     左 = 素材（这条线已经有的：事实、往来、人、定稿的文件）
+     中 = 商量（你和 Fairwind）
+     右 = 交付（要交出去的东西，可编辑）
+   抽屉不用三栏——它窄，塞不下，保持单栏。
+   ══════════════════════════════════════════════════════════════ */
+/* 三栏宽度跟着窗口走，不写死。
+   写死的话两头都难看：窗口一窄，两侧照样霸着 302/400，中栏被挤成一条缝；
+   窗口一宽，两侧又细得像两条边条。所以用 clamp——中间那段跟 vw 走，
+   两头卡住上下限，免得窄屏挤爆、宽屏拉成大白板。
+   min 是「还看得下去」的底，max 是「再宽也没意义」的顶。 */
+.focus.page .focus-cols { flex: 1; min-height: 0; display: grid;
+  grid-template-columns:
+    clamp(232px, 21vw, 460px)
+    minmax(0, 1fr)
+    clamp(288px, 27vw, 580px); }
+.fc-l, .fc-r { min-height: 0; overflow-y: auto; padding: 14px 14px 40px;
+  background: color-mix(in srgb, var(--paper-2) 55%, var(--paper)); }
+.fc-l { border-right: 1px solid var(--line); }
+.fc-r { border-left: 1px solid var(--line); }
+.fc-m { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* 中栏稍窄稍小——三栏之后它不再是整个页面，字撑那么大反而累。
+   正文列同样跟着窗口走，但顶到 720 就不再长：一行超过这个宽度眼睛回行会丢行。 */
+.focus.page .fc-m { --focus-col: clamp(430px, 44vw, 780px); }
+.focus.page .fc-m .md { font-size: 13.5px; }
+.focus.page .fc-m .bubble { font-size: 13px; }
+.focus.page .fc-m .focus-inner { padding-bottom: 40px; }
+
+/* 截止：并到卡头，跟球权站一起 */
+.dl { display: inline-flex; align-items: baseline; gap: 7px; flex: none;
+  font-size: 12.5px; font-variant-numeric: tabular-nums;
+  padding: 4px 11px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--paper-2); }
+.dl i { font-style: normal; font-size: 11px; color: var(--ink-3); letter-spacing: .3px; }
+.dl b { font-weight: 700; }
+.dl em { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.dl.urgent { border-color: color-mix(in srgb, var(--g2) 45%, transparent);
+  background: color-mix(in srgb, var(--g2) 11%, var(--paper)); }
+.dl.urgent b { color: var(--g2); }
+
+/* ── 左栏：卷宗 ── */
+.secttl { font-size: 10.5px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 8px; }
+.dsect { margin-bottom: 18px; }
+.cue { font-size: 11.5px; color: var(--ink-2); line-height: 1.5; padding: 8px 11px;
+  border-radius: 9px; background: var(--accent-soft); margin-bottom: 8px; }
+.cue.held { background: color-mix(in srgb, var(--g2) 13%, transparent); }
+.cue b { color: var(--ink); font-weight: 600; }
+
+/* 池子：点击开合。左栏一列全是池子，hover 展开会一路闪，所以不用 hover。 */
+.pool { border: 1px solid var(--line-2); border-radius: 11px; background: var(--paper); overflow: hidden; }
+.pool + .pool { margin-top: 8px; }
+/* 标题行 = 开合按钮 + 可选动作 + 计数。三者是兄弟，不是嵌套——
+   button 套 button 是非法的，点一下两个都会响。 */
+.pool-headrow { display: flex; align-items: center; gap: 8px; padding-right: 12px; }
+.pool-head { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font: inherit; font-size: 12.5px;
+  padding: 9px 12px; background: transparent; border: 0; color: var(--ink-2); cursor: pointer; text-align: left; }
+.pool-head:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.pool-head b { font-weight: 600; color: var(--ink); }
+.pool-headrow .n { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; flex: none; }
+.pool-head .chev { font-size: 10px; color: var(--ink-3); transition: transform .15s; }
+/* 标题行上的动作。平时安静（只有边框），hover 才亮起来——
+   它不该跟标题抢注意力，但也不能藏到要找。 */
+.poolbtn { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 7px;
+  border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink-2); cursor: pointer;
+  flex: none; white-space: nowrap; }
+.poolbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.poolbtn:disabled { opacity: .55; cursor: default; }
+.poolbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.syncnote { font-size: 11px; color: var(--ink-3); margin: 8px 0 2px; line-height: 1.5; }
+.syncnote.bad { color: var(--g2); }
+.pool.open .chev { transform: rotate(90deg); }
+.pool.open .pool-head b { color: var(--accent); }
+.pool-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pool-body { padding: 2px 12px 12px; border-top: 1px solid var(--line); }
+.empty { font-size: 12px; color: var(--ink-3); line-height: 1.55; margin: 8px 0 0; }
+
+.dossier .facts { display: flex; flex-direction: column; }
+.dossier .fact { display: flex; gap: 9px; font-size: 12.5px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.dossier .fact:last-child { border-bottom: 0; }
+.dossier .fact i { font-style: normal; color: var(--ink-3); font-size: 11px; letter-spacing: .3px;
+  width: 42px; flex: none; padding-top: 1px; }
+.dossier .fact span { min-width: 0; }
+.dossier .fact a { color: var(--accent); text-decoration: none; }
+.dossier .fact a:hover { text-decoration: underline; }
+
+.mails { display: flex; flex-direction: column; }
+.mail { border-bottom: 1px solid var(--line); padding: 9px 0; }
+.mail:last-child { border-bottom: 0; }
+.mail-top { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; }
+.mail .who { font-weight: 700; font-size: 11px; letter-spacing: .3px; padding: 1px 6px; border-radius: 5px; }
+.mail .who.org { background: color-mix(in srgb, var(--mark-blue) 26%, transparent); color: var(--ink); }
+.mail .who.you { background: var(--accent-soft); color: var(--accent); }
+.mail-sum { font-size: 12.5px; line-height: 1.5; margin-top: 4px; color: var(--ink-2); }
+.mail-acts { display: flex; gap: 12px; margin-top: 4px; }
+.lnk { font: inherit; font-size: 11.5px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; }
+.lnk:hover { text-decoration: underline; }
+.mail-full { margin-top: 7px; padding: 9px 11px; border-radius: 9px; background: var(--paper-2);
+  border: 1px solid var(--line); font-family: var(--serif); font-size: 12.5px; line-height: 1.6;
+  color: var(--ink-2); white-space: pre-wrap; }
+.mail-full .hdr { font-family: var(--sans); font-size: 11px; color: var(--ink-3); margin-bottom: 6px; }
+.flag { font-size: 10.5px; font-weight: 700; letter-spacing: .3px; color: var(--g2);
+  border: 1px solid color-mix(in srgb, var(--g2) 45%, transparent); border-radius: 5px; padding: 0 5px; }
+
+.person { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; line-height: 1.55; margin-top: 9px; }
+.person .avatar { width: 26px; height: 26px; border-radius: 50%; flex: none; background: var(--grad); }
+.person .sub { color: var(--ink-3); font-size: 11.5px; }
+
+.files { display: flex; flex-direction: column; margin-top: 6px; }
+.file { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0;
+  border-bottom: 1px dashed var(--line); font-size: 12.5px; line-height: 1.45; }
+.file:last-child { border-bottom: 0; }
+.file .fi { width: 24px; height: 26px; flex: none; border-radius: 3px; border: 1px solid var(--line-2);
+  background: var(--paper-2); font-size: 8px; font-weight: 700; color: var(--ink-3);
+  display: grid; place-items: center; margin-top: 1px; }
+.file .body { min-width: 0; flex: 1; }
+.file .body b { font-weight: 600; }
+.file .m { display: block; font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+.undo { font: inherit; font-size: 11px; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--line-2);
+  background: transparent; color: var(--ink-3); cursor: pointer; flex: none; align-self: center;
+  white-space: nowrap; opacity: 0; transition: opacity .12s; }
+.file:hover .undo, .undo:focus-visible { opacity: 1; }
+.undo:hover { border-color: var(--g2); color: var(--g2); }
+
+/* ── 中栏里的两样新东西 ── */
+/* 机构来信不能再挂 Fairwind 的名字了 */
+.msg.org .bubble { background: color-mix(in srgb, var(--mark-blue) 12%, var(--paper-2));
+  border: 1px solid color-mix(in srgb, var(--mark-blue) 35%, transparent); }
+.viamail { color: var(--ink-3); font-weight: 400; }
+/* 邮件在左栏，这儿只留一条锚点——时间线上「这天来了一封信」不能没有 */
+.mailanchor { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-3);
+  padding: 6px 0; margin-bottom: 14px; }
+.mailanchor::before { content: ""; height: 1px; background: var(--line); width: 18px; flex: none; }
+.mailanchor::after { content: ""; height: 1px; background: var(--line); flex: 1; }
+.mailanchor b { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.flash { animation: flash 1.6s ease-out; border-radius: 10px; }
+@keyframes flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
+
+/* ── 右栏：交付 ── */
+.deliv .empty { margin-bottom: 12px; }
+.dv { border: 1px solid var(--line-2); border-radius: 12px; background: var(--paper);
+  margin-bottom: 10px; overflow: hidden; }
+.dv-top { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.dv-top h4 { margin: 0; font-size: 13px; font-weight: 600; min-width: 0; }
+.pill { font-size: 10.5px; font-weight: 700; letter-spacing: .3px; padding: 2px 7px; border-radius: 999px;
+  white-space: nowrap; margin-left: auto; }
+.pill.block { background: color-mix(in srgb, var(--g2) 18%, transparent); color: var(--g2); }
+.pill.draft { background: var(--accent-soft); color: var(--accent); }
+.pill.ready { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+.dv-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 12px 0; font-size: 11.5px; color: var(--ink-3); }
+.dv-meta b { color: var(--ink-2); font-weight: 600; }
+.dv-body { padding: 10px 12px 12px; position: relative; }
+.dv-block { font-size: 12.5px; line-height: 1.6; color: var(--ink-2);
+  background: color-mix(in srgb, var(--g2) 9%, transparent); border-radius: 9px; padding: 10px 11px; }
+.dv-block b { color: var(--ink); }
+.dv-block .jump { display: block; margin-top: 7px; font: inherit; font-size: 11.5px; color: var(--accent);
+  background: none; border: 0; padding: 0; cursor: pointer; }
+.dv-edit { width: 100%; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-2);
+  color: var(--ink); font-family: var(--serif); font-size: 13px; line-height: 1.6; padding: 10px 11px;
+  resize: vertical; outline: none; }
+.dv-edit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dv-rule { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3);
+  margin-top: 6px; font-variant-numeric: tabular-nums; }
+.dv-rule .ok { color: var(--good); font-weight: 700; }
+.dv-rule .bad { color: var(--g2); font-weight: 700; }
+.dv-rule .sp2 { margin-left: auto; }
+.dv-save { display: block; font-size: 11px; color: var(--ink-3); margin-top: 4px; height: 14px; }
+.dv-acts { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.dv-acts .b { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 9px;
+  border: 1px solid var(--line-2); background: transparent; color: var(--ink); cursor: pointer; }
+.dv-acts .b.primary { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+.dv-acts .b:disabled { opacity: .45; cursor: not-allowed; }
+.dv-acts .b:not(:disabled):hover { filter: brightness(1.06); }
+.dv-acts .b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dv-why { font-size: 11px; color: var(--ink-3); }
+.dv-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dv-checks li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; }
+.dv-checks .m { font-size: 11px; color: var(--ink-3); }
+.tick { width: 15px; height: 15px; border-radius: 4px; border: 1px solid var(--line-2); flex: none;
+  margin-top: 2px; display: grid; place-items: center; font-size: 10px; color: var(--paper); }
+.tick.on { background: var(--good); border-color: var(--good); }
+.tick.warn { border-color: var(--g2); color: var(--g2); }
+.dv-del { position: absolute; right: 12px; bottom: 12px; font: inherit; font-size: 11px; color: var(--ink-3);
+  background: none; border: 0; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.dv:hover .dv-del, .dv-del:focus-visible { opacity: 1; }
+.dv-del:hover { color: var(--g2); }
+.dv-err { font-size: 12px; color: var(--g2); line-height: 1.5; padding: 8px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--g2) 12%, transparent); margin-bottom: 10px; }
+.dv-foot { font-size: 11.5px; color: var(--ink-3); margin: 14px 0 0; }
+.newout { width: 100%; font: inherit; font-size: 12.5px; padding: 9px; border: 1px dashed var(--line-2);
+  border-radius: 11px; background: transparent; color: var(--ink-3); cursor: pointer; }
+.newout:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 三栏撑不住了就分两步退，不要一步摔到底。
+   1080–1300：两侧已经缩到下限（232 + 288），中栏只剩 560 左右——还能用，
+   所以这一档只把左右两栏的内边距收一收，多挤出十几个像素给中栏。 */
+@media (max-width: 1300px) {
+  .fc-l, .fc-r { padding-left: 10px; padding-right: 10px; }
+  .focus.page .fc-m { --focus-pad: 18px; }
+}
+/* 1080 以下：中栏就算给到全部剩余也读不成一段话了，这时候三栏是硬撑。
+   叠成一栏，顺序 卷宗 → 商量 → 交付——先看清这条线有什么，再商量，再交东西。 */
+@media (max-width: 1080px) {
+  .focus.page .focus-cols { grid-template-columns: minmax(0, 1fr); }
+  .fc-l, .fc-r { border: 0; border-bottom: 1px solid var(--line); overflow: visible;
+    padding-left: 14px; padding-right: 14px; }
+  .fc-m { min-height: 60vh; }
+  .focus.page .fc-m { --focus-col: 100%; }
+}
+/* 备注 / 决定：这条线上的一笔记录，不是谁在说话 */
+.notecard { border-left: 2px solid var(--line-2); padding: 2px 0 2px 12px; margin-bottom: 14px; }
+.notecard .ntag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .5px;
+  color: var(--ink-3); margin-bottom: 4px; }
+.notecard .md { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+.notecard .md strong { color: var(--ink); }
+.lnk:disabled { color: var(--ink-3); cursor: default; text-decoration: none; }

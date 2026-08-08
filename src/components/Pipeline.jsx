@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, actionLine } from '../lib/nextAction.js'
+import { heldLabel, useProfile } from '../lib/profile.js'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
 // 然后发出去、等回信；末尾两个收尾去处——成了 = 谈成，停了 = 暂停处理。
 const STAGES = [
-  ['pending', '待批准'],
+  ['pending', '新机会'],
   ['matching', '匹配项目'],
   ['writing', '一起写'],
   ['sent', '发出&提交'],
-  ['replying', '初次回信&继续沟通'],
+  ['replying', '进一步'],
   ['won', '谈成'],
   ['paused', '暂停处理'],
 ]
@@ -70,8 +71,8 @@ function Jot({ p, onSave }) {
   )
 }
 
-function statusText(p) {
-  if (!p.eligible && (p.stage === 'pending' || p.stage === 'matching')) return 'O-1 · 资格搁置'
+function statusText(p, held) {
+  if (!p.eligible && (p.stage === 'pending' || p.stage === 'matching')) return held
   switch (p.stage) {
     case 'pending': return '读透了，等你批'
     case 'matching': return '一起挑作品'
@@ -86,6 +87,7 @@ function statusText(p) {
 }
 
 function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked, onPick }) {
+  const held = heldLabel(useProfile())
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
   const ball = ballOf(p)
@@ -152,7 +154,7 @@ function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked
       <Jot p={p} onSave={onJot} />
       <div className="pc-m" style={p.stage === 'won' ? { color: 'var(--good)' } : undefined}>
         <span className={'src' + (p.source === 'manual' ? '' : ' scout')} aria-hidden="true" />
-        {p.contact_name ? p.contact_name + ' · ' : ''}{statusText(p)}
+        {p.contact_name ? p.contact_name + ' · ' : ''}{statusText(p, held)}
       </div>
     </div>
   )

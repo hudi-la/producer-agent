@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
-import { setStage, setBall, setActionDone, markTouched, setJot, acceptNextAction } from './lib/chat.js'
+import { loadProfile, ProfileContext, PROFILE_FALLBACK } from './lib/profile.js'
+import { setStage, setBall, setActionDone, markTouched, setJot, acceptNextAction, markSeen as markSeenDb } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -39,6 +40,8 @@ export default function App() {
   const [lib, setLib] = useState(null)
   const [pl, setPl] = useState(null)
   const [tk, setTk] = useState(null)
+  // 关于你自己的事实。卡片、详情页、档案页都要用，所以走 context 而不是一路当 prop 传。
+  const [profile, setProfile] = useState(PROFILE_FALLBACK)
   const [view, setView] = useState({ name: 'home' })
   const [area, setArea] = useState('pursue')
   const [tasksOpen, setTasksOpen] = useState(false)
@@ -102,22 +105,31 @@ export default function App() {
   const cancelPick = () => { setPicking(false); setPicked(new Set()) }
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
   const [brain, setBrain] = useState(null)
-  const [seen, setSeen] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pa_seen') || '{}') } catch (_) { return {} }
-  })
   const focusedOnceRef = useRef(false)
   const dueScannedRef = useRef(false)
+  const migratedRef = useRef(false)
 
-  const markSeen = (id) => setSeen((s) => {
-    const next = { ...s, [id]: new Date().toISOString() }
-    try { localStorage.setItem('pa_seen', JSON.stringify(next)) } catch (_) {}
-    return next
-  })
+  // 「读到这儿了」写进库（0030 的 pursuit_seen）。跟卡走，不跟浏览器走。
+  //
+  // 先就地把 unread 关掉再写库：小红点该在你点开的那一瞬间灭，不该等一趟网络。
+  // 写失败也不回滚——最坏是下一次 8 秒轮询把它带回来，比卡在那儿转圈强。
+  const markSeen = (id) => {
+    setPl((cur) => {
+      if (!cur) return cur
+      const hit = cur.pursuits.find((p) => p.id === id)
+      // 没变化就原样返回 —— 下面那个「正看着的这张随时算已看」的 effect 依赖 pl，
+      // 每次都造个新对象的话它会自己触发自己，停不下来。
+      if (!hit || !hit.unread) return cur
+      return { ...cur, pursuits: cur.pursuits.map((p) => (p.id === id ? { ...p, unread: false } : p)) }
+    })
+    markSeenDb(id).catch(() => {})
+  }
 
   useEffect(() => {
     loadLibrary().then(setLib)
     loadPursuits().then(setPl)
     loadTasks().then(setTk)
+    loadProfile().then(setProfile)
   }, [])
 
   useEffect(() => { saveQueue(queue) }, [queue])
@@ -134,6 +146,41 @@ export default function App() {
     // 开页面时扫一次「到日子的」（判据 2）。只扫这一次，不跟着 8 秒轮询反复扫——
     // 「做完了」出队的卡这个会话里不再回来；真没办的话，下次开页面它还在，那是对的。
     if (!dueScannedRef.current) { dueScannedRef.current = true; enqueueDue(pl.pursuits) }
+  }, [pl])
+
+  // 一次性搬迁：把旧的 localStorage['pa_seen'] 推进库里。
+  //
+  // 不搬的话，改完第一次打开时你读过的每一条线都会重新变红——那份记录是真的，
+  // 不能因为换了个存法就当它不存在。
+  //
+  // 只跑一次，跑完盖个记号（**不删原值**，万一搬错了还查得回来）。
+  // 库里那边只前进不后退，所以搬进去的旧时间戳压不掉任何已有的阅读进度。
+  useEffect(() => {
+    if (!pl || pl.source !== 'live' || migratedRef.current) return
+    migratedRef.current = true
+    let old
+    try {
+      if (localStorage.getItem('pa_seen_migrated')) return
+      old = JSON.parse(localStorage.getItem('pa_seen') || '{}')
+    } catch (_) { return }
+    const ids = new Set(pl.pursuits.map((p) => p.id))
+    const rows = Object.entries(old || {}).filter(([id, at]) => ids.has(id) && at)
+    if (!rows.length) {
+      try { localStorage.setItem('pa_seen_migrated', new Date().toISOString()) } catch (_) {}
+      return
+    }
+    ;(async () => {
+      let ok = 0
+      for (const [id, at] of rows) {
+        try { await markSeenDb(id, at); ok++ } catch (_) {}
+      }
+      // 全部成功才盖记号——半路失败的话下次开页面接着搬（RPC 幂等，重来没副作用）
+      if (ok === rows.length) {
+        try { localStorage.setItem('pa_seen_migrated', new Date().toISOString()) } catch (_) {}
+        const r = await loadPursuits()
+        if (r) setPl(r)
+      }
+    })()
   }, [pl])
 
   // 脑子是本机进程，你随时会把那个终端关掉。每 20 秒探一次，
@@ -174,10 +221,11 @@ export default function App() {
     if (p) { focusedOnceRef.current = true; markSeen(pid); setView({ name: 'pursuit', pursuit: p, mode: 'page' }) }
   }, [pl])
 
-  // 别的标签页把某张卡标成「已看」时，这个标签页的小红点也跟着清掉。
+  // 「已看」不再走 localStorage —— 它在库里，8 秒一次的轮询自然会把别处的阅读
+  // 带过来，而且跨浏览器、跨机器都算数（原来只有同一个浏览器的标签页之间才同步）。
+  // 队列还在本地，所以这个监听留着。
   useEffect(() => {
     const onStorage = (e) => {
-      if (e.key === 'pa_seen') { try { setSeen(JSON.parse(e.newValue || '{}')) } catch (_) {} }
       // 别的标签页把一张卡结掉了，这个标签页顶栏的数字也跟着降。
       if (e.key === 'pa_queue') { try { setQueue(normalize(JSON.parse(e.newValue || 'null'))) } catch (_) {} }
     }
@@ -221,15 +269,14 @@ export default function App() {
     window.history.replaceState(null, '', window.location.pathname)
     setView({ name: 'home' })
   }
-  // 你离开期间 Fairwind 回了的卡：最后一条是 Fairwind 发的、且比你上次看它更新。当前打开的那张不算。
+  // 你离开期间 Fairwind 说了话、你还没读到的卡。判据在库里算（0030 的 v_pa_pursuits.unread）：
+  // 最后一条是 Fairwind 说的、不是建卡那份 brief、且晚于你上次读这条线。
+  // 对方来信不直接点红点——收信时 Fairwind 会补一句告知，由那句来点。
+  // 当前正开着的那张不算。
   const unseen = new Set(
-    pl.pursuits.filter((p) => {
-      if (view.name === 'pursuit' && view.pursuit.id === p.id) return false
-      const list = pl.messagesByPursuit[p.id]
-      const last = list && list[list.length - 1]
-      const seenAt = seen[p.id] ? new Date(seen[p.id]).getTime() : 0
-      return last && last.role === 'producer' && new Date(last.created_at).getTime() > seenAt
-    }).map((p) => p.id)
+    pl.pursuits
+      .filter((p) => p.unread && !(view.name === 'pursuit' && view.pursuit.id === p.id))
+      .map((p) => p.id)
   )
 
   // 移卡：先乐观更新，再写回库；写失败就回滚 + 提示
@@ -387,6 +434,7 @@ export default function App() {
   const drawered = onPursuit && !paged                // 抽屉：看板留着
 
   return (
+   <ProfileContext.Provider value={profile}>
     <div className={'wrap' + (drawered ? ' drawered' : '')}>
       <header className="app-top">
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
@@ -440,7 +488,8 @@ export default function App() {
       {area === 'people' ? (
         <People tasks={tk.tasks.filter(isPeopleTask)} pursuits={pl.pursuits} />
       ) : area === 'profile' ? (
-        <Library entries={lib.entries} concerns={lib.concerns} />
+        <Library entries={lib.entries} concerns={lib.concerns}
+                 onProfileSaved={() => loadProfile().then(setProfile)} />
       ) : paged ? (
         <PursuitFocus
           // key：换一条线就换一个实例。不加的话 React 复用同一个，thinking / text /
@@ -491,5 +540,6 @@ export default function App() {
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
       <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)} />
     </div>
+   </ProfileContext.Provider>
   )
 }

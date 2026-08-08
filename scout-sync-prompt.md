@@ -14,7 +14,7 @@
    - `match_stars`=H匹配度（★★★→3，★★→2）
    - `why`=I中文简介；`notes`=J英文Notes（可空）
    - `source`='scout_aggregators'；`task_id`=(select id from producer.tasks where type='scout_aggregators')
-   - `stage`='pending'（先进「待批准」列——producer 在后台替 HuDi 读透后，HuDi 再批准）
+   - `stage`='pending'（先进「新机会」列——producer 在后台替 HuDi 读透后，HuDi 再批准）
    - `eligible`：默认 true；来自 Eligibility Hold sheet、或 G状态含“绿卡/公民限定/工作权” → false
    - G状态含 🟡 或“关注” → 仍插入，`notes` 开头加 “🟡 关注 · ”
 

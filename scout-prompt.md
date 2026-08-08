@@ -26,7 +26,7 @@
    - `match_stars`=匹配度（★★★→3，★★→2）
    - `why`=中文一句话理由；`notes`=英文 Notes（可空；🟡关注 在此注明）
    - `source`='scout_aggregators'；`task_id`=(select id from producer.tasks where type='scout_aggregators')
-   - `stage`='pending'（新卡先落进「待批准」——producer 在后台替 HuDi 读透，再由 HuDi 批准）
+   - `stage`='pending'（新卡先落进「新机会」——producer 在后台替 HuDi 读透，再由 HuDi 批准）
    - `eligible`：默认 true；限美国公民/绿卡或需当地工作权 → false
 
    INSERT 模板（每条一句）：
@@ -60,4 +60,4 @@ where stage not in ('won','paused');
 == 输出 ==
 给 HuDi 一条简洁中文消息：先报「本周新增」（列出入库的项目名 + 一句话理由；没有就说“本周无新增合适机会”），再给三组截止提醒（30 天内都没有就说“近 30 天无临近截止”）。语气友好直接简洁，别长篇。
 
-（注：不再写 Excel。所有机会现在进 Supabase 的 `producer.pursuits`，先落「待批准」列——producer 在后台替 HuDi 读透后，HuDi 再批准。）
+（注：不再写 Excel。所有机会现在进 Supabase 的 `producer.pursuits`，先落「新机会」列——producer 在后台替 HuDi 读透后，HuDi 再批准。）

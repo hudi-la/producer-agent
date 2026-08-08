@@ -2,9 +2,13 @@ import React, { useEffect, useRef, useState } from 'react'
 import { fetchMessages, sendMessage } from '../lib/chat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { doneAction, voidedAction, actionLine } from '../lib/nextAction.js'
+import { fetchDeliverables, fetchAttachments, setFinal, syncMail } from '../lib/deliverables.js'
+import Dossier from './Dossier.jsx'
+import Deliverables from './Deliverables.jsx'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
+import { heldLabel, useProfile } from '../lib/profile.js'
 
 // remark-breaks：单个换行就换行。标准 markdown 里单换行等于空格，
 // 可 Fairwind 和 scout 写进库的东西是按行分的（「**流程**：…\n**判断**：…」），
@@ -21,8 +25,8 @@ function Md({ children }) {
 }
 
 const STAGE_LABELS = {
-  pending: '待批准', matching: '匹配项目', writing: '一起写', sent: '发出&提交',
-  replying: '初次回信&继续沟通', won: '谈成', paused: '暂停处理',
+  pending: '新机会', matching: '匹配项目', writing: '一起写', sent: '发出&提交',
+  replying: '进一步', won: '谈成', paused: '暂停处理',
 }
 const STAGE_ORDER = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused']
 
@@ -30,6 +34,7 @@ const srcLabel = (s) => (s === 'manual' ? '你丢的' : 'scout')
 const PAYOFF = { paid: '给钱', access: '给圈子', both: '钱 + 圈子' }
 
 function Facts({ p }) {
+  const profile = useProfile()
   const stars = p.match_stars ? '★'.repeat(p.match_stars) : null
   return (
     <div className="pfacts">
@@ -45,12 +50,48 @@ function Facts({ p }) {
       <span className="pf"><i>来源</i>{srcLabel(p.source)}</span>
       <span className="pf"><i>主打作品</i>{p.work_title || '待定'}</span>
       {p.url && <a className="pf pf-a" href={p.url} target="_blank" rel="noreferrer"><i>链接</i>官方页面 ↗</a>}
-      {!p.eligible && <span className="pf held">O-1 · 资格搁置</span>}
+      {!p.eligible && <span className="pf held">{heldLabel(profile)}</span>}
     </div>
   )
 }
 
+// 截止并进卡头，跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关。
+// 原来截止在左边的事实堆里、球权在卡头，两个要害分在两处；而且球权还出现过两次
+// （左栏那份是只读副本），人会以为是两件事。
+function Deadline({ p }) {
+  const raw = p.deadline_at || p.deadline
+  if (!raw) return null
+  // 按日历天算，不按 24 小时算。截止在明天，就该说「剩 1 天」——
+  // 用毫秒差去 ceil 的话现在是下午就会说成 2 天，多给你一天不存在的余地。
+  let left = null
+  if (p.deadline_at) {
+    const d = new Date(p.deadline_at + 'T00:00:00')
+    if (!Number.isNaN(+d)) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      left = Math.round((d - today) / 86400000)
+    }
+  }
+  const urgent = left != null && left <= 14
+  return (
+    <span className={'dl' + (urgent ? ' urgent' : '')}>
+      <i>截止</i><b>{raw}</b>
+      {left != null && <em>{left < 0 ? '已过' : left === 0 ? '今天' : `剩 ${left} 天`}</em>}
+    </span>
+  )
+}
+
 function Message({ m }) {
+  // 备注不是谁在说话。role='note' 是这条线上的一笔记录（线下发生的事、一个决定），
+  // 原来它也走「其余一律显示 Fairwind」那条路，于是你自己记的事看起来像 Fairwind 说的。
+  if (m.role === 'note') {
+    return (
+      <div id={'msg-' + m.id} className="notecard">
+        <span className="ntag">{m.kind === 'decision' ? '决定' : '备注'}</span>
+        <div className="md"><Md>{m.content}</Md></div>
+      </div>
+    )
+  }
   if (m.kind === 'brief') {
     return (
       <div className="msg-row">
@@ -71,17 +112,51 @@ function Message({ m }) {
       </div>
     )
   }
+  // 谁在说话，得说准。
+  //
+  // 原来只分两类：artist 显示「你」，**其余一律显示 Fairwind**。于是库里 10 封
+  // role='org' 的机构来信在界面上全挂着 Fairwind 的名字——Kirk 说的、Sarah 说的、
+  // CultureHub 的正式邀请，看起来都像是 Fairwind 说的。这是在骗人。
   const mine = m.role === 'artist'
+  const external = m.role === 'org'
+  const who = mine ? '你' : external ? (m.meta?.from_name || '对方') : 'Fairwind'
   return (
-    <div className={'msg' + (mine ? ' you' : ' producer')}>
-      <span className="who">{mine ? '你' : 'Fairwind'}</span>
+    <div id={'msg-' + m.id} className={'msg' + (mine ? ' you' : external ? ' org' : ' producer')}>
+      <span className="who">{who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}</span>
       <div className="bubble md"><Md>{m.content}</Md></div>
     </div>
   )
 }
 
+// 整页里，邮件在左栏卷宗，中栏只留这一条锚点。
+// 它必须留——时间线上「这天来了一封信」是叙事的一部分，抽掉了对话就断了。
+function MailAnchor({ m, onJump }) {
+  const d = m.created_at ? new Date(m.created_at) : null
+  const when = d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
+  const who = m.role === 'artist' ? '你发了一封' : `${m.meta?.from_name || '对方'}来信`
+  return (
+    <div id={'msg-' + m.id} className="mailanchor">
+      <b>{when}</b> {who}
+      <button className="lnk" onClick={() => onJump?.(m.id)}>看左栏 ↖</button>
+    </div>
+  )
+}
+
+// 已经被搬进右栏产出的那版草稿，这儿只留一条线索。
+// 不是删——原文一个字没动，还在库里，也还在右栏那份产出的正文里。
+// 只是同一段话在一屏上出现两次，人会以为是两份东西。
+function PromotedAnchor({ m, title }) {
+  const d = m.created_at ? new Date(m.created_at) : null
+  const when = d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
+  return (
+    <div id={'msg-' + m.id} className="mailanchor">
+      <b>{when}</b> Fairwind 起了一版 → 成了右栏的《{title}》
+    </div>
+  )
+}
+
 function emptyText(stage) {
-  // 待批准的卡本该在后台就读透了。还空着 = 脑子没开，或刚进来还没轮到。
+  // 新机会的卡本该在后台就读透了。还空着 = 脑子没开，或刚进来还没轮到。
   if (stage === 'pending') return 'Fairwind 还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。'
   if (stage === 'matching') return '你批准了——接下来我们一起挑用哪件作品，再往下写。'
   return '这条机会线还没有往来。我这就开始。'
@@ -108,6 +183,12 @@ export default function PursuitFocus({
   const done = doneAction(p)
   const voided = voidedAction(p)
   const endRef = useRef(null)
+  // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
+  const threeCol = !inDrawer
+  const [deliv, setDeliv] = useState([])
+  const [atts, setAtts] = useState([])
+  const [syncing, setSyncing] = useState(false)
+  const [syncNote, setSyncNote] = useState(null)
 
   // 「在想」不能靠猜。
   //
@@ -128,7 +209,7 @@ export default function PursuitFocus({
   const stalled = awaiting && !thinking && waitedMs >= STALE_MS
 
   // 换一条线：先用手上的，再从库里拉最新（别的地方写进来的卡也能看见）。
-  // 「讲懂」不在这儿触发了——脑子在后台把待批准的卡先读好，你点开时它已经在库里。
+  // 「讲懂」不在这儿触发了——脑子在后台把新机会的卡先读好，你点开时它已经在库里。
   useEffect(() => {
     let alive = true
     setMsgs(messages || [])
@@ -144,6 +225,49 @@ export default function PursuitFocus({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [msgs.length, thinking])
+
+  // 产出和附件。只有整页要，抽屉不拉——省一次往返。
+  async function reloadDeliv() {
+    if (!threeCol) return
+    const [d, a] = await Promise.all([fetchDeliverables(p.id), fetchAttachments(p.id)])
+    if (d) setDeliv(d)
+    if (a) setAtts(a)
+  }
+  useEffect(() => {
+    setDeliv([]); setAtts([]); setSyncNote(null)
+    reloadDeliv()
+    const iv = setInterval(reloadDeliv, 5000)
+    return () => clearInterval(iv)
+  }, [p.id, threeCol])
+
+  // 收信。失败要说出来——不说的话你会以为「没新信」，其实是同步断了。
+  async function doSync() {
+    setSyncing(true)
+    try {
+      const r = await syncMail(p.id)
+      setSyncNote(r.note ? r.note : r.added ? `刚收到 ${r.added} 封` : '收过了，没有新的')
+      const rows = await fetchMessages(p.id)
+      if (rows) setMsgs(rows)
+    } catch (e) {
+      setSyncNote('收信失败：' + e.message)
+    } finally { setSyncing(false) }
+  }
+
+  // 取消定稿：左栏那份退回右栏接着改。改的还是同一份，不生第二个版本。
+  async function unfinal(id) {
+    try { await setFinal(id, false); await reloadDeliv() } catch (e) { setErr(e.message) }
+  }
+
+  // 两个方向的跳：产出/卷宗 → 中栏那一句；中栏的锚点 → 左栏那封信
+  function flashTo(domId) {
+    const el = document.getElementById(domId)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('flash')
+    setTimeout(() => el.classList.remove('flash'), 1600)
+  }
+  const jumpTo = (msgId) => flashTo('msg-' + msgId)
+  const jumpMail = (msgId) => flashTo('dmail-' + msgId)
 
   // 实时兜底：开着这条线时每 3 秒拉一次库。 Fairwind 在后台想完的回复会自动出现——
   // 你不必守着这个页面。离开再回来也一样，因为回复本就落在库里，不在你的屏幕上。
@@ -193,6 +317,11 @@ export default function PursuitFocus({
     }
   }
 
+  // 哪些消息已经被搬进右栏当产出了（deliverables.source_msg 指着它）
+  const promotedFrom = new Map(
+    deliv.filter((d) => d.source_msg).map((d) => [d.source_msg, d.title])
+  )
+
   // 「这次发生了什么」：更新最新信息把这张卡送进队，先交代它动了什么再让你过。
   // 内容全部从库里读（最新的信、作废行、它提的那句）——队列只存 id 和 via，
   // 不背内容：背了的那份不会跟着库变，迟早说谎。
@@ -204,92 +333,21 @@ export default function PursuitFocus({
     return d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
   }
 
-  return (
-    <div className={'focus ' + variant}>
-      <div className="focus-top">
-        {/* 队头。翻页什么都不改——翻回来那张原样在那儿，所以 ‹ › 旁边
-            没有任何「已处理」的标记，只有位置。
-            两个出口也在这排——原来在抽屉底部，跟输入框叠在一起被盖住了；
-            而且「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */}
-        {queue && (
-          <div className="qnav">
-            <button className="qarrow" onClick={onQueuePrev} disabled={queue.i <= 0} aria-label="上一张">‹</button>
-            <span className="qcount">{queue.i + 1} / {queue.n}</span>
-            <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
-            {queue.skippedAt && <span className="qskip">{queue.skippedAt} 你先放着了</span>}
-            <span className="qsp" />
-            {/* 只有「做完了」让顶栏那个数字降下去——「再等一等」留在队里挪队尾，它还欠着。 */}
-            <button className="wbtn" onClick={onQueueDone}>做完了</button>
-            <button className="btn" onClick={onQueueLater}>再等一等</button>
-          </div>
-        )}
-
-        {/* 你为什么在队里。
-            一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
-            「到日子了」和「更新最新信息送来的」都要交代，只有你自己勾进来的
-            （via='pick'）不用：那是你亲手放的，不用它讲给你听。
-          **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
-          effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
-          跟两个出口挪上来是同一个理由。 */}
-        {queue?.dueWhy && (
-          <div className="qwhat">
-            <span>到日子了 · {queue.dueWhy}</span>
-          </div>
-        )}
-        {queue && viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
-          <div className="qwhat">
-            {lastMail && <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}</span>}
-            {voided && <span>作废了 · <s>{voided.text}</s></span>}
-            {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
-          </div>
-        )}
-        {inDrawer ? (
-          <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
-        ) : (
-          <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
-        )}
-        <span style={{ flex: 1 }} />
-        {/* 球在谁那边。Fairwind 自己贴一个，贴错了直接改掉——没有「谁来判断」这个选项。
-            两个都不亮 = 还没有依据（既没往来也没跟进日），你可以自己定一个。 */}
-        <div className="ballsw" role="group" aria-label="球在谁那边">
-          {BALL_STATES.map(([v, label]) => (
-            <button
-              key={v}
-              type="button"
-              className={'bsw ' + v + (ball === v ? ' on' : '')}
-              aria-pressed={ball === v}
-              onClick={() => { if (ball === v) return; setBallLocal(v); onSetBall?.(p.id, v) }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <label className="stg-lbl">阶段
-          <select
-            className="stg-sel"
-            value={stage}
-            onChange={(e) => { setStageLocal(e.target.value); onMove?.(p.id, e.target.value) }}
-          >
-            {STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-          </select>
-        </label>
-        {inDrawer && (
-          <button className="expand" onClick={() => onExpand?.(p)} title="在新标签页里整页打开">
-            整页 <span aria-hidden="true">↗</span>
-          </button>
-        )}
-      </div>
+  // 中栏那一整块：往来时间线 + 输入框。三栏和抽屉装的是同一份内容，
+  // 只是三栏把它塞进中间那格，抽屉直接铺满。
+  const body = (
+    <>
       <div className="focus-scroll">
         <div className="focus-inner">
           <div className="fh">
-            <h1>{p.title}</h1>
-            <Facts p={p} />
+            {/* 整页时事实搬去了左栏卷宗，这儿不再重复一遍；抽屉没有卷宗，照旧显示 */}
+            {!threeCol && <Facts p={p} />}
             {/* 勾掉的待办不从卡面消失就完事——这条线上你做过什么，得留得住。 */}
             {done && <p className="pf-done">✓ {done.text} <span>· {done.at}完成</span></p>}
-            {/* 被新信作废的待办：划掉留痕，说得出因为哪封信。不是它凭空没了。 */}
+            {/* 被新信作废的待办：划掉留痕，说得出因为哪封信、点得回去。不是它凭空没了。 */}
             {voided && (
               <p className="pf-void">✗ <s>{voided.text}</s> <span>· {voided.at}作废</span>
-                {voided.byMsg && <span> · 因为这封信</span>}
+                {voided.byMsg && <button className="lnk" onClick={() => jumpTo(voided.byMsg)}>因为这封信 →</button>}
               </p>
             )}
             {p.last_touch_at && <p className="pf-done">✓ 已碰过 <span>· {p.last_touch_at}</span></p>}
@@ -299,12 +357,20 @@ export default function PursuitFocus({
             {p.notes && <div className="pf-notes md"><Md>{p.notes}</Md></div>}
           </div>
 
-
           {msgs.length === 0 && !busy ? (
             <div className="empty-thread">{emptyText(p.stage)}</div>
           ) : (
             <div className="thread">
-              {msgs.map((m, i) => <Message m={m} key={m.id || i} />)}
+              {/* 整页里邮件不进这条流——它在左栏卷宗。这儿只留一条极轻的锚点，
+                  点它跳到左边那封。信一封不少，只是待在它该待的地方。 */}
+              {msgs.map((m, i) => {
+                if (threeCol && m.kind === 'email') {
+                  return <MailAnchor m={m} key={m.id || i} onJump={jumpMail} />
+                }
+                const promoted = threeCol && promotedFrom.get(m.id)
+                if (promoted) return <PromotedAnchor m={m} title={promoted} key={m.id || i} />
+                return <Message m={m} key={m.id || i} />
+              })}
               {/* 没在想、又确实欠着一条回复——说实话，别拿三个点糊弄过去 */}
               {stalled && (
                 <div className="stalled">
@@ -338,6 +404,120 @@ export default function PursuitFocus({
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
       </div>
+    </>
+  )
+
+  return (
+    <div className={'focus ' + variant}>
+      {/* 标题在顶条里，跟着一起钉住——你往下读对话时，「这是哪条线」不该滚走。
+          整页一行放得下就一行，放不下截断；抽屉窄，最多两行。 */}
+      <div className="focus-top">
+        {/* 队头。翻页什么都不改——翻回来那张原样在那儿，所以 ‹ › 旁边
+            没有任何「已处理」的标记，只有位置。
+            两个出口也在这排——原来在抽屉底部，跟输入框叠在一起被盖住了；
+            而且「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */}
+        {queue && (
+          <div className="qnav">
+            <button className="qarrow" onClick={onQueuePrev} disabled={queue.i <= 0} aria-label="上一张">‹</button>
+            <span className="qcount">{queue.i + 1} / {queue.n}</span>
+            <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
+            {queue.dueWhy && <span className="qwhy">到日子了 · {queue.dueWhy}</span>}
+            <span className="qsp" />
+            {/* 只有「做完了」让顶栏那个数字降下去、把卡从队里拿走。
+                想先放着 = 翻页 ‹ › 走过去、或关掉抽屉——它下次还在原位。 */}
+            <button className="wbtn" onClick={onQueueDone}>做完了</button>
+          </div>
+        )}
+
+        {/* 你为什么在队里。
+            一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
+            「到日子了」和「更新最新信息送来的」都要交代，只有你自己勾进来的
+            （via='pick'）不用：那是你亲手放的，不用它讲给你听。
+            **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
+            effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
+            跟两个出口挪上来是同一个理由。 */}
+        {queue && viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
+          <div className="qwhat">
+            {lastMail && (
+              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}
+                <button className="lnk" onClick={() => jumpTo(lastMail.id)}>看最近这封 →</button>
+              </span>
+            )}
+            {voided && <span>作废了 · <s>{voided.text}</s></span>}
+            {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
+          </div>
+        )}
+
+        <div className="ft-head">
+          {inDrawer ? (
+            <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+          ) : (
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
+          )}
+          <h1 className="ft-title" title={p.title}>{p.title}</h1>
+          {inDrawer && (
+            <button className="expand" onClick={() => onExpand?.(p)} title="在新标签页里整页打开">
+              整页 <span aria-hidden="true">↗</span>
+            </button>
+          )}
+        </div>
+        <div className="ft-ctl">
+        {/* 截止跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关 */}
+        <Deadline p={p} />
+        {/* 球在谁那边。Fairwind 自己贴一个，贴错了直接改掉——没有「谁来判断」这个选项。
+            两个都不亮 = 还没有依据（既没往来也没跟进日），你可以自己定一个。 */}
+        <div className="ballsw" role="group" aria-label="球在谁那边">
+          {BALL_STATES.map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              className={'bsw ' + v + (ball === v ? ' on' : '')}
+              aria-pressed={ball === v}
+              onClick={() => { if (ball === v) return; setBallLocal(v); onSetBall?.(p.id, v) }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="stg-lbl">阶段
+          <select
+            className="stg-sel"
+            value={stage}
+            onChange={(e) => { setStageLocal(e.target.value); onMove?.(p.id, e.target.value) }}
+          >
+            {STAGE_ORDER.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+          </select>
+        </label>
+        </div>
+      </div>
+
+      {threeCol ? (
+        <div className="focus-cols">
+          <aside className="fc-l">
+            <Dossier
+              p={p}
+              msgs={msgs}
+              files={deliv.filter((d) => d.status === 'final')}
+              attachments={atts}
+              onUnfinal={unfinal}
+              onJump={jumpTo}
+              onSync={doSync}
+              syncing={syncing}
+              syncNote={syncNote}
+            />
+          </aside>
+          <div className="fc-m">{body}</div>
+          <aside className="fc-r">
+            <Deliverables
+              pursuitId={p.id}
+              items={deliv}
+              files={deliv.filter((d) => d.status === 'final')}
+              onChanged={reloadDeliv}
+              onJump={jumpTo}
+            />
+          </aside>
+        </div>
+      ) : body}
     </div>
   )
 }

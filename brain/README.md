@@ -30,14 +30,21 @@ npm run brain          # 在项目根目录；等同于 cd brain && npm start
 
 | | |
 |---|---|
-| 能 | 读这条机会线的全部往来、你的战绩信息库、你的画像；联网搜、读网页；往往来历史里写一条回复 |
-| **不能** | 改阶段、改作品盒子、建卡、删东西 |
+| 能 | 读这条机会线的全部往来、你的战绩信息库、你的画像；联网搜、读网页；往往来历史里写一条回复；**建 / 改一份草稿产出**；**读这条线登记过的 Gmail thread**；**把一封信放进你的草稿箱** |
+| **不能** | 定稿、**发邮件**、改阶段、改作品盒子、建卡、删东西、翻你的信箱 |
 
-不能那一栏是**结构上做不到**，不是嘱咐它别做——数据库那头只开了「读上下文」和
-「写一条消息」两个函数（`supabase/migrations/0009_brain_rpc.sql`），没有别的口。
-Fairwind 本人拿到的工具也只有 WebSearch / WebFetch，它连数据库都碰不到，是这个进程代它读写的。
+不能那一栏是**结构上做不到**，不是嘱咐它别做：
 
-想让它能动阶段和盒子，是另开一刀的事，先把「一起想」跑顺。
+- **定稿**——数据库那头 `pa_upsert_deliverable` 只碰得到 `status='draft'` 的行，已定稿的它改不动；而把 draft 变 final 的那个函数（`pa_set_final`）压根没 grant 给它。定稿只对浏览器开放，也就是只对你的手开放。
+- **发邮件**——claude.ai 的 Gmail 连接器整套工具里**没有 send**，只有读和 `create_draft`。发送这个能力不存在，不是被我们关掉的。
+- **翻信箱**——收信只拉这条线在 `producer.pursuit_threads` 里登记过的 thread。它没有「列出所有邮件」的入口。
+- **越线**——它每个写口的第一个参数都是 `pursuit_id`。它被关在你正打开的那一条线里，那条线之外的东西够不着。
+
+（口子的全部清单见 `supabase/migrations/0027_deliverables_and_threads.sql` 末尾那段 grant；
+工具白名单在 `server.js` 的 `READ_TOOLS` / `GMAIL_TOOLS`。）
+
+⚠️ **白名单不能省。** 2026-08-05 实测发现 Agent SDK 会继承你整台机器的工具配置——
+不写 `allowedTools` 的话，Fairwind 拿得到 Bash、Write、Supabase MCP。那两个常量是护栏本身。
 
 ## 边界
 

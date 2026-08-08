@@ -20,7 +20,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-06e'
+export const BRAIN_BUILD = '2026-08-08a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -50,6 +50,9 @@ async function loadContext(pursuitId) {
     msgs: data.messages || [],
     entries: data.entries || [],
     profile: data.profile || null,
+    // 0027 之后上下文里还有产出和邮件线索。它们不进对话 prompt（那是另一套用法），
+    // 但 /gmail-draft 和 /sync 要照着它们干活，所以整包留在这儿。
+    raw: data,
   }
 }
 
@@ -61,7 +64,25 @@ async function addMessage(pursuitId, role, content, kind = 'message') {
   return data
 }
 
-const SYSTEM = `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。你服务的艺术家是 Hu Di，作品站 https://hudiworks.com/。
+// 「你服务的谁」是**数据**，不是常量。原来这儿写死着 "Hu Di / hudiworks.com"，
+// 而同一批事实在 producer.profile 里也存着一份 —— 两份会飘，而且改的时候只有
+// 开 SQL 一条路。现在只有库里那一份是真的；这里每次开工现读。
+//
+// 读不到就退回一句不认人的话：宁可它说"这位艺术家"，也不要它张口就叫错名字。
+// 档案里没填就退回不认人的说法 —— 宁可说「这位艺术家」，也不要编一个。
+const artistOf  = (profile) => profile?.name || '这位艺术家'
+const idOf      = (profile) => {
+  const d = profile?.data || {}
+  const loc = Array.isArray(d.location) ? d.location.join(' / ') : d.location
+  return [d.visa, loc && `常住 ${loc}`].filter(Boolean).join('，')
+}
+const mailboxOf = (profile) => profile?.data?.email || null
+
+const systemFor = (profile) => {
+  const name = profile?.name
+  const site = profile?.website
+  const who = name ? `你服务的艺术家是 ${name}${site ? `，作品站 ${site}` : ''}。` : ''
+  return `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。${who}
 
 你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
 
@@ -76,6 +97,45 @@ const SYSTEM = `你是「 Fairwind 」，一位艺术家的 producer / 外联搭
 - 拿不准就问 ta，别自己替 ta 决定。
 
 你不能做的：你改不了这条线的阶段、也改不了作品盒子。要动这些，说出来让 ta 点。`
+}
+
+// 履历那些「一条」的关键事实——学校名、机构、起止年份、地点——存在 meta 这个
+// jsonb 里，不是表上的列。所以这里必须按 kind 摊开：不摊，education / credit / job
+// 在 prompt 里就只剩一个光秃秃的标题，Fairwind 会如实汇报「你档案里没有这些」，
+// 而界面上明明白白写着。（这已经害过一次：它跟 Hu Di 说「教育那栏空得有点厉害」。）
+//
+// 界面上那份对应实现是 src/data/entriesSeed.js 的 subInfo()——改一边记得改另一边。
+// 故意没有共用一份：brain 是独立进程，import 前端源码会连 57 条种子数据一起拖进来；
+// 而且两边需求不同（见下面 credit 那条）。
+function entryFacts(e) {
+  const m = e.meta || {}
+  const keep = (xs) => xs.filter((x) => x && x !== '（待补）')
+  const period = keep([m.start, m.end]).join(' – ')
+  switch (e.kind) {
+    case 'education': return keep([m.school, m.year, m.location])
+    case 'job':       return keep([m.org, period, m.location])
+    case 'credit':    return keep([m.org, m.year, m.location])
+    case 'statement': return keep([m.scope])
+    default:          return []                // work / skill / offer 的事实在真列上
+  }
+}
+
+// 「战绩信息库」那一段。chat 和 brief 两条路都用它——本来是两份一模一样的复制，
+// 漏改一份就是一条路瞎、另一条路不瞎，最难查。
+function entriesBlock(entries) {
+  if (!entries.length) return []
+  const lines = ['## Ta 的作品与履历（战绩信息库）']
+  for (const e of entries) {
+    // credit 的「个展 / 群展 / 驻地 / grant / 策展」在界面上是分组标题，prompt 里
+    // 没有分组，所以要挂到 kind 标签上——不然它分不出这是个展还是群展。
+    const label = e.kind === 'credit' && e.meta?.type ? `credit · ${e.meta.type}` : e.kind
+    const bits = [e.year, e.medium, e.concern, ...entryFacts(e)].filter(Boolean).join(' · ')
+    const tags = e.tags?.length ? `〔标签：${e.tags.join(' / ')}〕` : ''
+    lines.push(`- [${label}] ${e.title}${bits ? ` (${bits})` : ''}${e.body ? ` — ${e.body}` : ''}${tags}`)
+  }
+  lines.push('')
+  return lines
+}
 
 // incoming 那句刚已经落库了，所以要从「之前的往来」里摘出去（exceptId），
 // 否则它会在 prompt 里出现两次。
@@ -89,14 +149,7 @@ function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
     lines.push('')
   }
 
-  if (entries.length) {
-    lines.push('## Ta 的作品与履历（战绩信息库）')
-    for (const e of entries) {
-      const bits = [e.year, e.medium, e.concern].filter(Boolean).join(' · ')
-      lines.push(`- [${e.kind}] ${e.title}${bits ? ` (${bits})` : ''}${e.body ? ` — ${e.body}` : ''}`)
-    }
-    lines.push('')
-  }
+  lines.push(...entriesBlock(entries))
 
   lines.push('## 这条机会线')
   lines.push(
@@ -104,14 +157,16 @@ function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
     fact('类型', p.kind) + fact('资助', p.funding) + fact('截止', p.deadline) +
     fact('官方页面', p.url) + fact('当前阶段', p.stage) +
     fact('为什么可能合适', p.why) + fact('备注', p.notes) +
-    (p.eligible === false ? '⚠️ 资格搁置：目前身份（O-1/绿卡限定）不满足，先别推进申请。\n' : '')
+    (p.eligible === false
+      ? `⚠️ 资格搁置：目前身份${idOf(profile) ? `（${idOf(profile)}）` : ''}不满足这条线的要求，先别推进申请。\n`
+      : '')
   )
 
   const history = msgs.filter((m) => m.id !== exceptId)
   if (history.length) {
     lines.push('## 你们之前的往来（从早到晚）')
     for (const m of history) {
-      const who = m.role === 'artist' ? 'Hu Di' : m.role === 'producer' ? '你（Fairwind）' : m.role
+      const who = m.role === 'artist' ? artistOf(profile) : m.role === 'producer' ? '你（Fairwind）' : m.role
       const tag = m.kind && m.kind !== 'message' ? `〔${m.kind}〕` : ''
       lines.push(`${who}${tag}：${m.content}`)
     }
@@ -137,14 +192,7 @@ function buildBriefPrompt({ p, entries, profile }) {
     lines.push(JSON.stringify(profile, null, 2))
     lines.push('')
   }
-  if (entries.length) {
-    lines.push('## Ta 的作品与履历（战绩信息库）')
-    for (const e of entries) {
-      const bits = [e.year, e.medium, e.concern].filter(Boolean).join(' · ')
-      lines.push(`- [${e.kind}] ${e.title}${bits ? ` (${bits})` : ''}${e.body ? ` — ${e.body}` : ''}`)
-    }
-    lines.push('')
-  }
+  lines.push(...entriesBlock(entries))
 
   lines.push('## 要讲懂的机会（卡上现有信息，可能不全或过时）')
   lines.push(
@@ -158,7 +206,7 @@ function buildBriefPrompt({ p, entries, profile }) {
 1. 这一届/这一轮是不是真的开放？找到官方页面。
 2. 真实截止日期——聚合站上的常是上一届残留，以官方为准。
 3. 申请要什么（材料、流程）。
-4. 有没有国籍 / 居留 / 工作权限制——对照这位艺术家的身份（美国 O-1，常住 LA / 湾区）。ta 能不能申？
+4. 有没有国籍 / 居留 / 工作权限制——对照这位艺术家的身份（${idOf(profile) || '档案里没填，别猜；拿不准就说需要确认'}）。ta 能不能申？
 5. 跟 ta 的作品和方向契合吗？值不值得投？
 
 然后用简洁中文写一段「讲懂」给 ta 看——像个熟这行的搭档在讲，不是复述资料。一次只递这一件事：说清楚"这机会到底是什么、关键事实、能不能申、值不值得"，最后给一句"要不要批准往下走"。别写前言。
@@ -184,15 +232,33 @@ function extractFacts(text) {
 
 // ── 想 ──────────────────────────────────────────────────────
 
-async function think(prompt) {
+// 工具白名单。
+//
+// 2026-08-05 实测发现的一件要紧事：Agent SDK **继承了你整台机器的工具配置**——
+// 不写 allowedTools 的话，Fairwind 拿得到 Bash、Write、Supabase MCP。
+// 所以这个白名单从「一个稳妥的做法」升级成必须写死的护栏，一天都不能省。
+const READ_TOOLS = ['WebSearch', 'WebFetch']
+
+// 邮件那档另外给。claude.ai 的 Gmail 连接器**整套工具里根本没有 send**——
+// 只有读和 create_draft / update_draft。所以「它发不出去」不是我们关掉的，
+// 是这个能力不存在。ToolSearch 要一起给，那几个工具是延迟加载的。
+const GMAIL_TOOLS = [
+  'ToolSearch',
+  'mcp__claude_ai_Gmail__search_threads',
+  'mcp__claude_ai_Gmail__get_thread',
+  'mcp__claude_ai_Gmail__get_message',
+  'mcp__claude_ai_Gmail__create_draft',
+]
+
+async function think(prompt, tools = READ_TOOLS, profile = null) {
   const out = []
   let usage = null
   for await (const m of query({
     prompt,
     options: {
-      systemPrompt: SYSTEM,          // 完全自定义人格，不加载 Claude Code 那套编码 prompt
-      allowedTools: ['WebSearch', 'WebFetch'],  // 只给读网页的能力，碰不到文件和数据库
-      permissionMode: 'bypassPermissions',      // 无人值守；工具面只读，安全
+      systemPrompt: systemFor(profile),   // 完全自定义人格，不加载 Claude Code 那套编码 prompt
+      allowedTools: tools,
+      permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
       maxTurns: 20,
     },
   })) {
@@ -220,7 +286,7 @@ async function handleChat(body) {
 
   const ctx = await loadContext(pursuit_id)
   console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库`)
-  const { text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id))
+  const { text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id), READ_TOOLS, ctx.profile)
   console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
 
   const theirs = await addMessage(pursuit_id, 'producer', reply)
@@ -258,7 +324,7 @@ async function handleBrief(body) {
   const existing = ctx.msgs.find((m) => m.kind === 'brief')
   if (existing) return { brief: existing, skipped: true }
 
-  const { text, usage } = await think(buildBriefPrompt(ctx))
+  const { text, usage } = await think(buildBriefPrompt(ctx), READ_TOOLS, ctx.profile)
   const { clean, facts } = extractFacts(text)
 
   // 日期只认 YYYY-MM-DD。模型偶尔会把 "spring 2027" 塞进日期字段，
@@ -281,6 +347,170 @@ async function handleBrief(body) {
 
   const brief = await addMessage(pursuit_id, 'producer', clean, 'brief')
   return { brief, facts, usage }
+}
+
+// ── 邮件 ───────────────────────────────────────────────────────
+//
+// 这两个口是 2026-08-05 那一刀开的。分工写在设计稿里，一句话：
+//   **后台进货（扫聚合源、扫信箱找陌生来信、造卡），页面加工（一条线里面的事）。**
+// 这儿两个都属于「加工」——它们只碰你正打开的那一条线，不遍历你的信箱。
+
+// 把一份产出放进 Gmail 草稿箱。
+//
+// 注意它**不定稿**。邮件的定稿分两步：放进草稿箱（这儿），和你在 Gmail 里
+// 真的按发送。只有第二步发生了、下次同步把它当成一封真信收回来，
+// 球权才翻。不然系统会替你撒一个你察觉不到的谎：那条线显示「等回复」，
+// 而信还躺在草稿箱里没人收到。
+async function handleGmailDraft(body) {
+  const { pursuit_id, deliverable_id } = body
+  if (!pursuit_id || !deliverable_id) throw new Error('要有 pursuit_id 和 deliverable_id')
+
+  const ctx = await loadContext(pursuit_id)
+  const d = (ctx.raw.deliverables || []).find((x) => x.id === deliverable_id)
+  if (!d) throw new Error('这条线上没有这份产出')
+  if (d.status === 'final') throw new Error('已定稿的不用再放草稿箱')
+  if (!d.body?.trim()) throw new Error('正文是空的，没东西可放')
+
+  const threads = (ctx.raw.threads || []).map((t) => t.gmail_thread_id)
+  const { text } = await think(
+    `把下面这封信放进${mailboxOf(ctx.profile) ? ` ${artistOf(ctx.profile)}（${mailboxOf(ctx.profile)}）的` : ''} Gmail 草稿箱。**只建草稿，不发送**——你也没有发送的工具。
+
+机会线：${ctx.p.title}${ctx.p.org ? ` · ${ctx.p.org}` : ''}
+${threads.length ? `这条线已认领的 thread：${threads.join(', ')}——把草稿建成对最新那封的回复。`
+  : '这条线还没认领 thread。先用 search_threads 按机构名/对方地址找到最近那串往来，作为回复目标；找不到就新建一封。'}
+
+主题：${d.title}
+
+正文（原样使用，一个字都不要改写——这是他定的稿）：
+---
+${d.body}
+---
+
+建完之后，**最后一行**单独输出这个，别的什么都不要加：
+[[DRAFT]] {"draft_id":"…","thread_id":"…","to":"…"}`,
+    GMAIL_TOOLS,
+    ctx.profile,
+  )
+
+  const m = text.match(/\[\[DRAFT\]\]\s*(\{[\s\S]*?\})\s*$/)
+  let info = null
+  try { info = m ? JSON.parse(m[1]) : null } catch (_) { info = null }
+  if (!info?.draft_id) throw new Error('草稿没建成（Fairwind 没报回 draft_id）')
+
+  // 认领这个 thread：下次同步就会跟着它走
+  if (info.thread_id) {
+    await db.rpc('pa_link_thread', {
+      p_pursuit_id: pursuit_id, p_thread_id: info.thread_id, p_added_by: 'fairwind',
+    })
+  }
+  const meta = { ...(d.meta || {}), gmail_draft_id: info.draft_id, to: info.to || null }
+  const { error } = await db.rpc('pa_upsert_deliverable', {
+    p_pursuit_id: pursuit_id, p_id: deliverable_id,
+    p_kind: d.kind, p_title: d.title, p_meta: meta,
+  })
+  if (error) throw new Error('记草稿号失败：' + error.message)
+  return { ok: true, ...info }
+}
+
+// 按线收信：只拉这条线登记过的 thread，永远不遍历信箱。
+//
+// 顺序要紧：**先落原文，后写摘要**。第一步是机械的，不会因为脑子没开就丢信；
+// 摘要失败了行还在，界面显示原文首段。反过来做的话，模型一挂那封信就永远不存在。
+// 认领：这条线该去 Gmail 里跟哪几串。
+//
+// 库里已有的信自己就带着答案——每条 pursuit_messages 都存了 gmail_message_id，
+// 而 Gmail 的 get_message 能从 message id 反查出它属于哪个 thread。
+// 所以「这条线有 5 封信，却说没处可收」这种矛盾根本不该出现：
+// 有信就有串，让它自己接上，不用你去贴链接。
+//
+// 一条线只会走一次（认领完就落进 producer.pursuit_threads 了）。
+async function ensureThreads(pursuitId, ctx) {
+  const have = (ctx.raw.threads || []).map((t) => t.gmail_thread_id)
+  if (have.length) return have
+
+  const known = ctx.msgs.filter((m) => m.gmail_message_id).map((m) => m.gmail_message_id)
+  if (!known.length) return []
+
+  const { text } = await think(
+    `查这些 Gmail message 各属于哪个 thread（用 mcp__claude_ai_Gmail__get_message，读 threadId 就行，别读正文）：
+${known.join(', ')}
+
+去重后，**最后一行**单独输出，别的什么都不要加：
+[[THREADS]] {"thread_ids":["…"]}`,
+    GMAIL_TOOLS,
+    ctx.profile,
+  )
+  const m = text.match(/\[\[THREADS\]\]\s*(\{[\s\S]*?\})\s*$/)
+  let ids = []
+  try { ids = m ? (JSON.parse(m[1]).thread_ids || []) : [] } catch (_) { ids = [] }
+  for (const t of ids) {
+    await db.rpc('pa_link_thread', { p_pursuit_id: pursuitId, p_thread_id: t, p_added_by: 'fairwind' })
+  }
+  return ids
+}
+
+async function handleSync(body) {
+  const { pursuit_id } = body
+  if (!pursuit_id) throw new Error('要有 pursuit_id')
+
+  const ctx = await loadContext(pursuit_id)
+  const threads = await ensureThreads(pursuit_id, ctx)
+  if (!threads.length) {
+    // 真的无处可收：这条线一封信都没有，所以连反查的线头都没有。
+    // 说清楚是「还没有往来」，别让它看起来像「查过了，没有新信」——那两件事天差地别。
+    return { ok: true, threads: 0, added: 0,
+      note: '这条线还没有任何邮件往来，所以没处可收。起草一封发出去，它就接上了。' }
+  }
+
+  const known = ctx.msgs.filter((m) => m.gmail_message_id).map((m) => m.gmail_message_id)
+  const { text } = await think(
+    `读这几个 Gmail thread，把**还没入库**的邮件抓出来。
+
+thread：${threads.join(', ')}
+库里已有的 message id（这些跳过）：${known.join(', ') || '（一封都没有）'}
+
+对每一封新的，给我：
+· id           Gmail message id
+· role         "org"（对方发的）或 "artist"（${artistOf(ctx.profile)} 发的）
+· at           ISO 时间，真实发信时间
+· subject/from
+· raw          正文纯文本（**原样**，不要摘、不要改）
+· summary      一句中文摘要，说清这封信要什么或给了什么
+
+**最后一行**单独输出，别的什么都不要加：
+[[MAIL]] {"messages":[{"id":"…","role":"org","at":"…","subject":"…","from":"…","raw":"…","summary":"…"}]}
+一封新的都没有就输出 [[MAIL]] {"messages":[]}`,
+    GMAIL_TOOLS,
+    ctx.profile,
+  )
+
+  const m = text.match(/\[\[MAIL\]\]\s*(\{[\s\S]*\})\s*$/)
+  let parsed = null
+  try { parsed = m ? JSON.parse(m[1]) : null } catch (_) { parsed = null }
+  if (!parsed) throw new Error('收信回来的格式不对，没敢往库里写')
+
+  let added = 0
+  let addedIn = 0
+  for (const mail of parsed.messages || []) {
+    if (!mail?.id || !mail?.role) continue
+    const { data, error } = await db.rpc('pa_add_email', {
+      p_pursuit_id: pursuit_id,
+      p_role: mail.role === 'artist' ? 'artist' : 'org',
+      p_gmail_message_id: mail.id,
+      p_content: mail.summary || (mail.raw || '').slice(0, 200),
+      p_body_raw: mail.raw || null,
+      p_meta: { subject: mail.subject || null, from_name: mail.from || null },
+      p_created_at: mail.at || null,
+    })
+    if (error) { console.warn('  ⚠️ 一封没写进去：' + error.message); continue }
+    if (data?.inserted) { added++; if (mail.role !== 'artist') addedIn++ }
+  }
+  for (const t of threads) {
+    await db.rpc('pa_touch_thread', { p_pursuit_id: pursuit_id, p_thread_id: t, p_history_id: null })
+  }
+  // addedIn = 对方来的那几封。你自己发的信收录进档案不该惊动你——你知道你发过。
+  // 前端拿它当过卡判据 1，added 仍是总数（进度和日志用）。
+  return { ok: true, threads: threads.length, added, addedIn }
 }
 
 // ── 更新最新信息：收信 → （收到了才）消化 ─────────────────────
@@ -315,7 +545,7 @@ async function handleRefresh(body) {
 
 【现在卡上的待办】${cur ? `「${cur}」` : '（没有）'}
 【近期往来（含新信）】
-${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ? 'HuDi' : (m.meta?.from_name || '对方')}：${m.content}`).join('\n')}
+${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ? artistOf(ctx.profile) : (m.meta?.from_name || '对方')}：${m.content}`).join('\n')}
 【截止】${p.deadline_at || p.deadline || '无'}　【该碰日】${p.next_touch_at || '无'}
 
 问题一：新信有没有让卡上那条待办**过期**？（比如「没回就催」而对方回了。）
@@ -328,6 +558,7 @@ ${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ?
 **最后一行**单独输出，别的什么都不要加：
 [[DIGEST]] {"void": {"msg_id": "<作废依据那封信的库内 id，从上面往来里没有就用最新那封的 gmail id 对应行>", "reason": "…"} | null, "next": {"action": "一句话，20 字内", "basis": "依据（哪封信/哪个日期）", "touch": "YYYY-MM-DD 或 null"} | null}`,
     READ_TOOLS,
+    ctx.profile,
   )
 
   const m = text.match(/\[\[DIGEST\]\]\s*(\{[\s\S]*\})\s*$/)
@@ -370,7 +601,7 @@ ${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ?
 }
 
 // ── 后台先读 ───────────────────────────────────────────────────
-// 「待批准」这个列名承诺的是「 Fairwind 已经读透了，就等你点头」。所以读这件事
+// 「新机会」这个列名承诺的是「 Fairwind 已经读透了，就等你点头」。所以读这件事
 // 不能等你点开卡才现做——脑子自己扫，卡进来就读，你看见它时 brief 已在库里。
 //
 // handleBrief 本来就幂等（有 brief 就 skipped），所以重复扫是安全的；
@@ -391,7 +622,7 @@ async function sweepBriefs() {
       .select('id, title')
       .eq('stage', 'pending')
       .order('created_at')
-    if (error) { console.warn('⚠️ 扫待批准失败：' + error.message); return }
+    if (error) { console.warn('⚠️ 扫新机会失败：' + error.message); return }
 
     for (const p of data || []) {
       if (briefed.has(p.id)) continue
@@ -528,7 +759,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
   console.log(`   放行来源：${ORIGIN}`)
-  console.log(`   后台先读：每 ${Math.round(SWEEP_MS / 1000)} 秒扫一次「待批准」`)
+  console.log(`   后台先读：每 ${Math.round(SWEEP_MS / 1000)} 秒扫一次「新机会」`)
   console.log(`   计费：走你的 Claude 订阅用量（没用 API key）\n`)
   sweepBriefs()
   setInterval(sweepBriefs, SWEEP_MS)

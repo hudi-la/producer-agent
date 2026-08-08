@@ -49,7 +49,7 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, refre
           <span className="tr-txt">
             <b>Fairwind 的脑子没开</b>
             <span className="tr-fix">
-              待批准的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。
+              新机会的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。
               另开一个终端跑 <code>npm run brain</code>
             </span>
           </span>

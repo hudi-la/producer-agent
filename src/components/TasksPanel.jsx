@@ -17,7 +17,7 @@ export default function TasksPanel({ tasks, open, onClose }) {
           <h3>造卡任务</h3>
           <button className="btn" onClick={onClose}>收起</button>
         </div>
-        <p className="tm-intro">机会从这些任务流进「待批准」。<b>scout 只是第一条</b>，你可以一条条加——每条都是个小造卡器，往同一条流水线丢卡。</p>
+        <p className="tm-intro">机会从这些任务流进「新机会」。<b>scout 只是第一条</b>，你可以一条条加——每条都是个小造卡器，往同一条流水线丢卡。</p>
         <div className="tm-list">
           {tasks.map((t) => (
             <div className={'task' + (t.enabled ? '' : ' off')} key={t.id || t.type}>
