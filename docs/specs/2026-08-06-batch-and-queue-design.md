@@ -443,15 +443,16 @@ Fairwind 会看见一句莫名其妙的「同时发给了 6 条线」。跟 `nex
 
 ---
 
-## 六、分三刀
+## 六、分四刀
 
 | 刀 | 做什么 | 为什么这个顺序 |
 |---|---|---|
 | **一** | 两个筛选开关 + 选择模式（含叠的半选）+ 过卡队列（抽屉左右翻、两个出口、入口、localStorage）。批量动作只有「过一遍」 | **不碰库，不碰 brain。** 拿最便宜的路把队列这套东西跑通——诚实性（什么算做完、数字准不准、放过的会不会转圈）在这一刀验完 |
 | **二** | 更新最新信息（三步全套）+ 三列新字段 + Trouble 报错 | 队列已经能用了，这一刀的产出才有地方去。最险的「重提下一步」两道闸也在这刀 |
 | **三** | 「说一句…」（群发指令 + 标记 + 进队）· 队列改批处理专用（删「行动时间到了」那套自动判据 + 入口挪进工具条）· 出口改名「移出」+ 认领剥离到抽屉里的活待办行 | 复用现成的 `/chat`，不新增后端能力。**一道很小的迁移**：`pa_add_message` 开个 meta 参数，群发记号才存得进去。后两件是第二刀真跑之后暴露的，顺路一起 |
+| **四** | 队列上库：`pursuit_queue` 一张表 + 四个口子 + 一次性搬迁，光标（`is_current`）跟着走 | 队列变成批处理专用之后，它记的「这次跑了哪几条」库里没有第二处记着——丢了就是真丢了。**等第三刀跑顺了再搬**，免得一边改语义一边改存法 |
 
-第一刀零迁移。第二刀三列新字段（`next_action_void_at` / `next_action_void_by` / `next_action_by`；`pursuit_threads.last_synced_at` [0027](../../supabase/migrations/0027_deliverables_and_threads.sql) 已有）。第三刀不加字段。
+第一刀零迁移。第二刀三列新字段（`next_action_void_at` / `next_action_void_by` / `next_action_by`；`pursuit_threads.last_synced_at` [0027](../../supabase/migrations/0027_deliverables_and_threads.sql) 已有）。第三刀一道小迁移（0031：`pa_add_message` 开 meta 参数）。第四刀一张新表 + 四个口子。
 
 ---
 
