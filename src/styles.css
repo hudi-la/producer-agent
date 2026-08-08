@@ -495,6 +495,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .qwhat { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 9px;
   padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--ink-2);
   background: var(--accent-soft); display: flex; flex-direction: column; gap: 4px; }
+/* 抽屉里那条活着的待办。原来只显示做完的和作废的 —— 唯独没显示「现在该干什么」。 */
+.pf-live { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--ink); }
+.pf-live.urgent .pf-live-t { color: var(--accent); font-weight: 600; }
+.pf-live .pc-by { margin-left: 0; }
 .pf-why { font-family: var(--serif); font-size: 14.5px; color: var(--ink); margin: 0 0 14px; }
 /* notes 是正文，不是脚注——跟对话气泡同号。加粗的小标题靠 .md strong 提到 --ink，
    比周围的 --ink-2 深一档，扫的时候一眼能找到「流程」「判断」在哪儿。 */

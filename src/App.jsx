@@ -424,20 +424,23 @@ export default function App() {
     setQueue(q)
     openQueueCard(q.at)
   }
+  // 移出：从这一摞里拿走。**就这一个意思。**
+  //
+  // 原来它还偷偷替你认领 Fairwind 提的下一步（next_action_by → you）。
+  // 那是让队列去替卡里的事实说话：「队列里有没有它」和「这件事做没做完」是两回事，
+  // 一个按钮断言两件事，就有一件迟早是假的。认领搬到那句提案自己旁边去了。
   const finishCard = () => {
-    // 「更新最新信息」送进来的卡，点「做完了」= 你认了它提的那句：
-    // 记号消失（next_action_by → you）。先乐观更新再写库；写失败不拦出队——
-    // 「做完了」这个动作本身不能因为一次认领没写上就卡住，但要说一声。
-    const id = view.pursuit.id
-    const cur = pl.pursuits.find((x) => x.id === id)
-    if (qItem?.via === 'update' && cur?.next_action_by === 'fairwind') {
-      setPl((cl) => ({ ...cl, pursuits: cl.pursuits.map((x) => (x.id === id ? { ...x, next_action_by: 'you' } : x)) }))
-      acceptNextAction(id).catch((e) => alert('认领没写上（下次更新它还会带记号）：' + e.message))
-    }
-    const q = queueDone(queue, id)
+    const q = queueDone(queue, view.pursuit.id)
     setQueue(q)
     if (!q.items.length) closePursuit()
     else openQueueCard(q.at)
+  }
+  // 你认了它提的那句：记号消失。这是对**那句话**表态，
+  // 跟「这张卡还在不在我手头」无关——所以它不在过卡器的出口上。
+  // 先乐观更新再写库：认领是你已经做出的判断，界面不该等一趟网络才承认。
+  const acceptProposal = async (id) => {
+    setPl((cur) => cur && ({ ...cur, pursuits: cur.pursuits.map((x) => (x.id === id ? { ...x, next_action_by: 'you' } : x)) }))
+    try { await acceptNextAction(id) } catch (e) { alert('没认上（下次更新它还会带记号）：' + e.message) }
   }
   const laterCard = () => {
     const q = queueLater(queue, view.pursuit.id)
@@ -450,6 +453,13 @@ export default function App() {
   const onPursuit = area === 'pursue' && view.name === 'pursuit'
   const paged = onPursuit && view.mode === 'page'     // 整页：看板让位
   const drawered = onPursuit && !paged                // 抽屉：看板留着
+  // 打开的那条线，永远取 pl 里最新的那一份。
+  // view.pursuit 是**你点开那一刻的快照**——乐观更新和 8 秒轮询都只动 pl，不动它，
+  // 所以照着快照渲染的话，你在抽屉里点「认了」，看板上的记号消失了、抽屉里那个还在。
+  // 找不到（刚被过滤掉/还没读回来）就退回快照，卡不能因此空掉。
+  const openedPursuit = onPursuit
+    ? (pl.pursuits.find((x) => x.id === view.pursuit.id) || view.pursuit)
+    : null
 
   return (
    <ProfileContext.Provider value={profile}>
@@ -516,11 +526,14 @@ export default function App() {
           // 而 A 的回复回来时还会塞进你正看着的 B 卡里。
           key={view.pursuit.id}
           variant="page"
-          pursuit={view.pursuit}
+          pursuit={openedPursuit}
           messages={pl.messagesByPursuit[view.pursuit.id]}
           onBack={closePursuit}
           onMove={moveCard}
           onSetBall={markBall}
+          // 整页也有那条活待办，「认了」在哪儿都得真能点——
+          // 摆一个按不动的按钮比不摆更糟。
+          onAccept={acceptProposal}
         />
       ) : (
         <>
@@ -538,7 +551,7 @@ export default function App() {
                 <PursuitFocus
                   key={view.pursuit.id}
                   variant="drawer"
-                  pursuit={view.pursuit}
+                  pursuit={openedPursuit}
                   messages={pl.messagesByPursuit[view.pursuit.id]}
                   onBack={closePursuit}
                   onExpand={expandPursuit}
@@ -549,6 +562,7 @@ export default function App() {
                   onQueueNext={() => queueGo(1)}
                   onQueueDone={finishCard}
                   onQueueLater={laterCard}
+                  onAccept={acceptProposal}
                 />
               )}
             </aside>

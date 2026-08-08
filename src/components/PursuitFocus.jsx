@@ -174,7 +174,7 @@ function emptyText(stage) {
 // 整页才会长出抽屉装不下的部分。
 export default function PursuitFocus({
   pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall,
-  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater,
+  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater, onAccept,
 }) {
   const inDrawer = variant === 'drawer'
   const [msgs, setMsgs] = useState(messages || [])
@@ -187,6 +187,12 @@ export default function PursuitFocus({
   const [ball, setBallLocal] = useState(ballOf(p))
   const done = doneAction(p)
   const voided = voidedAction(p)
+  // 活着的待办：现在该干什么（actionLine 已经跳过作废的）。
+  // 卡面一直有这行，唯独抽屉里没有——抽屉只显示做完的和作废的，
+  // 于是「现在该干什么」是这儿唯一看不见的那种状态。
+  const live = actionLine(p)
+  // 它提的、你还没认的那句。认领挂在这句话旁边，不挂在过卡器的出口上。
+  const proposed = live?.by === 'fairwind' ? live : null
   const endRef = useRef(null)
   // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
   const threeCol = !inDrawer
@@ -332,7 +338,7 @@ export default function PursuitFocus({
   // 不背内容：背了的那份不会跟着库变，迟早说谎。
   const viaUpdate = queue?.via === 'update'
   const lastMail = viaUpdate ? [...msgs].reverse().find((m) => m.kind === 'email') : null
-  const proposal = viaUpdate ? actionLine(p) : null
+  const proposal = viaUpdate ? live : null
   const mailWhen = (m) => {
     const d = m?.created_at ? new Date(m.created_at) : null
     return d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
@@ -427,9 +433,10 @@ export default function PursuitFocus({
             <span className="qcount">{queue.i + 1} / {queue.n}</span>
             <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
             <span className="qsp" />
-            {/* 只有「做完了」让顶栏那个数字降下去、把卡从队里拿走。
+            {/* 「移出」就一个意思：这张从这一摞里拿走，卡里什么都不碰。
+                它不说「这件事我干完了」——干没干完看内容（草稿定没定稿、待办勾没勾、信回没回）。
                 想先放着 = 翻页 ‹ › 走过去、或关掉抽屉——它下次还在原位。 */}
-            <button className="wbtn" onClick={onQueueDone}>做完了</button>
+            <button className="wbtn" onClick={onQueueDone}>移出</button>
           </div>
         )}
 
@@ -449,6 +456,22 @@ export default function PursuitFocus({
             )}
             {voided && <span>作废了 · <s>{voided.text}</s></span>}
             {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
+          </div>
+        )}
+
+        {/* 现在该干什么。跟队头、两个出口、「这次发生了什么」一样钉在卡头里：
+            放进对话流上方的话，打开卡片时那个自动滚到底的 effect 会把它滚走。
+            「它提的」记号和「认了」贴在这句话自己旁边——认领是对**这句话**表态，
+            跟「这张卡还在不在我手头」无关，所以它不在过卡器的出口上。 */}
+        {live && (
+          <div className={'pf-live' + (live.urgent ? ' urgent' : '')}>
+            <span className="pf-live-t">{live.text}</span>
+            {proposed && (
+              <>
+                <span className="pc-by">它提的</span>
+                <button className="lnk" onClick={() => onAccept?.(p.id)}>认了</button>
+              </>
+            )}
           </div>
         )}
 
