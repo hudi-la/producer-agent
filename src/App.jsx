@@ -3,7 +3,7 @@ import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
 import { loadProfile, ProfileContext, PROFILE_FALLBACK } from './lib/profile.js'
-import { setStage, setBall, setActionDone, markTouched, setJot, acceptNextAction, markSeen as markSeenDb } from './lib/chat.js'
+import { setStage, setBall, setActionDone, markTouched, setJot, acceptNextAction, sendMessage, markSeen as markSeenDb } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -14,6 +14,7 @@ import Trouble from './components/Trouble.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
+import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters, dueNow, dueReason } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
@@ -55,6 +56,9 @@ export default function App() {
   const [queue, setQueue] = useState(loadQueue)
   const [refreshing, setRefreshing] = useState(null)      // {i, n} | null
   const [refreshFailed, setRefreshFailed] = useState(0)   // 上一轮挂了几条，Trouble 用
+  const [sayOpen, setSayOpen] = useState(false)
+  const [saying, setSaying] = useState(null)              // {i, n} | null
+  const [sayFailed, setSayFailed] = useState(0)           // 群发挂了几条，也归 Trouble 说
 
   // 进队的判据是「现在需要你」，不是「库里多了行数据」。
   // 第一次真跑就吃过亏：提了个 8-12 才要做的事，8-6 就吵人。
@@ -97,6 +101,36 @@ export default function App() {
     setRefreshFailed(failed)
     const r = await loadPursuits()          // 立刻把新状态拉回来，不等 8 秒轮询
     if (r) { setPl(r); enqueueDue(r.pursuits) }
+  }
+
+  // 群发：同一句话分别说给每条线，各答各的。
+  //
+  // 串行，一条十几秒——跟 runRefresh 一个节奏。答完的当场进队，先到先过。
+  // 批次标识用一个时间戳串：同一批的每条消息带同一个 batch，将来要认出
+  // 「这几条是一次群发」也认得出来。
+  const runSay = async (text) => {
+    if (saying) return
+    const ids = [...picked]
+    if (!ids.length) return
+    setSayOpen(false)
+    cancelPick()
+    setSayFailed(0)
+    const batch = new Date().toISOString()
+    const meta = { broadcast: { batch, count: ids.length } }
+    let failed = 0
+    for (let i = 0; i < ids.length; i++) {
+      setSaying({ i: i + 1, n: ids.length })
+      try {
+        await sendMessage(ids[i], text, meta)
+        setQueue((q) => enqueue(q, [{ id: ids[i], via: 'say' }]))
+      } catch (_) {
+        failed++
+      }
+    }
+    setSaying(null)
+    setSayFailed(failed)
+    const r = await loadPursuits()
+    if (r) setPl(r)
   }
 
   // 这一行必须待在这儿（状态旁边），不能挪到组件下半截去。
@@ -464,7 +498,7 @@ export default function App() {
         detail={fellBackDetail}
         brainDown={brain ? !brain.up : false}
         brainStale={brain ? brain.stale : false}
-        refreshFailed={refreshFailed}
+        batchFailed={refreshFailed + sayFailed}
       />
 
       {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
@@ -482,6 +516,8 @@ export default function App() {
           onOpenTasks={() => setTasksOpen(true)}
           onRefresh={runRefresh}
           refreshing={refreshing}
+          onSay={() => setSayOpen(true)}
+          saying={saying}
         />
       )}
 
@@ -535,6 +571,11 @@ export default function App() {
             </aside>
           )}
         </>
+      )}
+
+      {/* 一条都没勾就没有「对选中的 0 条线」这回事 —— 干脆不摆 */}
+      {sayOpen && picked.size > 0 && (
+        <SayTo n={picked.size} onSend={runSay} onCancel={() => setSayOpen(false)} />
       )}
 
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}

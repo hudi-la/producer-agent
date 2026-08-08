@@ -13,6 +13,7 @@ export default function Subbar({
   picking, pickedCount, hiddenPickedCount,
   onStartPick, onCancelPick, onPickAll,
   onOpenTasks, onRefresh, refreshing,
+  onSay, saying,
 }) {
   return (
     <div className="subbar">
@@ -54,11 +55,16 @@ export default function Subbar({
       {refreshing && (
         <span className="refreshing"><i className="spin" aria-hidden="true" />更新中 {refreshing.i}/{refreshing.n}</span>
       )}
+      {saying && (
+        <span className="refreshing"><i className="spin" aria-hidden="true" />说给第 {saying.i}/{saying.n} 条</span>
+      )}
 
       <span className="sp" />
 
       {picking ? (
         <>
+          {/* 「说一句…」在前：它是主动作，「过一遍」只是端上工作台 */}
+          <button className="wbtn" disabled={!pickedCount || Boolean(saying)} onClick={onSay}>说一句…</button>
           <button className="wbtn" disabled={!pickedCount} onClick={onPickAll}>过一遍</button>
           <button className="btn" onClick={onCancelPick}>取消</button>
         </>

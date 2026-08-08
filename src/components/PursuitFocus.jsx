@@ -120,9 +120,14 @@ function Message({ m }) {
   const mine = m.role === 'artist'
   const external = m.role === 'org'
   const who = mine ? '你' : external ? (m.meta?.from_name || '对方') : 'Fairwind'
+  // 群发的那句要标明是群发的。不标的话，半年后你翻回这条线看见自己说
+  // 「帮我起一封信问问日程」，会以为当时专门为这家想过——其实那是一句群发。
+  const bc = m.meta?.broadcast
   return (
     <div id={'msg-' + m.id} className={'msg' + (mine ? ' you' : external ? ' org' : ' producer')}>
-      <span className="who">{who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}</span>
+      <span className="who">{who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
+        {bc && <span className="viamail"> · 同时发给了 {bc.count} 条线</span>}
+      </span>
       <div className="bubble md"><Md>{m.content}</Md></div>
     </div>
   )

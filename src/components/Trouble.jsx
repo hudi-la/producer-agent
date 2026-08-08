@@ -28,9 +28,9 @@ const DANGER = {
   },
 }
 
-export default function Trouble({ fellBack, detail, brainDown, brainStale, refreshFailed }) {
+export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed }) {
   const bad = fellBack ? DANGER[fellBack] : null
-  if (!bad && !brainDown && !brainStale && !refreshFailed) return null      // 一切正常 → 闭嘴
+  if (!bad && !brainDown && !brainStale && !batchFailed) return null      // 一切正常 → 闭嘴
 
   return (
     <div className="trouble">
@@ -69,16 +69,17 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, refre
           </span>
         </div>
       )}
-      {/* 「更新最新信息」上一轮有线没跑成。数据是真的，只是有几条这轮没更新到——
-          静默失败是最坏的，所以哪怕只挂一条也要在这儿说话。 */}
-      {refreshFailed > 0 && (
+      {/* 整批跑（「更新最新信息」/「说一句…」）上一轮有线没跑成。数据是真的，
+          只是有几条这轮没轮到——静默失败是最坏的，所以哪怕只挂一条也要在这儿说话。
+          两种批量合并成一句：对你来说都是「刚才那批有几条没成」，分开报只是多两行噪音。 */}
+      {batchFailed > 0 && (
         <div className="tr-row warn">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
-            <b>有 {refreshFailed} 条线这轮没更新到</b>
+            <b>有 {batchFailed} 条线这轮没跑成</b>
             <span className="tr-fix">
-              信没丢——它们只是这轮没收到。brain 的终端里有每条的报错，
-              再按一次「更新最新信息」会重试。
+              信没丢、话也没记错——它们只是这轮没轮到。brain 的终端里有每条的报错，
+              再跑一次会重试（要群发的话就再勾一次）。
             </span>
           </span>
         </div>

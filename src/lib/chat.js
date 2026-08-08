@@ -17,14 +17,19 @@ export async function fetchMessages(pursuitId) {
   return data
 }
 
-/** 说一句话给 Fairwind 。你的话先落库，然后等它想完 —— 联网查资料时可能要几十秒。 */
-export async function sendMessage(pursuitId, text) {
+/**
+ * 说一句话给 Fairwind 。你的话先落库，然后等它想完 —— 联网查资料时可能要几十秒。
+ *
+ * meta 记的是「你这句是怎么发出来的」（比如群发），只贴在你那条消息上。
+ * 不传就完全不带这个键，走 RPC 的默认值 —— 单发的调用方一个字都不用改。
+ */
+export async function sendMessage(pursuitId, text, meta) {
   let res
   try {
     res = await fetch(`${BRAIN}/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pursuit_id: pursuitId, text }),
+      body: JSON.stringify({ pursuit_id: pursuitId, text, ...(meta ? { meta } : {}) }),
     })
   } catch (_) {
     throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
