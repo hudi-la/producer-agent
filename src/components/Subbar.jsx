@@ -14,6 +14,7 @@ export default function Subbar({
   onStartPick, onCancelPick, onPickAll,
   onOpenTasks, onRefresh, refreshing,
   onSay, saying,
+  queueCount, onOpenQueue,
 }) {
   return (
     <div className="subbar">
@@ -72,6 +73,13 @@ export default function Subbar({
         <>
           <button className="wbtn" disabled={Boolean(refreshing)} onClick={onRefresh}>更新最新信息</button>
           <button className="wbtn" onClick={onStartPick}>批量操作</button>
+          {/* 队列是批处理生的，就跟批处理站一排（原来在顶栏）。
+              队空的时候整个按钮不渲染——不显示「过卡 · 0」，占位就是骗人。 */}
+          {queueCount > 0 && (
+            <button className="qbtn" onClick={onOpenQueue}>
+              <span className="qpile" aria-hidden="true" />过卡 · {queueCount}
+            </button>
+          )}
           <button className="wbtn" onClick={onOpenTasks}>造卡任务</button>
         </>
       )}

@@ -53,50 +53,5 @@ test('deadline 只有原文、没有可算的日期，也不算紧急', () => {
   assert.equal(matches(vague, { mine: false, urgent: true }), false)
 })
 
-// ── dueNow：过卡队列判据 2 ──
-import { dueNow } from './filters.js'
-
-test('该碰日到了 → due；还没到 → 不 due', () => {
-  assert.equal(dueNow({ next_touch_at: day(0) }), true)
-  assert.equal(dueNow({ next_touch_at: day(-2) }), true)
-  assert.equal(dueNow({ next_touch_at: day(3) }), false)
-})
-
-test('截止进 14 天窗口且球在我 → due；球在对方 → 不 due（光近不吵你）', () => {
-  assert.equal(dueNow({ deadline_at: day(5), ball_eff: 'me' }), true)
-  assert.equal(dueNow({ deadline_at: day(5), ball_eff: 'them' }), false)
-  assert.equal(dueNow({ deadline_at: day(60), ball_eff: 'me' }), false)
-})
-
-test('收尾列不算——那些日期是历史，不是待办', () => {
-  assert.equal(dueNow({ stage: 'paused', next_touch_at: day(-5) }), false)
-  assert.equal(dueNow({ stage: 'won', deadline_at: day(3), ball_eff: 'me' }), false)
-})
-
-test('什么日子都没有 → 不 due', () => {
-  assert.equal(dueNow({}), false)
-})
-
-// ── dueReason：进队得说得出理由 ──
-import { dueReason } from './filters.js'
-
-test('该碰日到了，说得出是哪个日子定的', () => {
-  assert.match(dueReason({ next_touch_at: day(0) }), /该碰一下 · .*定的就是今天/)
-  assert.match(dueReason({ next_touch_at: day(-3) }), /该碰一下 · .*过了 3 天/)
-})
-
-test('截止那句自己组，绝不把截止原文（可能是一整段）拖进理由行', () => {
-  assert.equal(dueReason({ deadline_at: day(3), ball_eff: 'me' }), '截止还剩 3 天 · 球在你')
-  assert.equal(dueReason({ deadline_at: day(0), ball_eff: 'me' }), '今天截止 · 球在你')
-  assert.equal(dueReason({ deadline_at: day(-2), ball_eff: 'me' }), '截止过了 2 天 · 球在你')
-  // Stanford 那条：deadline 原文是一整段，理由行必须不受影响
-  const wall = { deadline_at: day(11), ball_eff: 'me',
-    deadline: 'We are now accepting proposals for Spring Quarter 2027. Submissions are due by August 18th at 11:59 pm (PT).' }
-  assert.equal(dueReason(wall), '截止还剩 11 天 · 球在你')
-})
-
-test('不进队的一律返回 null —— 没理由就不该在队里', () => {
-  assert.equal(dueReason({ deadline_at: day(3), ball_eff: 'them' }), null)
-  assert.equal(dueReason({ stage: 'paused', next_touch_at: day(-5) }), null)
-  assert.equal(dueReason({}), null)
-})
+// dueNow / dueReason 的 7 个测试跟着那对函数一起撤了：队列不再自己判断该动哪张，
+// 那件事交回给上面这两个开关（filters.js 里有为什么）。

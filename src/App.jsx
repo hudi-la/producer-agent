@@ -15,7 +15,7 @@ import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
 import SayTo from './components/SayTo.jsx'
-import { NO_FILTERS, anyOn, applyFilters, dueNow, dueReason } from './lib/filters.js'
+import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
 import QueueRest from './components/QueueRest.jsx'
@@ -63,21 +63,14 @@ export default function App() {
   // 进队的判据是「现在需要你」，不是「库里多了行数据」。
   // 第一次真跑就吃过亏：提了个 8-12 才要做的事，8-6 就吵人。
   //   ① 对方来信（addedIn）——你自己发的信被收录不惊动你，你知道你发过
-  //   ③ 有话跟你说——待办被作废；提案只有现在就能动的（无日期或到了）才算
+  //   ② 有话跟你说——待办被作废；提案只有现在就能动的（无日期或到了）才算
+  // （原来还有一条「行动时间到了」，撤了：那件事两个筛选开关已经在做，见 filters.js）
   const needsMe = (out) => {
     if (out.addedIn > 0 || out.voided) return true
     if (!out.proposed) return false
     const today = new Date(); today.setHours(0, 0, 0, 0)
     return !out.touch || new Date(out.touch + 'T00:00:00') <= today
   }
-
-  // ② 行动时间到了——到日子的卡自己进队，不用你扫看板。
-  // 只在开页面和整轮更新后扫；**永不碰已在队里的卡**，你放过的记号才留得住。
-  const enqueueDue = (pursuits) =>
-    setQueue((q) => {
-      const fresh = pursuits.filter((p) => dueNow(p) && !inQueue(q, p.id))
-      return fresh.length ? enqueue(q, fresh.map((p) => ({ id: p.id, via: 'due' }))) : q
-    })
 
   // 串行逐线。几十条里多数没邮件，brain 秒回；有信的那几条各要十几秒。
   // 需要你的线当场进队（via: 'update'）——不等整轮跑完，先到先过。
@@ -100,7 +93,7 @@ export default function App() {
     setRefreshing(null)
     setRefreshFailed(failed)
     const r = await loadPursuits()          // 立刻把新状态拉回来，不等 8 秒轮询
-    if (r) { setPl(r); enqueueDue(r.pursuits) }
+    if (r) setPl(r)
   }
 
   // 群发：同一句话分别说给每条线，各答各的。
@@ -140,7 +133,6 @@ export default function App() {
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
   const [brain, setBrain] = useState(null)
   const focusedOnceRef = useRef(false)
-  const dueScannedRef = useRef(false)
   const migratedRef = useRef(false)
 
   // 「读到这儿了」写进库（0030 的 pursuit_seen）。跟卡走，不跟浏览器走。
@@ -177,9 +169,6 @@ export default function App() {
       const items = q.items.filter((x) => live.has(x.id))
       return items.length === q.items.length ? q : normalize({ items, at: q.at })
     })
-    // 开页面时扫一次「到日子的」（判据 2）。只扫这一次，不跟着 8 秒轮询反复扫——
-    // 「做完了」出队的卡这个会话里不再回来；真没办的话，下次开页面它还在，那是对的。
-    if (!dueScannedRef.current) { dueScannedRef.current = true; enqueueDue(pl.pursuits) }
   }, [pl])
 
   // 一次性搬迁：把旧的 localStorage['pa_seen'] 推进库里。
@@ -420,13 +409,8 @@ export default function App() {
     // '2026-08-06' → '8/6'。你什么时候放过它的，得看得见。
     skippedAt: mdOf(qItem?.skippedAt),
     // 这张卡怎么进队的：'pick' 你自己勾的 / 'update' 更新最新信息送来的 /
-    // 'due' 到日子了。抽屉靠它决定要不要摆「这次发生了什么」。
+    // 'say' 群发那句送来的。抽屉靠它决定要不要摆「这次发生了什么」。
     via: qItem?.via || null,
-    // 'due' 那种得说得出**哪个**日子到了。现算不存——存下来的理由不会跟着
-    // 库变（你把该碰日往后挪了，存的那句还在喊「过了 3 天」）。
-    // 算出来是 null（日子被改远了 / 卡进了收尾列）说明它已经不该在队里，
-    // 抽屉就什么都不摆——宁可不说，也不说过期的话。
-    dueWhy: qItem?.via === 'due' ? dueReason(view.pursuit) : null,
   } : null
   // 剩下的全放过了：抽屉不再摆卡，改摆一句话然后停手。
   //
@@ -484,12 +468,9 @@ export default function App() {
           ))}
         </nav>
         <span className="sp" />
-        {/* 队空的时候整个按钮不渲染。不显示「过卡 · 0」——这一刀刚撤掉四个占位的。 */}
-        {queue.items.length > 0 && (
-          <button className="qbtn" onClick={() => openQueueCard(queue.at)}>
-            <span className="qpile" aria-hidden="true" />过卡 · {queue.items.length}
-          </button>
-        )}
+        {/* 过卡入口原来在这儿。挪进工具条了——顶栏常驻角标本身就是一句主张：
+            「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
+            就不该站在这儿。谁生的跟谁站。 */}
       </header>
 
       {/* 一切正常时这里什么都不渲染 */}
@@ -518,6 +499,8 @@ export default function App() {
           refreshing={refreshing}
           onSay={() => setSayOpen(true)}
           saying={saying}
+          queueCount={queue.items.length}
+          onOpenQueue={() => openQueueCard(queue.at)}
         />
       )}
 

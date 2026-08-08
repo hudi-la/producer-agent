@@ -426,7 +426,6 @@ export default function PursuitFocus({
             <button className="qarrow" onClick={onQueuePrev} disabled={queue.i <= 0} aria-label="上一张">‹</button>
             <span className="qcount">{queue.i + 1} / {queue.n}</span>
             <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
-            {queue.dueWhy && <span className="qwhy">到日子了 · {queue.dueWhy}</span>}
             <span className="qsp" />
             {/* 只有「做完了」让顶栏那个数字降下去、把卡从队里拿走。
                 想先放着 = 翻页 ‹ › 走过去、或关掉抽屉——它下次还在原位。 */}
@@ -436,8 +435,8 @@ export default function PursuitFocus({
 
         {/* 你为什么在队里。
             一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
-            「到日子了」和「更新最新信息送来的」都要交代，只有你自己勾进来的
-            （via='pick'）不用：那是你亲手放的，不用它讲给你听。
+            「更新最新信息送来的」要交代，你自己端上来的（via='pick'/'say'）不用：
+            那是你亲手放的，不用它讲给你听。
             **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
             effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
             跟两个出口挪上来是同一个理由。 */}
