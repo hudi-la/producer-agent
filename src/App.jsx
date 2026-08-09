@@ -8,6 +8,9 @@ import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
 import People from './components/People.jsx'
+import PersonFocus from './components/PersonFocus.jsx'
+import { loadContacts } from './lib/loadContacts.js'
+import { cuesFor, actionable } from './lib/cues.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
@@ -16,7 +19,7 @@ import { checkBrain } from './lib/backends.js'
 import Subbar from './components/Subbar.jsx'
 import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
-import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue } from './lib/queue.js'
+import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
 import QueueRest from './components/QueueRest.jsx'
 
@@ -41,6 +44,8 @@ export default function App() {
   const [lib, setLib] = useState(null)
   const [pl, setPl] = useState(null)
   const [tk, setTk] = useState(null)
+  // 人这一层。名片 + 他名下的往来 —— 人际管理页和过卡队列都靠它。
+  const [ct, setCt] = useState(null)
   // 关于你自己的事实。卡片、详情页、档案页都要用，所以走 context 而不是一路当 prop 传。
   const [profile, setProfile] = useState(PROFILE_FALLBACK)
   const [view, setView] = useState({ name: 'home' })
@@ -84,7 +89,7 @@ export default function App() {
       try {
         const out = await refreshPursuit(list[i].id)
         if (needsMe(out)) {
-          setQueue((q) => enqueue(q, [{ id: list[i].id, via: 'update' }]))
+          setQueue((q) => enqueue(q, [{ kind: 'pursuit', id: list[i].id, via: 'update' }]))
         }
       } catch (_) {
         failed++
@@ -115,7 +120,7 @@ export default function App() {
       setSaying({ i: i + 1, n: ids.length })
       try {
         await sendMessage(ids[i], text, meta)
-        setQueue((q) => enqueue(q, [{ id: ids[i], via: 'say' }]))
+        setQueue((q) => enqueue(q, [{ kind: 'pursuit', id: ids[i], via: 'say' }]))
       } catch (_) {
         failed++
       }
@@ -151,22 +156,56 @@ export default function App() {
     markSeenDb(id).catch(() => {})
   }
 
+  const reloadContacts = () => loadContacts().then(setCt)
+
   useEffect(() => {
     loadLibrary().then(setLib)
     loadPursuits().then(setPl)
     loadTasks().then(setTk)
     loadProfile().then(setProfile)
+    loadContacts().then(setCt)
   }, [])
+
+  // 由头进队 —— 跟 needsMe 一个姿势：**纯计算，页面加载时算，不加 cron**。
+  //
+  // 停了的（碰满三次那种）不进：它只在卡上显示「停了」，不塞进你手头这摊活。
+  // 一个人身上可能有好几个由头，进队的 via 取第一个——卡头上四个都看得见。
+  useEffect(() => {
+    if (!ct?.contacts?.length) return
+    const today = new Date()
+    const byId = Object.fromEntries(ct.contacts.map((c) => [c.id, c]))
+    const entries = []
+    for (const c of ct.contacts) {
+      const cs = actionable(cuesFor(c, ct.msgsByContact[c.id] || [],
+        { today, introName: byId[c.intro_by]?.name }))
+      if (cs.length) entries.push({ kind: 'contact', id: c.id, via: cs[0].via })
+    }
+    if (entries.length) setQueue((q) => enqueue(q, entries))
+  }, [ct])
+
+  // 库里没有的人也从队里清掉 —— 跟机会线那半是同一个道理：
+  // 顶栏显示一个点了没反应的数字，就是在说谎。
+  useEffect(() => {
+    if (!ct) return
+    const live = new Set(ct.contacts.map((c) => c.id))
+    setQueue((q) => {
+      const items = q.items.filter((x) => x.kind !== 'contact' || live.has(x.id))
+      return items.length === q.items.length ? q : normalize({ items, at: q.at })
+    })
+  }, [ct])
 
   useEffect(() => { saveQueue(queue) }, [queue])
 
   // 库换过之后（seed ↔ live，id 完全是两套），localStorage 里可能躺着一批
   // 已经不存在的 id。不清掉的话顶栏会显示一个点了没反应的数字——那是在说谎。
+  //
+  // **只清机会线那一半。** 队里现在还躺着人（kind='contact'），他们的死活
+  // 由 ct 那份数据说了算——拿 pl 的 id 表去筛人，会把每一个人都当成幽灵清掉。
   useEffect(() => {
     if (!pl) return
     const live = new Set(pl.pursuits.map((p) => p.id))
     setQueue((q) => {
-      const items = q.items.filter((x) => live.has(x.id))
+      const items = q.items.filter((x) => x.kind !== 'pursuit' || live.has(x.id))
       return items.length === q.items.length ? q : normalize({ items, at: q.at })
     })
   }, [pl])
@@ -268,6 +307,7 @@ export default function App() {
         window.history.replaceState(null, '', window.location.pathname)
         setView({ name: 'home' })
       }
+      else if (view.name === 'person') setView({ name: 'home' })
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -385,14 +425,26 @@ export default function App() {
 
   // 打开队里的某一张。队列和 view 是两件事：view 说「抽屉现在看哪张」，
   // 队列说「你还欠着哪几件」。收起抽屉不动队列。
-  const openQueueCard = (id) => {
+  //
+  // 队里现在混着两种东西，所以进来的是 key（'pursuit:xxx' / 'contact:xxx'）
+  // 不是裸 id —— 拆开之后各开各的抽屉。
+  const openQueueCard = (k) => {
+    if (!k) return
+    const { kind, id } = parseKey(k)
+    if (kind === 'contact') {
+      const c = ct?.contacts?.find((x) => x.id === id)
+      // 队里下一张是个人，就把主区一起切过去——否则 view 换了、区没换，
+      // 你按了「下一张」却看见一片空白，那比翻不动更糟。
+      if (c) { setArea('people'); setView({ name: 'person', person: c }) }
+      return
+    }
     const p = pl.pursuits.find((x) => x.id === id)
-    if (p) { markSeen(id); setView({ name: 'pursuit', pursuit: p, mode: 'drawer' }) }
+    if (p) { setArea('pursue'); markSeen(id); setView({ name: 'pursuit', pursuit: p, mode: 'drawer' }) }
   }
 
   // 过一遍：不跑任何东西，直接把勾中的端上工作台。
   const pickAll = () => {
-    const entries = [...picked].map((id) => ({ id, via: 'pick' }))
+    const entries = [...picked].map((id) => ({ kind: 'pursuit', id, via: 'pick' }))
     if (!entries.length) return
     const q = enqueue(queue, entries)
     setQueue(q)
@@ -401,15 +453,22 @@ export default function App() {
   }
 
   // 抽屉正看的这张在不在队里。在 = 显示队头和两个出口。
-  const atQueue = view.name === 'pursuit' && inQueue(queue, view.pursuit.id)
-  const qItem = atQueue ? queue.items.find((x) => x.id === view.pursuit.id) : null
+  //
+  // 抽屉里看的可能是一条线也可能是一个人，先算出它在队里叫什么名字。
+  const viewKey =
+    view.name === 'pursuit' ? qKey('pursuit', view.pursuit.id)
+    : view.name === 'person' ? qKey('contact', view.person.id)
+    : null
+  const atQueue = Boolean(viewKey) && inQueue(queue, viewKey)
+  const qItem = atQueue ? queue.items.find((x) => keyOf(x) === viewKey) : null
   const qInfo = atQueue ? {
-    i: queue.items.findIndex((x) => x.id === view.pursuit.id),
+    i: queue.items.findIndex((x) => keyOf(x) === viewKey),
     n: queue.items.length,
     // '2026-08-06' → '8/6'。你什么时候放过它的，得看得见。
     skippedAt: mdOf(qItem?.skippedAt),
     // 这张卡怎么进队的：'pick' 你自己勾的 / 'update' 更新最新信息送来的 /
-    // 'say' 群发那句送来的。抽屉靠它决定要不要摆「这次发生了什么」。
+    // 'say' 群发那句送来的 / 四种由头（bump·circleback·thanks·met）。
+    // 抽屉靠它决定要不要摆「这次发生了什么」。
     via: qItem?.via || null,
   } : null
   // 剩下的全放过了：抽屉不再摆卡，改摆一句话然后停手。
@@ -420,7 +479,7 @@ export default function App() {
   const resting = atQueue && allSkipped(queue) && Boolean(view.rest)
 
   const queueGo = (d) => {
-    const q = queueGoto({ ...queue, at: view.pursuit.id }, d)
+    const q = queueGoto({ ...queue, at: viewKey }, d)
     setQueue(q)
     openQueueCard(q.at)
   }
@@ -430,7 +489,7 @@ export default function App() {
   // 那是让队列去替卡里的事实说话：「队列里有没有它」和「这件事做没做完」是两回事，
   // 一个按钮断言两件事，就有一件迟早是假的。认领搬到那句提案自己旁边去了。
   const finishCard = () => {
-    const q = queueDone(queue, view.pursuit.id)
+    const q = queueDone(queue, viewKey)
     setQueue(q)
     if (!q.items.length) closePursuit()
     else openQueueCard(q.at)
@@ -443,7 +502,7 @@ export default function App() {
     try { await acceptNextAction(id) } catch (e) { alert('没认上（下次更新它还会带记号）：' + e.message) }
   }
   const laterCard = () => {
-    const q = queueLater(queue, view.pursuit.id)
+    const q = queueLater(queue, viewKey)
     setQueue(q)
     // 全放过了：不换卡，在 view 上立个 rest 标——停手面板只在这一刻出现。
     if (!allSkipped(q)) openQueueCard(q.at)
@@ -459,6 +518,10 @@ export default function App() {
   // 找不到（刚被过滤掉/还没读回来）就退回快照，卡不能因此空掉。
   const openedPursuit = onPursuit
     ? (pl.pursuits.find((x) => x.id === view.pursuit.id) || view.pursuit)
+    : null
+  // 名片同理：改完一格要立刻显示新值，所以永远取 ct 里最新那一份。
+  const openedPerson = view.name === 'person'
+    ? (ct?.contacts?.find((x) => x.id === view.person.id) || view.person)
     : null
 
   return (
@@ -514,8 +577,40 @@ export default function App() {
         />
       )}
 
+      {/* 人际管理的工具条：**同一个过卡入口、同一个数字**。
+          队列是一条不是两条——它是「你还欠着几件事」，不是某个区的活。 */}
+      {area === 'people' && view.name !== 'person' && (
+        <div className="subbar ppl-subbar">
+          <span className="sp" />
+          <button className="lnk" onClick={() => openQueueCard(queue.at)} disabled={!queue.items.length}>
+            过卡{queue.items.length ? ` ${queue.items.length}` : ''}
+          </button>
+        </div>
+      )}
+
       {area === 'people' ? (
-        <People tasks={tk.tasks.filter(isPeopleTask)} pursuits={pl.pursuits} />
+        view.name === 'person' ? (
+          <PersonFocus
+            key={view.person.id}
+            person={openedPerson}
+            queue={qInfo}
+            onQueuePrev={() => queueGo(-1)}
+            onQueueNext={() => queueGo(1)}
+            onQueueDone={finishCard}
+            onQueueLater={laterCard}
+            onChanged={reloadContacts}
+            onOpenPursuit={(id) => { setArea('pursue'); openPursuit(pl.pursuits.find((p) => p.id === id)) }}
+          />
+        ) : (
+          <People
+            contacts={ct?.contacts || []}
+            msgsByContact={ct?.msgsByContact || {}}
+            tasks={tk.tasks.filter(isPeopleTask)}
+            fellBack={ct?.reason || null}
+            onOpen={(c) => setView({ name: 'person', person: c })}
+            onAdded={reloadContacts}
+          />
+        )
       ) : area === 'profile' ? (
         <Library entries={lib.entries} concerns={lib.concerns}
                  onProfileSaved={() => loadProfile().then(setProfile)} />

@@ -1,0 +1,97 @@
+import { supa, BRAIN } from './backends.js'
+
+// 人这一层的写口。分工跟 chat.js 一模一样：
+//  · 「你自己改自己名片上的字段」—— 浏览器直连走 anon，靠 security definer 函数，
+//    能改的列写死在 0034 里，anon 拿不到别的写权限。
+//  · 「让 Fairwind 去想」（起草、收信）—— 走本机 sidecar，那需要 service_role。
+//
+// 好处跟当初一样：sidecar 开不开、是不是最新的，都不影响你整理自己的名片。
+
+const rpc = async (fn, args) => {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { data, error } = await supa.rpc(fn, args)
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** 建 / 改一个人。只传要改的字段——没传的一格都不动。 */
+export const upsertContact = (f = {}) => rpc('pa_upsert_contact', {
+  p_id: f.id ?? null,
+  p_name: f.name ?? null,
+  p_email: f.email ?? null,
+  p_org: f.org ?? null,
+  p_role: f.role ?? null,
+  p_notes: f.notes ?? null,
+  p_channels: f.channels ?? null,
+  p_intro_by: f.intro_by ?? null,
+  p_next_touch_at: f.next_touch_at ?? null,
+  p_next_touch_why: f.next_touch_why ?? null,
+  p_cadence_days: f.cadence_days ?? null,
+})
+
+/** 认领一条邮件往来。登记过的 thread 才会被同步——永远不遍历信箱（0027 的原则）。 */
+export const claimThread = (contactId, threadId) =>
+  rpc('pa_claim_contact_thread', { p_contact_id: contactId, p_thread_id: threadId })
+
+/**
+ * 线下见了一面，记一笔。
+ * 一条记录同时干三件事：更新「上次碰」、触发 48 小时由头、留下「上次聊到哪」。
+ */
+export const logMeet = (contactId, text) =>
+  rpc('pa_add_contact_message', {
+    p_contact_id: contactId, p_role: 'note', p_kind: 'meet', p_content: text,
+  })
+
+/** 微信 / 电话 / 线下聊完了，打个卡。系统看不见那些渠道，所以靠你这一下。 */
+export const checkin = (contactId) => rpc('pa_contact_checkin', { p_contact_id: contactId })
+
+/** 回谢过介绍人了。由头③ 立刻不再提。 */
+export const markIntroThanked = (contactId) =>
+  rpc('pa_mark_intro_thanked', { p_contact_id: contactId })
+
+/** 这个人认领了哪几条往来。名片上要显示，也是「更新最新信息」能不能按的前提。 */
+export async function fetchThreads(contactId) {
+  if (!supa) return []
+  const { data, error } = await supa
+    .from('v_pa_threads').select('*').eq('contact_id', contactId).order('created_at')
+  return error ? [] : (data || [])
+}
+
+/** 这个人名下要发的信。 */
+export async function fetchContactDeliverables(contactId) {
+  if (!supa) return []
+  const { data, error } = await supa
+    .from('v_pa_deliverables').select('*').eq('contact_id', contactId)
+  return error ? [] : (data || [])
+}
+
+// ── 走 sidecar 的那几件 ─────────────────────────────────────────
+
+const post = async (path, body) => {
+  let res
+  try {
+    res = await fetch(`${BRAIN}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (_) {
+    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
+  }
+  const out = await res.json().catch(() => ({}))
+  if (!res.ok || out?.error) throw new Error(out?.error || `脑子出错了（${res.status}）`)
+  return out
+}
+
+/** 收这个人认领的那几条 thread 的新信。 */
+export const refreshContact = (id) => post('/refresh', { contact_id: id })
+
+/** 跟 Fairwind 说一句（起草回信就是从这儿来的）。 */
+export const sayToContact = (id, text) => post('/chat', { contact_id: id, text })
+
+/**
+ * 把一份定了稿的信放进 Gmail 草稿箱。
+ * **只建草稿，不发送** —— 不是我们关掉的，是 claude.ai 的 Gmail 连接器
+ * 整套工具里根本没有 send。最后那下发送永远是你的手。
+ */
+export const draftToGmail = (deliverableId) => post('/gmail-draft', { deliverable_id: deliverableId })

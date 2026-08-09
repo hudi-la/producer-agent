@@ -18,6 +18,25 @@ export async function fetchMessages(pursuitId) {
 }
 
 /**
+ * 拉这个人名下的往来：邮件（有 gmail_message_id）+ 你记的笔（role='note'）。
+ * 没连库时返回 null。
+ *
+ * 跟 fetchMessages 是一对：一个按线读「你跟 Fairwind 的商量」，
+ * 一个按人读「跟外面的人的真实往来」。两种消息躺在同一张表里，
+ * 靠 pursuit_id / contact_id 分开（见 0033 那道迁移）。
+ */
+export async function fetchContactMessages(contactId) {
+  if (!supa) return null
+  const { data, error } = await supa
+    .from('v_pa_pursuit_messages')
+    .select('*')
+    .eq('contact_id', contactId)
+    .order('created_at')
+  if (error) return null
+  return data
+}
+
+/**
  * 说一句话给 Fairwind 。你的话先落库，然后等它想完 —— 联网查资料时可能要几十秒。
  *
  * meta 记的是「你这句是怎么发出来的」（比如群发），只贴在你那条消息上。

@@ -20,7 +20,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-08b'
+export const BRAIN_BUILD = '2026-08-08c'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -56,12 +56,53 @@ async function loadContext(pursuitId) {
   }
 }
 
-async function addMessage(pursuitId, role, content, kind = 'message', meta = null) {
-  const { data, error } = await db.rpc('pa_add_message', {
-    p_pursuit_id: pursuitId, p_role: role, p_content: content, p_kind: kind,
-    // 不传就完全不带这个键，走函数默认值（0031）——现有那几处 4 参调用一处都不用改。
-    ...(meta ? { p_meta: meta } : {}),
-  })
+// 一次请求是给谁干活：一条机会线，还是一个人。
+//
+// 两个口子进来的形状一样，只是主人不同。写成一个小对象，免得每个函数各判一遍
+// ——各判一遍就一定会有一处判漏，而那一处会静悄悄把信写到没有主的地方去。
+function ownerOf(body) {
+  if (body?.contact_id) return { kind: 'contact', id: body.contact_id }
+  if (body?.pursuit_id) return { kind: 'pursuit', id: body.pursuit_id }
+  return null
+}
+const asOwner = (x) => (x && typeof x === 'object' && x.kind ? x : { kind: 'pursuit', id: x })
+
+// 一个人的上下文。形状跟 loadContext 一样（p / msgs / entries / profile / raw），
+// 好让下面那些 prompt 一套两用——照抄两份迟早会分叉。
+// p 装的是名片：prompt 里那句「这条线是什么」，对人来说就是「这个人是谁」。
+async function loadPersonContext(contactId) {
+  const { data, error } = await db.rpc('pa_brain_person_context', { p_contact_id: contactId })
+  if (error) throw new Error('读上下文失败：' + error.message)
+  if (!data?.contact) throw new Error('没有这个人：' + contactId)
+  const c = data.contact
+  return {
+    kind: 'contact',
+    p: { ...c, title: c.name || '未具名联系人' },
+    msgs: data.messages || [],
+    entries: data.entries || [],
+    profile: data.profile || null,
+    raw: data,
+  }
+}
+
+async function loadOwnerContext(owner) {
+  const o = asOwner(owner)
+  return o.kind === 'contact'
+    ? loadPersonContext(o.id)
+    : { ...(await loadContext(o.id)), kind: 'pursuit' }
+}
+
+async function addMessage(owner, role, content, kind = 'message', meta = null) {
+  const o = asOwner(owner)
+  const { data, error } = await db.rpc(
+    o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_message',
+    {
+      ...(o.kind === 'contact' ? { p_contact_id: o.id } : { p_pursuit_id: o.id }),
+      p_role: role, p_content: content, p_kind: kind,
+      // 不传就完全不带这个键，走函数默认值（0031）——现有那几处 4 参调用一处都不用改。
+      ...(meta ? { p_meta: meta } : {}),
+    },
+  )
   if (error) throw new Error(`存${role === 'artist' ? '你的话' : 'Fairwind 的回复'}失败：` + error.message)
   return data
 }
@@ -141,7 +182,7 @@ function entriesBlock(entries) {
 
 // incoming 那句刚已经落库了，所以要从「之前的往来」里摘出去（exceptId），
 // 否则它会在 prompt 里出现两次。
-function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
+function buildPrompt({ p, msgs, entries, profile, kind }, incoming, exceptId) {
   const fact = (k, v) => (v ? `${k}：${v}\n` : '')
   const lines = []
 
@@ -153,16 +194,35 @@ function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
 
   lines.push(...entriesBlock(entries))
 
-  lines.push('## 这条机会线')
-  lines.push(
-    fact('标题', p.title) + fact('机构', p.org) + fact('地点', p.location) +
-    fact('类型', p.kind) + fact('资助', p.funding) + fact('截止', p.deadline) +
-    fact('官方页面', p.url) + fact('当前阶段', p.stage) +
-    fact('为什么可能合适', p.why) + fact('备注', p.notes) +
-    (p.eligible === false
-      ? `⚠️ 资格搁置：目前身份${idOf(profile) ? `（${idOf(profile)}）` : ''}不满足这条线的要求，先别推进申请。\n`
-      : '')
-  )
+  // 一个人和一条机会线是两种东西：线有阶段和截止推着，人只有「你们是什么关系」。
+  // 所以这一段分岔，往来那一段以下完全共用。
+  if (kind === 'contact') {
+    lines.push('## 这个人')
+    lines.push(
+      fact('名字', p.name) + fact('机构', p.org) + fact('他管什么', p.role) +
+      fact('邮箱', p.email) + fact('谁介绍的', p.intro_by_name) +
+      fact('上次碰', p.last_touch_at && `${p.last_touch_at}（${
+        { email: '来自那封信', checkin: '你打的卡', meet: '你记的一笔' }[p.last_touch_src] || '来源不明'}）`) +
+      fact('说好什么时候再碰', p.next_touch_at && `${p.next_touch_at}${p.next_touch_why ? ` —— ${p.next_touch_why}` : ''}`) +
+      fact('关系记忆', p.notes) +
+      fact('他挂着的机会线', (p.pursuits || []).map((x) => x.title).join('、'))
+    )
+    lines.push('')
+    lines.push('写给他的信按对方语言写。**别写纯问候**——在美国，「just checking in」/「hope you\'re well」' +
+               '是公认最没用的邮件。每一封都得带一个由头：有新作品 / 看到个东西想到他 / 要去他的城市 / 恭喜他那个展。')
+    lines.push('')
+  } else {
+    lines.push('## 这条机会线')
+    lines.push(
+      fact('标题', p.title) + fact('机构', p.org) + fact('地点', p.location) +
+      fact('类型', p.kind) + fact('资助', p.funding) + fact('截止', p.deadline) +
+      fact('官方页面', p.url) + fact('当前阶段', p.stage) +
+      fact('为什么可能合适', p.why) + fact('备注', p.notes) +
+      (p.eligible === false
+        ? `⚠️ 资格搁置：目前身份${idOf(profile) ? `（${idOf(profile)}）` : ''}不满足这条线的要求，先别推进申请。\n`
+        : '')
+    )
+  }
 
   const history = msgs.filter((m) => m.id !== exceptId)
   if (history.length) {
@@ -174,7 +234,7 @@ function buildPrompt({ p, msgs, entries, profile }, incoming, exceptId) {
     }
     lines.push('')
   } else {
-    lines.push('（这条线还没有往来，你们刚开始。）\n')
+    lines.push('（还没有往来，刚开始。）\n')
   }
 
   lines.push('## Ta 刚说')
@@ -280,20 +340,21 @@ async function think(prompt, tools = READ_TOOLS, profile = null) {
 // ── HTTP ────────────────────────────────────────────────────
 
 async function handleChat(body) {
-  const { pursuit_id, text, meta } = body
-  if (!pursuit_id || !text?.trim()) throw new Error('要有 pursuit_id 和 text')
+  const { text, meta } = body
+  const owner = ownerOf(body)
+  if (!owner || !text?.trim()) throw new Error('要有 pursuit_id 或 contact_id，外加 text')
 
   // 先落库：哪怕后面想崩了，你说的话也不会丢。
   // meta 只贴在**你这条**上——它记的是「你这句是怎么发出来的」（群发/单发），
   // 不是这条线的属性，更不是 Fairwind 回复的属性。
-  const mine = await addMessage(pursuit_id, 'artist', text.trim(), 'message', meta || null)
+  const mine = await addMessage(owner, 'artist', text.trim(), 'message', meta || null)
 
-  const ctx = await loadContext(pursuit_id)
+  const ctx = await loadOwnerContext(owner)
   console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库`)
   const { text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id), READ_TOOLS, ctx.profile)
   console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
 
-  const theirs = await addMessage(pursuit_id, 'producer', reply)
+  const theirs = await addMessage(owner, 'producer', reply)
   return { mine, reply: theirs }
 }
 
@@ -366,12 +427,13 @@ async function handleBrief(body) {
 // 球权才翻。不然系统会替你撒一个你察觉不到的谎：那条线显示「等回复」，
 // 而信还躺在草稿箱里没人收到。
 async function handleGmailDraft(body) {
-  const { pursuit_id, deliverable_id } = body
-  if (!pursuit_id || !deliverable_id) throw new Error('要有 pursuit_id 和 deliverable_id')
+  const { deliverable_id } = body
+  const owner = ownerOf(body)
+  if (!owner || !deliverable_id) throw new Error('要有 pursuit_id 或 contact_id，外加 deliverable_id')
 
-  const ctx = await loadContext(pursuit_id)
+  const ctx = await loadOwnerContext(owner)
   const d = (ctx.raw.deliverables || []).find((x) => x.id === deliverable_id)
-  if (!d) throw new Error('这条线上没有这份产出')
+  if (!d) throw new Error(owner.kind === 'contact' ? '这个人名下没有这份产出' : '这条线上没有这份产出')
   if (d.status === 'final') throw new Error('已定稿的不用再放草稿箱')
   if (!d.body?.trim()) throw new Error('正文是空的，没东西可放')
 
@@ -379,9 +441,9 @@ async function handleGmailDraft(body) {
   const { text } = await think(
     `把下面这封信放进${mailboxOf(ctx.profile) ? ` ${artistOf(ctx.profile)}（${mailboxOf(ctx.profile)}）的` : ''} Gmail 草稿箱。**只建草稿，不发送**——你也没有发送的工具。
 
-机会线：${ctx.p.title}${ctx.p.org ? ` · ${ctx.p.org}` : ''}
-${threads.length ? `这条线已认领的 thread：${threads.join(', ')}——把草稿建成对最新那封的回复。`
-  : '这条线还没认领 thread。先用 search_threads 按机构名/对方地址找到最近那串往来，作为回复目标；找不到就新建一封。'}
+${owner.kind === 'contact' ? '收信人' : '机会线'}：${ctx.p.title}${ctx.p.org ? ` · ${ctx.p.org}` : ''}${owner.kind === 'contact' && ctx.p.email ? ` <${ctx.p.email}>` : ''}
+${threads.length ? `已认领的 thread：${threads.join(', ')}——把草稿建成对最新那封的回复。`
+  : '还没认领 thread。先用 search_threads 按机构名/对方地址找到最近那串往来，作为回复目标；找不到就新建一封。'}
 
 主题：${d.title}
 
@@ -403,15 +465,21 @@ ${d.body}
 
   // 认领这个 thread：下次同步就会跟着它走
   if (info.thread_id) {
-    await db.rpc('pa_link_thread', {
-      p_pursuit_id: pursuit_id, p_thread_id: info.thread_id, p_added_by: 'fairwind',
-    })
+    if (owner.kind === 'contact') {
+      await db.rpc('pa_claim_contact_thread', { p_contact_id: owner.id, p_thread_id: info.thread_id })
+    } else {
+      await db.rpc('pa_link_thread', {
+        p_pursuit_id: owner.id, p_thread_id: info.thread_id, p_added_by: 'fairwind',
+      })
+    }
   }
   const meta = { ...(d.meta || {}), gmail_draft_id: info.draft_id, to: info.to || null }
-  const { error } = await db.rpc('pa_upsert_deliverable', {
-    p_pursuit_id: pursuit_id, p_id: deliverable_id,
-    p_kind: d.kind, p_title: d.title, p_meta: meta,
-  })
+  const { error } = await db.rpc(
+    owner.kind === 'contact' ? 'pa_upsert_contact_deliverable' : 'pa_upsert_deliverable',
+    {
+      ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }),
+      p_id: deliverable_id, p_kind: d.kind, p_title: d.title, p_meta: meta,
+    })
   if (error) throw new Error('记草稿号失败：' + error.message)
   return { ok: true, ...info }
 }
@@ -428,7 +496,8 @@ ${d.body}
 // 有信就有串，让它自己接上，不用你去贴链接。
 //
 // 一条线只会走一次（认领完就落进 producer.pursuit_threads 了）。
-async function ensureThreads(pursuitId, ctx) {
+async function ensureThreads(owner, ctx) {
+  const o = asOwner(owner)
   const have = (ctx.raw.threads || []).map((t) => t.gmail_thread_id)
   if (have.length) return have
 
@@ -448,22 +517,28 @@ ${known.join(', ')}
   let ids = []
   try { ids = m ? (JSON.parse(m[1]).thread_ids || []) : [] } catch (_) { ids = [] }
   for (const t of ids) {
-    await db.rpc('pa_link_thread', { p_pursuit_id: pursuitId, p_thread_id: t, p_added_by: 'fairwind' })
+    if (o.kind === 'contact') {
+      await db.rpc('pa_claim_contact_thread', { p_contact_id: o.id, p_thread_id: t })
+    } else {
+      await db.rpc('pa_link_thread', { p_pursuit_id: o.id, p_thread_id: t, p_added_by: 'fairwind' })
+    }
   }
   return ids
 }
 
 async function handleSync(body) {
-  const { pursuit_id } = body
-  if (!pursuit_id) throw new Error('要有 pursuit_id')
+  const owner = ownerOf(body)
+  if (!owner) throw new Error('要有 pursuit_id 或 contact_id')
 
-  const ctx = await loadContext(pursuit_id)
-  const threads = await ensureThreads(pursuit_id, ctx)
+  const ctx = await loadOwnerContext(owner)
+  const threads = await ensureThreads(owner, ctx)
   if (!threads.length) {
-    // 真的无处可收：这条线一封信都没有，所以连反查的线头都没有。
+    // 真的无处可收：一封信都没有，所以连反查的线头都没有。
     // 说清楚是「还没有往来」，别让它看起来像「查过了，没有新信」——那两件事天差地别。
     return { ok: true, threads: 0, added: 0,
-      note: '这条线还没有任何邮件往来，所以没处可收。起草一封发出去，它就接上了。' }
+      note: owner.kind === 'contact'
+        ? '这个人还没认领任何邮件往来，所以没处可收。在名片上认领一条，或者起草一封发出去。'
+        : '这条线还没有任何邮件往来，所以没处可收。起草一封发出去，它就接上了。' }
   }
 
   const known = ctx.msgs.filter((m) => m.gmail_message_id).map((m) => m.gmail_message_id)
@@ -497,20 +572,26 @@ thread：${threads.join(', ')}
   let addedIn = 0
   for (const mail of parsed.messages || []) {
     if (!mail?.id || !mail?.role) continue
-    const { data, error } = await db.rpc('pa_add_email', {
-      p_pursuit_id: pursuit_id,
-      p_role: mail.role === 'artist' ? 'artist' : 'org',
-      p_gmail_message_id: mail.id,
-      p_content: mail.summary || (mail.raw || '').slice(0, 200),
-      p_body_raw: mail.raw || null,
-      p_meta: { subject: mail.subject || null, from_name: mail.from || null },
-      p_created_at: mail.at || null,
-    })
+    const { data, error } = await db.rpc(
+      owner.kind === 'contact' ? 'pa_add_contact_email' : 'pa_add_email',
+      {
+        ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }),
+        p_role: mail.role === 'artist' ? 'artist' : 'org',
+        p_gmail_message_id: mail.id,
+        p_content: mail.summary || (mail.raw || '').slice(0, 200),
+        p_body_raw: mail.raw || null,
+        p_meta: { subject: mail.subject || null, from_name: mail.from || null },
+        p_created_at: mail.at || null,
+      })
     if (error) { console.warn('  ⚠️ 一封没写进去：' + error.message); continue }
     if (data?.inserted) { added++; if (mail.role !== 'artist') addedIn++ }
   }
   for (const t of threads) {
-    await db.rpc('pa_touch_thread', { p_pursuit_id: pursuit_id, p_thread_id: t, p_history_id: null })
+    if (owner.kind === 'contact') {
+      await db.rpc('pa_touch_contact_thread', { p_contact_id: owner.id, p_thread_id: t, p_history_id: null })
+    } else {
+      await db.rpc('pa_touch_thread', { p_pursuit_id: owner.id, p_thread_id: t, p_history_id: null })
+    }
   }
   // addedIn = 对方来的那几封。你自己发的信收录进档案不该惊动你——你知道你发过。
   // 前端拿它当过卡判据 1，added 仍是总数（进度和日志用）。
@@ -525,9 +606,67 @@ thread：${threads.join(', ')}
 // 消化 = 两问：① 新信让现在的待办作废了吗 ② 现在该干什么。
 // 答案落库走 0029 的两个口子——闸在库里（你的活待办拒绝覆盖、
 // 作废必须指认哪封信），prompt 只是第一道，不是唯一一道。
+// 人身上的「更新最新信息」——比机会线那套简单得多。
+//
+// 线上那一套（待办作废 / 下一步提案）在人身上没有对应物：人没有 next_action，
+// 也没有阶段和截止。人身上唯一要消化的是**时间锚点**。
+//
+// 「circle back next semester」在美国语境里**是真话**，是真的邀请你在那个时间点
+// 再来一次。婉拒长的是另一个样子（not a fit at this time），而且不给时间锚点。
+// 0011 那份迁移开头记着两条真事：LACHSA 和 Ruth Asawa SOTA 都给了锚点，
+// 都因为没人记得再碰而飘掉了。
+//
+// 认不出来就**什么都不写**——不猜、不用默认值。名片上永远留一个手填的口。
+// 这是整刀里唯一「调出来的」东西，所以它必须能干净降级：
+// 它认不准，最坏也只是这个由头不出现，不会往库里写一个假日期。
+async function handlePersonRefresh(contactId) {
+  const sync = await handleSync({ contact_id: contactId })
+  if (!sync.added) return { ...sync, anchored: false }
+
+  const ctx = await loadPersonContext(contactId)
+  const fresh = ctx.msgs.filter((m) => m.gmail_message_id).slice(-sync.added)
+  const inbound = fresh.filter((m) => m.role === 'org')
+  if (!inbound.length) return { ...sync, anchored: false }   // 全是你自己发的，没什么可消化
+
+  const { text } = await think(
+    `${ctx.p.title} 刚回了 ${inbound.length} 封信。只问一件事：**他有没有给出再联系的时间锚点？**
+
+【新信】
+${inbound.map((m) => `${m.created_at?.slice(0, 10) || '?'}：${m.body_raw || m.content}`).join('\n---\n')}
+【今天】${new Date().toISOString().slice(0, 10)}
+
+算数的锚点长这样：circle back next semester / after March / in the fall / 具体日期 /
+「等我们排完下学期课表」。这些**是真话**，不是客套。
+
+不算数的：「not a fit at this time」「we don't have capacity」这类婉拒，
+以及任何**没给时间**的客气话。它们一律当成没有锚点。
+
+有锚点就**最后一行**单独输出，别的什么都不要加：
+[[NEXT]] {"at":"2026-09-01","quote":"circle back next semester"}
+at 是你把那句话折算成的日期，quote 是**原话**，一个字都别改。
+
+没有锚点就**这一行整个不要输出**——宁可不说，不许猜。`,
+    READ_TOOLS,
+    ctx.profile,
+  )
+
+  const m = text.match(/\[\[NEXT\]\]\s*(\{[\s\S]*?\})\s*$/m)
+  let a = null
+  try { a = m ? JSON.parse(m[1]) : null } catch (_) { a = null }
+  if (!a?.at || !a?.quote) return { ...sync, anchored: false }
+
+  const { error } = await db.rpc('pa_upsert_contact', {
+    p_id: contactId, p_next_touch_at: a.at, p_next_touch_why: `他说 "${a.quote}"`,
+  })
+  if (error) return { ...sync, anchored: false, note: '锚点没写进去：' + error.message }
+  return { ...sync, anchored: true, next_touch_at: a.at, quote: a.quote }
+}
+
 async function handleRefresh(body) {
-  const { pursuit_id } = body
-  if (!pursuit_id) throw new Error('要有 pursuit_id')
+  const owner = ownerOf(body)
+  if (!owner) throw new Error('要有 pursuit_id 或 contact_id')
+  if (owner.kind === 'contact') return handlePersonRefresh(owner.id)
+  const pursuit_id = owner.id
 
   const sync = await handleSync({ pursuit_id })
   if (!sync.added) {
@@ -745,7 +884,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const body = JSON.parse(raw || '{}')
-        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} ${isDraft ? '放草稿箱' : isRefresh ? '更新' : '收信'} ${body.pursuit_id}`)
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} ${isDraft ? '放草稿箱' : isRefresh ? '更新' : '收信'} ${body.contact_id ? `人 ${body.contact_id}` : body.pursuit_id}`)
         const out = isDraft ? await handleGmailDraft(body) : isRefresh ? await handleRefresh(body) : await handleSync(body)
         console.log(`  ↳ ${JSON.stringify(out)}`)
         send(res, 200, out)
