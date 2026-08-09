@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { fetchMessages, sendMessage } from '../lib/chat.js'
+import { fetchMessages, sendMessage, stopThinking } from '../lib/chat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { doneAction, voidedAction, actionLine } from '../lib/nextAction.js'
 import { fetchDeliverables, fetchAttachments, setFinal, syncMail } from '../lib/deliverables.js'
@@ -194,6 +194,8 @@ export default function PursuitFocus({
   // 它提的、你还没认的那句。认领挂在这句话旁边，不挂在过卡器的出口上。
   const proposed = live?.by === 'fairwind' ? live : null
   const endRef = useRef(null)
+  const taRef = useRef(null)        // 输入框本体，用来按内容撑高
+  const runIdRef = useRef(null)     // 正在跑的那一次，「终止」靠它找到对应的活
   // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
   const threeCol = !inDrawer
   const [deliv, setDeliv] = useState([])
@@ -210,9 +212,13 @@ export default function PursuitFocus({
   // 现在：只有「刚发出去、还在合理等待窗口内」才算在想。超过这个窗口就承认
   // 它没回，把输入框还给你。另外限定 kind='message'——你发给机构的真实邮件
   // （role='artist', kind='email'）不是在跟 Fairwind 说话，不该触发「在想」。
+  // 你按过终止的那条：别再等它的回复了，回复不会来了。
+  // 不写这个的话，终止完输入框还得按上面那个 3 分钟窗口干等——你正是急着改字才按的停。
+  const [stoppedId, setStoppedId] = useState(null)
   const STALE_MS = 3 * 60 * 1000   // 联网研究最久见过 30–60 秒，3 分钟还没回就是死了
   const lastMsg = msgs.length ? msgs[msgs.length - 1] : null
   const awaiting = !!lastMsg && lastMsg.role === 'artist' && (lastMsg.kind || 'message') === 'message'
+    && lastMsg.id !== stoppedId
   const waitedMs = awaiting && lastMsg.created_at
     ? Date.now() - new Date(lastMsg.created_at).getTime()
     : 0   // 乐观插入的临时消息还没有 created_at，当作刚发出
@@ -236,6 +242,16 @@ export default function PursuitFocus({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [msgs.length, thinking])
+
+  // 输入框按内容撑高。必须先归零再量 scrollHeight——不归零的话 scrollHeight
+  // 永远不小于当前高度，删字的时候框只会长不会缩。上限在 CSS 的 max-height，
+  // 到顶了 textarea 自己滚。
+  useEffect(() => {
+    const el = taRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [text])
 
   // 产出和附件。只有整页要，抽屉不拉——省一次往返。
   async function reloadDeliv() {
@@ -304,11 +320,17 @@ export default function PursuitFocus({
     setText('')
     setErr(null)
     setThinking(true)
+    // run_id 在这儿生成，跟着请求一起发过去——不能等回来再拿：
+    // /chat 是想完了才返回的，那时候早没得停了。
+    const runId = crypto.randomUUID()
+    runIdRef.current = runId
     const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: t }
     setMsgs((m) => [...m, tmp])
     try {
-      const { mine, reply } = await sendMessage(p.id, t)
-      setMsgs((m) => [...m.filter((x) => x.id !== tmp.id), mine, reply])
+      const { mine, reply, aborted } = await sendMessage(p.id, t, undefined, runId)
+      // 终止了就只留你那条：它没写回复，reply 是 null。
+      setMsgs((m) => [...m.filter((x) => x.id !== tmp.id), mine, ...(reply ? [reply] : [])])
+      if (aborted) setStoppedId(mine.id)
     } catch (e) {
       // 脑子是先存你的话、再去想的，所以失败有两种：
       //   连不上 → 一个字都没存 → 把内容还回输入框，别让你白打
@@ -325,7 +347,20 @@ export default function PursuitFocus({
       }
     } finally {
       setThinking(false)
+      runIdRef.current = null
     }
+  }
+
+  // 终止：掐掉正在跑的那一次，不写回复。你说的那句留着——它是你说的话，不是它想的。
+  //
+  // 拿不到 run_id 也照样把界面解开：可能是脑子重启过、或者这条「在想」是上次
+  // 开着页面时留下的。那种情况下本来也没东西在跑，卡着输入框没有意义。
+  async function stop() {
+    const rid = runIdRef.current
+    if (lastMsg) setStoppedId(lastMsg.id)
+    setThinking(false)
+    runIdRef.current = null
+    if (rid) await stopThinking(rid)
   }
 
   // 哪些消息已经被搬进右栏当产出了（deliverables.source_msg 指着它）
@@ -403,17 +438,33 @@ export default function PursuitFocus({
 
       {err && <div className="composer-err">{err}</div>}
       <div className="composer">
-        <input
+        {/* textarea 而不是 input：一行装不下就自己长高（上限在 CSS 的 max-height，
+            到顶了才开始滚）。Enter 发送，Shift+Enter 换行。
+            isComposing 那句不能删——中文输入法选词时也会敲 Enter，
+            不挡的话你选个词就把半句话发出去了。 */}
+        <textarea
+          ref={taRef}
           className="ph"
+          rows={1}
           value={text}
           disabled={busy}
           placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）' : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+            e.preventDefault()
+            send()
+          }}
         />
-        <button className="send" aria-label="发送" onClick={send} disabled={busy || !text.trim()}>
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
+        {busy ? (
+          <button className="send stop" aria-label="终止" title="终止——停掉 Fairwind 这次的回复" onClick={stop}>
+            <svg width="15" height="15" viewBox="0 0 16 16"><rect x="4.5" y="4.5" width="7" height="7" rx="1.4" fill="#fff" /></svg>
+          </button>
+        ) : (
+          <button className="send" aria-label="发送" onClick={send} disabled={!text.trim()}>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        )}
       </div>
     </>
   )

@@ -42,20 +42,41 @@ export async function fetchContactMessages(contactId) {
  * meta 记的是「你这句是怎么发出来的」（比如群发），只贴在你那条消息上。
  * 不传就完全不带这个键，走 RPC 的默认值 —— 单发的调用方一个字都不用改。
  */
-export async function sendMessage(pursuitId, text, meta) {
+export async function sendMessage(pursuitId, text, meta, runId) {
   let res
   try {
     res = await fetch(`${BRAIN}/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pursuit_id: pursuitId, text, ...(meta ? { meta } : {}) }),
+      body: JSON.stringify({ pursuit_id: pursuitId, text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) }),
     })
   } catch (_) {
     throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error || `脑子出错了（${res.status}）`)
-  return body
+  return body   // { mine, reply } —— 你按了终止的话 reply 是 null、带 aborted: true
+}
+
+/**
+ * 终止某一次「Fairwind 在想」。run_id 是发起时浏览器自己生成、随 /chat 一起发过去的
+ * ——不能等 /chat 返回再拿，那时候早想完了，没得停。
+ *
+ * 停的是它的回复，不是你的话：你那句在 /chat 一开头就落库了，留着。
+ * 停不掉也不报错（可能刚好想完了，也可能脑子重启过），前端照样把界面解开。
+ */
+export async function stopThinking(runId) {
+  if (!runId) return { ok: true, stopped: false }
+  try {
+    const res = await fetch(`${BRAIN}/chat/stop`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ run_id: runId }),
+    })
+    return await res.json().catch(() => ({ ok: true, stopped: false }))
+  } catch (_) {
+    return { ok: false, stopped: false }
+  }
 }
 
 // 「讲懂」没有前端入口了：脑子自己在后台扫「新机会里还没读的卡」去读，

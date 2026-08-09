@@ -312,7 +312,15 @@ const GMAIL_TOOLS = [
   'mcp__claude_ai_Gmail__create_draft',
 ]
 
-async function think(prompt, tools = READ_TOOLS, profile = null) {
+// 正在想的那些活：run_id → AbortController。你按「终止」时靠它找到对应那一次。
+//
+// 为什么要有这张表：光在浏览器里断掉请求是假停——连接断了，这边 think() 照跑，
+// 几十秒后回复照样落库、被轮询捞出来。要真停，得停在这儿。
+// run_id 由浏览器生成并随 /chat 一起发过来，不是这边生成再回传的——
+// 回传得等 think() 想完，那时候早没得停了。
+const RUNS = new Map()
+
+async function think(prompt, tools = READ_TOOLS, profile = null, abortController = null) {
   const out = []
   let usage = null
   for await (const m of query({
@@ -322,6 +330,7 @@ async function think(prompt, tools = READ_TOOLS, profile = null) {
       allowedTools: tools,
       permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
       maxTurns: 20,
+      ...(abortController ? { abortController } : {}),
     },
   })) {
     if (m.type === 'assistant') {
@@ -340,7 +349,7 @@ async function think(prompt, tools = READ_TOOLS, profile = null) {
 // ── HTTP ────────────────────────────────────────────────────
 
 async function handleChat(body) {
-  const { text, meta } = body
+  const { text, meta, run_id } = body
   const owner = ownerOf(body)
   if (!owner || !text?.trim()) throw new Error('要有 pursuit_id 或 contact_id，外加 text')
 
@@ -351,11 +360,38 @@ async function handleChat(body) {
 
   const ctx = await loadOwnerContext(owner)
   console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库`)
-  const { text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id), READ_TOOLS, ctx.profile)
+
+  const ac = run_id ? new AbortController() : null
+  if (ac) RUNS.set(run_id, ac)
+  let reply, usage
+  try {
+    ;({ text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id), READ_TOOLS, ctx.profile, ac))
+  } catch (err) {
+    // 你按了终止：不写回复，也不算出错。你那条留着（是你说的话，不是它想的）。
+    if (ac?.signal.aborted) {
+      console.log('  ↳ 你终止了这一次，没写回复')
+      return { mine, reply: null, aborted: true }
+    }
+    throw err
+  } finally {
+    if (run_id) RUNS.delete(run_id)
+  }
   console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
 
   const theirs = await addMessage(owner, 'producer', reply)
   return { mine, reply: theirs }
+}
+
+// 终止：把那一次正在想的活掐掉。找不到就说找不到——可能已经想完了，
+// 也可能是脑子重启过。两种情况都不是错，前端照样把界面解开。
+function handleStop(body) {
+  const { run_id } = body
+  if (!run_id) throw new Error('要有 run_id')
+  const ac = RUNS.get(run_id)
+  if (!ac) return { ok: true, stopped: false }
+  ac.abort()
+  RUNS.delete(run_id)
+  return { ok: true, stopped: true }
 }
 
 // 用户移卡：改这条线的阶段。这是「你」的动作，不是 Fairwind 的——Fairwind 只有 WebSearch/WebFetch，
@@ -820,6 +856,22 @@ const server = http.createServer(async (req, res) => {
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}`)
         console.log(`  ${String(body.text).slice(0, 50)}`)
         send(res, 200, await handleChat(body))
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
+  if (req.method === 'POST' && req.url === '/chat/stop') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', () => {
+      try {
+        const body = JSON.parse(raw || '{}')
+        console.log(`\n→ 终止 ${body.run_id}`)
+        send(res, 200, handleStop(body))
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })

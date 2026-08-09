@@ -56,15 +56,25 @@ update producer.pursuit_messages m
 -- ② 那条 pursuit 根本没有 contact_id 的 —— 从邮件里认人。
 --
 -- 这是整道迁移唯一脏的一步。meta->>'from_name' 存的是 Gmail 的 from 字段
--- （brain/server.js 收信时写的），可能是「名字 <邮箱>」也可能只有名字，
--- **不保证是干净的邮箱**。所以这儿只拿它当名字用，邮箱留空——
--- 下次收信或你在名片上手填。宁可空着，也不往 email 那列塞一个猜出来的值：
+-- （brain/server.js 收信时写的），通常长这样：
+--     Maisa Chen <m.chen@calarts.edu>
+-- **邮箱就在里面**，库里就有，不用去 Gmail 拿。名字和邮箱分开抠：
+--   · 尖括号里的 → email
+--   · 尖括号外的 → name（去掉可能包着的引号）
+--   · 整段就是个裸地址（没有名字）→ email 拿全段，name 退回机构名
+--
+-- 为什么非抠不可：没有邮箱的人**收不到信也发不出信**，而且 contacts 那条
+-- email 唯一索引对他们完全失效——你哪天贴一封他们的信进来，会长出第二个人。
+--
+-- 抠不出来的就老实留空。宁可空着，也不往 email 那列塞一个猜出来的值：
 -- 那一列上有唯一索引，塞错了会挡住真正的那个人。
+--
+-- 已经存在的邮箱不再建人，直接挂上去 —— 同一个人不该有两张名片。
 --
 -- 建出来的人会出现在人际管理页上，而你从没手动加过他们。
 -- 这不是副作用：**这正是他们第一次进系统。**
 do $$
-declare r record; cid uuid;
+declare r record; cid uuid; nm text; em text;
 begin
   for r in
     select p.id as pid, p.org,
@@ -79,11 +89,29 @@ begin
        and exists (select 1 from producer.pursuit_messages m
                     where m.pursuit_id = p.id and m.gmail_message_id is not null)
   loop
-    insert into producer.contacts (name, org, notes)
-    values (coalesce(nullif(btrim(r.from_name), ''), r.org, '未具名联系人'),
-            r.org,
-            '0033 迁移从这条线的邮件里认出来的人。邮箱还没有——下次收信或你手填。')
-    returning id into cid;
+    -- 先抠尖括号里的；没有尖括号就看整段本身是不是个地址
+    em := lower(nullif(btrim((regexp_match(coalesce(r.from_name, ''), '<([^>]+@[^>]+)>'))[1]), ''));
+    if em is null and r.from_name ~ '^\s*[^\s<>@]+@[^\s<>@]+\s*$' then
+      em := lower(btrim(r.from_name));
+    end if;
+    -- 名字 = 尖括号外那截，去掉包裹的引号
+    nm := btrim(regexp_replace(coalesce(r.from_name, ''), '<[^>]*>', ''), ' "''');
+    if nm = '' or nm = em then nm := null; end if;
+
+    -- 这个邮箱已经在库里了 → 挂过去，不建第二个
+    cid := null;
+    if em is not null then
+      select id into cid from producer.contacts where lower(email) = em limit 1;
+    end if;
+
+    if cid is null then
+      insert into producer.contacts (name, email, org, notes)
+      values (coalesce(nm, r.org, '未具名联系人'), em, r.org,
+              case when em is null
+                then '0033 迁移从这条线的邮件里认出来的人。**邮箱没抠出来**——他收不到信也发不出信，去 Gmail 里补一个。'
+                else '0033 迁移从这条线的邮件里认出来的人。' end)
+      returning id into cid;
+    end if;
 
     update producer.pursuits         set contact_id = cid where id = r.pid;
     update producer.pursuit_messages set contact_id = cid
