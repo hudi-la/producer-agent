@@ -13,10 +13,17 @@
 // 那个人名下的消息，回一句**带日期带来源**的人话，或者 null。
 // 存下来的东西会跟事实分叉，算出来的不会。
 
-/** 日期 → '8/6'。两位数的月日都要去前导零，不能出现「8/06」。 */
+/**
+ * 日期 → '8/6'。两位数的月日都要去前导零，不能出现「8/06」。
+ *
+ * **按 UTC 取月日，不按本地时区。** 库里的 last_touch_at 是 created_at::date
+ * 算出来的（UTC 日），名片和通讯录都显示那一个。这儿要是按本地时区格式化，
+ * 一封 UTC 凌晨到的信会被说成前一天——于是由头写着「8/5 他回你了」，
+ * 同一页的通讯录那行写着「8/6」。同一封信两个日期，你不知道该信哪个。
+ */
 const md = (x) => {
   const d = x instanceof Date ? x : new Date(x)
-  return Number.isNaN(+d) ? '?' : `${d.getMonth() + 1}/${d.getDate()}`
+  return Number.isNaN(+d) ? '?' : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
 }
 const DAY = 86400000
 const daysSince = (from, to) => Math.floor((to - new Date(from)) / DAY)
@@ -50,6 +57,35 @@ export const BUMP_WAIT = [7, 21]
 
 /** 见完面那封 follow-up 的时限。过了不消失，只是改口。 */
 export const MEET_HOURS = 48
+
+/**
+ * 他回你了，你还没回。
+ *
+ * 这条是**最常发生、也最要紧的一条**，而我一开始定四种由头时把它漏了——
+ * 漏得很没道理：机会线那边早就有这个判据（收到来信就进队，见 App.jsx 的
+ * needsMe），人这边偏偏没接上。而「Maisa 回了我，我该回他」正是这一整刀
+ * 最开始要解决的那件事。
+ *
+ * 判据：往来里最后一封邮件是对方发的。就这么简单——你回了，最后一封就是你的了。
+ *
+ * 怎么算办完了：你回信（下次收信自然就不响了），或者你按「聊过了」打个卡
+ * ——有些信本来就不用回（「谢谢，回头见」），那就打卡了事，别让它一直挂着。
+ */
+function repliedCue(contact, msgs, today) {
+  const mail = mailsOf(msgs)
+  const last = mail[mail.length - 1]
+  if (!last || last.role !== 'artist' && last.role !== 'org') return null
+  if (last.role !== 'org') return null                    // 最后一封是你发的，轮不到这条
+  // 你打过卡说处理过了，而且是在这封信之后 —— 不再吵你
+  if (contact.last_touch_src === 'checkin' && contact.last_touch_at &&
+      new Date(contact.last_touch_at + 'T23:59:59') >= new Date(last.created_at)) return null
+  const d = daysSince(last.created_at, today)
+  return {
+    via: 'replied',
+    why: d <= 0 ? `${md(last.created_at)} 他回你了，还没回`
+       : `${md(last.created_at)} 他回你了，${d} 天没回`,
+  }
+}
 
 function bumpCue(msgs, today) {
   const run = unansweredRun(msgs)
@@ -131,6 +167,8 @@ function metCue(msgs, today) {
  */
 export function cuesFor(contact, msgs, { today = new Date(), introName = null } = {}) {
   return [
+    // 「他回你了」排第一：球在你手上的时候，别的都是次要的
+    repliedCue(contact, msgs, today),
     bumpCue(msgs, today),
     circlebackCue(contact, today),
     thanksCue(contact, msgs, introName),

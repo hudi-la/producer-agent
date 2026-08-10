@@ -13,6 +13,49 @@ const note = (at) =>
 const who = { id: 'c1', name: 'Maisa' }
 const via = (cs, v) => cs.find((c) => c.via === v)
 
+// ── ⓪ 他回你了，还没回 ──────────────────────────────────────────
+// 这条最常发生也最要紧，最初定四种由头时漏了。机会线那边早就有这个判据。
+
+test('他回了你 —— 第一条由头就是它，带日期和天数', () => {
+  const cs = cuesFor(who, [mail('2026-08-01', 'artist'), mail('2026-08-06', 'org')],
+                     { today: T('2026-08-09') })
+  assert.equal(cs[0].via, 'replied')            // 球在你手上，排第一
+  assert.ok(cs[0].why.includes('8/6'))
+  assert.ok(cs[0].why.includes('3 天'))
+})
+
+test('他刚回，当天 —— 提，但不说「0 天」', () => {
+  const c = via(cuesFor(who, [mail('2026-08-09', 'org')], { today: T('2026-08-09') }), 'replied')
+  assert.ok(c.why.includes('还没回'))
+  assert.equal(c.why.includes('0 天'), false)
+})
+
+test('你已经回了 —— 最后一封是你的，这条就不提了', () => {
+  const cs = cuesFor(who, [mail('2026-08-06', 'org'), mail('2026-08-07', 'artist')],
+                     { today: T('2026-08-09') })
+  assert.equal(via(cs, 'replied'), undefined)
+})
+
+test('有些信不用回 —— 打个卡「聊过了」就不再挂着', () => {
+  const msgs = [mail('2026-08-06', 'org')]
+  const 没打卡 = { ...who }
+  assert.ok(via(cuesFor(没打卡, msgs, { today: T('2026-08-09') }), 'replied'))
+  const 打过卡 = { ...who, last_touch_src: 'checkin', last_touch_at: '2026-08-07' }
+  assert.equal(via(cuesFor(打过卡, msgs, { today: T('2026-08-09') }), 'replied'), undefined)
+})
+
+test('打卡在他回信之前 —— 不算，那是上一轮的事', () => {
+  const c = { ...who, last_touch_src: 'checkin', last_touch_at: '2026-08-01' }
+  assert.ok(via(cuesFor(c, [mail('2026-08-06', 'org')], { today: T('2026-08-09') }), 'replied'))
+})
+
+test('「他回你了」和「该 bump 了」互斥 —— 球不可能同时在两边', () => {
+  const 他回了 = cuesFor(who, [mail('2026-07-01', 'artist'), mail('2026-08-06', 'org')],
+                        { today: T('2026-08-09') })
+  assert.ok(via(他回了, 'replied'))
+  assert.equal(via(他回了, 'bump'), undefined)
+})
+
 // ── ① 该 bump 了 ────────────────────────────────────────────────
 
 test('发出去还没到等待期 —— 不吵你', () => {
@@ -125,11 +168,11 @@ test('见面之前发的信不算 —— 那封是见面之前的事', () => {
 
 // ── 合起来 ──────────────────────────────────────────────────────
 
-test('一个人身上可以同时有好几个由头', () => {
+test('一个人身上可以同时有好几个由头，「他回你了」排最前', () => {
   const c = { ...who, intro_by: 'tom', next_touch_at: '2026-08-01' }
   const cs = cuesFor(c, [mail('2026-07-01', 'artist'), mail('2026-07-02', 'org')],
                      { today: T('2026-08-08'), introName: 'Tom Leeser' })
-  assert.deepEqual(cs.map((x) => x.via).sort(), ['circleback', 'thanks'])
+  assert.deepEqual(cs.map((x) => x.via), ['replied', 'circleback', 'thanks'])
 })
 
 test('什么由头都没有 —— 空数组，不是 null', () => {
@@ -139,4 +182,14 @@ test('什么由头都没有 —— 空数组，不是 null', () => {
 test('等待期就是设计稿里那两个数', () => {
   assert.deepEqual(BUMP_WAIT, [7, 21])
   assert.equal(MEET_HOURS, 48)
+})
+
+// 日期必须跟库里那个对得上，否则同一封信在同一页上会有两个日期。
+// UTC 凌晨到的信最容易露馅：本地时区一格式化就变成前一天。
+test('按 UTC 取月日 —— 跟通讯录那行说同一个日期', () => {
+  const 凌晨到的 = {
+    created_at: '2026-08-06T04:54:41Z', role: 'org', gmail_message_id: 'x', kind: 'message',
+  }
+  const c = via(cuesFor(who, [凌晨到的], { today: T('2026-08-10') }), 'replied')
+  assert.ok(c.why.includes('8/6'), `应该说 8/6，实际说的是「${c.why}」`)
 })

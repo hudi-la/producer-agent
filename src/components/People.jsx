@@ -136,7 +136,7 @@ export default function People({
           <h1>人际管理</h1>
           <p className="note">
             一份能搜的通讯录，加上<b>现在该动的那几个</b>。推着走的不是阶段和截止，是由头——
-            该 bump 了 / 到日子了 / 还没回谢介绍人 / 见面 48 小时信。
+            他回你了 / 该 bump 了 / 到日子了 / 还没回谢介绍人 / 见面 48 小时信。
           </p>
         </header>
 
