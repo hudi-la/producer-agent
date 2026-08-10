@@ -10,7 +10,6 @@ import Library from './components/Library.jsx'
 import People from './components/People.jsx'
 import PersonFocus from './components/PersonFocus.jsx'
 import { loadContacts } from './lib/loadContacts.js'
-import { cuesFor, actionable } from './lib/cues.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
@@ -166,33 +165,14 @@ export default function App() {
     loadContacts().then(setCt)
   }, [])
 
-  // 由头进队 —— 跟 needsMe 一个姿势：**纯计算，页面加载时算，不加 cron**。
+  // 人这一层**不进过卡队列**。
   //
-  // 停了的（碰满三次那种）不进：它只在卡上显示「停了」，不塞进你手头这摊活。
-  // 一个人身上可能有好几个由头，进队的 via 取第一个——卡头上四个都看得见。
-  useEffect(() => {
-    if (!ct?.contacts?.length) return
-    const today = new Date()
-    const byId = Object.fromEntries(ct.contacts.map((c) => [c.id, c]))
-    const entries = []
-    for (const c of ct.contacts) {
-      const cs = actionable(cuesFor(c, ct.msgsByContact[c.id] || [],
-        { today, introName: byId[c.intro_by]?.name }))
-      if (cs.length) entries.push({ kind: 'contact', id: c.id, via: cs[0].via })
-    }
-    if (entries.length) setQueue((q) => enqueue(q, entries))
-  }, [ct])
-
-  // 库里没有的人也从队里清掉 —— 跟机会线那半是同一个道理：
-  // 顶栏显示一个点了没反应的数字，就是在说谎。
-  useEffect(() => {
-    if (!ct) return
-    const live = new Set(ct.contacts.map((c) => c.id))
-    setQueue((q) => {
-      const items = q.items.filter((x) => x.kind !== 'contact' || live.has(x.id))
-      return items.length === q.items.length ? q : normalize({ items, at: q.at })
-    })
-  }, [ct])
+  // 队列是「你还欠着几件事」——它是项目争取那边的形状：一条线有阶段、有截止，
+  // 需要你一张张过。人不是：由头在人际管理页上就是一行字，看见了点进去办完就完了。
+  // 硬塞进队列只会让那个数字混进另一种东西，而那个数字现在说的是一句准话。
+  //
+  // queue.js 里的 kind 支持留着（旧存档兼容 + 将来要接也不用再迁存储），
+  // 但今天没有任何东西往队里塞 contact。
 
   useEffect(() => { saveQueue(queue) }, [queue])
 
@@ -430,14 +410,7 @@ export default function App() {
   // 不是裸 id —— 拆开之后各开各的抽屉。
   const openQueueCard = (k) => {
     if (!k) return
-    const { kind, id } = parseKey(k)
-    if (kind === 'contact') {
-      const c = ct?.contacts?.find((x) => x.id === id)
-      // 队里下一张是个人，就把主区一起切过去——否则 view 换了、区没换，
-      // 你按了「下一张」却看见一片空白，那比翻不动更糟。
-      if (c) { setArea('people'); setView({ name: 'person', person: c }) }
-      return
-    }
+    const { id } = parseKey(k)      // 队里现在只有机会线，见上面那段
     const p = pl.pursuits.find((x) => x.id === id)
     if (p) { setArea('pursue'); markSeen(id); setView({ name: 'pursuit', pursuit: p, mode: 'drawer' }) }
   }
@@ -453,12 +426,8 @@ export default function App() {
   }
 
   // 抽屉正看的这张在不在队里。在 = 显示队头和两个出口。
-  //
-  // 抽屉里看的可能是一条线也可能是一个人，先算出它在队里叫什么名字。
-  const viewKey =
-    view.name === 'pursuit' ? qKey('pursuit', view.pursuit.id)
-    : view.name === 'person' ? qKey('contact', view.person.id)
-    : null
+  // 队里只有机会线（人这一层不进队，见上面那段）。
+  const viewKey = view.name === 'pursuit' ? qKey('pursuit', view.pursuit.id) : null
   const atQueue = Boolean(viewKey) && inQueue(queue, viewKey)
   const qItem = atQueue ? queue.items.find((x) => keyOf(x) === viewKey) : null
   const qInfo = atQueue ? {
@@ -577,27 +546,12 @@ export default function App() {
         />
       )}
 
-      {/* 人际管理的工具条：**同一个过卡入口、同一个数字**。
-          队列是一条不是两条——它是「你还欠着几件事」，不是某个区的活。 */}
-      {area === 'people' && view.name !== 'person' && (
-        <div className="subbar ppl-subbar">
-          <span className="sp" />
-          <button className="lnk" onClick={() => openQueueCard(queue.at)} disabled={!queue.items.length}>
-            过卡{queue.items.length ? ` ${queue.items.length}` : ''}
-          </button>
-        </div>
-      )}
-
       {area === 'people' ? (
         view.name === 'person' ? (
           <PersonFocus
             key={view.person.id}
             person={openedPerson}
-            queue={qInfo}
-            onQueuePrev={() => queueGo(-1)}
-            onQueueNext={() => queueGo(1)}
-            onQueueDone={finishCard}
-            onQueueLater={laterCard}
+            onBack={() => setView({ name: 'home' })}
             onChanged={reloadContacts}
             onOpenPursuit={(id) => { setArea('pursue'); openPursuit(pl.pursuits.find((p) => p.id === id)) }}
           />
@@ -605,7 +559,6 @@ export default function App() {
           <People
             contacts={ct?.contacts || []}
             msgsByContact={ct?.msgsByContact || {}}
-            tasks={tk.tasks.filter(isPeopleTask)}
             fellBack={ct?.reason || null}
             onOpen={(c) => setView({ name: 'person', person: c })}
             onAdded={reloadContacts}

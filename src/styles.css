@@ -763,83 +763,114 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .notecard .md strong { color: var(--ink); }
 .lnk:disabled { color: var(--ink-3); cursor: default; text-decoration: none; }
 
+
 /* ══ 人这一层 ════════════════════════════════════════════════════
    设计稿：docs/specs/2026-08-08-people-layer-design.md
-   名片列表 + 名片三栏。三栏直接复用 .focus-cols / .fc-l / .fc-m / .fc-r，
-   所以窄屏叠成一栏那套规则不用写第二遍。 */
 
-.ppl-bar { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; }
-.ppl-count { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+   这一页的主角是**找**，不是浏览。一人一张卡是对的，但卡是你找到他之后
+   看的东西——四个人的时候网格卡片勉强能看，几千个人就废了，搜索框不会。
+   所以列表全是密行；三栏名片直接复用 .focus-cols / .fc-* ，一格都不错位。 */
 
-.ppl-add { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px;
+/* ── 找人 ── */
+.pfind { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.pfind svg { position: absolute; left: 13px; top: 50%; margin-top: -7px; opacity: .5; pointer-events: none; }
+.pfind input { flex: 1; max-width: 460px; font: inherit; font-size: 14px; font-family: var(--serif);
+  padding: 10px 14px 10px 36px; border: 1px solid var(--line-2); border-radius: 10px;
+  background: var(--paper-2); color: var(--ink); box-shadow: var(--shadow); }
+.pfind input::placeholder { color: var(--ink-3); }
+
+.padd { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px;
   padding: 12px; border: 1px dashed var(--line-2); border-radius: 10px; }
-.ppl-add input, .ppl-add select { font: inherit; font-size: 12.5px; padding: 6px 10px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2); color: var(--ink); min-width: 150px; }
+.padd input, .padd select { font: inherit; font-size: 12.5px; padding: 6px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2);
+  color: var(--ink); min-width: 148px; }
 
-.ppl-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.ppl-card { text-align: left; display: block; width: 100%; cursor: pointer;
-  padding: 13px 14px; border: 1px solid var(--line); border-radius: 11px;
-  background: var(--paper-2); box-shadow: var(--shadow); font: inherit; color: var(--ink); }
-.ppl-card:hover { border-color: var(--line-2); transform: translateY(-1px); }
-.ppl-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ppl-name { font-family: var(--serif); font-size: 14.5px; font-weight: 600; line-height: 1.25; }
-.ppl-sub { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; }
-.ppl-ch { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.ppl-chip { font-size: 10px; font-weight: 700; letter-spacing: .3px; padding: 2px 7px;
-  border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-3); }
-/* 日期永远带来源 —— 没有来源的日期是来路不明的数字 */
-.ppl-meta { font-size: 11px; color: var(--ink-3); margin-top: 8px; font-variant-numeric: tabular-nums; }
-.ppl-dim { color: var(--ink-3); opacity: .75; }
+.psect { margin-bottom: 30px; }
+.psect-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;
+  padding-bottom: 7px; border-bottom: 1px solid var(--line); }
+.psect-h h2 { font-family: var(--serif); font-size: 14px; font-weight: 600; margin: 0; }
+.pcount { margin-left: auto; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.pnone { font-size: 12px; color: var(--ink-3); padding: 8px 2px; line-height: 1.7; }
 
-/* 由头。卡上必须说得出「你为什么在队里」，而且带日期带来源。 */
-.cue { font-size: 11.5px; line-height: 1.5; color: var(--ink); margin-top: 8px;
-  padding: 5px 9px; border-radius: 8px; background: var(--accent-soft);
-  border-left: 2px solid var(--accent); }
+/* 密行。一人一行，扫得动。 */
+.prows { display: flex; flex-direction: column; }
+.prow { display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  font: inherit; color: inherit; padding: 9px 10px; background: none; border: 0;
+  border-bottom: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.prow:last-child { border-bottom: 0; }
+.prow:hover { background: var(--paper-2); }
+.prow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.prow-n { font-family: var(--serif); font-size: 13.5px; font-weight: 600; flex: none; }
+.prow-s { font-size: 11.5px; color: var(--ink-3); min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.prow-sp { flex: 1; min-width: 12px; }
+.prow-ch { display: flex; gap: 4px; flex: none; }
+.prow-w { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; flex: none;
+  min-width: 34px; text-align: right; }
+.pchip { font-size: 9.5px; font-weight: 700; letter-spacing: .3px; padding: 1px 6px;
+  border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-3); flex: none; }
+
+/* 现在该动的：由头顶在名字右边，一眼看得见为什么。 */
+.pcue { display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  font: inherit; color: inherit; cursor: pointer; margin-bottom: 7px; padding: 10px 12px;
+  border: 0; border-left: 2px solid var(--accent); border-radius: 0 8px 8px 0;
+  background: var(--accent-soft); }
+.pcue:hover { filter: brightness(.98); }
+.pcue:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pcue-w { font-size: 11.5px; color: var(--ink-2); line-height: 1.5; }
 /* 碰满三次停了的：还在，但不吵。消失等于替你决定放弃了。 */
-.cue-stopped { background: transparent; border-left-color: var(--line-2); color: var(--ink-3); }
-
-.ppl-subbar { display: flex; align-items: center; gap: 14px; padding: 8px 22px;
-  border-bottom: 1px solid var(--line); flex: none; }
-.ppl-subbar .sp { flex: 1; }
+.pcue.stopped { border-left-color: var(--line-2); background: transparent; }
+.pcue.stopped .pcue-w, .pcue.stopped .prow-n { color: var(--ink-3); }
 
 /* ── 名片三栏 ── */
-.pf-name { font-family: var(--serif); font-size: 19px; margin: 0 0 14px; }
 .pf-cell { margin-bottom: 12px; }
 .pf-k { font-size: 10.5px; font-weight: 700; letter-spacing: .5px; color: var(--ink-3); margin-bottom: 3px; }
 .pf-v { font: inherit; font-size: 12.5px; color: var(--ink); background: none; border: 0;
   padding: 0; text-align: left; cursor: text; line-height: 1.55; }
-.pf-cell input { font: inherit; font-size: 12.5px; width: 100%; padding: 4px 8px;
-  border: 1px solid var(--accent); border-radius: 7px; background: var(--paper-2); color: var(--ink); }
+.pf-cell input, .pf-cell textarea { font: inherit; font-size: 12.5px; width: 100%; padding: 5px 8px;
+  border: 1px solid var(--accent); border-radius: 7px; background: var(--paper-2);
+  color: var(--ink); resize: vertical; }
 .pf-empty { color: var(--ink-3); opacity: .7; }
-.pf-note { font-size: 11px; color: var(--ink-3); }
+.pf-note { font-size: 11px; color: var(--ink-3); line-height: 1.6; }
 .pf-why { margin: -8px 0 12px; font-style: italic; }
 .pf-inline { margin-left: 8px; font-size: 11px; }
 .pf-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.pf-cues { margin-top: 16px; }
+.pf-cues { margin: 16px 0; display: flex; flex-direction: column; gap: 6px; }
+.pcue-tag { font-size: 11.5px; line-height: 1.5; padding: 5px 9px; border-radius: 8px;
+  background: var(--accent-soft); border-left: 2px solid var(--accent); }
+.pcue-tag.stopped { background: transparent; border-left-color: var(--line-2); color: var(--ink-3); }
 
-.pf-lines { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 14px;
-  padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.pf-tools { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
-.pf-claim, .pf-meet { display: flex; gap: 8px; margin-bottom: 16px; }
-.pf-claim input, .pf-meet input { flex: 1; font: inherit; font-size: 12px; padding: 6px 10px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2); color: var(--ink); }
+/* 卷宗里那段往来。字比中栏小一号——它是资料，不是对话。 */
+.pf-sect { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pf-sect-h { display: flex; align-items: baseline; gap: 10px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .5px; color: var(--ink-3); margin-bottom: 6px; }
+.pf-sect-h .lnk { margin-left: auto; font-size: 11px; }
+.pf-syncnote { font-size: 11px; color: var(--ink-2); margin-top: 6px; padding: 4px 8px;
+  border-radius: 6px; background: var(--paper-3); }
+.pf-syncnote.bad { color: var(--g2); }
+.pf-field { display: flex; gap: 6px; margin: 10px 0 14px; }
+.pf-field input { flex: 1; min-width: 0; font: inherit; font-size: 11.5px; padding: 5px 8px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--paper-2); color: var(--ink); }
 
-.pf-msgs { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.pf-msgs { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
 .pf-msg { border-left: 2px solid var(--line-2); padding-left: 12px; }
-/* 你记的一笔不是「谁在说话」，是一条记录 —— 跟 .notecard 一个待遇 */
-.pf-note-role { border-left-style: dashed; }
+/* 你记的一笔不是「谁在说话」，是一条记录——跟 .notecard 一个待遇 */
+.pf-msg.note { border-left-style: dashed; }
 .pf-who { font-size: 11px; font-weight: 700; color: var(--ink-2); margin-bottom: 4px; }
 .pf-tag { font-size: 9.5px; font-weight: 700; letter-spacing: .4px; color: var(--ink-3);
   border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 6px; margin-left: 7px; }
 .pf-body { font-size: 12.5px; line-height: 1.65; color: var(--ink-2); white-space: pre-wrap;
   overflow-wrap: anywhere; }
+.pf-body.sm { font-size: 11.5px; line-height: 1.6; }
+
+.pf-lines { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 16px;
+  padding-bottom: 13px; border-bottom: 1px solid var(--line); }
+
+.pf-say { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.pf-say textarea { font: inherit; font-size: 12.5px; padding: 8px 10px; border: 1px solid var(--line-2);
+  border-radius: 9px; background: var(--paper-2); color: var(--ink); resize: vertical; }
+.pf-say-btns { display: flex; gap: 14px; }
 
 .pf-del { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px;
   background: var(--paper-2); }
 .pf-del .pf-body { margin: 8px 0 10px; }
-
-/* 过卡时的卡头。「你为什么在队里」必须看得见 —— 渲染了但看不见等于没渲染。 */
-.pf-q { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 8px 18px; border-bottom: 1px solid var(--line); }
-.pf-qwhy { font-size: 11.5px; color: var(--ink); padding: 3px 9px; border-radius: 8px;
-  background: var(--accent-soft); border-left: 2px solid var(--accent); }

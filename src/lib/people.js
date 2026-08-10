@@ -57,11 +57,17 @@ export async function fetchThreads(contactId) {
   return error ? [] : (data || [])
 }
 
-/** 这个人名下要发的信。 */
+/**
+ * 这个人名下**要发的信**。
+ *
+ * 只取 kind='email'。别的交付物（营销素材、项目陈述、申请表）是交给**机构**的，
+ * 归那条机会线，不归这个人——名片右栏摆一份「营销素材 6 样」等于在说
+ * 「这是要发给 Mattie 的」，那是假的。
+ */
 export async function fetchContactDeliverables(contactId) {
   if (!supa) return []
   const { data, error } = await supa
-    .from('v_pa_deliverables').select('*').eq('contact_id', contactId)
+    .from('v_pa_deliverables').select('*').eq('contact_id', contactId).eq('kind', 'email')
   return error ? [] : (data || [])
 }
 

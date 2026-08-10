@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import { TASK_DESC } from '../data/tasksSeed.js'
 import { cuesFor } from '../lib/cues.js'
 import { upsertContact } from '../lib/people.js'
 
@@ -7,18 +6,19 @@ import { upsertContact } from '../lib/people.js'
 //
 // 设计稿：docs/specs/2026-08-08-people-layer-design.md
 //
-// 原来这页写着「这里管的是没有 proposal 压力的关系」，那句话是**错的**：
-// Kirk / Sarah / Mattie 恰恰挂在机会线上，你却要在这儿看他们的名片；
-// 而 Maisa 一条机会线都没有。真正的分法是——
+// 这一页的主角是**找**，不是浏览。
+// 一人一张卡是对的，但卡是你找到他之后看的东西，不该占满这一页——
+// 四个人的时候网格卡片勉强能看，等扫完老邮箱几千个人进来就废了。搜索框不会。
 //
-//   人是一个独立的层。项目争取和人际管理是看这一层的两个入口，共用同一张名片。
-//   区别在**谁在推你**：有交付压力的，机会线推；没有的，由头推。
+// 所以只有三样：一个搜索框、一段「现在该动的」、一份密行通讯录。
 //
-// 这一页不做四层分层（有来有往 / 久没动 / 从没回过 / 办完事的）。
-// 分层的全部价值在人多的时候，现在库里十来个人，它只会是负担。
-// 判据记在设计稿缓办三里，跟扫老邮箱那一刀一起做。
+// **这儿没有过卡。** 队列是「你还欠着几件事」，那是项目争取那边的形状；
+// 人这一层推着走的是由头，而由头在这页上就是一行字——看见了就点进去办，
+// 不需要再排成一摞让你一张张翻。
 
 const SRC = { email: '来自那封信', checkin: '你打的卡', meet: '你记的一笔' }
+const CH  = { email: '邮箱', wechat: '微信', sms: '短信', whatsapp: 'WhatsApp', ig: 'IG', phone: '电话' }
+
 const md = (s) => {
   if (!s) return null
   const [, m, d] = String(s).split('-')
@@ -31,25 +31,39 @@ function channelsOf(c) {
   if (list.length) return list
   return c.email ? [{ kind: 'email', value: c.email }] : []
 }
-const CH = { email: '邮箱', wechat: '微信', sms: '短信', whatsapp: 'WhatsApp', ig: 'IG', phone: '电话' }
 
 export default function People({
-  contacts = [], msgsByContact = {}, tasks = [], onOpen, onAdded, fellBack,
+  contacts = [], msgsByContact = {}, fellBack = null, onOpen, onAdded,
 }) {
+  const [q, setQ] = useState('')
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', org: '', intro_by: '' })
   const [busy, setBusy] = useState(false)
 
-  const byId = useMemo(
-    () => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts])
+  const byId = useMemo(() => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts])
 
   // 一次算出今天，所有人共用 —— 免得列表渲染到一半跨过午夜，前后两半用两个「今天」。
-  const today = useMemo(() => new Date(), [contacts])
+  const acting = useMemo(() => {
+    const today = new Date()
+    const out = []
+    for (const c of contacts) {
+      for (const cue of cuesFor(c, msgsByContact[c.id] || [],
+        { today, introName: byId[c.intro_by]?.name })) out.push({ c, cue })
+    }
+    // 停了的（碰满三次那种）排后面、灰着：不吵你，但不许消失。
+    return out.sort((a, b) => (a.cue.stopped ? 1 : 0) - (b.cue.stopped ? 1 : 0))
+  }, [contacts, msgsByContact, byId])
+  const live = acting.filter((x) => !x.cue.stopped).length
 
-  const rows = contacts.map((c) => ({
-    c,
-    cues: cuesFor(c, msgsByContact[c.id] || [], { today, introName: byId[c.intro_by]?.name }),
-  }))
+  const key = q.trim().toLowerCase()
+  const found = key
+    ? contacts.filter((c) => [c.name, c.org, c.role, c.email, c.notes]
+        .filter(Boolean).some((s) => String(s).toLowerCase().includes(key)))
+    : null
+
+  const sorted = useMemo(
+    () => [...contacts].sort((a, b) => String(b.last_touch_at || '').localeCompare(a.last_touch_at || '')),
+    [contacts])
 
   const add = async (e) => {
     e.preventDefault()
@@ -72,34 +86,53 @@ export default function People({
     }
   }
 
+  const Row = ({ c }) => (
+    <button className="prow" onClick={() => onOpen?.(c)}>
+      <span className="prow-n">{c.name || '未具名联系人'}</span>
+      <span className="prow-s">{[c.org, c.role].filter(Boolean).join(' · ')}</span>
+      <span className="prow-sp" />
+      <span className="prow-ch">
+        {channelsOf(c).map((x, i) => <span key={i} className="pchip">{CH[x.kind] || x.kind}</span>)}
+      </span>
+      {c.pursuits?.length > 0 && <span className="pchip">{c.pursuits.length} 条线</span>}
+      <span className="prow-w">{c.last_touch_at ? md(c.last_touch_at) : '—'}</span>
+    </button>
+  )
+
   return (
     <div className="page">
       <div className="page-inner">
         <header className="page-head">
           <h1>人际管理</h1>
           <p className="note">
-            一人一张卡，不挂在任何机会线上。推着走的不是阶段和截止，是<b>由头</b>——
+            一份能搜的通讯录，加上<b>现在该动的那几个</b>。推着走的不是阶段和截止，是由头——
             该 bump 了 / 到日子了 / 还没回谢介绍人 / 见面 48 小时信。
           </p>
         </header>
 
-        <div className="ppl-bar">
+        <div className="pfind">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+               stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <circle cx="6" cy="6" r="4.4" /><path d="M9.3 9.3 13 13" />
+          </svg>
+          <input value={q} onChange={(e) => setQ(e.target.value)}
+                 placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
           <button className="lnk" onClick={() => setAdding((v) => !v)}>
             {adding ? '不加了' : '加个人'}
           </button>
-          <span className="ppl-count">{contacts.length} 个人</span>
         </div>
 
         {adding && (
-          <form className="ppl-add" onSubmit={add}>
+          <form className="padd" onSubmit={add}>
             <input autoFocus placeholder="名字（必填）" value={form.name}
                    onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input placeholder="邮箱" value={form.email}
                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
             <input placeholder="机构" value={form.org}
                    onChange={(e) => setForm({ ...form, org: e.target.value })} />
-            {/* 谁介绍的：warm intro 在美国是有分量的资产，而且它撑着由头③。 */}
-            <select value={form.intro_by} onChange={(e) => setForm({ ...form, intro_by: e.target.value })}>
+            {/* 谁介绍的：warm intro 是有分量的资产，而且它撑着「还没回谢」那条由头。 */}
+            <select value={form.intro_by}
+                    onChange={(e) => setForm({ ...form, intro_by: e.target.value })}>
               <option value="">谁介绍的（可不填）</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name || '未具名'}</option>)}
             </select>
@@ -111,63 +144,44 @@ export default function People({
 
         {/* 空页可以，骗人不行 —— 说清是「库里真没有」还是「没连上」。 */}
         {!contacts.length && (
-          <p className="soon-note">
+          <p className="pnone">
             {fellBack === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
              : fellBack === 'query-failed' ? '连上了但查询报错——名片读不出来，不是库里没人。'
-             : '库里一个人都没有。上面「加个人」加第一个，或者跑一遍 0033 迁移把邮件里的人认出来。'}
+             : '库里一个人都没有。上面「加个人」加第一个。'}
           </p>
         )}
 
-        <div className="ppl-list">
-          {rows.map(({ c, cues }) => (
-            <button key={c.id} className="pcard ppl-card" onClick={() => onOpen?.(c)}>
-              <div className="ppl-name">{c.name || '未具名联系人'}</div>
-              {(c.org || c.role) && (
-                <div className="ppl-sub">{[c.org, c.role].filter(Boolean).join(' · ')}</div>
-              )}
+        {found ? (
+          <section className="psect">
+            <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
+            <div className="prows">
+              {found.length
+                ? found.map((c) => <Row key={c.id} c={c} />)
+                : <p className="pnone">没有叫这个的。「加个人」把他加进来。</p>}
+            </div>
+          </section>
+        ) : contacts.length > 0 && (
+          <>
+            <section className="psect">
+              <div className="psect-h"><h2>现在该动的</h2><span className="pcount">{live} 件</span></div>
+              {acting.length ? acting.map(({ c, cue }) => (
+                <button key={c.id + cue.via}
+                        className={'pcue' + (cue.stopped ? ' stopped' : '')}
+                        onClick={() => onOpen?.(c)}>
+                  <span className="prow-n">{c.name || '未具名联系人'}</span>
+                  <span className="pcue-w">{cue.why}</span>
+                </button>
+              )) : <p className="pnone">现在没有该动的。这是好事，不是漏了什么。</p>}
+            </section>
 
-              {/* 用什么找他。每个人不一样——这是这一层跟机会线最不一样的地方。 */}
-              {channelsOf(c).length > 0 && (
-                <div className="ppl-ch">
-                  {channelsOf(c).map((x, i) => (
-                    <span key={i} className="ppl-chip">{CH[x.kind] || x.kind}</span>
-                  ))}
-                </div>
-              )}
-
-              {/* 日期永远带来源。没有来源的日期是来路不明的数字。 */}
-              <div className="ppl-meta">
-                {c.last_touch_at
-                  ? <>上次 {md(c.last_touch_at)} · {SRC[c.last_touch_src] || '来源不明'}</>
-                  : <span className="ppl-dim">还没碰过</span>}
-                {c.pursuits?.length > 0 && <> · 挂着 {c.pursuits.length} 条线</>}
+            <section className="psect">
+              <div className="psect-h">
+                <h2>通讯录</h2>
+                <span className="pcount">{contacts.length} 人 · 按上次碰排</span>
               </div>
-
-              {cues.map((q) => (
-                <div key={q.via} className={`cue cue-${q.via}${q.stopped ? ' cue-stopped' : ''}`}>
-                  {q.why}
-                </div>
-              ))}
-            </button>
-          ))}
-        </div>
-
-        {tasks.length > 0 && (
-          <div className="soon">
-            <div className="soon-h">归这儿的造卡任务</div>
-            <ul className="soon-list">
-              {tasks.map((t) => (
-                <li key={t.id || t.type}>
-                  <b>{t.name}</b> —— {TASK_DESC[t.type] || t.type}
-                  <span className="soon-state">{t.enabled ? '已开' : '未接'}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="soon-note">
-              这条任务还没接。它的活现在由<b>四种由头</b>顶着——由头是算出来的，
-              不需要一条定时任务去巡逻。
-            </p>
-          </div>
+              <div className="prows">{sorted.map((c) => <Row key={c.id} c={c} />)}</div>
+            </section>
+          </>
         )}
       </div>
     </div>
