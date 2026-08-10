@@ -118,6 +118,17 @@ const post = async (path, body) => {
 }
 
 /** 收这个人认领的那几条 thread 的新信。 */
+/**
+ * 「这个地址背后是谁」—— Fairwind 去信箱里读，自己判断。
+ *
+ * 加人原来是让你填表，后来是让你从下拉框挑人。**两个都错**：
+ * 几千个联系人的时候你挑不动，而这些答案信里全都有——签名里有名字和网站，
+ * 正文里有机构和头衔，主题行里常写着谁介绍的。该干这活的是它，不是你。
+ *
+ * 它**只提议不写库**。认错人比不认更麻烦，所以最后那下点头永远是你的。
+ */
+export const identifyEmail = (email) => post('/identify', { email })
+
 export const refreshContact = (id) => post('/refresh', { contact_id: id })
 
 /** 跟 Fairwind 说一句（起草回信就是从这儿来的）。 */

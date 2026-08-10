@@ -147,9 +147,6 @@ export default function People({
           </svg>
           <input value={q} onChange={(e) => setQ(e.target.value)}
                  placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
-          <button className="lnk" onClick={() => setAdding((v) => !v)}>
-            {adding ? '不加了' : '加个人'}
-          </button>
         </div>
 
         {adding && (
@@ -192,8 +189,8 @@ export default function People({
           </section>
         ) : (
           <>
-            {/* 加人的真入口：系统自己发现有陌生地址在跟你写信，只问你一句他是谁。
-                排在最上面——它是唯一一件「不办就会一直不准」的事。 */}
+            {/* 加人：粘个邮箱，或者从系统自己发现的陌生地址里挑。
+                两条路都通向同一件事——让 Fairwind 去读信，它判断，你点头。 */}
             <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
 
             {contacts.length > 0 && <>

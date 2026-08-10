@@ -562,6 +562,73 @@ ${known.join(', ')}
   return ids
 }
 
+// ── 这个地址是谁 ───────────────────────────────────────────────
+//
+// 加人这件事原来是让你填表：名字、邮箱、机构，一格格敲。后来改成让你从
+// 下拉框里挑「这是谁」。**两个都错**——几千个联系人的时候你挑不动，
+// 而且这些答案**信里全都有**：签名里有名字和网站，正文里有机构和头衔，
+// 主题行里常常写着谁介绍的。
+//
+// 该干这活的是它，不是你。你只负责点头。
+//
+// 三条护栏：
+//   · 认不出就说认不出（kind:'unknown'），不编一个人出来
+//   · 共享信箱要认出来（residency@ / workshops@ / info@，署名是一组人）——
+//     它不是人，硬当成人就是 0033 犯过的错
+//   · **只提议，不写库**。写库是前端拿着你的点头去调 RPC。
+//     认错人比不认更麻烦，所以这一步永远留一个人的判断。
+async function handleIdentify(body) {
+  const email = String(body?.email || '').trim().toLowerCase()
+  if (!email.includes('@')) throw new Error('要一个邮箱地址')
+
+  // 通讯录现状喂给它，好让它认出「这是某人的另一个邮箱」
+  const { data: known } = await db.rpc('pa_address_book_digest')
+  const { data: prof } = await db.from('v_pa_profile').select('*').limit(1)
+  const profile = prof?.[0] || null
+
+  const { text } = await think(
+    `查清 ${email} 这个地址背后是谁。
+
+先用 mcp__claude_ai_Gmail__search_threads 搜 \`from:${email} OR to:${email}\`，
+再用 get_thread 读最近那一两条（要正文——签名在正文里）。
+
+【已经在通讯录里的人】
+${(known || []).map((k) => `- ${k.name}｜邮箱：${(k.emails || []).join(', ') || '（无）'}｜机构：${k.org || '（无）'}`).join('\n') || '（通讯录是空的）'}
+
+【已经登记的机构共享信箱】
+${(known || []).flatMap((k) => k.mailboxes || []).join(', ') || '（还没有）'}
+
+要判断三件事：
+
+**一、这是人还是机构的共享信箱？**
+共享信箱的样子：地址像 residency@ / workshops@ / info@ / hello@，
+署名是一组人（"Mattie, Billy, and Joo"），或者口气是机构而不是某个人。
+**它不是人。** 认成人的话往来会归错到某个倒霉蛋头上。
+
+**二、如果是人，他是不是上面那份名单里已有的某位？**
+常见情形：他换了邮箱（信里可能明说 "I've changed to…"、或者旧地址的告别信里
+留了新地址）。名字对得上、或者同一个机构同一件事在接着聊，就算命中。
+**名字像但机构和事情都对不上的，不算**——那多半是两个人。
+
+**三、如果是新人，从信里能认出什么？**
+名字（签名）、机构、他管什么、个人网站、**谁介绍的**（主题行和正文第一句常有）。
+认不出的字段就留空，别编。
+
+**最后一行**单独输出，别的什么都不要加：
+[[WHO]] {"kind":"person|shared_box|unknown","name":"…","org":"…","role":"…","site":"…","intro_by":"…","notes":"中文，两三句说清这段关系是怎么回事、他最近说了什么、下一步该干嘛","match_name":"命中通讯录里哪位，没有就 null","match_why":"…","threads":["thread id"],"confidence":"high|low"}
+
+字段没有就用 null。**认不出来就 kind:"unknown"，别硬凑一个人出来。**`,
+    GMAIL_TOOLS,
+    profile,
+  )
+
+  const m = text.match(/\[\[WHO\]\]\s*(\{[\s\S]*?\})\s*$/m)
+  let who = null
+  try { who = m ? JSON.parse(m[1]) : null } catch (_) { who = null }
+  if (!who) return { email, kind: 'unknown', note: '没认出来（它没按格式回话）' }
+  return { email, ...who }
+}
+
 async function handleSync(body) {
   const owner = ownerOf(body)
   if (!owner) throw new Error('要有 pursuit_id 或 contact_id')
@@ -920,6 +987,24 @@ const server = http.createServer(async (req, res) => {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 讲懂 ${body.pursuit_id}`)
         send(res, 200, await handleBrief(body))
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
+  if (req.method === 'POST' && req.url === '/identify') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(raw || '{}')
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 认人 ${body.email}`)
+        const out = await handleIdentify(body)
+        console.log(`  ↳ ${out.kind}${out.name ? ' · ' + out.name : ''}${out.match_name ? ' → 命中 ' + out.match_name : ''}`)
+        send(res, 200, out)
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })

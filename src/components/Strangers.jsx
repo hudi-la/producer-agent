@@ -1,16 +1,20 @@
 import React, { useState } from 'react'
-import { claimEmail, markOrgMailbox, upsertContact } from '../lib/people.js'
+import {
+  identifyEmail, claimEmail, markOrgMailbox, upsertContact, claimThread, refreshContact,
+} from '../lib/people.js'
 
-// 「还不认识的地址」—— 加人的真入口。
+// 加人。
 //
-// 原来这儿是让你贴一个 Gmail thread id。那不是人干的事：你手上有的是一封信，
-// 不是一个内部编号。后来想改成让你贴邮件链接，其实也还是绕——
+// 走过两版错的：
+//   一、让你填表（名字、邮箱、机构一格格敲）—— 这些信里全都有，凭什么让你敲
+//   二、让你从下拉框挑「这是谁」—— 几千个联系人的时候你挑不动
 //
-// **系统本来就知道有个陌生地址在跟你写信。** 它不该等你去告诉它，
-// 它该自己把这几个地址摆出来，只问你一句：他是谁。
+// 现在的形状：**Fairwind 去读那几封信，自己判断，摆一句填好的话给你，你点头。**
+// 签名里有名字和网站，正文里有机构和头衔，主题行里常写着谁介绍的——
+// 该干这活的是它。
 //
-// 你回答之后，那个地址名下**所有历史往来当场归位**（pa_claim_email 干的），
-// 不是从今天开始记——以前那些信本来就是他的。
+// 但它**只提议，不写库**。认错人比不认更麻烦，所以最后那下永远是你按的。
+// 这跟卡上那个「它提的 / 认了」是同一条规矩。
 
 const md = (s) => {
   if (!s) return '—'
@@ -18,131 +22,213 @@ const md = (s) => {
   return `${Number(m)}/${Number(d)}`
 }
 
-/** 从信头署名里抠个像样的默认名字：「Maisa Chen <m@x.edu>」→「Maisa Chen」 */
-function guessName(row) {
-  const raw = (row.信头署名 || '').replace(/<[^>]*>/g, '').replace(/^["']|["']$/g, '').trim()
-  if (raw && !raw.includes('@')) return raw
-  // 没有署名就拿地址的用户名凑一个，你自己再改
-  return (row.email || '').split('@')[0].replace(/[._-]+/g, ' ')
-}
-
-export default function Strangers({ rows = [], contacts = [], onDone }) {
-  const [open, setOpen] = useState(null)     // 正在处理哪个地址
-  const [mode, setMode] = useState('new')    // 'new' | 'existing' | 'org'
-  const [name, setName] = useState('')
-  const [pick, setPick] = useState('')
-  const [org, setOrg] = useState('')
+/** Fairwind 认出来的那张草稿名片。你改得动，也可以整个否掉。 */
+function Proposal({ who, email, contacts, onDone, onCancel }) {
   const [busy, setBusy] = useState(false)
+  const [f, setF] = useState({
+    name: who.name || '', org: who.org || '', role: who.role || '',
+    notes: who.notes || '',
+  })
+  // 它命中了通讯录里某位 → 默认走「合并」；否则默认建新人
+  const matched = who.match_name
+    ? contacts.find((c) => c.name === who.match_name)
+    : null
+  const [how, setHow] = useState(
+    who.kind === 'shared_box' ? 'org' : matched ? 'merge' : 'new')
 
-  if (!rows.length) return null
-
-  const start = (r) => {
-    setOpen(r.email); setMode('new')
-    setName(guessName(r)); setPick(''); setOrg('')
-  }
-
-  const submit = async (r) => {
+  const go = async () => {
     if (busy) return
     setBusy(true)
     try {
-      if (mode === 'org') {
-        if (!org.trim()) throw new Error('要填机构名')
-        await markOrgMailbox(r.email, org.trim(), null,
-          `从「还不认识的地址」认的。${r.封数} 封往来。`)
+      if (how === 'org') {
+        await markOrgMailbox(email, f.org || who.org || '未具名机构', '共享信箱', who.notes || null)
       } else {
-        let id = pick
-        if (mode === 'new') {
-          if (!name.trim()) throw new Error('要填名字')
-          const c = await upsertContact({ name: name.trim(), email: r.email })
+        let id = matched?.id
+        if (how === 'new') {
+          if (!f.name.trim()) throw new Error('要有名字')
+          const c = await upsertContact({
+            name: f.name.trim(), email,
+            org: f.org.trim() || null, role: f.role.trim() || null,
+            notes: f.notes.trim() || null,
+          })
           id = c.id
         }
-        if (!id) throw new Error('要选一个人')
-        // 认领：这个地址名下所有历史往来当场归位
-        await claimEmail(r.email, id)
+        if (!id) throw new Error('没有可合并的人')
+        // 认领地址：这个地址名下所有历史往来当场归位
+        await claimEmail(email, id, how === 'merge' ? 'Fairwind 从信里认出这是他的另一个邮箱' : null)
+        // 顺手认领它读到的那几条 thread，以后按「收信」就跟着走
+        for (const t of who.threads || []) {
+          try { await claimThread(id, t) } catch (_) {}
+        }
+        if (who.threads?.length) { try { await refreshContact(id) } catch (_) {} }
       }
-      setOpen(null)
       onDone?.()
     } catch (e) {
       alert('没弄成：' + e.message)
     } finally { setBusy(false) }
   }
 
+  if (who.kind === 'unknown') {
+    return (
+      <div className="prop">
+        <p className="pf-note">
+          Fairwind 没认出来这是谁{who.note ? `（${who.note}）` : ''}。
+          可能是信太少、也可能签名里什么都没写。你自己填一个吧。
+        </p>
+        <div className="stranger-btns">
+          <button className="lnk" onClick={() => setHow('new')}>我自己填</button>
+          <button className="lnk" onClick={onCancel}>算了</button>
+        </div>
+        {how === 'new' && (
+          <div className="stranger-form">
+            <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })}
+                   placeholder="他叫什么" autoFocus />
+            <div className="stranger-btns">
+              <button className="lnk" disabled={busy} onClick={go}>加上</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="prop">
+      <div className="prop-head">
+        {who.kind === 'shared_box' ? (
+          <span><b>这是机构的共享信箱</b>，不是某个人</span>
+        ) : matched ? (
+          <span>这是 <b>{who.match_name}</b> 的另一个邮箱</span>
+        ) : (
+          <span>通讯录里没有，这是个新人</span>
+        )}
+        {who.confidence === 'low' && <span className="pchip">它自己也不太确定</span>}
+      </div>
+
+      {who.match_why && <p className="pf-note">依据：{who.match_why}</p>}
+
+      {how !== 'org' && (
+        <div className="prop-fields">
+          <label>名字<input value={f.name} disabled={how === 'merge'}
+                            onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          <label>机构<input value={f.org}
+                            onChange={(e) => setF({ ...f, org: e.target.value })} /></label>
+          <label>他管什么<input value={f.role}
+                            onChange={(e) => setF({ ...f, role: e.target.value })} /></label>
+        </div>
+      )}
+      {how === 'org' && (
+        <div className="prop-fields">
+          <label>哪个机构<input value={f.org}
+                            onChange={(e) => setF({ ...f, org: e.target.value })} /></label>
+        </div>
+      )}
+
+      {who.site && <p className="pf-note">个人站 {who.site}</p>}
+      {who.intro_by && <p className="pf-note">谁介绍的：{who.intro_by}</p>}
+      {f.notes && how !== 'org' && (
+        <label className="prop-notes">关系记忆
+          <textarea rows={4} value={f.notes}
+                    onChange={(e) => setF({ ...f, notes: e.target.value })} />
+        </label>
+      )}
+
+      <div className="stranger-btns">
+        <button className="lnk" disabled={busy} onClick={go}>
+          {busy ? '弄着…'
+            : how === 'org' ? '记成机构共享信箱'
+            : how === 'merge' ? `合到 ${who.match_name} 名下` : '加进通讯录'}
+        </button>
+        {/* 它判断错了你得改得动。合并/新建/共享箱三条路随时切。 */}
+        {how !== 'new' && <button className="lnk" onClick={() => setHow('new')}>不对，是个新人</button>}
+        {how !== 'merge' && matched &&
+          <button className="lnk" onClick={() => setHow('merge')}>其实是 {who.match_name}</button>}
+        {how !== 'org' && <button className="lnk" onClick={() => setHow('org')}>其实是共享信箱</button>}
+        <button className="lnk" onClick={onCancel}>算了</button>
+      </div>
+    </div>
+  )
+}
+
+/** 一个地址：先让 Fairwind 去认，再摆提议。 */
+function One({ email, meta, contacts, onDone, onCancel }) {
+  const [who, setWho] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const ask = async () => {
+    if (busy) return
+    setBusy(true); setErr(null)
+    try { setWho(await identifyEmail(email)) }
+    catch (e) { setErr(e.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="stranger">
+      <div className="stranger-h">
+        <span className="prow-n">{meta?.信头署名 || email}</span>
+        {meta?.信头署名 && <span className="pf-note">{email}</span>}
+        <span className="prow-sp" />
+        {meta && <>
+          <span className="pchip">{meta.封数} 封</span>
+          <span className="pf-note">
+            他发来 {meta.他发来的} · 你发去 {meta.你发去的} · {md(meta.第一次)}–{md(meta.最近一次)}
+          </span>
+        </>}
+        {!who && <button className="lnk" onClick={ask} disabled={busy}>
+          {busy ? '读信中…' : '这是谁？'}
+        </button>}
+      </div>
+
+      {meta?.出现在哪些机会线?.length > 0 && (
+        <div className="pf-note">出现在：{meta.出现在哪些机会线.join(' · ')}</div>
+      )}
+      {err && <p className="pf-note" style={{ color: 'var(--g2)' }}>没认成：{err}</p>}
+      {who && <Proposal who={who} email={email} contacts={contacts}
+                        onDone={onDone} onCancel={() => { setWho(null); onCancel?.() }} />}
+    </div>
+  )
+}
+
+export default function Strangers({ rows = [], contacts = [], onDone }) {
+  const [typed, setTyped] = useState('')
+  const [asking, setAsking] = useState(null)   // 你手敲的那个地址
+
   return (
     <section className="psect">
       <div className="psect-h">
-        <h2>还不认识的地址</h2>
-        <span className="pcount">{rows.length} 个</span>
+        <h2>加人</h2>
+        {rows.length > 0 && <span className="pcount">{rows.length} 个地址还不认识</span>}
       </div>
-      <p className="pnone" style={{ paddingTop: 0 }}>
-        这几个地址在跟你来往，但库里不知道是谁。说一句他是谁，
-        <b>他名下所有历史往来会当场归位</b> —— 不是从今天开始记。
-      </p>
 
-      {rows.map((r) => (
-        <div key={r.email} className="stranger">
-          <div className="stranger-h">
-            <span className="prow-n">{r.信头署名 || r.email}</span>
-            {r.信头署名 && <span className="pf-note">{r.email}</span>}
-            <span className="prow-sp" />
-            <span className="pchip">{r.封数} 封</span>
-            <span className="pf-note">
-              他发来 {r.他发来的} · 你发去 {r.你发去的} · {md(r.第一次)}–{md(r.最近一次)}
-            </span>
-            {open !== r.email && (
-              <button className="lnk" onClick={() => start(r)}>他是谁？</button>
-            )}
-          </div>
+      {/* 你手上有个邮箱就粘进来。Gmail 网页链接不行——那串 id 跟 API 用的是
+          两套编码，Google 没给转换的路子（试过 get_thread 和 rfc822msgid，都空）。 */}
+      <div className="pfind" style={{ marginBottom: 14 }}>
+        <input value={typed} onChange={(e) => setTyped(e.target.value)}
+               placeholder="粘一个邮箱地址，我去信箱里查他是谁"
+               onKeyDown={(e) => { if (e.key === 'Enter' && typed.includes('@')) setAsking(typed.trim().toLowerCase()) }} />
+        <button className="lnk" disabled={!typed.includes('@')}
+                onClick={() => setAsking(typed.trim().toLowerCase())}>查</button>
+      </div>
 
-          {r.出现在哪些机会线?.length > 0 && (
-            <div className="pf-note">出现在：{r.出现在哪些机会线.join(' · ')}</div>
-          )}
+      {asking && (
+        <One email={asking} contacts={contacts}
+             onDone={() => { setAsking(null); setTyped(''); onDone?.() }}
+             onCancel={() => setAsking(null)} />
+      )}
 
-          {open === r.email && (
-            <div className="stranger-form">
-              <div className="stranger-modes">
-                {[['new', '是个新人'], ['existing', '是库里已有的人'], ['org', '是机构的共享信箱']]
-                  .map(([m, label]) => (
-                    <button key={m} className={'smode' + (mode === m ? ' on' : '')}
-                            onClick={() => setMode(m)}>{label}</button>
-                  ))}
-              </div>
-
-              {mode === 'new' && (
-                <input value={name} onChange={(e) => setName(e.target.value)}
-                       placeholder="他叫什么" autoFocus />
-              )}
-              {mode === 'existing' && (
-                <select value={pick} onChange={(e) => setPick(e.target.value)}>
-                  <option value="">选一个人 —— 这是他的另一个邮箱</option>
-                  {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              )}
-              {mode === 'org' && (
-                <input value={org} onChange={(e) => setOrg(e.target.value)}
-                       placeholder="哪个机构的共享箱（例如 CultureHub）" autoFocus />
-              )}
-
-              <div className="stranger-btns">
-                <button className="lnk" disabled={busy} onClick={() => submit(r)}>
-                  {busy ? '弄着…' : mode === 'org' ? '记成机构信箱' : `认领这 ${r.封数} 封`}
-                </button>
-                <button className="lnk" disabled={busy} onClick={() => setOpen(null)}>算了</button>
-              </div>
-
-              {mode === 'existing' && (
-                <p className="pf-note">
-                  人会换邮箱。选了之后旧地址<b>不删</b>——它是那些历史往来的钥匙。
-                </p>
-              )}
-              {mode === 'org' && (
-                <p className="pf-note">
-                  共享信箱署的是一组人，不是一个人。它的往来会从所有名片上撤下来，只留在机会线上。
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+      {rows.length > 0 && (
+        <>
+          <p className="pnone" style={{ paddingTop: 0 }}>
+            这几个地址在跟你来往，但库里不知道是谁。让它去读信，
+            <b>认领之后那个地址名下所有历史往来会当场归位</b> —— 不是从今天开始记。
+          </p>
+          {rows.map((r) => (
+            <One key={r.email} email={r.email} meta={r} contacts={contacts} onDone={onDone} />
+          ))}
+        </>
+      )}
     </section>
   )
 }

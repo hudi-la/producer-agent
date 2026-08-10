@@ -905,3 +905,16 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
   border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink);
   max-width: 380px; }
 .stranger-btns { display: flex; gap: 14px; }
+
+/* Fairwind 认出来的那张草稿名片。它只提议不写库——认错人比不认更麻烦，
+   所以最后那下点头永远是你按的。 */
+.prop { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 9px; }
+.prop-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.prop-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+.prop-fields label, .prop-notes { display: flex; flex-direction: column; gap: 3px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .5px; color: var(--ink-3); }
+.prop-fields input, .prop-notes textarea { font: inherit; font-weight: 400; letter-spacing: 0;
+  font-size: 12.5px; color: var(--ink); padding: 5px 9px; border: 1px solid var(--line-2);
+  border-radius: 7px; background: var(--paper); min-width: 190px; resize: vertical; }
+.prop-fields input:disabled { color: var(--ink-3); }
