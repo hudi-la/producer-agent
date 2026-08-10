@@ -188,8 +188,12 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot
             onClick={(e) => { e.stopPropagation(); onPick(ids, !allOn) }}
           />
         )}
-        <span className="stack-pile" aria-hidden="true" />
-        {anyUnseen && !open && <span className="pc-badge" aria-label="Fairwind 回复了" />}
+        {/* 这儿原来有个恒亮的琥珀色小圆点（.stack-pile），纯装饰、不带信息。
+            两个毛病：一是它按叠头整体高度垂直居中，标题折几行、开不开批量操作
+            都会让它挪位；二是它跟卡上那个**有意义**的球点（.pc-ball.me .bd）
+            几乎同色同大小——同一个记号在卡上是「该你动」，在叠头上什么都不是。
+            「这儿是一摞」已经由身后那两层垫纸、「N 张」和「展开」说了三遍。 */}
+        {anyUnseen && !open && <span className="pc-badge" aria-label="有你还没读到的新消息" />}
         <span className="stack-txt">
           <span className="stack-n">{name || '一批机构'}</span>
           <span className="stack-c">

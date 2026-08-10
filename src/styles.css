@@ -476,7 +476,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 }
 .stack-head:hover { transform: translateY(-2px); border-color: var(--line-2); }
 .stack-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.stack-pile { width: 6px; height: 6px; border-radius: 50%; background: var(--g1); flex: none; }
+/* .stack-pile 删了 —— 见 Pipeline.jsx 叠头那段注释。装饰不该长得像状态。 */
 .stack-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .stack-n { font-family: var(--serif); font-size: 13px; font-weight: 600; line-height: 1.25; }
 .stack-c { font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
