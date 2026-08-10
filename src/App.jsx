@@ -571,6 +571,7 @@ export default function App() {
           <People
             contacts={ct?.contacts || []}
             orgs={ct?.orgs || []}
+            strangers={ct?.strangers || []}
             msgsByContact={ct?.msgsByContact || {}}
             fellBack={ct?.reason || null}
             onOpen={(c) => setView({ name: 'person', person: c })}

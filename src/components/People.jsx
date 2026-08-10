@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cuesFor } from '../lib/cues.js'
 import { upsertContact } from '../lib/people.js'
+import Strangers from './Strangers.jsx'
 
 // 「人际管理」—— 人这一层。
 //
@@ -33,7 +34,8 @@ function channelsOf(c) {
 }
 
 export default function People({
-  contacts = [], orgs = [], msgsByContact = {}, fellBack = null, onOpen, onOpenOrg, onAdded,
+  contacts = [], orgs = [], strangers = [], msgsByContact = {},
+  fellBack = null, onOpen, onOpenOrg, onAdded,
 }) {
   const [q, setQ] = useState('')
   const [adding, setAdding] = useState(false)
@@ -188,8 +190,13 @@ export default function People({
                 : <p className="pnone">没有叫这个的。「加个人」把他加进来。</p>}
             </div>
           </section>
-        ) : contacts.length > 0 && (
+        ) : (
           <>
+            {/* 加人的真入口：系统自己发现有陌生地址在跟你写信，只问你一句他是谁。
+                排在最上面——它是唯一一件「不办就会一直不准」的事。 */}
+            <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
+
+            {contacts.length > 0 && <>
             <section className="psect">
               <div className="psect-h"><h2>现在该动的</h2><span className="pcount">{live} 件</span></div>
               {acting.length ? acting.map(({ c, cue }) => (
@@ -211,6 +218,7 @@ export default function People({
               </div>
               <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
             </section>
+            </>}
           </>
         )}
       </div>

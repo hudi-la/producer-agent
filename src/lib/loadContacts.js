@@ -67,6 +67,9 @@ export async function loadContacts() {
     const { data: orgRows } = await supa
       .from('v_pa_orgs').select('*').order('mail_count', { ascending: false })
 
+    // 还不认识的地址 —— 加人的真入口。系统自己发现有陌生地址在跟你写信。
+    const { data: strangers } = await supa.from('v_pa_unknown_senders').select('*')
+
     return {
       contacts: contacts.map((c) => ({
         ...c,
@@ -75,6 +78,7 @@ export async function loadContacts() {
         orgs: orgsOf[c.id] || (c.org ? [{ org: c.org, role: c.role }] : []),
       })),
       orgs: orgRows || [],
+      strangers: strangers || [],
       msgsByContact,
       source: 'live', reason: null, detail: null,
     }

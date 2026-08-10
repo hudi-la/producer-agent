@@ -49,6 +49,34 @@ export const checkin = (contactId) => rpc('pa_contact_checkin', { p_contact_id: 
 export const markIntroThanked = (contactId) =>
   rpc('pa_mark_intro_thanked', { p_contact_id: contactId })
 
+/**
+ * 还不认识的地址：在跟你来往，但库里不知道是谁。
+ *
+ * **这就是「加个人」的真入口。** 你不用去 Gmail 里复制什么链接——
+ * 系统自己发现有陌生地址在跟你写信，你只需要回答一句「他是谁」。
+ */
+export async function fetchUnknownSenders() {
+  if (!supa) return []
+  const { data, error } = await supa.from('v_pa_unknown_senders').select('*')
+  return error ? [] : (data || [])
+}
+
+/**
+ * 「这个地址是某某的」。
+ * 认领一次，那个地址名下**所有历史往来当场归位**——不用重跑迁移，不用手工挑信。
+ */
+export const claimEmail = (email, contactId, note) =>
+  rpc('pa_claim_email', { p_email: email, p_contact_id: contactId, p_note: note ?? null })
+
+/**
+ * 「这是机构的共享信箱」。
+ * 它不是人，所以它的往来从所有名片上撤下来，只留在机会线上。
+ */
+export const markOrgMailbox = (email, org, label, notes) =>
+  rpc('pa_mark_org_mailbox', {
+    p_email: email, p_org: org, p_label: label ?? null, p_notes: notes ?? null,
+  })
+
 /** 这个人认领了哪几条往来。名片上要显示，也是「更新最新信息」能不能按的前提。 */
 export async function fetchThreads(contactId) {
   if (!supa) return []
