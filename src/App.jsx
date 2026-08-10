@@ -9,6 +9,7 @@ import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
 import People from './components/People.jsx'
 import PersonFocus from './components/PersonFocus.jsx'
+import OrgFocus from './components/OrgFocus.jsx'
 import { loadContacts } from './lib/loadContacts.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
@@ -287,7 +288,7 @@ export default function App() {
         window.history.replaceState(null, '', window.location.pathname)
         setView({ name: 'home' })
       }
-      else if (view.name === 'person') setView({ name: 'home' })
+      else if (view.name === 'person' || view.name === 'org') setView({ name: 'home' })
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -555,12 +556,25 @@ export default function App() {
             onChanged={reloadContacts}
             onOpenPursuit={(id) => { setArea('pursue'); openPursuit(pl.pursuits.find((p) => p.id === id)) }}
           />
+        ) : view.name === 'org' ? (
+          <OrgFocus
+            key={view.org.org}
+            org={ct?.orgs?.find((o) => o.org === view.org.org) || view.org}
+            onBack={() => setView({ name: 'home' })}
+            onOpenPerson={(id) => {
+              const c = ct?.contacts?.find((x) => x.id === id)
+              if (c) setView({ name: 'person', person: c })
+            }}
+            onOpenPursuit={(id) => { setArea('pursue'); openPursuit(pl.pursuits.find((p) => p.id === id)) }}
+          />
         ) : (
           <People
             contacts={ct?.contacts || []}
+            orgs={ct?.orgs || []}
             msgsByContact={ct?.msgsByContact || {}}
             fellBack={ct?.reason || null}
             onOpen={(c) => setView({ name: 'person', person: c })}
+            onOpenOrg={(o) => setView({ name: 'org', org: o })}
             onAdded={reloadContacts}
           />
         )

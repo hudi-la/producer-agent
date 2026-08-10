@@ -33,7 +33,7 @@ function channelsOf(c) {
 }
 
 export default function People({
-  contacts = [], msgsByContact = {}, fellBack = null, onOpen, onAdded,
+  contacts = [], orgs = [], msgsByContact = {}, fellBack = null, onOpen, onOpenOrg, onAdded,
 }) {
   const [q, setQ] = useState('')
   const [adding, setAdding] = useState(false)
@@ -55,15 +55,22 @@ export default function People({
   }, [contacts, msgsByContact, byId])
   const live = acting.filter((x) => !x.cue.stopped).length
 
-  const key = q.trim().toLowerCase()
-  const found = key
-    ? contacts.filter((c) => [c.name, c.org, c.role, c.email, c.notes]
-        .filter(Boolean).some((s) => String(s).toLowerCase().includes(key)))
-    : null
+  // 通讯录装的是**你会写信的对象**，不是只装人。机构和它的共享信箱也在里面。
+  const entries = useMemo(() => [
+    ...contacts.map((c) => ({ kind: 'person', id: c.id, c, at: c.last_touch_at })),
+    ...orgs.map((o) => ({ kind: 'org', id: o.org, o, at: o.last_touch_at })),
+  ].sort((a, b) => String(b.at || '').localeCompare(a.at || '')), [contacts, orgs])
 
-  const sorted = useMemo(
-    () => [...contacts].sort((a, b) => String(b.last_touch_at || '').localeCompare(a.last_touch_at || '')),
-    [contacts])
+  const key = q.trim().toLowerCase()
+  const hit = (e) => {
+    const bag = e.kind === 'person'
+      ? [e.c.name, e.c.role, e.c.notes, ...(e.c.emails || []).map((x) => x.email),
+         ...(e.c.orgs || []).map((x) => x.org)]
+      : [e.o.org, ...(e.o.mailboxes || []).map((m) => m.email + ' ' + (m.label || '')),
+         ...(e.o.people || []).map((p) => p.name)]
+    return bag.filter(Boolean).some((s) => String(s).toLowerCase().includes(key))
+  }
+  const found = key ? entries.filter(hit) : null
 
   const add = async (e) => {
     e.preventDefault()
@@ -86,16 +93,37 @@ export default function People({
     }
   }
 
-  const Row = ({ c }) => (
-    <button className="prow" onClick={() => onOpen?.(c)}>
-      <span className="prow-n">{c.name || '未具名联系人'}</span>
-      <span className="prow-s">{[c.org, c.role].filter(Boolean).join(' · ')}</span>
+  /** 现在挂着的机构（离开了的不在这儿显示，那是名片里的事）。 */
+  const nowOrg = (c) => {
+    const cur = (c.orgs || []).find((o) => !o.until)
+    return cur ? [cur.org, cur.role].filter(Boolean).join(' · ')
+      : ((c.orgs || []).length ? '（现在没挂机构）' : [c.org, c.role].filter(Boolean).join(' · '))
+  }
+
+  const Row = ({ e }) => e.kind === 'org' ? (
+    <button className="prow" onClick={() => onOpenOrg?.(e.o)}>
+      <span className="prow-n">{e.o.org}</span>
+      <span className="pchip org">机构</span>
+      <span className="prow-s">
+        {e.o.mailboxes?.[0]?.email || <span className="pf-empty">没有共享信箱</span>}
+      </span>
+      <span className="prow-sp" />
+      <span className="pchip">
+        {e.o.people_now} 人{e.o.people_past ? ` · 走了 ${e.o.people_past}` : ''}
+      </span>
+      {e.o.mail_count > 0 && <span className="pchip">{e.o.mail_count} 封</span>}
+      <span className="prow-w">{e.o.last_touch_at ? md(e.o.last_touch_at) : '—'}</span>
+    </button>
+  ) : (
+    <button className="prow" onClick={() => onOpen?.(e.c)}>
+      <span className="prow-n">{e.c.name || '未具名联系人'}</span>
+      <span className="prow-s">{nowOrg(e.c)}</span>
       <span className="prow-sp" />
       <span className="prow-ch">
-        {channelsOf(c).map((x, i) => <span key={i} className="pchip">{CH[x.kind] || x.kind}</span>)}
+        {channelsOf(e.c).map((x, i) => <span key={i} className="pchip">{CH[x.kind] || x.kind}</span>)}
       </span>
-      {c.pursuits?.length > 0 && <span className="pchip">{c.pursuits.length} 条线</span>}
-      <span className="prow-w">{c.last_touch_at ? md(c.last_touch_at) : '—'}</span>
+      {e.c.pursuits?.length > 0 && <span className="pchip">{e.c.pursuits.length} 条线</span>}
+      <span className="prow-w">{e.c.last_touch_at ? md(e.c.last_touch_at) : '—'}</span>
     </button>
   )
 
@@ -156,7 +184,7 @@ export default function People({
             <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
             <div className="prows">
               {found.length
-                ? found.map((c) => <Row key={c.id} c={c} />)
+                ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
                 : <p className="pnone">没有叫这个的。「加个人」把他加进来。</p>}
             </div>
           </section>
@@ -177,9 +205,11 @@ export default function People({
             <section className="psect">
               <div className="psect-h">
                 <h2>通讯录</h2>
-                <span className="pcount">{contacts.length} 人 · 按上次碰排</span>
+                <span className="pcount">
+                  {contacts.length} 人 · {orgs.length} 机构 · 按上次碰排
+                </span>
               </div>
-              <div className="prows">{sorted.map((c) => <Row key={c.id} c={c} />)}</div>
+              <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
             </section>
           </>
         )}

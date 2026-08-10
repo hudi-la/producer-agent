@@ -884,3 +884,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
   padding: 1px 6px; border-radius: 999px; margin-left: 7px; white-space: nowrap; }
 .pf-now-tag { border: 1px solid var(--good); color: var(--good); }
 .pf-past-tag { border: 1px solid var(--line-2); color: var(--ink-3); }
+/* 机构条目。跟人排在同一份通讯录里，但一眼分得出来。 */
+.pchip.org { border-color: var(--accent); color: var(--accent); }
+.pf-link { display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 0; cursor: pointer; font: inherit; }
+.pf-link:hover { color: var(--accent); }

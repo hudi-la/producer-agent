@@ -12,7 +12,7 @@ import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
 // 到时候会疼，但现在为它加复杂度是白加。
 
 const empty = (reason, detail) => ({
-  contacts: [], msgsByContact: {}, source: 'empty', reason, detail,
+  contacts: [], orgs: [], msgsByContact: {}, source: 'empty', reason, detail,
 })
 
 export async function loadContacts() {
@@ -62,6 +62,11 @@ export async function loadContacts() {
     const msgsByContact = {}
     for (const m of msgs || []) (msgsByContact[m.contact_id] ||= []).push(m)
 
+    // 机构也进通讯录。通讯录装的是**你会写信的对象**，不是只装人——
+    // residency@culturehub.org 来回七封，它当然该有一条。
+    const { data: orgRows } = await supa
+      .from('v_pa_orgs').select('*').order('mail_count', { ascending: false })
+
     return {
       contacts: contacts.map((c) => ({
         ...c,
@@ -69,6 +74,7 @@ export async function loadContacts() {
         emails: emailsOf[c.id] || (c.email ? [{ email: c.email, is_primary: true }] : []),
         orgs: orgsOf[c.id] || (c.org ? [{ org: c.org, role: c.role }] : []),
       })),
+      orgs: orgRows || [],
       msgsByContact,
       source: 'live', reason: null, detail: null,
     }
