@@ -874,3 +874,13 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pf-del { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px;
   background: var(--paper-2); }
 .pf-del .pf-body { margin: 8px 0 10px; }
+
+/* 一个人的多个邮箱 / 多个机构。历史不删，标出来「以前是，后来不是了」——
+   旧地址是历史往来的钥匙，删了那些信就再也认不回来。 */
+.pf-hist { display: block; margin-bottom: 6px; }
+.pf-hist.past { color: var(--ink-3); }
+.pf-mail { overflow-wrap: anywhere; }
+.pf-now-tag, .pf-past-tag { font-size: 9.5px; font-weight: 700; letter-spacing: .3px;
+  padding: 1px 6px; border-radius: 999px; margin-left: 7px; white-space: nowrap; }
+.pf-now-tag { border: 1px solid var(--good); color: var(--good); }
+.pf-past-tag { border: 1px solid var(--line-2); color: var(--ink-3); }

@@ -149,17 +149,41 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
 
         {/* ── 左 · 卷宗：他是谁 + 往来 ─────────────────────────── */}
         <aside className="fc-l">
-          <Cell label="机构" value={c.org} placeholder="没填" onSave={(v) => save({ org: v })} />
-          <Cell label="他管什么" value={c.role} placeholder="没填" onSave={(v) => save({ role: v })} />
-          <Cell label="邮箱" value={c.email} placeholder="没填" onSave={(v) => save({ email: v })} />
+          {/* 机构：一个人可以待过好几个。**离开了的不删**，标上到哪天为止——
+              「她以前在 CultureHub」是真事，而且正是它解释了为什么
+              stacy@culturehub.org 那几封信是她的。 */}
+          <div className="pf-cell">
+            <div className="pf-k">机构</div>
+            {(c.orgs?.length ? c.orgs : [null]).map((o, i) => o ? (
+              <div key={i} className={'pf-v pf-hist' + (o.until ? ' past' : '')}>
+                {o.org}{o.role ? <span className="pf-note"> · {o.role}</span> : null}
+                {o.until && <span className="pf-past-tag">到 {o.until} 为止</span>}
+                {!o.until && o.since && <span className="pf-note"> · {o.since} 起</span>}
+              </div>
+            ) : <div key={i} className="pf-empty">没填</div>)}
+          </div>
+
+          {/* 邮箱：一个人会换。**停用的留着**——旧地址是历史往来的钥匙，
+              删了那些信就再也认不回来。 */}
+          <div className="pf-cell">
+            <div className="pf-k">邮箱</div>
+            {(c.emails?.length ? c.emails : [null]).map((e, i) => e ? (
+              <div key={i} className={'pf-v pf-hist' + (e.until ? ' past' : '')}>
+                <span className="pf-mail">{e.email}</span>
+                {e.is_primary && !e.until && <span className="pf-now-tag">在用</span>}
+                {e.until && <span className="pf-past-tag">⛔ {e.until} 起停用</span>}
+                {e.note && <div className="pf-note">{e.note}</div>}
+              </div>
+            ) : <div key={i} className="pf-empty">没填</div>)}
+          </div>
 
           <div className="pf-cell">
-            <div className="pf-k">用什么找他</div>
+            <div className="pf-k">别的渠道</div>
             <div className="pf-chips">
               {channels.length
                 ? channels.map((x, i) => (
                     <span key={i} className="pchip" title={x.value}>{CH[x.kind] || x.kind}</span>))
-                : <span className="pf-empty">还不知道</span>}
+                : <span className="pf-empty">只有邮箱</span>}
             </div>
           </div>
 
