@@ -50,7 +50,85 @@ function Mail({ m, onJump }) {
   )
 }
 
-export default function Dossier({ p, msgs = [], files = [], attachments = [], onUnfinal, onJump, onSync, syncing, syncNote }) {
+const fmtSize = (b) => {
+  if (!b && b !== 0) return ''
+  if (b < 1024) return b + ' B'
+  if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'
+  return (b / 1048576).toFixed(1) + ' MB'
+}
+
+// 文件格。传进来、点开、删掉，都在这一小块里。
+//
+// 「传」用 label 包一个隐藏的 input——原生的文件选择框长得跟这一栏里
+// 任何东西都不像，而且样式改不动。
+function Files({ items, onUpload, onOpen, onDelete }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [over, setOver] = useState(false)
+
+  async function take(fileList) {
+    const fs = [...(fileList || [])]
+    if (!fs.length) return
+    setErr(null)
+    setBusy(true)
+    try {
+      // 一份一份传，不并发：并发时某一份失败，你看不出是哪一份。
+      for (const f of fs) await onUpload?.(f)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className={'files' + (over ? ' over' : '')}
+      onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false) }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files) }}
+    >
+      {items.map((a) => (
+        <div className="file" key={a.id}>
+          <span className="fi" aria-hidden="true">
+            {(a.filename.split('.').pop() || '?').slice(0, 3).toUpperCase()}
+          </span>
+          <span className="body">
+            <b>{a.filename}</b>
+            <span className="m">
+              {fmtSize(a.bytes)}
+              {a.source === 'mail' || a.from_msg ? ' · 从一封信的附件来' : ''}
+            </span>
+          </span>
+          <span className="acts">
+            <button className="lnk" onClick={() => onOpen?.(a)}>打开</button>
+            <button
+              className="lnk del"
+              onClick={() => { if (confirm(`删掉《${a.filename}》？桶里那份字节也一起没了，撤不回来。`)) onDelete?.(a) }}
+            >
+              删
+            </button>
+          </span>
+        </div>
+      ))}
+      <label className={'fdrop' + (busy ? ' busy' : '')}>
+        <input
+          type="file"
+          multiple
+          disabled={busy}
+          onChange={(e) => { take(e.target.files); e.target.value = '' }}
+        />
+        {busy ? '传着……' : items.length ? '+ 再丢一份（也可以直接拖进来）' : '把 PDF / MD / Excel 拖进来，或点这儿选'}
+      </label>
+      {err && <div className="ferr">{err}</div>}
+    </div>
+  )
+}
+
+export default function Dossier({
+  p, msgs = [], files = [], attachments = [], onUnfinal, onJump, onSync, syncing, syncNote,
+  onUpload, onOpenFile, onDeleteFile,
+}) {
   const stars = p.match_stars ? '★'.repeat(p.match_stars) : null
   // 只把邮件收进卷宗。线下备注（note / decision）留在中栏的时间线里——
   // 它们是这条线的叙事，两边都放就成了重复，而重复比缺失更难发现。
@@ -164,26 +242,16 @@ export default function Dossier({ p, msgs = [], files = [], attachments = [], on
             </div>
           )}
         </Pool>
-        {attachments.length > 0 && (
-          <Pool title="附件" count={`${attachments.length} 份`}>
-            <div className="files">
-              {attachments.map((a) => (
-                <div className="file" key={a.id}>
-                  <span className="fi" aria-hidden="true">
-                    {(a.filename.split('.').pop() || '?').slice(0, 3).toUpperCase()}
-                  </span>
-                  <span className="body">
-                    <b>{a.filename}</b>
-                    <span className="m">
-                      {a.bytes ? (a.bytes / 1048576).toFixed(1) + ' MB' : ''}
-                      {a.from_msg ? ' · 从一封信的附件来' : ''}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Pool>
-        )}
+        {/* 这一格永远在，哪怕一份都没有——原来是「有附件才显示」，
+            于是「往这条线丢个文件」这件事在界面上根本不存在，你无从发现。 */}
+        <Pool title="附件" count={attachments.length ? `${attachments.length} 份` : '空'}>
+          <Files
+            items={attachments}
+            onUpload={onUpload}
+            onOpen={onOpenFile}
+            onDelete={onDeleteFile}
+          />
+        </Pool>
       </div>
     </div>
   )

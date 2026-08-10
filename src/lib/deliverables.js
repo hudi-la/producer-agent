@@ -54,6 +54,64 @@ export async function deleteDeliverable(id) {
   return { ok: true }
 }
 
+// ── 附件：真文件 ────────────────────────────────────────────────
+// 桶是私有的，所以「打开」永远是现拿一条签名 URL，不存永久链接——
+// 存了的话那条链接就等于一把配给全世界的钥匙。
+const BUCKET = 'pursuit-files'
+
+/** 文件名里除了字母数字点横线以外的一律换成 -。中文名在 key 里会出事，但 filename 那列原样留着。 */
+const safeName = (name) =>
+  (name || 'file').normalize('NFKD').replace(/[^\w.\-]+/g, '-').replace(/^-+|-+$/g, '').slice(-80) || 'file'
+
+/**
+ * 传一份文件上去。顺序是死的：**先传字节，再登记这一行**。
+ * 反过来的话，登记成功而上传失败，卡上会出现一个点不开的鬼文件——
+ * 而你没法从界面上看出它是鬼。
+ */
+export async function uploadAttachment(pursuitId, file) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const key = `${pursuitId}/${crypto.randomUUID()}-${safeName(file.name)}`
+  const up = await supa.storage.from(BUCKET).upload(key, file, {
+    contentType: file.type || 'application/octet-stream',
+    upsert: false,
+  })
+  if (up.error) throw new Error('传不上去：' + up.error.message)
+  const { data, error } = await supa.rpc('pa_add_attachment', {
+    p_pursuit_id: pursuitId,
+    p_filename: file.name,
+    p_storage_key: key,
+    p_mime: file.type || null,
+    p_bytes: file.size ?? null,
+  })
+  if (error) {
+    // 字节传上去了但登记失败：把刚传的那份收掉，别在桶里留无主的东西。
+    await supa.storage.from(BUCKET).remove([key]).catch(() => {})
+    throw new Error('登记失败：' + error.message)
+  }
+  return data
+}
+
+/** 现拿一条能打开这份文件的临时链接。默认 60 秒——够点开，不够被转发。 */
+export async function attachmentUrl(storageKey, seconds = 60) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { data, error } = await supa.storage.from(BUCKET).createSignedUrl(storageKey, seconds)
+  if (error) throw new Error('打不开：' + error.message)
+  return data.signedUrl
+}
+
+/**
+ * 删。先删行拿回 key，再删桶里的字节——反过来做的话，行没了就再也不知道
+ * 该删哪个对象，桶里留一具查不到的无名尸。
+ * 桶里那步失败不报错：留个孤儿对象没人看得见，比让你以为没删掉强。
+ */
+export async function deleteAttachment(id) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { data: key, error } = await supa.rpc('pa_delete_attachment', { p_id: id })
+  if (error) throw new Error(error.message)
+  if (key) await supa.storage.from(BUCKET).remove([key]).catch(() => {})
+  return { ok: true }
+}
+
 /** 附件（左栏文件格里那些不是产出的东西：邮件附件、上传的 PDF）。 */
 export async function fetchAttachments(pursuitId) {
   if (!supa) return null

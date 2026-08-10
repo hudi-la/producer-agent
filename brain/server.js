@@ -9,7 +9,9 @@
 
 import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
-import { query } from '@anthropic-ai/claude-agent-sdk'
+import { query, createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
+import { z } from 'zod'
+import { toText, slice } from './files.js'
 
 // 默认值必须和前端 backends.js 里的 BRAIN 对得上。两边默认值不一致的话，
 // brain/.env 一丢，脑子听一个端口、界面敲另一个，结果是永远误报「脑子没开」。
@@ -20,7 +22,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-10a'
+export const BRAIN_BUILD = '2026-08-10b'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -182,7 +184,7 @@ function entriesBlock(entries) {
 
 // incoming 那句刚已经落库了，所以要从「之前的往来」里摘出去（exceptId），
 // 否则它会在 prompt 里出现两次。
-function buildPrompt({ p, msgs, entries, profile, kind }, incoming, exceptId) {
+function buildPrompt({ p, msgs, entries, profile, kind, raw }, incoming, exceptId) {
   const fact = (k, v) => (v ? `${k}：${v}\n` : '')
   const lines = []
 
@@ -193,6 +195,7 @@ function buildPrompt({ p, msgs, entries, profile, kind }, incoming, exceptId) {
   }
 
   lines.push(...entriesBlock(entries))
+  lines.push(...filesBlock(raw?.attachments))
 
   // 一个人和一条机会线是两种东西：线有阶段和截止推着，人只有「你们是什么关系」。
   // 所以这一段分岔，往来那一段以下完全共用。
@@ -320,7 +323,76 @@ const GMAIL_TOOLS = [
 // 回传得等 think() 想完，那时候早没得停了。
 const RUNS = new Map()
 
-async function think(prompt, tools = READ_TOOLS, profile = null, abortController = null) {
+// ── 这条线上的文件 ────────────────────────────────────────────
+//
+// 为什么是工具，不是上下文：把每条线的每份文件都塞进 prompt，既贵又吵，
+// 而且大部分对话根本用不上。要用的时候现开一份，这才是人翻文件的方式。
+//
+// 护栏在闭包里，不在提示词里：这台工具是**按这一次对话现造的**，
+// atts 是这条线的附件清单，写死在函数里。别条线的文件、磁盘上别的东西，
+// 不是「不许它碰」，是它够不到——跟 0009 / 0027 那套一样，结构上做不到。
+//
+// 三种格式一视同仁：从它那边看只有「给名字，拿文字」。PDF 要解析、
+// Excel 要遍历工作表、MD 直接就是文本——这些差别只活在 files.js 里。
+const FILE_TOOL = 'mcp__pursuit_files__open_file'
+
+function filesServer(atts) {
+  const find = (name) => {
+    const n = (name || '').trim().toLowerCase()
+    return atts.find((a) => a.filename.toLowerCase() === n)
+      || atts.find((a) => a.filename.toLowerCase().includes(n))   // 说个大概也认
+  }
+  return createSdkMcpServer({
+    name: 'pursuit_files',
+    tools: [
+      tool(
+        'open_file',
+        '打开这条机会线上的一份文件，拿到里面的文字。文件清单在 prompt 里给了；要用哪份才开哪份，别一上来全开一遍。文件太长会分段给你，按提示用 from 接着要下一段。',
+        {
+          name: z.string().describe('文件名，跟清单里写的一致（写个能认出来的片段也行）'),
+          from: z.number().optional().describe('从第几个字接着看。第一次不用传'),
+        },
+        async ({ name, from }) => {
+          const a = find(name)
+          if (!a) {
+            const list = atts.map((x) => x.filename).join('、') || '（这条线上没有文件）'
+            return { content: [{ type: 'text', text: `没有叫「${name}」的文件。这条线上有：${list}` }] }
+          }
+          if (!a.storage_key) {
+            return { content: [{ type: 'text', text: `《${a.filename}》只有登记、没有字节，打不开。` }] }
+          }
+          try {
+            const dl = await db.storage.from('pursuit-files').download(a.storage_key)
+            if (dl.error) throw new Error(dl.error.message)
+            const buf = Buffer.from(await dl.data.arrayBuffer())
+            const text = await toText(buf, a.filename, a.mime)
+            const { body, note } = slice(text, from || 0)
+            console.log(`  ↳ 它开了《${a.filename}》${from ? `（从 ${from} 字接着）` : ''}`)
+            return { content: [{ type: 'text', text: `# ${a.filename}\n\n${body}${note}` }] }
+          } catch (err) {
+            // 读不了要明说读不了。返回半通不通的东西更糟——那会被当成内容引用进一封真信里。
+            return { content: [{ type: 'text', text: `《${a.filename}》打不开：${err.message}` }] }
+          }
+        },
+      ),
+    ],
+  })
+}
+
+// prompt 里那份清单：只有名字/类型/多大/哪来的，**没有内容**。
+function filesBlock(atts) {
+  if (!atts?.length) return []
+  const lines = ['## 这条线上的文件']
+  for (const a of atts) {
+    const size = a.bytes ? `${(a.bytes / 1024).toFixed(0)} KB` : ''
+    const bits = [size, a.source === 'mail' ? '从一封信的附件来' : '他传的'].filter(Boolean).join(' · ')
+    lines.push(`- ${a.filename}${bits ? `（${bits}）` : ''}`)
+  }
+  lines.push('要看里面写了什么，用 open_file 开。别猜内容——没开过就说没看过。', '')
+  return lines
+}
+
+async function think(prompt, tools = READ_TOOLS, profile = null, abortController = null, mcpServers = null) {
   const out = []
   let usage = null
   for await (const m of query({
@@ -331,6 +403,7 @@ async function think(prompt, tools = READ_TOOLS, profile = null, abortController
       permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
       maxTurns: 20,
       ...(abortController ? { abortController } : {}),
+      ...(mcpServers ? { mcpServers } : {}),
     },
   })) {
     if (m.type === 'assistant') {
@@ -359,13 +432,22 @@ async function handleChat(body) {
   const mine = await addMessage(owner, 'artist', text.trim(), 'message', meta || null)
 
   const ctx = await loadOwnerContext(owner)
-  console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库`)
+  // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件。
+  const atts = ctx.raw?.attachments || []
+  console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库${atts.length ? ` / ${atts.length} 份文件` : ''}`)
+
+  // 有文件才给这台工具。没文件还挂着，等于告诉它「你可以去开文件」，
+  // 然后它去开一个不存在的东西——白跑一轮，还得自己想明白为什么开不到。
+  const tools = atts.length ? [...READ_TOOLS, FILE_TOOL] : READ_TOOLS
+  const servers = atts.length ? { pursuit_files: filesServer(atts) } : null
 
   const ac = run_id ? new AbortController() : null
   if (ac) RUNS.set(run_id, ac)
   let reply, usage
   try {
-    ;({ text: reply, usage } = await think(buildPrompt(ctx, text.trim(), mine.id), READ_TOOLS, ctx.profile, ac))
+    ;({ text: reply, usage } = await think(
+      buildPrompt(ctx, text.trim(), mine.id), tools, ctx.profile, ac, servers,
+    ))
   } catch (err) {
     // 你按了终止：不写回复，也不算出错。你那条留着（是你说的话，不是它想的）。
     if (ac?.signal.aborted) {

@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import { fetchMessages, sendMessage, stopThinking } from '../lib/chat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { doneAction, voidedAction, actionLine } from '../lib/nextAction.js'
-import { fetchDeliverables, fetchAttachments, setFinal, syncMail } from '../lib/deliverables.js'
+import {
+  fetchDeliverables, fetchAttachments, setFinal, syncMail,
+  uploadAttachment, attachmentUrl, deleteAttachment,
+} from '../lib/deliverables.js'
 import Dossier from './Dossier.jsx'
 import Deliverables from './Deliverables.jsx'
 import ReactMarkdown from 'react-markdown'
@@ -283,6 +286,29 @@ export default function PursuitFocus({
   // 取消定稿：左栏那份退回右栏接着改。改的还是同一份，不生第二个版本。
   async function unfinal(id) {
     try { await setFinal(id, false); await reloadDeliv() } catch (e) { setErr(e.message) }
+  }
+
+  // ── 卡上的文件 ────────────────────────────────────────────────
+  // 传完立刻重拉一次，不做乐观更新：这儿的「成功」是两步（字节 + 登记），
+  // 乐观更新就得自己编一行假的，编出来的那行跟库里对不上就是在骗自己。
+  async function addFile(file) {
+    await uploadAttachment(p.id, file)
+    await reloadDeliv()
+  }
+
+  // 私有桶，每次现拿一条 60 秒的签名链接。新标签页打开，不下载——
+  // PDF 直接在浏览器里看就行，不用先落到你的下载文件夹里。
+  async function openFile(a) {
+    try {
+      if (!a.storage_key) throw new Error('这份只有登记没有字节（多半是早年的空行）')
+      window.open(await attachmentUrl(a.storage_key), '_blank', 'noopener')
+    } catch (e) {
+      setErr(e.message)
+    }
+  }
+
+  async function dropFile(a) {
+    try { await deleteAttachment(a.id); await reloadDeliv() } catch (e) { setErr(e.message) }
   }
 
   // 两个方向的跳：产出/卷宗 → 中栏那一句；中栏的锚点 → 左栏那封信
@@ -582,6 +608,9 @@ export default function PursuitFocus({
               onSync={doSync}
               syncing={syncing}
               syncNote={syncNote}
+              onUpload={addFile}
+              onOpenFile={openFile}
+              onDeleteFile={dropFile}
             />
           </aside>
           <div className="fc-m">{body}</div>
