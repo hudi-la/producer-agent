@@ -74,12 +74,14 @@ npm run brain          # 在项目根目录；等同于 cd brain && npm start
 
 1. 开 https://console.cloud.google.com/ ，建一个项目（叫什么都行）。
 2. **APIs & Services → Library** → 搜 `Gmail API` → **Enable**。
-3. **APIs & Services → OAuth consent screen**：
-   - User type 选 **External**
-   - 应用名随便填，support email 和 developer email 填你自己
-   - Scopes 那步可以直接跳过（我们在代码里要）
-   - **然后回到 OAuth consent screen 首页，把发布状态从 Testing 改成
-     「In production」（Publish App）。**
+3. **APIs & Services → OAuth 同意屏幕**（新版界面叫 **Google Auth Platform**，
+   左边栏拆成了 Overview / Branding / **Audience** / Clients / Data Access）：
+   - **User type 在「Audience」这一页**，选 **External**
+     （个人 Gmail 账号只有这一个选项，多半已经是了）
+   - 应用名、support email 在「Branding」那页，填你自己的
+   - Scopes（Data Access）那步可以跳过——我们在代码里要
+   - **还在「Audience」这一页往下拉，找到 Publishing status，
+     点「PUBLISH APP」把它从 Testing 改成 In production。**
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**：
    - Application type 选 **Desktop app**
    - 建好之后把 Client ID 和 Client secret 填进 `brain/.env`：
@@ -97,7 +99,7 @@ npm run brain          # 在项目根目录；等同于 cd brain && npm start
 
 ### 第 3 步那个「In production」为什么要紧
 
-同意屏幕停在 **Testing** 的话，Google 发下来的 refresh token **7 天就过期**。
+同意屏幕（Audience 那页）停在 **Testing** 的话，Google 发下来的 refresh token **7 天就过期**。
 对一个天天在用的系统，那等于每周挂一次，而且挂的样子是「这轮 0 封新信」——
 跟「真的没有新信」长得一模一样。改成 In production 之后 token 是长期的。
 
