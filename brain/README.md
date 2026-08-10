@@ -59,3 +59,57 @@ npm run brain          # 在项目根目录；等同于 cd brain && npm start
 | Fairwind 的脑子没开 | `npm run brain` 没起，或者端口被占了 |
 | 缺配置（终端里） | `.env` 里的 service_role key 还是空的 |
 | 读上下文失败 | key 填错了（填成 anon 了？），或者迁移没应用 |
+
+## 接上 Gmail
+
+全局邮件同步要 brain 自己拿 OAuth 直连 Gmail API——不再走 claude.ai 那个
+连接器。为什么换：连接器的工具**只有模型能调**，于是每取一批信都要花一次
+模型往返，抓取和理解焊死在一起。65 条机会线里只有 3 条登记过 thread，就是
+这么卡住的。换掉之后抓取是纯 HTTP，模型只在「这个地址背后是谁」那一步出场。
+
+**只读**：scope 只有 `gmail.readonly`。这个系统本来就发不出信，不给写权限，
+这条护栏就不是嘱咐，是结构上做不到。
+
+### 一次性配置
+
+1. 开 https://console.cloud.google.com/ ，建一个项目（叫什么都行）。
+2. **APIs & Services → Library** → 搜 `Gmail API` → **Enable**。
+3. **APIs & Services → OAuth consent screen**：
+   - User type 选 **External**
+   - 应用名随便填，support email 和 developer email 填你自己
+   - Scopes 那步可以直接跳过（我们在代码里要）
+   - **然后回到 OAuth consent screen 首页，把发布状态从 Testing 改成
+     「In production」（Publish App）。**
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**：
+   - Application type 选 **Desktop app**
+   - 建好之后把 Client ID 和 Client secret 填进 `brain/.env`：
+     ```
+     GMAIL_CLIENT_ID=…
+     GMAIL_CLIENT_SECRET=…
+     ```
+5. 在 `brain/` 里跑：
+   ```
+   npm run mail:auth
+   ```
+   浏览器会开一个 Google 授权页。**「Google 尚未验证此应用」是正常的**——
+   这就是你自己刚建的应用，点「高级」→「继续前往」。
+   授权成功后凭证落在 `brain/.mail-tokens.json`（已 gitignore）。
+
+### 第 3 步那个「In production」为什么要紧
+
+同意屏幕停在 **Testing** 的话，Google 发下来的 refresh token **7 天就过期**。
+对一个天天在用的系统，那等于每周挂一次，而且挂的样子是「这轮 0 封新信」——
+跟「真的没有新信」长得一模一样。改成 In production 之后 token 是长期的。
+
+（未经 Google 验证也可以 publish。未验证的应用授权时会多一个警告页，
+自己用点过去就行。）
+
+### 授权还是会掉的几种情况
+
+代码会明确报 `MailAuthError` 并告诉你怎么修，**不会**静默变成「0 封新信」：
+
+- **你改了 Google 密码** —— 带 Gmail scope 的 token 必失效，最容易撞上
+- 6 个月没用过
+- 你在 https://myaccount.google.com/permissions 撤销了授权
+
+修法都一样：再跑一次 `npm run mail:auth`。

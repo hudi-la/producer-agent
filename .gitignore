@@ -5,3 +5,6 @@ dist/
 .DS_Store
 *.log
 .playwright-mcp/
+
+# Gmail 的钥匙：能读你全部邮件，永远不进仓库
+brain/.mail-tokens.json
