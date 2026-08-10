@@ -20,7 +20,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-08c'
+export const BRAIN_BUILD = '2026-08-10a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -656,11 +656,16 @@ thread：${threads.join(', ')}
 · role         "org"（对方发的）或 "artist"（${artistOf(ctx.profile)} 发的）
 · at           ISO 时间，真实发信时间
 · subject/from
+· counterpart   **对面那个地址**（纯地址，不要名字不要尖括号）。
+                他发来的信 = From 那个；你发出去的信 = To 那个。
+                一句话：**永远不是 ${mailboxOf(ctx.profile) || '你自己'}**。
+                这一栏是归属的唯一判据——没有它，这封信就只能靠猜是谁的，
+                而猜正是 0033 犯过的错（Stacy 的告别信被记到了别人卡上）。
 · raw          正文纯文本（**原样**，不要摘、不要改）
 · summary      一句中文摘要，说清这封信要什么或给了什么
 
 **最后一行**单独输出，别的什么都不要加：
-[[MAIL]] {"messages":[{"id":"…","role":"org","at":"…","subject":"…","from":"…","raw":"…","summary":"…"}]}
+[[MAIL]] {"messages":[{"id":"…","role":"org","at":"…","subject":"…","from":"…","counterpart":"…","raw":"…","summary":"…"}]}
 一封新的都没有就输出 [[MAIL]] {"messages":[]}`,
     GMAIL_TOOLS,
     ctx.profile,
@@ -673,20 +678,38 @@ thread：${threads.join(', ')}
 
   let added = 0
   let addedIn = 0
+  // 入库走 pa_add_mail：**brain 不判断这封信是谁的**，它只把信头照抄进来，
+  // 归属由那个函数查 contact_emails / org_mailboxes 算出来。
+  //
+  // 这是 0033 那个 bug 的结构性药方。当时的判据是「这条线挂了谁，信就都是谁的」，
+  // 于是 Mattie 名下 13 封里只有 1 封真是她的。判据只能是信头上的地址。
+  //
+  // 认不出来的地址也照样入库（0043 放宽了约束）——它会出现在
+  // 「还不认识的地址」里等你认，那不叫无主，叫待认领。为了守一条护栏
+  // 把信丢在门外，本末倒置。
+  let unknown = 0
   for (const mail of parsed.messages || []) {
     if (!mail?.id || !mail?.role) continue
-    const { data, error } = await db.rpc(
-      owner.kind === 'contact' ? 'pa_add_contact_email' : 'pa_add_email',
-      {
-        ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }),
-        p_role: mail.role === 'artist' ? 'artist' : 'org',
-        p_gmail_message_id: mail.id,
-        p_content: mail.summary || (mail.raw || '').slice(0, 200),
-        p_body_raw: mail.raw || null,
-        p_meta: { subject: mail.subject || null, from_name: mail.from || null },
-        p_created_at: mail.at || null,
-      })
+    const cp = String(mail.counterpart || '').trim().toLowerCase()
+    if (!cp.includes('@')) {
+      // 没给地址就不写——宁可这一封没进来，也不要它进来之后归错人。
+      console.warn(`  ⚠️ ${mail.id} 没报对面地址，这封先不入库`)
+      continue
+    }
+    const { data, error } = await db.rpc('pa_add_mail', {
+      p_gmail_message_id: mail.id,
+      p_counterpart: cp,
+      p_role: mail.role === 'artist' ? 'artist' : 'org',
+      p_content: mail.summary || (mail.raw || '').slice(0, 200),
+      // 收一条**线**的信就挂那条线；收一个**人**的信没有线可挂，
+      // 归属完全由地址决定（他自己那几封会认到他头上）。
+      p_pursuit_id: owner.kind === 'pursuit' ? owner.id : null,
+      p_body_raw: mail.raw || null,
+      p_meta: { subject: mail.subject || null, from_name: mail.from || null },
+      p_created_at: mail.at || null,
+    })
     if (error) { console.warn('  ⚠️ 一封没写进去：' + error.message); continue }
+    if (data?.owner === 'unknown') unknown++
     if (data?.inserted) { added++; if (mail.role !== 'artist') addedIn++ }
   }
   for (const t of threads) {
@@ -698,7 +721,9 @@ thread：${threads.join(', ')}
   }
   // addedIn = 对方来的那几封。你自己发的信收录进档案不该惊动你——你知道你发过。
   // 前端拿它当过卡判据 1，added 仍是总数（进度和日志用）。
-  return { ok: true, threads: threads.length, added, addedIn }
+  // unknown = 这一轮里地址还没登记的那几封，它们会出现在「还不认识的地址」等你认。
+  if (unknown) console.log(`  ↳ 其中 ${unknown} 封的地址还不认识，去人际管理页认一下`)
+  return { ok: true, threads: threads.length, added, addedIn, unknown }
 }
 
 // ── 更新最新信息：收信 → （收到了才）消化 ─────────────────────
