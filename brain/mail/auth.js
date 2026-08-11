@@ -26,7 +26,14 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const TOKENS = path.join(HERE, '..', '.mail-tokens.json')
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-const CALLBACK_PORT = 8789          // brain 自己是 8788，别撞上
+
+// 授权回调听在哪个口。默认 8789（brain 自己是 8788，别撞上）。
+//
+// 做成可配的是为了迁就**你已经有的那条 client**：Desktop app 类型的
+// client，Google 允许任意回环端口，不用登记；但 Web application 类型的
+// 必须逐字登记 redirect URI。如果那条现成 client 上登记的是别的端口，
+// 改这儿比去改 Google 那边省事。
+const CALLBACK_PORT = Number(process.env.GMAIL_CALLBACK_PORT || 8789)
 
 /**
  * 授权掉了要认得出来。
