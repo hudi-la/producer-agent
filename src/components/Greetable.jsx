@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   fetchGreetable, searchArchive, archiveTally, overrideVerdict, adopt, markGreeted, mailState,
 } from '../lib/mail.js'
@@ -56,10 +56,23 @@ export default function Greetable({ onChanged }) {
   const [rows, setRows] = useState(null)
   const [state, setState] = useState(null)
   const [pick, setPick] = useState(() => new Set())
-  const [busy, setBusy] = useState(null)          // 正在认的那个 email
+  // 正在认的那些 email。**必须是一组，不能是单个值。**
+  //
+  // 原来这儿是 setBusy(email)：你点第二个人，第一个人的「认领中…」就没了，
+  // 看起来像被打断了——可后台那一趟还在飞，信照样在搬。界面说的和实际
+  // 发生的对不上，这比慢更糟。
+  const [busy, setBusy] = useState(() => new Set())
   const [run, setRun] = useState(null)            // 批量：{i, n}
   const [err, setErr] = useState(null)
-  const [done, setDone] = useState(null)
+  const [done, setDone] = useState([])            // 认完的报告，攒着不互相顶掉
+  const seeded = useRef(false)                    // 首次那批默认全勾，只做一次
+
+  const mark = (email, on) => setBusy((s) => {
+    const n = new Set(s)
+    on ? n.add(email) : n.delete(email)
+    return n
+  })
+  const say = (line) => setDone((d) => [line, ...d].slice(0, 4))
 
   // 档案柜
   const [q, setQ] = useState('')
@@ -71,8 +84,10 @@ export default function Greetable({ onChanged }) {
     try {
       const [g, s, t] = await Promise.all([fetchGreetable(), mailState(), archiveTally()])
       setRows(g); setState(s?.[0] || null); setTally(t)
-      // 首次那一批默认全勾：一百多个一个个点是另一种苦差事
-      if (g && g.length > 20 && pick.size === 0) setPick(new Set(g.map((r) => r.email)))
+      // 首次那一批默认全勾：一百多个一个个点是另一种苦差事。
+      // 只在第一次载入时做——不然你按了「全不选」，随便认成一个触发 reload，
+      // 又会被全勾回来。
+      if (!seeded.current && g && g.length > 20) { seeded.current = true; setPick(new Set(g.map((r) => r.email))) }
     } catch (e) { setErr(e.message) }
   }
   useEffect(() => { reload() }, [])
@@ -86,24 +101,25 @@ export default function Greetable({ onChanged }) {
     return () => { alive = false; clearTimeout(t) }
   }, [q, open])
 
+  // 认一个。**可以同时认好几个**——各飞各的，互不打断，界面按 email 各记各的。
   async function one(r) {
-    setBusy(r.email); setErr(null)
+    mark(r.email, true); setErr(null)
     try {
       const out = await adopt(r)
-      setDone(`${r.name || r.org || r.email}：搬进来 ${out.promoted} 封`)
+      say(`${r.name || r.org || r.email}：搬进来 ${out.promoted} 封`)
       await reload(); onChanged?.()
     } catch (e) {
       setErr(e.needsAuth ? `${e.message}——${e.fix || '重新授权一次'}` : e.message)
-    } finally { setBusy(null) }
+    } finally { mark(r.email, false) }
   }
 
   async function reject(r) {
-    setBusy(r.email)
+    mark(r.email, true)
     try {
       // 不删，改判。decided_by='you' 之后自动判定再也动不了它。
       await overrideVerdict({ ...r, business: false, why: r.why ? `${r.why}（你说不要）` : '你说不要' })
       await reload()
-    } catch (e) { setErr(e.message) } finally { setBusy(null) }
+    } catch (e) { setErr(e.message) } finally { mark(r.email, false) }
   }
 
   // 批量：串行一个个来。一条挂了不停，接着跑下一条——跟「更新最新信息」
@@ -111,14 +127,14 @@ export default function Greetable({ onChanged }) {
   async function many() {
     const list = (rows || []).filter((r) => pick.has(r.email))
     if (!list.length) return
-    setErr(null); setDone(null)
+    setErr(null)
     let ok = 0, bad = 0, mails = 0
     for (let i = 0; i < list.length; i++) {
       setRun({ i: i + 1, n: list.length })
       try { const out = await adopt(list[i]); ok++; mails += out.promoted || 0 } catch (_) { bad++ }
     }
     setRun(null); setPick(new Set())
-    setDone(`认了 ${ok} 个，搬进来 ${mails} 封${bad ? `；${bad} 个没成，还在上面等着` : ''}`)
+    say(`认了 ${ok} 个，搬进来 ${mails} 封${bad ? `；${bad} 个没成，还在上面等着` : ''}`)
     await reload(); onChanged?.()
   }
 
@@ -147,7 +163,7 @@ export default function Greetable({ onChanged }) {
         ) : (
           <>
             <p className="pnone" style={{ paddingTop: 0 }}>
-              它把 {state?.headers ?? 0} 封信里的地址判了一遍，这些是**跟你这摊事有关的真人和机构信箱**。
+              它把 {state?.headers ?? 0} 封信里的地址判了一遍，这些是<b>跟你这摊事有关的真人和机构信箱</b>。
               <b>认下之后，那个地址名下所有历史往来当场归位</b>——不是从今天开始记。
             </p>
 
@@ -170,12 +186,15 @@ export default function Greetable({ onChanged }) {
                      const n = new Set(s); on ? n.add(e) : n.delete(e); return n
                    }) : null}
                    onAdopt={one} onReject={reject}
-                   busy={busy === r.email || Boolean(run)} />
+                   busy={busy.has(r.email) || Boolean(run)} />
             ))}
           </>
         )}
 
-        {done && <p className="gr-ok">{done}</p>}
+        {busy.size > 0 && !run && (
+          <p className="gr-ok">{busy.size} 个正在认领——各跑各的，互不打断，点别的不会打断它们。</p>
+        )}
+        {done.map((d, i) => <p className="gr-ok" key={i}>{d}</p>)}
         {err && <p className="gr-err">{err}</p>}
       </section>
 
