@@ -22,7 +22,7 @@ import { toText, slice } from './files.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-10b'
+export const BRAIN_BUILD = '2026-08-11a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
@@ -1135,6 +1135,46 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
+  // ── 邮件：全局同步那一套 ──────────────────────────────────────
+  //
+  // 这几个口的活儿浏览器干不了：认领要去 Gmail 拉正文、要让模型写摘要。
+  // 但它们跟上面那些不一样——**代码机械拉，模型只碰该碰的那一步**，
+  // 逻辑全在 mail/ 底下，这儿只是转发。
+  if (req.method === 'POST' && (req.url === '/mail/adopt' || req.url === '/mail/sync')) {
+    const isAdopt = req.url === '/mail/adopt'
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(raw || '{}')
+        const t = new Date().toLocaleTimeString('zh-CN')
+        let out
+        if (isAdopt) {
+          const { adoptPerson, adoptOrgMailbox } = await import('./mail/adopt.js')
+          console.log(`\n→ ${t} 认领 ${body.email}（${body.kind === 'org' ? '机构信箱' : '人'}）`)
+          out = body.kind === 'org'
+            ? await adoptOrgMailbox(body.email, { org: body.org, notes: body.why })
+            : await adoptPerson(body.email, {
+                contactId: body.contact_id || null, name: body.name,
+                org: body.org, role: body.role, notes: body.why,
+              })
+        } else {
+          const { incremental } = await import('./mail/sync.js')
+          console.log(`\n→ ${t} 收全局新信`)
+          out = await incremental()
+        }
+        console.log(`  ↳ ${JSON.stringify(out)}`)
+        send(res, 200, out)
+      } catch (err) {
+        console.error('✗', err.message)
+        // 授权掉了要认得出来，不能长成「这轮 0 封新信」——那正是这次事故里
+        // 最伤人的失败形态。前端拿 needs_auth 弹一句人话。
+        send(res, 500, { error: err.message, needs_auth: err.name === 'MailAuthError', fix: err.fix || null })
       }
     })
     return

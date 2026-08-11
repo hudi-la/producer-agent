@@ -28,12 +28,24 @@ const DANGER = {
   },
 }
 
-export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed }) {
+export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed, note, onDismissNote }) {
   const bad = fellBack ? DANGER[fellBack] : null
-  if (!bad && !brainDown && !brainStale && !batchFailed) return null      // 一切正常 → 闭嘴
+  // note 是「这一轮发生了什么」，**包括什么都没发生**。它不是出事，
+  // 所以另起一档 quiet：不红不黄，说完一句就等你划掉。
+  //
+  // 为什么它非得有个位置：原来整轮跑完屏幕上一点动静没有，于是「没有新信」
+  // 和「按钮坏了」长得一模一样。树皮书那次就是这么被当成坏了的。
+  if (!bad && !brainDown && !brainStale && !batchFailed && !note) return null
 
   return (
     <div className="trouble">
+      {note && (
+        <div className="tr-row quiet">
+          <span className="tr-dot" aria-hidden="true" />
+          <span className="tr-txt">{note}</span>
+          {onDismissNote && <button className="tr-x" onClick={onDismissNote}>知道了</button>}
+        </div>
+      )}
       {bad && (
         <div className="tr-row danger">
           <span className="tr-dot" aria-hidden="true" />

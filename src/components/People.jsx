@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { cuesFor } from '../lib/cues.js'
 import { upsertContact } from '../lib/people.js'
 import Strangers from './Strangers.jsx'
+import Greetable from './Greetable.jsx'
 
 // 「人际管理」—— 人这一层。
 //
@@ -191,6 +192,10 @@ export default function People({
           <>
             {/* 加人：粘个邮箱，或者从系统自己发现的陌生地址里挑。
                 两条路都通向同一件事——让 Fairwind 去读信，它判断，你点头。 */}
+            {/* 它替你判完的那些：只端上来跟你这摊事有关的真人和机构信箱。
+                判掉的退到后台，变成一个你不需要清空、但搜得到的档案柜。 */}
+            <Greetable onChanged={onAdded} />
+
             <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
 
             {contacts.length > 0 && <>
