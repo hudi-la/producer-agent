@@ -193,14 +193,14 @@ export function waitForCode() {
       // 整个授权流程就当场被打断——而 Google 那边的重定向随后扑空，
       // 报出来的还是「没带回 code」这种查不到根上的错。
       if (!code && !err) {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', connection: 'close' })
         res.end(page('<h2>还在等 Google 把你送回来。</h2>'
           + '<p>这个地址不用你自己打开——去终端里那个授权链接点完同意，'
           + '浏览器会自己跳到这儿。</p>'))
         return
       }
 
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', connection: 'close' })
       res.end(page(code
         ? '<h2>好了，可以关掉这个页面回终端了。</h2>'
         : `<h2>授权没成：${err}</h2><p>回终端看看，那边会说下一步怎么办。</p>`))
@@ -220,6 +220,12 @@ export function waitForCode() {
       settled = true
       clearTimeout(timer)
       server.close(() => fn(v))
+      // **这一行不能省。** server.close() 的回调要等所有连接断开才触发，
+      // 而浏览器会保着 keep-alive 长连接不放——不主动掐断的话，授权
+      // 拿到 code 之后会永远卡在这儿：端口已经不监听了，进程却还活着，
+      // 看起来像「点完同意就没反应了」。
+      // （用 fetch 写的测试暴露不出来，因为 fetch 关得快。）
+      server.closeAllConnections?.()
     }
 
     server.on('error', (e) => {

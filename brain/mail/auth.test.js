@@ -1,9 +1,22 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import http from 'node:http'
 import { waitForCode } from './auth.js'
 
 const PORT = Number(process.env.GMAIL_CALLBACK_PORT || 8789)
 const hit = (path) => fetch(`http://localhost:${PORT}${path}`).then((r) => r.text())
+
+/** 像浏览器那样请求：keep-alive，回完不主动断开。 */
+function hitKeepAlive(path, agent) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ host: '127.0.0.1', port: PORT, path, agent }, (res) => {
+      let body = ''
+      res.on('data', (d) => { body += d })
+      res.on('end', () => resolve(body))
+    })
+    req.on('error', reject)
+  })
+}
 
 // 这条是为一个真的 bug 写的回归测试。
 //
@@ -27,9 +40,38 @@ test('闲杂请求不打断授权：手动访问过一次之后，照样能收�
   assert.equal(await waiting, 'THE_CODE')
 })
 
+// 这条是为**上一条修复引入的新 bug** 写的。
+//
+// server.close(cb) 的回调要等所有连接断开才触发，而浏览器保着 keep-alive
+// 不放。于是真跑的时候：code 收到了、端口不监听了、进程却永远卡着——
+// 表现成「点完同意就没反应」。上一条测试用 fetch，连接关得快，漏掉了。
+//
+// 判据是**必须在几秒内 resolve**，不是「最终会 resolve」。
+test('浏览器保着长连接也要能收工，不能卡死', async () => {
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 })
+  try {
+    const waiting = waitForCode()
+    await hitKeepAlive('/', agent)                       // 先来一发闲杂的，连接留着
+    await hitKeepAlive('/?code=KEEPALIVE_CODE', agent)   // 再送 code，连接**还留着**
+
+    const code = await Promise.race([
+      waiting,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('卡住了：5 秒没 resolve')), 5000)),
+    ])
+    assert.equal(code, 'KEEPALIVE_CODE')
+  } finally {
+    agent.destroy()
+  }
+})
+
 test('Google 说不行的时候，当场失败并把原因带出来', async () => {
-  const waiting = waitForCode()
+  // 先把 catch 挂上再发请求：修好卡死之后 reject 来得很快，
+  // 用 assert.rejects(waiting) 会赶不及，报成 unhandled rejection。
+  const waiting = waitForCode().then(() => null, (e) => e)
   const page = await hit('/?error=access_denied')
   assert.match(page, /access_denied/)
-  await assert.rejects(waiting, /access_denied/)
+
+  const err = await waiting
+  assert.ok(err, '本该失败的')
+  assert.match(err.message, /access_denied/)
 })
