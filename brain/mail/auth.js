@@ -176,26 +176,66 @@ export async function authorize() {
            total: Number(data.messagesTotal || 0) }
 }
 
-function waitForCode() {
+/** 导出只为了能测：授权流程里最容易被打断的就是这一段。 */
+export function waitForCode() {
   return new Promise((resolve, reject) => {
+    const page = (s) => `<meta charset="utf-8"><body style="font:16px/1.6 system-ui;padding:3rem">${s}</body>`
+
     const server = http.createServer((req, res) => {
       const u = new URL(req.url, `http://localhost:${CALLBACK_PORT}`)
       const code = u.searchParams.get('code')
       const err = u.searchParams.get('error')
+
+      // 既没 code 也没 error 的请求**一律不当回事**，继续等着。
+      //
+      // 这儿踩过：原来只要有任何请求进来就 close + reject，于是浏览器顺手
+      // 要一下 /favicon.ico、或者你自己手抖打开一次 localhost:8789，
+      // 整个授权流程就当场被打断——而 Google 那边的重定向随后扑空，
+      // 报出来的还是「没带回 code」这种查不到根上的错。
+      if (!code && !err) {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+        res.end(page('<h2>还在等 Google 把你送回来。</h2>'
+          + '<p>这个地址不用你自己打开——去终端里那个授权链接点完同意，'
+          + '浏览器会自己跳到这儿。</p>'))
+        return
+      }
+
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      res.end(code
+      res.end(page(code
         ? '<h2>好了，可以关掉这个页面回终端了。</h2>'
-        : `<h2>授权没成：${err || '不知道为什么'}</h2>`)
-      server.close()
-      if (code) resolve(code)
-      else reject(new MailAuthError(`授权没成：${err || '浏览器没带回 code'}`))
+        : `<h2>授权没成：${err}</h2><p>回终端看看，那边会说下一步怎么办。</p>`))
+      if (code) finish(resolve, code)
+      else finish(reject, new MailAuthError(`授权没成：${err}`))
     })
-    server.on('error', (e) => reject(new MailAuthError(
-      `本地回调口 ${CALLBACK_PORT} 起不来（${e.message}）——是不是已经有一个在跑了？`, e)))
+
+    // 收摊只做一次，而且**要等服务真的关完**再交差。
+    //
+    // 这儿踩过两个坑，都是「看起来成了、其实没退干净」：
+    //   · 超时那个定时器不清掉的话，授权成功之后进程还要白挂五分钟才退出
+    //   · server.close() 是异步的，不等它关完就 resolve，下一次 listen
+    //     会撞上 EADDRINUSE——重新授权时表现为「口起不来」，查不到根上
+    let settled = false
+    const finish = (fn, v) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      server.close(() => fn(v))
+    }
+
+    server.on('error', (e) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      reject(new MailAuthError(
+        `本地回调口 ${CALLBACK_PORT} 起不来（${e.message}）——是不是已经有一个在跑了？`, e))
+    })
+
+    const timer = setTimeout(
+      () => finish(reject, new MailAuthError('等授权等了五分钟，先算了')),
+      5 * 60 * 1000)
+
     server.listen(CALLBACK_PORT, () => {
       console.log(`等着浏览器回调（localhost:${CALLBACK_PORT}）…\n`)
     })
-    // 五分钟没动静就别挂着了
-    setTimeout(() => { server.close(); reject(new MailAuthError('等授权等了五分钟，先算了')) }, 5 * 60 * 1000)
   })
 }
