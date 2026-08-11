@@ -34,13 +34,17 @@ ${batch.map(card).join('\n\n')}
 
 **一、这是什么**
 · person      —— 一个具体的人
-· shared_box  —— 机构共享信箱（residency@ / info@ / workshops@，署名常是一组人）。
+· shared_box  —— 机构/团队的共享信箱（residency@ / info@ / workshops@ /
+                 某个组织的公用 gmail，署名常是一组人或机构本身）。
                  **它不是人**，硬当成人的话往来会归错到某个倒霉蛋头上。
+                 但它**照样可能非常重要**——一个机构的公用信箱跟你有
+                 几十封实打实的往来是常事。别因为它不是人就判成不相关。
 · bulk        —— 群发源：通讯、推送、营销
-· machine     —— 系统自动发的：验证码、账单、平台通知
+· machine     —— 系统自动发的：验证码、账单、平台通知、送达失败
 · unsure      —— 看不出来
 
 **二、跟这摊事有关吗**（business: true / false）
+person 和 shared_box 都要判这一条。
 驻地、grant、奖项、群展、开放征集、机构合作、策展人、学校教学、艺术家同行 → true
 账单、订阅、购物、旅行、招聘、跟艺术事业无关的私人琐事 → false
 
@@ -56,17 +60,23 @@ ${batch.map(card).join('\n\n')}
 上面 ${batch.length} 个地址，每个都要有一条，一个都不能少。`
 }
 
-/** shared_box 在库里不是一种 verdict——它是「不是人」，归到 machine 那一档。 */
-const VERDICTS = new Set(['person', 'bulk', 'machine', 'unsure'])
+// shared_box 是独立的一档，**不能折进 machine**。
+//
+// 第一批真跑就撞上了：罗兹抽象艺术节的主办方信箱，跟他 80 封往来、
+// 给他出过 O-1 支持信——被折成 machine、强制 business=false，静默丢掉。
+// 共享信箱不是人（硬当成人的话往来会归错到某个倒霉蛋头上，那是 0033
+// 犯过的错），但它跟业务的相关性一点不比人低，该走「登记成机构信箱」。
+const VERDICTS = new Set(['person', 'shared_box', 'bulk', 'machine', 'unsure'])
 function normalize(v) {
   const raw = String(v?.verdict || '').trim()
-  const verdict = raw === 'shared_box' ? 'machine' : (VERDICTS.has(raw) ? raw : 'unsure')
+  const verdict = VERDICTS.has(raw) ? raw : 'unsure'
+  const isSomebody = verdict === 'person' || verdict === 'shared_box'
   return {
     email: String(v?.email || '').trim().toLowerCase(),
     verdict,
-    // 机构共享信箱本身有可能跟业务相关，但它不是人，不该进「等你点头」
-    business: verdict === 'person' ? Boolean(v?.business) : false,
-    why: v?.why || (raw === 'shared_box' ? '机构共享信箱，不是某个人' : null),
+    // 群发和机器一律不算业务相关；人和共享信箱由它判。
+    business: isSomebody ? Boolean(v?.business) : false,
+    why: v?.why || null,
     name: v?.name || null, org: v?.org || null, role: v?.role || null,
     decided_by: 'fairwind',
   }
