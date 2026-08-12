@@ -150,3 +150,33 @@ test('群发标记会落到那一行上', () => {
   const r = classify(msg({ From: 'news@x.com', To: ME, 'List-Unsubscribe': '<mailto:u@x>' }), [ME])
   assert.equal(r.bulk, true)
 })
+
+// ── 认亲的三个头 ────────────────────────────────────────────────
+// 「机构里另一个人回了信」从根上治的地方：一封点回复发出的邮件，无论
+// 换成哪个地址发，都带着 In-Reply-To / References 指向原信的 Message-ID。
+
+test('Message-ID / In-Reply-To / References 都存下来', () => {
+  const r = classify(msg({
+    From: 'someone@usc.edu', To: ME, Subject: 'Re: 提案',
+    'Message-ID': '<b@usc.edu>',
+    'In-Reply-To': '<a@mail.gmail.com>',
+    References: '<a@mail.gmail.com> <a0@mail.gmail.com>',
+  }), [ME])
+  assert.equal(r.message_id, '<b@usc.edu>')
+  assert.equal(r.in_reply_to, '<a@mail.gmail.com>')
+  assert.deepEqual(r.refs, ['<a@mail.gmail.com>', '<a0@mail.gmail.com>'])
+})
+
+test('References 可能折行、可能多个空格，都要拆干净', () => {
+  const r = classify(msg({
+    From: 'a@x.com', To: ME, References: '  <1@x>\n   <2@x>\t<3@x> ',
+  }), [ME])
+  assert.deepEqual(r.refs, ['<1@x>', '<2@x>', '<3@x>'])
+})
+
+test('没有这几个头就是 null / 空数组，不编', () => {
+  const r = classify(msg({ From: 'a@x.com', To: ME }), [ME])
+  assert.equal(r.message_id, null)
+  assert.equal(r.in_reply_to, null)
+  assert.deepEqual(r.refs, [])
+})

@@ -167,6 +167,10 @@ export function classify(msg, mine) {
     counterpart_email: counterpart,
     direction,
     bulk: isBulk(h, from.email),
+    // 认亲用的三个头。没有就是没有——大多数群发根本不带 In-Reply-To。
+    message_id: (h['message-id'] || '').trim() || null,
+    in_reply_to: (h['in-reply-to'] || '').trim() || null,
+    refs: parseRefs(h['references']),
   }
 }
 
@@ -175,4 +179,12 @@ export const WANT_HEADERS = [
   'From', 'To', 'Cc', 'Subject', 'Date',
   'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted',
   'X-Auto-Response-Suppress',
+  // ↓ 「机构里另一个人回了信」全靠这三个。一封真正点回复发出的邮件，
+  //   **无论换成哪个地址发**，都带着 In-Reply-To / References 指向原信的
+  //   Message-ID（RFC 5322）。Gmail 自己的 threadId 在跨地址、跨客户端时
+  //   并不总是把它们归成一串，这三个头比它可靠。
+  'Message-ID', 'In-Reply-To', 'References',
 ]
+
+/** `<a@b> <c@d>` → ['<a@b>', '<c@d>']。空白分隔，原样保留尖括号好做等值比对。 */
+export const parseRefs = (v) => String(v ?? '').trim().split(/\s+/).filter((x) => x.startsWith('<'))
