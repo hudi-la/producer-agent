@@ -1,4 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import Cast from './Cast.jsx'
+import { fetchPursuitMail } from '../lib/pursuitCast.js'
 import Pool from './Pool.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 
@@ -20,6 +22,20 @@ function fmtDate(s) {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+/** 跟这些人的**其他**往来：跟这条线没关系，但也不该消失。默认折着。 */
+function Aside({ items, onJump }) {
+  const [open, setOpen] = useState(false)
+  const who = [...new Set(items.map((m) => m.who).filter(Boolean))]
+  return (
+    <div className="aside">
+      <button className="lnk aside-t" onClick={() => setOpen((o) => !o)}>
+        {open ? '收起' : `还有 ${items.length} 封跟${who.slice(0, 2).join('、')}${who.length > 2 ? '等' : ''}的其他往来`}
+      </button>
+      {open && <div className="mails">{items.map((m) => <Mail m={m} key={m.id} onJump={onJump} />)}</div>}
+    </div>
+  )
+}
+
 function Mail({ m, onJump }) {
   const [open, setOpen] = useState(false)
   const mine = m.role === 'artist'
@@ -27,7 +43,9 @@ function Mail({ m, onJump }) {
   return (
     <div id={'dmail-' + m.id} className={'mail' + (open ? ' open' : '')}>
       <div className="mail-top">
-        <span className={'who ' + (mine ? 'you' : 'org')}>{mine ? '你' : (m.meta?.from_name || '对方')}</span>
+        {/* 推导来的那些没有 meta.from_name（它们没经过 /sync 那条路），
+            但视图给了 who。缺了就退回「对方」，不留空。 */}
+        <span className={'who ' + (mine ? 'you' : 'org')}>{mine ? '你' : (m.meta?.from_name || m.who || '对方')}</span>
         <span className="when">{fmtDate(m.created_at)}</span>
         {m.meta?.unanswered && <span className="flag">未回</span>}
       </div>
@@ -127,12 +145,30 @@ function Files({ items, onUpload, onOpen, onDelete }) {
 
 export default function Dossier({
   p, msgs = [], files = [], attachments = [], onUnfinal, onJump, onSync, syncing, syncNote,
-  onUpload, onOpenFile, onDeleteFile,
+  onUpload, onOpenFile, onDeleteFile, onOpenPerson,
 }) {
+  // 这条线的往来现在是**推导**出来的：挂在它名下那些人的邮件。
+  // 原来只认盖了 pursuit_id 的信，于是 Brooke 回了信这条线上还是 0 封。
+  // castV 只是个计数器——挂/摘完人要重拉一次。
+  const [derived, setDerived] = useState(null)
+  const [castV, setCastV] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchPursuitMail(p.id).then((d) => { if (alive) setDerived(d) }).catch(() => {})
+    return () => { alive = false }
+  }, [p.id, castV])
   const stars = p.match_stars ? '★'.repeat(p.match_stars) : null
   // 只把邮件收进卷宗。线下备注（note / decision）留在中栏的时间线里——
   // 它们是这条线的叙事，两边都放就成了重复，而重复比缺失更难发现。
-  const mails = msgs.filter((m) => m.kind === 'email')
+  // 两个来源合起来去重：盖过 pursuit_id 的老信 + 推导出来的。
+  // 一封信可能两边都有，按 gmail_message_id 认；没有 id 的按行 id 认。
+  const own = msgs.filter((m) => m.kind === 'email')
+  const seen = new Set(own.map((m) => m.gmail_message_id || m.id))
+  const extra = (derived || []).filter((m) => !seen.has(m.gmail_message_id || m.id))
+  const all = [...own.map((m) => ({ ...m, on_this_line: true })), ...extra]
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+  const mails = all.filter((m) => m.on_this_line)
+  const aside = all.filter((m) => !m.on_this_line)
   const failed = !!syncNote && syncNote.startsWith('收信失败')
 
   const profile = useProfile()
@@ -172,6 +208,8 @@ export default function Dossier({
         </Pool>
       </div>
 
+      <Cast pursuitId={p.id} onOpenPerson={onOpenPerson} onChanged={() => setCastV((v) => v + 1)} />
+
       <div className="dsect">
         <p className="secttl">往来</p>
         <Pool
@@ -192,13 +230,16 @@ export default function Dossier({
               你会以为没新信，其实是同步断了三天。 */}
           <p className={'syncnote' + (failed ? ' bad' : '')}>{syncNote || '还没收过这条线的信'}</p>
           {mails.length === 0 ? (
-            <p className="empty">暂时没有。这条线还没认领任何邮件线索——
-              有了往来，它会长在这儿。</p>
+            <p className="empty">暂时没有。上面「相关的人」挂一个人上来，
+              跟他的往来就会长在这儿。</p>
           ) : (
             <div className="mails">
               {mails.map((m) => <Mail m={m} key={m.id} onJump={onJump} />)}
             </div>
           )}
+          {/* 别的线的往来折起来。不藏——藏了就是「看不见 = 丢了」；
+              也不摊开——摊开这条线就混着别的项目的事。 */}
+          {aside.length > 0 && <Aside items={aside} onJump={onJump} />}
         </Pool>
       </div>
 

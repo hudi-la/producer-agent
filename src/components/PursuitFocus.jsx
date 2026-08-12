@@ -176,6 +176,7 @@ function emptyText(stage) {
 // 现在两者装的东西一样，只差宽度。等作品链、文档、邮件单独成栏做出来，
 // 整页才会长出抽屉装不下的部分。
 export default function PursuitFocus({
+  onOpenPerson,
   pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall,
   queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater, onAccept,
 }) {
@@ -611,6 +612,7 @@ export default function PursuitFocus({
               onUpload={addFile}
               onOpenFile={openFile}
               onDeleteFile={dropFile}
+              onOpenPerson={onOpenPerson}
             />
           </aside>
           <div className="fc-m">{body}</div>

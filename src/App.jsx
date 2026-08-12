@@ -622,6 +622,9 @@ export default function App() {
           key={view.pursuit.id}
           variant="page"
           pursuit={openedPursuit}
+          /* 从一条线上点相关的人 → 直接开他的名片。两边本来是断的：
+             线上看得到往来，却点不进那个人是谁。 */
+          onOpenPerson={(c) => setView({ name: 'person', person: c })}
           messages={pl.messagesByPursuit[view.pursuit.id]}
           onBack={closePursuit}
           onMove={moveCard}
@@ -647,6 +650,7 @@ export default function App() {
                   key={view.pursuit.id}
                   variant="drawer"
                   pursuit={openedPursuit}
+                  onOpenPerson={(c) => setView({ name: 'person', person: c })}
                   messages={pl.messagesByPursuit[view.pursuit.id]}
                   onBack={closePursuit}
                   onExpand={expandPursuit}

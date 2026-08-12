@@ -966,3 +966,30 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tr-row.quiet .tr-dot { background: #b9b4a9; }
 .tr-x { margin-left: auto; background: none; border: 0; cursor: pointer;
         font: inherit; font-size: 12px; color: #8a857a; text-decoration: underline; }
+
+/* ── 相关的人 ────────────────────────────────────────────────────
+   一条线牵扯的是一伙人，不是一个人。挂上之后线的往来是推导出来的——
+   他以后再来信不用做任何事就会出现；摘掉也只摘关系，信一封不少。 */
+.cast { display: flex; flex-direction: column; gap: 2px; }
+.cast-row { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; }
+.cast-who { flex: 1; min-width: 0; text-align: left; background: none; border: 0;
+            padding: 0; font: inherit; cursor: pointer; color: inherit; }
+.cast-who:disabled { cursor: default; }
+.cast-who:not(:disabled):hover b { text-decoration: underline; }
+.cast-org { margin-left: 6px; font-size: 11px; color: #97928a; }
+.cast-tag { margin-left: 6px; font-size: 10px; padding: 1px 5px; border-radius: 3px;
+            background: #e8eef2; color: #4a6070; }
+.cast-meta { flex: none; font-size: 11px; color: #97928a; }
+.cast-x { flex: none; font-size: 11px; color: #a8a49c; }
+.cast-add { align-self: flex-start; margin-top: 6px; font-size: 12px; }
+.cast-pick { margin-top: 6px; }
+.cast-pick input { width: 100%; box-sizing: border-box; margin-bottom: 4px; }
+.cast-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
+.cast-opt { text-align: left; background: none; border: 0; padding: 5px 2px;
+            font: inherit; cursor: pointer; border-bottom: 1px solid #f0eee9; }
+.cast-opt:hover { background: #f4f2ed; }
+
+/* 别的线的往来：不藏（藏了就是「看不见 = 丢了」），也不摊开（摊开这条线
+   就混着别的项目的事）。折一行，点开就有。 */
+.aside { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ddd9d1; }
+.aside-t { font-size: 12px; color: #8a857a; }
