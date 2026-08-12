@@ -84,6 +84,7 @@ export async function backfill({ q = '-in:chats', log = console.log } = {}) {
 
   const msgs = await getMetadata(gmail, ids, {
     onBatch: ({ done, total }) => log(`  拉信头 ${done}/${total}`),
+    onGone: (n) => log(`  ↳ ${n} 封在 Gmail 里已经不存在了（删了或移走了），跳过`),
   })
 
   const { rows, dropped } = toRows(msgs, acct.id, mine)
@@ -140,7 +141,9 @@ export async function incremental({ fallbackWindow = '30d', log = console.log } 
     return { added: 0, listed: 0, rebuilt, historyId, note: '没有新信' }
   }
 
-  const msgs = await getMetadata(gmail, ids)
+  const msgs = await getMetadata(gmail, ids, {
+    onGone: (n) => log(`  ↳ ${n} 封在 Gmail 里已经不存在了，跳过`),
+  })
   const { rows, dropped } = toRows(msgs, acct.id, mine)
   const written = await flush(rows, log)
   await setCursor(acct.id, historyId)

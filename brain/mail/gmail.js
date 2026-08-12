@@ -89,20 +89,35 @@ export async function listIds(gmail, { q = '-in:chats', onPage } = {}) {
  * 批量拿信头。**format=metadata + 指定 metadataHeaders**——不拉正文。
  * 一封信头几百字节，几万封也就几十 MB；正文等你认领了那个地址才拉。
  */
-export async function getMetadata(gmail, ids, { onBatch } = {}) {
+export async function getMetadata(gmail, ids, { onBatch, onGone } = {}) {
   let done = 0
+  let gone = 0
   const msgs = await pool(ids, async (id) => {
-    const r = await retry(
-      () => gmail.users.messages.get({
-        userId: 'me', id, format: 'metadata', metadataHeaders: WANT_HEADERS,
-      }),
-      `messages.get ${id}`)
+    let r
+    try {
+      r = await retry(
+        () => gmail.users.messages.get({
+          userId: 'me', id, format: 'metadata', metadataHeaders: WANT_HEADERS,
+        }),
+        `messages.get ${id}`)
+    } catch (err) {
+      // **一封拿不到不能拖垮整轮。**
+      //
+      // 真撞上了：增量里 6 封，其中 1 封你已经在 Gmail 里删了/移走了，
+      // messages.get 回 404 —— 结果另外 5 封真信一封都没进来。
+      // 那是最坏的失败形态：一封无关紧要的信让六封都不见了。
+      //
+      // 404 = 这封信现在不存在了，跳过它，接着跑。别的错照旧往上抛。
+      if ((err?.response?.status ?? err?.code) === 404) { gone++; return null }
+      throw err
+    }
     done++
     if (done % 200 === 0) onBatch?.({ done, total: ids.length })
     return r.data
   })
-  onBatch?.({ done, total: ids.length })
-  return msgs
+  onBatch?.({ done, total: ids.length, gone })
+  if (gone) onGone?.(gone)
+  return msgs.filter(Boolean)
 }
 
 /** 一封信的正文。只有认领之后才会走到这儿。 */
