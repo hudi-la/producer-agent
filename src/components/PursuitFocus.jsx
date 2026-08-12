@@ -190,12 +190,10 @@ export default function PursuitFocus({
   // 不是「你有没有手动改过」——后者不是你要看的东西。
   const [ball, setBallLocal] = useState(ballOf(p))
 
-  // 活着的待办：现在该干什么（actionLine 已经跳过作废的）。
-  // 卡面一直有这行，唯独抽屉里没有——抽屉只显示做完的和作废的，
-  // 于是「现在该干什么」是这儿唯一看不见的那种状态。
-  const live = null
-  // 它提的、你还没认的那句。认领挂在这句话旁边，不挂在过卡器的出口上。
-  const proposed = null
+  // 这儿原来还有「现在该干什么」和「Fairwind 提的、你还没认的那句」。
+  // 两样都删了：写 next_action 的那个消化环节早就不在了，留着就是一行
+  // 永远不会更新的字。要不要重做那套是另一场讨论。
+  // 见 docs/specs/2026-08-12-four-signals-design.md
   const endRef = useRef(null)
   const taRef = useRef(null)        // 输入框本体，用来按内容撑高
   const runIdRef = useRef(null)     // 正在跑的那一次，「终止」靠它找到对应的活

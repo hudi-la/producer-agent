@@ -88,10 +88,13 @@ export async function stopThinking(runId) {
 // 好处：sidecar 开不开、是不是最新的，都不影响你整理看板。
 
 /**
- * 改「球在谁那边」那个标：'me' 待处理 / 'them' 等回复（null 是给 Fairwind 留的，
- * 界面上没有这个选项）。写进去的同时库里盖一个时间戳 ball_at ——
- * 之后来了新信号（对外通信、跟进日到期），Fairwind 就重新接管这个标。
- * 最终显示哪个由视图算（ball_eff），这里只负责写。
+ * 改「球在谁那边」那个标：'me' 待处理 / 'them' 等回复 / null 两个都不亮
+ * （点已经亮着的那个 = 灭掉，传 null 进来）。
+ *
+ * **这个标只有你能改。** 原来库里有一套「你手动定的能撑到下一件真事发生，
+ * 之后 Fairwind 重新接管」的规则——它会把你的判断悄悄改回去，而你不会收到
+ * 任何通知。整套删了（0058）：系统只报事实（新来信、红点、日期），
+ * 「该不该我动」是判断，判断归你。
  */
 export async function setBall(pursuitId, ball) {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
