@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
-import { deadlineLine, actionLine } from '../lib/nextAction.js'
+import { deadlineLine, openLine } from '../lib/nextAction.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
@@ -86,13 +86,13 @@ function statusText(p, held) {
   }
 }
 
-function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked, onPick }) {
+function PCard({ p, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
   const held = heldLabel(useProfile())
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
   const ball = ballOf(p)
   const ddl = deadlineLine(p)
-  const act = actionLine(p)
+  const opn = openLine(p)
 
   // 卡整体是个可点的东西，但里面还嵌了个勾选框——button 套 button 是非法的，
   // 所以外层用 div + role，键盘操作自己接。
@@ -118,7 +118,7 @@ function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked
     >
       {picking && <span className="pc-check" aria-hidden="true" />}
       {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
-      {/* 球在谁那边——stage 说的是走到哪一格，这个说的是现在该谁动。 */}
+      {/* 你自己点的标签。系统不动它——点亮了就一直亮着，直到你再点。 */}
       {ball && (
         <div className={'pc-ball ' + ball}>
           <span className="bd" aria-hidden="true" />{BALL_LABEL[ball]}
@@ -127,41 +127,34 @@ function PCard({ p, onOpen, onDragStart, onTick, onJot, unseen, picking, checked
       <div className="pc-t">{p.title}</div>
       {p.match_stars ? <div className="pc-stars">{'★'.repeat(p.match_stars)}</div> : null}
 
-      {/* 该干什么——一张卡只说一句，而且每句都有确切依据。能勾的就勾掉。 */}
-      {act && (
-        act.tick ? (
-          <button
-            className={'pc-act tickable' + (act.urgent ? ' urgent' : '')}
-            onClick={(e) => { e.stopPropagation(); onTick?.(p, act.tick) }}
-            title="做完了？勾掉"
-          >
-            <span className="tick" aria-hidden="true" />
-            <span className="pc-act-t">{act.text}</span>
-            {/* 它提的、你还没认的。认了（做完了/自己改过）记号就消失。 */}
-            {act.by === 'fairwind' && <span className="pc-by">它提的</span>}
-          </button>
-        ) : (
-          <div className={'pc-act' + (act.urgent ? ' urgent' : '')}>{act.text}</div>
-        )
-      )}
+      {/* 「该干什么」那一行删了（见 lib/nextAction.js 顶部）。
+          系统不再替你判「这事该动了」——你觉得该动，点亮上面那个标签。 */}
 
       {ddl ? (
         <div className={'pc-ddl' + (ddl.urgent ? ' due' : '')}>{ddl.text}</div>
       ) : (
         <div className="pc-ddl none">无固定截止</div>
       )}
+      {/* 开放日期也是确定的信息，有就显示。不替你判急不急。 */}
+      {opn && <div className="pc-ddl">{opn.text}</div>}
       {p.work_title && <div className="pc-p">{p.work_title}</div>}
       <Jot p={p} onSave={onJot} />
       <div className="pc-m" style={p.stage === 'won' ? { color: 'var(--good)' } : undefined}>
         <span className={'src' + (p.source === 'manual' ? '' : ' scout')} aria-hidden="true" />
-        {p.contact_name ? p.contact_name + ' · ' : ''}{statusText(p, held)}
+        {p.contact_name ? p.contact_name + ' · ' : ''}
+        {/* **有外部新来信就说这句，顶掉阶段。**
+            卡面上的位置很贵：这条线有信在等你的时候，「新来信」比「沟通中」要紧。
+            点开这张卡就灭（跟右上角红点同一个机制），退回显示阶段。 */}
+        {p.new_mail
+          ? <span className="pc-new">新来信</span>
+          : statusText(p, held)}
       </div>
     </div>
   )
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot, unseen, picking, picked, onPick }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
@@ -205,7 +198,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot
       </div>
       {open && items.map((p) => (
         <PCard
-          p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onTick={onTick} onJot={onJot}
+          p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
           unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(p.id)} onPick={onPick}
         />
       ))}
@@ -213,7 +206,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onTick, onJot
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
+export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -285,7 +278,7 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick,
                   onToggle={() => toggleStack(row.stack)}
                   onOpen={onOpen}
                   onDragStart={onDragStart}
-                  onTick={onTick}
+                 
                   onJot={onJot}
                   unseen={unseen}
                   picking={picking}
@@ -295,7 +288,7 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onTick,
               ) : (
                 <PCard
                   p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
-                  onTick={onTick} onJot={onJot} unseen={unseen.has(row.card.id)}
+                  onJot={onJot} unseen={unseen.has(row.card.id)}
                   picking={picking} checked={picked.has(row.card.id)} onPick={onPick}
                 />
               )

@@ -1,34 +1,68 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { actionLine, voidedAction } from './nextAction.js'
+import { deadlineLine, openLine, daysFromToday, MD } from './nextAction.js'
 
-test('作废的待办不再出现在「该干什么」那行', () => {
-  const p = { next_action: '催 LOA', next_action_void_at: '2026-08-06T10:00:00Z' }
-  assert.equal(actionLine(p), null)
+// 原来这个文件测的是 actionLine / voidedAction —— 那一整套「该干什么」
+// 已经删了（见 nextAction.js 顶部）。现在只剩日期，测的也只有日期。
+
+const inDays = (n) => {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ── 截止 ────────────────────────────────────────────────────────
+
+test('没有截止就是没有，不编一个', () => {
+  assert.equal(deadlineLine({}), null)
 })
 
-test('作废但有开放日的卡，往下顺位到开放那条——作废不该让卡哑掉', () => {
-  const d = new Date(); d.setDate(d.getDate() + 5); d.setHours(0, 0, 0, 0)
-  const pad = (x) => String(x).padStart(2, '0')
-  const opens = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  const p = { next_action: '催 LOA', next_action_void_at: '2026-08-06T10:00:00Z', opens_at: opens }
-  assert.match(actionLine(p).text, /起开放/)
+test('截止原文永远保留——"spring 2027" 这种算不出日期，但它是真话', () => {
+  const l = deadlineLine({ deadline: 'spring 2027' })
+  assert.equal(l.text, '截止 spring 2027')
+  assert.equal(l.urgent, false)
 })
 
-test('它提的待办带 by 标记；你写的不带', () => {
-  assert.equal(actionLine({ next_action: 'x', next_action_by: 'fairwind' }).by, 'fairwind')
-  assert.equal(actionLine({ next_action: 'x', next_action_by: 'you' }).by, null)
-  assert.equal(actionLine({ next_action: 'x' }).by, null)   // 旧数据没这列
+test('远的不标急，近的才标', () => {
+  assert.equal(deadlineLine({ deadline_at: inDays(60) }).urgent, false)
+  assert.equal(deadlineLine({ deadline_at: inDays(3) }).urgent, true)
 })
 
-test('voidedAction 把作废行整理出来，含指回那封信的 id', () => {
-  const p = { next_action: '催 LOA', next_action_void_at: '2026-08-06T10:00:00Z', next_action_void_by: 'msg-1' }
-  const v = voidedAction(p)
-  assert.equal(v.text, '催 LOA')
-  assert.equal(v.byMsg, 'msg-1')
-  assert.match(v.at, /8月6日/)
+test('今天到期、已经过期，说法不一样', () => {
+  assert.match(deadlineLine({ deadline_at: inDays(0) }).text, /今天/)
+  const over = deadlineLine({ deadline_at: inDays(-2) })
+  assert.match(over.text, /已过/)
+  assert.equal(over.over, true)
 })
 
-test('没作废就没有作废行', () => {
-  assert.equal(voidedAction({ next_action: '催 LOA' }), null)
+// ── 开放 ────────────────────────────────────────────────────────
+// 开始日期是**确定的信息**，有就显示。它不再包装成「该干什么」——
+// 那一整套删了——但日期本身留着。
+
+test('还没开放：说清是在等它开门，带天数', () => {
+  const l = openLine({ opens_at: inDays(5) })
+  assert.match(l.text, /起开放/)
+  assert.match(l.text, /还有 5 天/)
+})
+
+test('已经开放了就不说了——那时候「开放」不是新闻', () => {
+  assert.equal(openLine({ opens_at: inDays(0) }), null)
+  assert.equal(openLine({ opens_at: inDays(-3) }), null)
+})
+
+test('没有开放日就是没有', () => {
+  assert.equal(openLine({}), null)
+})
+
+// ── 日期工具 ────────────────────────────────────────────────────
+
+test('daysFromToday：过去是负数，空值是 null', () => {
+  assert.equal(daysFromToday(inDays(7)), 7)
+  assert.equal(daysFromToday(inDays(-1)), -1)
+  assert.equal(daysFromToday(null), null)
+})
+
+test('MD 按本地时区格式化，不留前导零', () => {
+  assert.equal(MD('2026-08-06'), '8月6日')
+  assert.equal(MD(null), '')
 })

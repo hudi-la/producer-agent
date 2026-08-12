@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { fetchMessages, sendMessage, stopThinking } from '../lib/chat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
-import { doneAction, voidedAction, actionLine } from '../lib/nextAction.js'
+
 import {
   fetchDeliverables, fetchAttachments, setFinal, syncMail,
   uploadAttachment, attachmentUrl, deleteAttachment,
@@ -178,7 +178,7 @@ function emptyText(stage) {
 export default function PursuitFocus({
   onOpenPerson,
   pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall,
-  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater, onAccept,
+  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater,
 }) {
   const inDrawer = variant === 'drawer'
   const [msgs, setMsgs] = useState(messages || [])
@@ -189,14 +189,13 @@ export default function PursuitFocus({
   // 球权本地先动，写库由 App 负责回滚。装的是「球在谁那边」这个答案本身，
   // 不是「你有没有手动改过」——后者不是你要看的东西。
   const [ball, setBallLocal] = useState(ballOf(p))
-  const done = doneAction(p)
-  const voided = voidedAction(p)
+
   // 活着的待办：现在该干什么（actionLine 已经跳过作废的）。
   // 卡面一直有这行，唯独抽屉里没有——抽屉只显示做完的和作废的，
   // 于是「现在该干什么」是这儿唯一看不见的那种状态。
-  const live = actionLine(p)
+  const live = null
   // 它提的、你还没认的那句。认领挂在这句话旁边，不挂在过卡器的出口上。
-  const proposed = live?.by === 'fairwind' ? live : null
+  const proposed = null
   const endRef = useRef(null)
   const taRef = useRef(null)        // 输入框本体，用来按内容撑高
   const runIdRef = useRef(null)     // 正在跑的那一次，「终止」靠它找到对应的活
@@ -387,7 +386,7 @@ export default function PursuitFocus({
   // 不背内容：背了的那份不会跟着库变，迟早说谎。
   const viaUpdate = queue?.via === 'update'
   const lastMail = viaUpdate ? [...msgs].reverse().find((m) => m.kind === 'email') : null
-  const proposal = viaUpdate ? live : null
+  const proposal = null
   const mailWhen = (m) => {
     const d = m?.created_at ? new Date(m.created_at) : null
     return d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
@@ -402,15 +401,9 @@ export default function PursuitFocus({
           <div className="fh">
             {/* 整页时事实搬去了左栏卷宗，这儿不再重复一遍；抽屉没有卷宗，照旧显示 */}
             {!threeCol && <Facts p={p} />}
-            {/* 勾掉的待办不从卡面消失就完事——这条线上你做过什么，得留得住。 */}
-            {done && <p className="pf-done">✓ {done.text} <span>· {done.at}完成</span></p>}
-            {/* 被新信作废的待办：划掉留痕，说得出因为哪封信、点得回去。不是它凭空没了。 */}
-            {voided && (
-              <p className="pf-void">✗ <s>{voided.text}</s> <span>· {voided.at}作废</span>
-                {voided.byMsg && <button className="lnk" onClick={() => jumpTo(voided.byMsg)}>因为这封信 →</button>}
-              </p>
-            )}
-            {p.last_touch_at && <p className="pf-done">✓ 已碰过 <span>· {p.last_touch_at}</span></p>}
+            {/* 「下一步」那一套（做完了 / 作废了 / 已碰过）都撤了：
+                写它的消化环节早就没了，留着就是三行永远不会更新的字。
+                库里字段没删——以后要不要重做那套是另一场讨论。 */}
             {/* why / notes 库里存的就是 markdown（带加粗、按行分段），
                 原来直接当纯文本塞进 <p>，所以星号露在外面、几行被压成一坨。 */}
             {p.why && <div className="pf-why md"><Md>{p.why}</Md></div>}
@@ -512,33 +505,18 @@ export default function PursuitFocus({
             **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
             effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
             跟两个出口挪上来是同一个理由。 */}
-        {queue && viaUpdate && (lastMail || voided || proposal?.by === 'fairwind') && (
+        {queue && viaUpdate && lastMail && (
           <div className="qwhat">
             {lastMail && (
               <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}
                 <button className="lnk" onClick={() => jumpTo(lastMail.id)}>看最近这封 →</button>
               </span>
             )}
-            {voided && <span>作废了 · <s>{voided.text}</s></span>}
-            {proposal?.by === 'fairwind' && <span>它提了 · {proposal.text}</span>}
           </div>
         )}
 
-        {/* 现在该干什么。跟队头、两个出口、「这次发生了什么」一样钉在卡头里：
-            放进对话流上方的话，打开卡片时那个自动滚到底的 effect 会把它滚走。
-            「它提的」记号和「认了」贴在这句话自己旁边——认领是对**这句话**表态，
-            跟「这张卡还在不在我手头」无关，所以它不在过卡器的出口上。 */}
-        {live && (
-          <div className={'pf-live' + (live.urgent ? ' urgent' : '')}>
-            <span className="pf-live-t">{live.text}</span>
-            {proposed && (
-              <>
-                <span className="pc-by">它提的</span>
-                <button className="lnk" onClick={() => onAccept?.(p.id)}>认了</button>
-              </>
-            )}
-          </div>
-        )}
+        {/* 「现在该干什么」那一块删了。系统不再替你判这事该不该动——
+            你觉得该动，点亮上面那个「待处理」标签。 */}
 
         <div className="ft-head">
           {inDrawer ? (
@@ -556,8 +534,8 @@ export default function PursuitFocus({
         <div className="ft-ctl">
         {/* 截止跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关 */}
         <Deadline p={p} />
-        {/* 球在谁那边。Fairwind 自己贴一个，贴错了直接改掉——没有「谁来判断」这个选项。
-            两个都不亮 = 还没有依据（既没往来也没跟进日），你可以自己定一个。 */}
+        {/* **你自己点的标签**，系统不再往里插手。
+            点已经亮着的那个 = 灭掉，回到「一个都不点」。 */}
         <div className="ballsw" role="group" aria-label="球在谁那边">
           {BALL_STATES.map(([v, label]) => (
             <button
@@ -565,7 +543,10 @@ export default function PursuitFocus({
               type="button"
               className={'bsw ' + v + (ball === v ? ' on' : '')}
               aria-pressed={ball === v}
-              onClick={() => { if (ball === v) return; setBallLocal(v); onSetBall?.(p.id, v) }}
+              onClick={() => {
+                const next = ball === v ? null : v      // 再点一下灭掉
+                setBallLocal(next); onSetBall?.(p.id, next)
+              }}
             >
               {label}
             </button>

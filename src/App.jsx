@@ -3,7 +3,7 @@ import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
 import { loadProfile, ProfileContext, PROFILE_FALLBACK } from './lib/profile.js'
-import { setStage, setBall, setActionDone, markTouched, setJot, acceptNextAction, sendMessage, markSeen as markSeenDb } from './lib/chat.js'
+import { setStage, setBall, setJot, sendMessage, markSeen as markSeenDb } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -323,20 +323,6 @@ export default function App() {
   // 勾掉「下一步」。做完一件事该立刻看见它被划掉，所以先动界面再写库。
   //   action —— 只写完成时间戳，next_action 原文留着（详情页仍看得见，也能取消勾）
   //   touch  —— 记下今天碰过了，把待碰日清掉。这个没有撤销。
-  const tickAction = async (p, what) => {
-    const prev = pl.pursuits
-    const patch = what === 'touch'
-      ? { last_touch_at: new Date().toISOString().slice(0, 10), next_touch_at: null }
-      : { next_action_done_at: new Date().toISOString() }
-    setPl({ ...pl, pursuits: prev.map((x) => (x.id === p.id ? { ...x, ...patch } : x)) })
-    try {
-      if (what === 'touch') await markTouched(p.id)
-      else await setActionDone(p.id, true)
-    } catch (e) {
-      setPl({ ...pl, pursuits: prev })
-      alert('没勾上：' + e.message)
-    }
-  }
 
   // 卡上随手记的几个字。写失败要把原文还回去——你刚打的字不能因为网络就没了。
   const jotCard = async (p, jot) => {
@@ -450,10 +436,6 @@ export default function App() {
   // 你认了它提的那句：记号消失。这是对**那句话**表态，
   // 跟「这张卡还在不在我手头」无关——所以它不在过卡器的出口上。
   // 先乐观更新再写库：认领是你已经做出的判断，界面不该等一趟网络才承认。
-  const acceptProposal = async (id) => {
-    setPl((cur) => cur && ({ ...cur, pursuits: cur.pursuits.map((x) => (x.id === id ? { ...x, next_action_by: 'you' } : x)) }))
-    try { await acceptNextAction(id) } catch (e) { alert('没认上（下次更新它还会带记号）：' + e.message) }
-  }
   const laterCard = () => {
     const q = queueLater(queue, viewKey)
     setQueue(q)
@@ -582,14 +564,13 @@ export default function App() {
           onSetBall={markBall}
           // 整页也有那条活待办，「认了」在哪儿都得真能点——
           // 摆一个按不动的按钮比不摆更糟。
-          onAccept={acceptProposal}
         />
       ) : (
         <>
           {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
               「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
               不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
-          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onTick={tickAction} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
+          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
           {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (
@@ -612,8 +593,7 @@ export default function App() {
                   onQueueNext={() => queueGo(1)}
                   onQueueDone={finishCard}
                   onQueueLater={laterCard}
-                  onAccept={acceptProposal}
-                />
+                        />
               )}
             </aside>
           )}
