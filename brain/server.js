@@ -12,6 +12,8 @@ import { createClient } from '@supabase/supabase-js'
 import { query, createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
 import { toText, slice } from './files.js'
+// 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
+import { promote } from './mail/adopt.js'
 
 // 默认值必须和前端 backends.js 里的 BRAIN 对得上。两边默认值不一致的话，
 // brain/.env 一丢，脑子听一个端口、界面敲另一个，结果是永远误报「脑子没开」。
@@ -22,7 +24,7 @@ import { toText, slice } from './files.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-12b'
+export const BRAIN_BUILD = '2026-08-12c'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -858,47 +860,61 @@ thread：${threads.join(', ')}
 // 认不出来就**什么都不写**——不猜、不用默认值。名片上永远留一个手填的口。
 // 这是整刀里唯一「调出来的」东西，所以它必须能干净降级：
 // 它认不准，最坏也只是这个由头不出现，不会往库里写一个假日期。
+// 人的「收信」按钮：**把他名下还没搬的信全补上。**
+//
+// 这条路一次 agent 都不走。以前它走 handleSync，那意味着让模型去 Gmail
+// 逐条读 thread —— 20 条 thread 读一遍要好几分钟，而且 59 封信一封不缺时
+// 也照读不误。找信是机械活，凭什么花模型。
+//
+// 现在的三步全是死的：
+//   ① 他有哪些地址          contact_emails，一次 SQL
+//   ② 那些地址下哪些信没搬   pa_mail_promote 查信头账本，一次 SQL
+//   ③ 拉正文、写进对话表     纯 HTTP + pa_add_mail（归属自己按地址算）
+//
+// 唯一过模型的是「给新搬进来的信写一句摘要」，8 封一批，而且**只摘新增的**——
+// 没有新信就一次都不花。摘要写不成也不算失败：退回正文首段，绝不留空。
+//
+// 去 Gmail 抓新信是 mail/loop.js 每 5 分钟干的事，这个按钮不重复那件事。
+// 它只负责「账本里已经有的，搬进这张卡」。
 async function handlePersonRefresh(contactId) {
-  const sync = await handleSync({ contact_id: contactId })
-  if (!sync.added) return { ...sync, anchored: false }
+  const { data: rows, error: ee } = await db
+    .from('v_pa_contact_emails').select('email').eq('contact_id', contactId)
+  if (ee) throw new Error('读他的地址失败：' + ee.message)
+  const addrs = (rows || []).map((r) => r.email).filter(Boolean)
+  if (!addrs.length) {
+    return { ok: true, added: 0, addedIn: 0, threads: 0,
+      note: '这个人名下一个邮箱都没登记，所以没处补。先在名片上填个地址。' }
+  }
 
-  const ctx = await loadPersonContext(contactId)
-  const fresh = ctx.msgs.filter((m) => m.gmail_message_id).slice(-sync.added)
-  const inbound = fresh.filter((m) => m.role === 'org')
-  if (!inbound.length) return { ...sync, anchored: false }   // 全是你自己发的，没什么可消化
+  let added = 0
+  const threads = new Set()
+  const notes = []
+  for (const a of addrs) {
+    try {
+      const out = await promote(a, { log: (m) => console.log(m) })
+      added += out.added || 0
+      for (const t of out.threads || []) threads.add(t)
+    } catch (err) {
+      // 一个地址挂了不该带垮别的地址 —— 说出来，接着补下一个
+      notes.push(`${a}：${err.message}`)
+      console.warn(`  ⚠️ ${a} 没补成：${err.message}`)
+    }
+  }
 
-  const { text } = await think(
-    `${ctx.p.title} 刚回了 ${inbound.length} 封信。只问一件事：**他有没有给出再联系的时间锚点？**
+  // 认领 thread：名片上「认领了几条」要跟着走，以后别的路子也认得回来
+  for (const t of threads) {
+    try { await db.rpc('pa_claim_contact_thread', { p_contact_id: contactId, p_thread_id: t }) }
+    catch (_) {}
+  }
 
-【新信】
-${inbound.map((m) => `${m.created_at?.slice(0, 10) || '?'}：${m.body_raw || m.content}`).join('\n---\n')}
-【今天】${new Date().toISOString().slice(0, 10)}
-
-算数的锚点长这样：circle back next semester / after March / in the fall / 具体日期 /
-「等我们排完下学期课表」。这些**是真话**，不是客套。
-
-不算数的：「not a fit at this time」「we don't have capacity」这类婉拒，
-以及任何**没给时间**的客气话。它们一律当成没有锚点。
-
-有锚点就**最后一行**单独输出，别的什么都不要加：
-[[NEXT]] {"at":"2026-09-01","quote":"circle back next semester"}
-at 是你把那句话折算成的日期，quote 是**原话**，一个字都别改。
-
-没有锚点就**这一行整个不要输出**——宁可不说，不许猜。`,
-    READ_TOOLS,
-    ctx.profile,
-  )
-
-  const m = text.match(/\[\[NEXT\]\]\s*(\{[\s\S]*?\})\s*$/m)
-  let a = null
-  try { a = m ? JSON.parse(m[1]) : null } catch (_) { a = null }
-  if (!a?.at || !a?.quote) return { ...sync, anchored: false }
-
-  const { error } = await db.rpc('pa_upsert_contact', {
-    p_id: contactId, p_next_touch_at: a.at, p_next_touch_why: `他说 "${a.quote}"`,
-  })
-  if (error) return { ...sync, anchored: false, note: '锚点没写进去：' + error.message }
-  return { ...sync, anchored: true, next_touch_at: a.at, quote: a.quote }
+  return {
+    ok: true, added, addedIn: added, threads: threads.size,
+    addrs: addrs.length,
+    // 说实话，包括「一封都没有」——静默是最坏的，你会分不清它查过了还是没查
+    note: notes.length ? notes.join('；')
+      : added ? null
+      : '账本里没有还没搬的信。新信由后台每 5 分钟自己收。',
+  }
 }
 
 async function handleRefresh(body) {
