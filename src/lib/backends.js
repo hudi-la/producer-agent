@@ -30,15 +30,17 @@ export const FELL_BACK = {
 // 而界面完全看不出来——这已经害过一次：把「讲懂」改成后台扫之后，前端触发器删了、
 // 后台扫描没跑起来，整整一天没有一张新卡被读过，谁也没发现。
 // 所以两边各存一个日期，对不上就提示重启。改 brain/server.js 的行为时两处一起改。
-export const BRAIN_BUILD = '2026-08-11a'
+export const BRAIN_BUILD = '2026-08-12a'
 
 export async function checkBrain() {
   try {
     const res = await fetch(`${BRAIN}/health`, { method: 'GET' })
-    if (!res.ok) return { up: false, stale: false }
+    if (!res.ok) return { up: false, stale: false, mail: null }
     const body = await res.json().catch(() => ({}))
-    return { up: true, stale: body.build !== BRAIN_BUILD }
+    // mail = 邮件那一轮的状态。**收信只发生在脑子里**，所以脑子没开
+    // 就等于没人在收信——这件事必须让界面说出来，不能静默。
+    return { up: true, stale: body.build !== BRAIN_BUILD, mail: body.mail || null }
   } catch (_) {
-    return { up: false, stale: false }
+    return { up: false, stale: false, mail: null }
   }
 }

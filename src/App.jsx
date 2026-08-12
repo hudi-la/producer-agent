@@ -59,9 +59,6 @@ export default function App() {
   const [picked, setPicked] = useState(() => new Set())
   // 手头这摊活。存 localStorage，不上库（见 lib/queue.js 开头）。
   const [queue, setQueue] = useState(loadQueue)
-  const [refreshing, setRefreshing] = useState(null)      // {i, n} | null
-  const [refreshFailed, setRefreshFailed] = useState(0)   // 上一轮挂了几条，Trouble 用
-  const [refreshNote, setRefreshNote] = useState(null)    // 上一轮到底发生了什么，说出来
   const [sayOpen, setSayOpen] = useState(false)
   const [saying, setSaying] = useState(null)              // {i, n} | null
   const [sayFailed, setSayFailed] = useState(0)           // 群发挂了几条，也归 Trouble 说
@@ -78,58 +75,14 @@ export default function App() {
     return !out.touch || new Date(out.touch + 'T00:00:00') <= today
   }
 
-  // 串行逐线。几十条里多数没邮件，brain 秒回；有信的那几条各要十几秒。
-  // 需要你的线当场进队（via: 'update'）——不等整轮跑完，先到先过。
-  const runRefresh = async () => {
-    if (refreshing) return
-    const list = pl.pursuits
-    setRefreshFailed(0)
-    setRefreshNote(null)
-    let failed = 0
-    // 这一轮的账，一笔笔记着——不记的话下面那句「发生了什么」就只能编。
-    let added = 0, voided = 0, proposed = 0, mute = 0
-    for (let i = 0; i < list.length; i++) {
-      setRefreshing({ i: i + 1, n: list.length })
-      try {
-        const out = await refreshPursuit(list[i].id)
-        added += Number(out.addedIn || 0)
-        if (out.voided) voided++
-        if (out.proposed) proposed++
-        // threads=0 就是「这条线压根没处可收」。它跟「查过了，没有新信」
-        // 天差地别，而原来这两种在界面上长得一模一样。
-        if (!out.threads) mute++
-        if (needsMe(out)) {
-          setQueue((q) => enqueue(q, [{ kind: 'pursuit', id: list[i].id, via: 'update' }]))
-        }
-      } catch (_) {
-        failed++
-      }
-    }
-    setRefreshing(null)
-    setRefreshFailed(failed)
-
-    // **这一轮到底发生了什么，必须说出来。**
-    //
-    // 原来这儿只留了 failed 计数，每条线返回的 note 全丢了。于是最常见的
-    // 那种情况——「这条线还没有任何邮件往来，所以没处可收」——你一个字都
-    // 看不到：进度条走完，屏幕上一点动静没有，看起来就像按钮坏了。
-    // 那正是树皮书那次让人以为「坏了」的一半原因。
-    //
-    // 0 也要说。「没有新信」和「什么都没发生」是两件事。
-    setRefreshNote(
-      added || voided || proposed
-        ? `收到 ${added} 封新信` +
-          (voided ? `，${voided} 条待办作废` : '') +
-          (proposed ? `，${proposed} 条新提案` : '') +
-          (mute ? `；另有 ${mute} 条线还没有任何邮件往来（在系统里起草一封，或者去人际管理认领那个地址，它就接上了）` : '')
-        : mute
-          ? `${list.length} 条线都没有新信；其中 ${mute} 条还没有任何邮件往来——它们不是没收到，是根本没处可收。`
-          : `${list.length} 条线都没有新信。`,
-    )
-
-    const r = await loadPursuits()          // 立刻把新状态拉回来，不等 8 秒轮询
-    if (r) setPl(r)
-  }
+  // 「更新最新信息」那个按钮和它背后的 runRefresh 都删了。
+  //
+  // 它按线逐条跑老路（拉这条线登记过的 thread）。可 62 条线一条都没登记，
+  // 于是它跑 65 次、62 次返回「没处可收」，**而真正该做的事——去 Gmail
+  // 收新信——它一次都没做**。8/11 那批信就是这么在库外躺了七个小时的。
+  //
+  // 收信现在在 brain 里每 5 分钟自己跑（mail/loop.js）。取代按钮的不是
+  // 「没有反馈」，是顶栏那句一直在的实话：上次收到什么、脑子开没开。
 
   // 群发：同一句话分别说给每条线，各答各的。
   //
@@ -552,9 +505,8 @@ export default function App() {
         detail={fellBackDetail}
         brainDown={brain ? !brain.up : false}
         brainStale={brain ? brain.stale : false}
-        batchFailed={refreshFailed + sayFailed}
-        note={refreshNote}
-        onDismissNote={() => setRefreshNote(null)}
+        batchFailed={sayFailed}
+        mail={brain?.mail}
       />
 
       {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
@@ -570,8 +522,7 @@ export default function App() {
           onCancelPick={cancelPick}
           onPickAll={pickAll}
           onOpenTasks={() => setTasksOpen(true)}
-          onRefresh={runRefresh}
-          refreshing={refreshing}
+          mail={brain?.mail}
           onSay={() => setSayOpen(true)}
           saying={saying}
           queueCount={queue.items.length}

@@ -204,8 +204,6 @@ export default function PursuitFocus({
   const threeCol = !inDrawer
   const [deliv, setDeliv] = useState([])
   const [atts, setAtts] = useState([])
-  const [syncing, setSyncing] = useState(false)
-  const [syncNote, setSyncNote] = useState(null)
 
   // 「在想」不能靠猜。
   //
@@ -272,17 +270,6 @@ export default function PursuitFocus({
   }, [p.id, threeCol])
 
   // 收信。失败要说出来——不说的话你会以为「没新信」，其实是同步断了。
-  async function doSync() {
-    setSyncing(true)
-    try {
-      const r = await syncMail(p.id)
-      setSyncNote(r.note ? r.note : r.added ? `刚收到 ${r.added} 封` : '收过了，没有新的')
-      const rows = await fetchMessages(p.id)
-      if (rows) setMsgs(rows)
-    } catch (e) {
-      setSyncNote('收信失败：' + e.message)
-    } finally { setSyncing(false) }
-  }
 
   // 取消定稿：左栏那份退回右栏接着改。改的还是同一份，不生第二个版本。
   async function unfinal(id) {
@@ -606,9 +593,6 @@ export default function PursuitFocus({
               attachments={atts}
               onUnfinal={unfinal}
               onJump={jumpTo}
-              onSync={doSync}
-              syncing={syncing}
-              syncNote={syncNote}
               onUpload={addFile}
               onOpenFile={openFile}
               onDeleteFile={dropFile}

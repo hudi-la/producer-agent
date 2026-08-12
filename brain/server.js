@@ -22,9 +22,11 @@ import { toText, slice } from './files.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-11a'
+export const BRAIN_BUILD = '2026-08-12a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
+// 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
+const MAIL_MS = Number(process.env.MAIL_SWEEP_MS || 5 * 60 * 1000)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env
@@ -1019,7 +1021,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
-  if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, build: BRAIN_BUILD })
+  if (req.method === 'GET' && req.url === '/health') {
+    // 邮件那一轮的状态跟着 /health 走：界面每 8 秒本来就在问它，
+    // 不用再多开一个口，也不会出现「界面以为在收、其实早停了」。
+    const { lastSweep } = await import('./mail/loop.js')
+    return send(res, 200, { ok: true, build: BRAIN_BUILD, mail: lastSweep() })
+  }
 
   if (req.method === 'POST' && req.url === '/chat') {
     let raw = ''
@@ -1190,4 +1197,21 @@ server.listen(PORT, () => {
   console.log(`   计费：走你的 Claude 订阅用量（没用 API key）\n`)
   sweepBriefs()
   setInterval(sweepBriefs, SWEEP_MS)
+
+  // 邮件那一轮。**它是这个系统里唯一会去 Gmail 拿信的东西**——
+  // 在这之前收信完全靠人记得按按钮，于是 8/11 那批信在库外躺了七小时。
+  // 判错还能查，没去拿是查不出来的：界面上「没有新信」和「根本没收」
+  // 长得一模一样。
+  //
+  // 五分钟一轮：新信几乎不花钱（纯 HTTP + 纯 SQL），只有真冒出新地址
+  // 或者真有孤儿来信时才动模型。
+  const mailLoop = async () => {
+    try {
+      const { sweepMail } = await import('./mail/loop.js')
+      await sweepMail()
+    } catch (err) { console.error('  ✗ 邮件循环起不来：' + err.message) }
+  }
+  setTimeout(mailLoop, 5000)          // 起来 5 秒后先跑一轮，别让你等五分钟
+  setInterval(mailLoop, MAIL_MS)
+  console.log(`   邮件：每 ${Math.round(MAIL_MS / 60000)} 分钟收一次新信（这是唯一会去 Gmail 拿信的地方）`)
 })

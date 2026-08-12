@@ -993,3 +993,9 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    就混着别的项目的事）。折一行，点开就有。 */
 .aside { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ddd9d1; }
 .aside-t { font-size: 12px; color: #8a857a; }
+
+/* 邮件那一轮的状态。不是按钮——按钮会让人以为「不按就不收」，而事实
+   相反：它一直在收，除非脑子没开。所以这儿只说实话。 */
+.mailst { font-size: 12px; color: #8a857a; }
+.mailst.bad { color: #9b4a3f; }
+.mailst.off { color: #a8a49c; }

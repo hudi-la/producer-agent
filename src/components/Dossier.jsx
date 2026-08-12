@@ -144,7 +144,7 @@ function Files({ items, onUpload, onOpen, onDelete }) {
 }
 
 export default function Dossier({
-  p, msgs = [], files = [], attachments = [], onUnfinal, onJump, onSync, syncing, syncNote,
+  p, msgs = [], files = [], attachments = [], onUnfinal, onJump,
   onUpload, onOpenFile, onDeleteFile, onOpenPerson,
 }) {
   // 这条线的往来现在是**推导**出来的：挂在它名下那些人的邮件。
@@ -169,7 +169,6 @@ export default function Dossier({
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
   const mails = all.filter((m) => m.on_this_line)
   const aside = all.filter((m) => !m.on_this_line)
-  const failed = !!syncNote && syncNote.startsWith('收信失败')
 
   const profile = useProfile()
 
@@ -216,19 +215,11 @@ export default function Dossier({
           title="邮件"
           count={mails.length ? `${mails.length} 封` : '0 封'}
           defaultOpen={mails.length > 0}
-          announce={syncNote}
-          /* 收信按在标题行上：池子收着也能按。它只拉这条线登记过的 thread，
-             不遍历你的信箱。 */
-          action={
-            <button className="poolbtn" onClick={onSync} disabled={syncing}
-              title="去 Gmail 拉这条线的新信（只看这条线认领过的往来）">
-              {syncing ? '收信中…' : '收信'}
-            </button>
-          }
+          /* 「收信」按钮删了。它只拉这条线登记过的 thread——而这一格现在
+             显示的是**推导出来的**往来（班底的信 + 已认亲的串）。两者对不上：
+             标题写着「3 封」，按一下却说「这条线还没有任何邮件往来」。
+             收信现在在脑子里每 5 分钟自己跑，不该在这儿再放一个按钮。 */
         >
-          {/* 「上次收信」必须写出来，失败更要写。静默失败是最坏的：
-              你会以为没新信，其实是同步断了三天。 */}
-          <p className={'syncnote' + (failed ? ' bad' : '')}>{syncNote || '还没收过这条线的信'}</p>
           {mails.length === 0 ? (
             <p className="empty">暂时没有。上面「相关的人」挂一个人上来，
               跟他的往来就会长在这儿。</p>

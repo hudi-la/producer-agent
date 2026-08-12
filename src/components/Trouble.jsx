@@ -28,22 +28,27 @@ const DANGER = {
   },
 }
 
-export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed, note, onDismissNote }) {
+export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed, mail }) {
   const bad = fellBack ? DANGER[fellBack] : null
   // note 是「这一轮发生了什么」，**包括什么都没发生**。它不是出事，
   // 所以另起一档 quiet：不红不黄，说完一句就等你划掉。
   //
   // 为什么它非得有个位置：原来整轮跑完屏幕上一点动静没有，于是「没有新信」
   // 和「按钮坏了」长得一模一样。树皮书那次就是这么被当成坏了的。
-  if (!bad && !brainDown && !brainStale && !batchFailed && !note) return null
+  // 邮件那一轮出了事才说：授权掉了、或者太久没收到了。
+  // 正常在跑的时候顶栏那句就够了，这儿闭嘴。
+  const mailBad = mail && mail.ok === false ? mail : null
+  if (!bad && !brainDown && !brainStale && !batchFailed && !mailBad) return null
 
   return (
     <div className="trouble">
-      {note && (
-        <div className="tr-row quiet">
+      {mailBad && (
+        <div className="tr-row danger">
           <span className="tr-dot" aria-hidden="true" />
-          <span className="tr-txt">{note}</span>
-          {onDismissNote && <button className="tr-x" onClick={onDismissNote}>知道了</button>}
+          <span className="tr-txt">
+            <b>{mailBad.note}</b>
+            {mailBad.fix && <span className="tr-fix">{mailBad.fix}</span>}
+          </span>
         </div>
       )}
       {bad && (
