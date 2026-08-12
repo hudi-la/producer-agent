@@ -243,20 +243,9 @@ export default function Dossier({
         </Pool>
       </div>
 
-      {(p.contact_name || p.contact_role) && (
-        <div className="dsect">
-          <p className="secttl">人</p>
-          <Pool title={p.contact_name || '对接人'} count="主对接" defaultOpen>
-            <div className="person">
-              <span className="avatar" aria-hidden="true" />
-              <div>
-                <div><b>{p.contact_name || '—'}</b></div>
-                {p.contact_role && <div className="sub">{p.contact_role}</div>}
-              </div>
-            </div>
-          </Pool>
-        </div>
-      )}
+      {/* 原来这儿有个「人 / 主对接」格，只显示一个名字、点不动、也不带往来数。
+          上面那个 Cast 完全覆盖它了（一伙人、各自几封、点进去就是名片），
+          留着就是同一个人在同一栏里出现两次。删。 */}
 
       <div className="dsect">
         <p className="secttl">文件</p>
