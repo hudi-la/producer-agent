@@ -46,7 +46,19 @@ export async function mergePass({ apply = true, log = console.log } = {}) {
   log(`拿 ${rows.length} 个待认地址跟通讯录里 ${people.length} 个人对一遍…`)
 
   const mine = new Set((await myAccounts()).map((a) => a.address))
-  const cards = rows.filter((r) => !mine.has(r.email))
+
+  // **机构共享信箱不参与合并到人。**
+  //
+  // 第一次真跑就撞上了：studio@bradhowe.com 判成 shared_box，却被并到了
+  // 「Brad Howe」这个人头上。那个例子本身无害（一人工作室，同一个域名），
+  // 但规则是危险的——照这个逻辑，residency@culturehub.org 只要匹配上在
+  // CultureHub 工作的 Mattie，整个机构的信就全归到她卡上了。
+  // **那正是 0033 犯过的错**：Mattie 名下 13 封里只有 1 封真是她的。
+  //
+  // 共享信箱有自己的路（登记成 org_mailbox），不走这儿。
+  const cards = rows.filter((r) => !mine.has(r.email) && r.verdict !== 'shared_box')
+  const skipped = rows.filter((r) => r.verdict === 'shared_box').length
+  if (skipped) log(`  （跳过 ${skipped} 个机构共享信箱——它们不并到人头上，走「登记成机构信箱」那条路）`)
 
   const text = await ask(`下面是通讯录里已经认识的人，和一批还没入册的邮件地址。
 挑出**其实是已认识的人的另一个地址**的那些。
