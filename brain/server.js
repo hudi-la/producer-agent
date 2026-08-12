@@ -619,6 +619,50 @@ ${d.body}
 async function ensureThreads(owner, ctx) {
   const o = asOwner(owner)
   const have = (ctx.raw.threads || []).map((t) => t.gmail_thread_id)
+
+  // ── 人：每次都按他的地址重搜一遍，不吃「已经登记过」这个短路 ──
+  //
+  // 0027 立过「只拉登记过的 thread，永远不遍历信箱」。那条对**机会线**是对的：
+  // 一条线就那么几串往来，登记完就够了。
+  //
+  // 对**人**是错的，而且错得很难发现。Stacy 就栽在这儿：库里认领了 4 条 thread，
+  // 而 Gmail 里她三个地址下有 20 条。漏掉的里面有一条是**正在进行的对话**——
+  // 她 8/10 刚回过信，而名片上写着「上次碰 7/2」。信没丢，是从来没进来过，
+  // 于是那个日期在撒谎，比空着更坏。
+  //
+  // 按地址搜**不是遍历信箱**：`from:他 OR to:他` 是一个精确条件，一个人一次查询。
+  // 那条原则防的是「每次扫全箱、越用越慢越吵」，不是防这个。
+  if (o.kind === 'contact') {
+    const addrs = (ctx.raw.contact?.emails_all || []).length
+      ? ctx.raw.contact.emails_all
+      : [ctx.p.email].filter(Boolean)
+    if (!addrs.length) return have
+    const q = addrs.map((a) => `from:${a} OR to:${a}`).join(' OR ')
+    const { text } = await think(
+      `用 mcp__claude_ai_Gmail__search_threads 搜这个查询，**只要 thread id，别读正文**：
+
+  ${q}
+
+pageSize 给 50。如果结果还有下一页（返回里有 nextPageToken），翻到没有为止。
+这个人可能换过邮箱，所以上面每个地址都要算数——旧地址下的老往来同样是他的。
+
+**最后一行**单独输出，别的什么都不要加：
+[[THREADS]] {"thread_ids":["…"]}`,
+      GMAIL_TOOLS,
+      ctx.profile,
+    )
+    const mm = text.match(/\[\[THREADS\]\]\s*(\{[\s\S]*?\})\s*$/m)
+    let found = []
+    try { found = mm ? (JSON.parse(mm[1]).thread_ids || []) : [] } catch (_) { found = [] }
+    const fresh = found.filter((t) => t && !have.includes(t))
+    for (const t of fresh) {
+      await db.rpc('pa_claim_contact_thread', { p_contact_id: o.id, p_thread_id: t })
+    }
+    if (fresh.length) console.log(`  ↳ 按地址搜出 ${fresh.length} 条没登记过的往来`)
+    return [...have, ...fresh]
+  }
+
+  // ── 机会线：照旧。登记过就不再找。 ──
   if (have.length) return have
 
   const known = ctx.msgs.filter((m) => m.gmail_message_id).map((m) => m.gmail_message_id)
