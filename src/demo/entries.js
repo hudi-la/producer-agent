@@ -1,44 +1,10 @@
-// Seed mirror of producer.works (now the unified 战绩信息库 entry table) +
-// producer.profile.concerns. Zero-config fallback so `npm run dev` shows the real
-// library before/without Supabase. Kept in sync with:
-//   supabase/seed/0002_seed_hudi.sql   (works)
-//   supabase/seed/0008_seed_entries.sql (statement / job / education / credit / skill)
-
-export const CONCERNS_SEED = {
-  intimacy: '对爱与亲密的痴望',
-  systems: '社会系统结构里的超现实',
-  body_space_time: '身体 / 空间 / 时间的方法实验',
-}
-
-// credit 子分组的类型顺序 + 标签（作品按 concern 子分组，见 CONCERNS_SEED）
-export const CREDIT_ORDER = ['个展', '群展', '驻地', 'grant', '策展']
-export const CREDIT_LABEL = { 个展: '个展', 群展: '群展 / 演出', 驻地: '驻地', grant: '资助 / 奖学金', 策展: '策展项目' }
-
-// Section order + labels. `sub` sub-groups a section: 'concern'(作品) | 'credit'(按 meta.type)。
-export const KINDS = [
-  { key: 'work', label: '作品', sub: 'concern' },
-  { key: 'statement', label: '自述 · Bio' },
-  { key: 'job', label: '工作 · 职业经历' },
-  { key: 'education', label: '教育 · 背景' },
-  { key: 'credit', label: '展览 · 驻地 · 获奖 · 策展', sub: 'credit' },
-  { key: 'skill', label: '技能' },
-]
-
-// Kind-specific one-line facts shown on the collapsed row (from meta).
-export function subInfo(entry) {
-  const m = entry.meta || {}
-  const clean = (xs) => xs.filter((x) => x && x !== '（待补）')
-  const join = (...xs) => clean(xs).join(' · ')
-  const period = clean([m.start, m.end]).join(' – ')
-  switch (entry.kind) {
-    case 'work': return clean([entry.medium])
-    case 'job': return clean([m.org, period, m.location])
-    case 'education': return clean([m.school, m.year, m.location])
-    case 'credit': return clean([m.org, m.year, m.location]) // type 已是子分组标题，不重复
-    case 'statement': return clean([{ artist: 'Artist Statement', 'bio-short': '一句话', 'bio-long': '长 Bio' }[m.scope] || m.scope])
-    default: return []
-  }
-}
+// 胡地的作品与履历 —— 57 条，其中 11 件作品。内容取自 hudiworks.com 预渲染页原文。
+//
+// **这是示范内容，不是系统的一部分。** 换成你自己的：改这个文件，或者接上
+// Supabase 之后让库里的真数据接管（连得上库时前端根本不读这里，见 src/lib/loadLibrary.js）。
+//
+// 库里那份对应的是 supabase/demo/0002_seed_hudi.sql（作品 + 画像）
+// 和 supabase/demo/0008_seed_entries.sql（自述/工作/教育/展览/技能）—— 改这边记得改那边。
 
 // ── builders ──────────────────────────────────────────────────────────────
 const w = (title, medium, body, concern, site_path, sort, box = {}) => ({

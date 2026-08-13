@@ -1,13 +1,21 @@
+-- ⚠️ 示范内容，不是系统的一部分。整个 demo/ 装的是一位艺术家的公开作品集，
+--    fork 下来请换成你自己的 —— 见 demo/README.md。
+--
+-- 下面这行是护栏（migration 0059）。这个库里要是真人的数据，整支在这里中止，
+-- 一行都不会删。种子必须整支跑在一个事务里，护栏才拦得住后面的 truncate。
+select producer.demo_guard();
+
 -- Seed: Hu Di's real works (read from hudiworks.com) + profile (ported from the Claude cron).
 -- Idempotent-ish: clears producer.works first so re-running gives a clean库.
 
 truncate producer.works;
 
 -- ── 画像 / profile (from the existing weekly cron's Profile) ──────────────
-insert into producer.profile (name, website, data)
+insert into producer.profile (name, website, is_demo, data)
 values (
   'Hu Di',
   'https://hudiworks.com/',
+  true,   -- is_demo：模板自带的示范画像（0059）。这个库归你之后，改成 false。
   jsonb_build_object(
     'location',        jsonb_build_array('Los Angeles', 'SF Bay Area'),
     'visa',            'O-1',

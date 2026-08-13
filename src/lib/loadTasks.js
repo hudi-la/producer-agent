@@ -1,5 +1,5 @@
 import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
-import { TASKS_SEED } from '../data/tasksSeed.js'
+import { TASKS_SEED } from '../demo/tasks.js'
 
 const seed = (reason, detail) => ({ tasks: TASKS_SEED, source: 'seed', reason, detail })
 

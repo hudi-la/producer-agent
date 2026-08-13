@@ -24,7 +24,7 @@ const DANGER = {
   },
   [FELL_BACK.EMPTY]: {
     title: '数据库是空的 —— 现在显示的是示例假数据',
-    fix: '库连上了但一行都没有。跑过 supabase/seed 里的种子了吗？',
+    fix: '库连上了但一行都没有。跑过 supabase/migrations 和 supabase/demo 里的种子了吗？',
   },
 }
 

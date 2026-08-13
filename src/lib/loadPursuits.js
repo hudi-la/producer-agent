@@ -1,5 +1,5 @@
 import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
-import { PURSUITS_SEED, MESSAGES_SEED } from '../data/pursuitsSeed.js'
+import { PURSUITS_SEED, MESSAGES_SEED } from '../demo/pursuits.js'
 
 // 九列并七列之前存进去的卡，stage 还是旧值。0015 那道迁移跑完就没有旧值了，
 // 但在跑之前（以及任何还没迁的库上）没有这层翻译，看板会一列都筛不到 —— 卡看着像丢了。

@@ -13,14 +13,20 @@ npm install
 npm run dev
 ```
 
-没配 `.env.local` 时，前端用 `src/data/worksSeed.js` 的**种子数据**（你真实的 11 件作品）渲染作品库——`npm run dev` 立刻能看到。
+没配 `.env.local` 时，前端用 `src/demo/` 里的**示范数据**（Hu Di 真实的 11 件作品）渲染作品库——`npm run dev` 立刻能看到。
+
+> 仓库分**骨架**和**内容**两半：内容（作品、履历、画像、筛选标准）集中在
+> `demo/` · `src/demo/` · `supabase/demo/` 三处，其余都是骨架。
+> 原委见 [`demo/README.md`](demo/README.md)。
 
 ## 数据库
 
 作品库已经在共用 Supabase 里（`producer` schema）：
 
-- `supabase/migrations/0001_producer_init.sql` — 建 `producer.profile` + `producer.works`
-- `supabase/seed/0002_seed_hudi.sql` — 灌 Hu Di 的真实作品 + 画像
+- `supabase/migrations/` — **结构**。45 支，纯建表建视图，不含任何人的内容。
+- `supabase/demo/` — **示范内容**。6 支，灌 Hu Di 的真实作品 + 画像。
+  含 `truncate`，但每支头上有护栏（`0059`），对着真人的库跑会当场中止。
+  见 [`supabase/demo/README.md`](supabase/demo/README.md)。
 
 （这两支已通过 MCP 应用到项目 `jjgvvtrsnoqnoigukobi`，`producer.works` 现有 11 行。）
 

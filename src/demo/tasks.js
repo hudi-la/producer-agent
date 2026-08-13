@@ -1,4 +1,9 @@
-// Seed mirror of producer.tasks — the card-creating tasks that feed 新机会.
+// 胡地的造卡任务清单 —— 哪几条开着、上次跑出什么。
+// **这是示范内容。** 类型本身（TASK_DESC）是骨架，在 src/data/schema.js。
+//
+// 注：'agency_scout'（找模特经纪）是胡地特有的一条线，留着是因为它演示了
+// 「一个卡点长出一类任务」这件事本身 —— 见 demo/README.md。
+
 export const TASKS_SEED = [
   { id: 'scout', name: '聚合源 scout', type: 'scout_aggregators', enabled: true, schedule: 'weekly', last_result: '上周新增 3 张' },
   { id: 'agency', name: '找模特经纪 · 湾区 + 南加州（第一批）', type: 'agency_scout', enabled: true, schedule: '手动', last_result: '2026-08-06 手动跑了一轮：核实 7 家，另有 4 家查了没建卡（域名易主 / 抓不到），已留档' },
@@ -7,12 +12,3 @@ export const TASKS_SEED = [
   { id: 'email', name: '邮箱进来的机会', type: 'email_watch', enabled: false, schedule: null, last_result: '未接' },
   { id: 'followup', name: '关系降温提醒', type: 'relationship_followup', enabled: false, schedule: null, last_result: '未接' },
 ]
-
-export const TASK_DESC = {
-  scout_aggregators: '扫 Creative Capital / Colossal / TransArtists…按你的画像筛、查资格、去重',
-  agency_scout: '扫模特/演艺经纪的 commercial / lifestyle / beauty 板，逐家核实投递入口再造卡',
-  manual: '朋友转的、你刷到的——贴链接 / 截图 / 一句话，我写成卡',
-  institution_monitor: '专盯某机构，它开下一轮 open call 就造张卡',
-  email_watch: '进你信箱的邀约 / open call → 自动造卡',
-  relationship_followup: '某联系人久没动静 → 造张"该 nudge 了"的卡',
-}

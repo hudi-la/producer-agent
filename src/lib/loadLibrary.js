@@ -1,5 +1,6 @@
 import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
-import { ENTRIES_SEED, CONCERNS_SEED } from '../data/entriesSeed.js'
+import { ENTRIES_SEED } from '../demo/entries.js'
+import { CONCERNS_SEED } from '../demo/concerns.js'
 
 // 读 public 里的 v_pa_* 视图（指向 producer schema）。连不上就退回种子数据，
 // 保证界面永远渲染得出来——但会把「为什么退回」带出去，让界面说清楚。

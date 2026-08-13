@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL } from '../data/entriesSeed.js'
+import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { useProfile } from '../lib/profile.js'
 

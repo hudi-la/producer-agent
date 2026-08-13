@@ -1,5 +1,5 @@
 import React from 'react'
-import { TASK_DESC } from '../data/tasksSeed.js'
+import { TASK_DESC } from '../data/schema.js'
 
 function stateLabel(t) {
   if (!t.enabled) return '未接 · 可加'

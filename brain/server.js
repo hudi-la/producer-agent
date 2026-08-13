@@ -153,9 +153,13 @@ const systemFor = (profile) => {
 // 在 prompt 里就只剩一个光秃秃的标题，Fairwind 会如实汇报「你档案里没有这些」，
 // 而界面上明明白白写着。（这已经害过一次：它跟 Hu Di 说「教育那栏空得有点厉害」。）
 //
-// 界面上那份对应实现是 src/data/entriesSeed.js 的 subInfo()——改一边记得改另一边。
-// 故意没有共用一份：brain 是独立进程，import 前端源码会连 57 条种子数据一起拖进来；
-// 而且两边需求不同（见下面 credit 那条）。
+// 界面上那份对应实现是 src/data/schema.js 的 subInfo()——改一边记得改另一边。
+// 故意没有共用一份：brain 是独立进程，跨包 import 前端源码是另一件事；而且两边
+// 需求不同（见下面 credit 那条）。
+//
+// 注：原来还有一条理由是「import 会连 57 条种子数据一起拖进来」——
+// 2026-08-13 骨架/血肉分家之后那条不成立了，schema.js 里一条内容都没有。
+// 要不要合成一份是独立的一刀，见 docs/specs/2026-08-13-skeleton-and-flesh-design.md 第九节。
 function entryFacts(e) {
   const m = e.meta || {}
   const keep = (xs) => xs.filter((x) => x && x !== '（待补）')
