@@ -1027,3 +1027,23 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .pf-body.md a { color: var(--accent); }
 .pf-body.md h1, .pf-body.md h2, .pf-body.md h3 {
   font-family: var(--serif); font-size: 1.05em; margin: .8em 0 .35em; }
+
+/* ── 人际管理：两栏 ──
+   左边是**今天的活**，右边是**你认识谁**。两件事性质不同，
+   上下堆着的时候通讯录一长就把「现在该动的」顶出视野——
+   而它才是你打开这一页的原因。 */
+/* 只有这一页放宽。720px 是全站页宽（我的档案也吃它），两栏塞不下——
+   但那个宽度对单栏长文是对的，不该为了这一页动全局。 */
+.ppl-inner { max-width: 1220px; }
+.ppl-cols { display: grid; gap: 30px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; }
+.ppl-cols .psect { margin-bottom: 0; }
+/* 两栏各自滚，不带着整页走 */
+.ppl-do, .ppl-book { max-height: calc(100vh - 300px); overflow-y: auto; padding-right: 4px; }
+.ppl-do .psect-h, .ppl-book .psect-h {
+  position: sticky; top: 0; background: var(--paper); z-index: 1; margin-top: 0; }
+/* 窄屏叠回一栏，顺序不变：先今天的活，再通讯录 */
+@media (max-width: 1000px) {
+  .ppl-cols { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .ppl-do, .ppl-book { max-height: none; overflow: visible; }
+}

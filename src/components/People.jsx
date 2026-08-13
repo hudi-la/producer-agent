@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react'
 import { cuesFor } from '../lib/cues.js'
 import { upsertContact } from '../lib/people.js'
 import Strangers from './Strangers.jsx'
-import Greetable from './Greetable.jsx'
 
 // 「人际管理」—— 人这一层。
 //
@@ -132,7 +131,7 @@ export default function People({
 
   return (
     <div className="page">
-      <div className="page-inner">
+      <div className="page-inner ppl-inner">
         <header className="page-head">
           <h1>人际管理</h1>
           <p className="note">
@@ -175,7 +174,7 @@ export default function People({
           <p className="pnone">
             {fellBack === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
              : fellBack === 'query-failed' ? '连上了但查询报错——名片读不出来，不是库里没人。'
-             : '库里一个人都没有。上面「加个人」加第一个。'}
+             : '库里一个人都没有。右边通讯录那栏粘个邮箱，我去信箱里查他是谁。'}
           </p>
         )}
 
@@ -185,21 +184,20 @@ export default function People({
             <div className="prows">
               {found.length
                 ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
-                : <p className="pnone">没有叫这个的。「加个人」把他加进来。</p>}
+                : <p className="pnone">没有叫这个的。清空搜索框，在通讯录那栏粘他的邮箱加进来。</p>}
             </div>
           </section>
         ) : (
-          <>
-            {/* 加人：粘个邮箱，或者从系统自己发现的陌生地址里挑。
-                两条路都通向同一件事——让 Fairwind 去读信，它判断，你点头。 */}
-            {/* 它替你判完的那些：只端上来跟你这摊事有关的真人和机构信箱。
-                判掉的退到后台，变成一个你不需要清空、但搜得到的档案柜。 */}
-            <Greetable onChanged={onAdded} />
+          /* 两栏：左边是你现在要做的，右边是通讯录。
+             这两件事的性质不一样——左边是**今天的活**，右边是**你认识谁**。
+             上下堆着的时候，通讯录一长，「现在该动的」就被顶出视野，
+             而它才是你打开这一页的原因。
 
-            <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
-
-            {contacts.length > 0 && <>
-            <section className="psect">
+             「等你点头 / 它判掉的」那一段撤了：那是导入那一次的活，
+             判完就没有下一次。组件还留在 components/Greetable.jsx，
+             哪天又要导一批，接回来就行。 */
+          <div className="ppl-cols">
+            <section className="psect ppl-do">
               <div className="psect-h"><h2>现在该动的</h2><span className="pcount">{live} 件</span></div>
               {acting.length ? acting.map(({ c, cue }) => (
                 <button key={c.id + cue.via}
@@ -211,17 +209,19 @@ export default function People({
               )) : <p className="pnone">现在没有该动的。这是好事，不是漏了什么。</p>}
             </section>
 
-            <section className="psect">
+            <section className="psect ppl-book">
               <div className="psect-h">
                 <h2>通讯录</h2>
                 <span className="pcount">
                   {contacts.length} 人 · {orgs.length} 机构 · 按上次碰排
                 </span>
               </div>
+              {/* 加人：粘个邮箱，Fairwind 去读信、认出他是谁，你点头。
+                  它属于通讯录这一栏——加人是往这儿加。 */}
+              <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
               <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
             </section>
-            </>}
-          </>
+          </div>
         )}
       </div>
     </div>
