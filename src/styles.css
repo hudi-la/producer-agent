@@ -559,7 +559,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    min 是「还看得下去」的底，max 是「再宽也没意义」的顶。 */
 .focus.page .focus-cols { flex: 1; min-height: 0; display: grid;
   grid-template-columns:
-    clamp(232px, 21vw, 460px)
+    clamp(280px, 25vw, 520px)
     minmax(0, 1fr)
     clamp(288px, 27vw, 580px); }
 .fc-l, .fc-r { min-height: 0; overflow-y: auto; padding: 14px 14px 40px;
@@ -1004,3 +1004,26 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    它顶掉阶段那个位置——卡面很贵，有信等着的时候它比「沟通中」要紧。
    点开卡就灭（跟右上角红点同一个机制）。 */
 .pc-new { color: var(--accent, #9a5b2f); font-weight: 600; }
+
+/* 名片中栏：对话自己滚，输入框钉底。
+   没这层的话聊长了整页一起滚——左边那张名片和右边的草稿全被推出视野，
+   而你要商量的事恰恰得看着它们。跟机会线详情页同一个结构。 */
+.fc-m > .focus-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.fc-m > .focus-scroll > .focus-inner { max-width: none; padding: 20px 22px 8px; }
+.pf-composer { flex: none; padding: 12px 22px 16px; border-top: 1px solid var(--line);
+  background: var(--paper); }
+
+/* markdown 在名片里的样子。字号跟着中栏走，段距收紧一点——
+   这是对话，不是文章。 */
+.pf-body.md p { margin: 0 0 .7em; }
+.pf-body.md p:last-child { margin-bottom: 0; }
+.pf-body.md strong { color: var(--ink); font-weight: 600; }
+.pf-body.md ul, .pf-body.md ol { margin: .4em 0 .7em; padding-left: 1.3em; }
+.pf-body.md li { margin-bottom: .25em; }
+.pf-body.md code { font-size: .92em; background: var(--paper-3); padding: 1px 5px; border-radius: 5px; }
+.pf-body.md pre { overflow-x: auto; background: var(--paper-3); padding: 10px 12px; border-radius: 8px; }
+.pf-body.md blockquote { margin: .5em 0; padding-left: 12px; border-left: 2px solid var(--line-2);
+  color: var(--ink-3); }
+.pf-body.md a { color: var(--accent); }
+.pf-body.md h1, .pf-body.md h2, .pf-body.md h3 {
+  font-family: var(--serif); font-size: 1.05em; margin: .8em 0 .35em; }

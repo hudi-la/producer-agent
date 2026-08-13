@@ -8,24 +8,10 @@ import {
 } from '../lib/deliverables.js'
 import Dossier from './Dossier.jsx'
 import Deliverables from './Deliverables.jsx'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkBreaks from 'remark-breaks'
 import { heldLabel, useProfile } from '../lib/profile.js'
-
-// remark-breaks：单个换行就换行。标准 markdown 里单换行等于空格，
-// 可 Fairwind 和 scout 写进库的东西是按行分的（「**流程**：…\n**判断**：…」），
-// 不加这个插件，三行会被粘成一坨——你截图里看到的就是这个。
-function Md({ children }) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkBreaks]}
-      components={{ a: (props) => <a target="_blank" rel="noreferrer" {...props} /> }}
-    >
-      {children || ''}
-    </ReactMarkdown>
-  )
-}
+// 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
+// （已经分叉过一次：名片上的粗体渲成了四个星号）。
+import Md from './Md.jsx'
 
 const STAGE_LABELS = {
   pending: '新机会', matching: '匹配项目', writing: '一起写', sent: '发出&提交',
@@ -260,13 +246,14 @@ export default function PursuitFocus({
     if (a) setAtts(a)
   }
   useEffect(() => {
-    setDeliv([]); setAtts([]); setSyncNote(null)
+    // 这儿原来还有一句 setSyncNote(null)。收信搬去 mail/loop.js 之后
+    // syncing/doSync/syncNote 三样都撤了，**唯独这句漏删**——于是详情页
+    // 一打开就 ReferenceError 崩掉，整页白。删掉。
+    setDeliv([]); setAtts([])
     reloadDeliv()
     const iv = setInterval(reloadDeliv, 5000)
     return () => clearInterval(iv)
   }, [p.id, threeCol])
-
-  // 收信。失败要说出来——不说的话你会以为「没新信」，其实是同步断了。
 
   // 取消定稿：左栏那份退回右栏接着改。改的还是同一份，不生第二个版本。
   async function unfinal(id) {

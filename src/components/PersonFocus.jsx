@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { fetchContactMessages } from '../lib/chat.js'
 import { cuesFor } from '../lib/cues.js'
+import Md from './Md.jsx'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
   fetchThreads, fetchContactDeliverables,
@@ -276,51 +277,64 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
           </div>
         </aside>
 
-        {/* ── 中 · 跟 Fairwind 商量 ───────────────────────────── */}
+        {/* ── 中 · 跟 Fairwind 商量 ─────────────────────────────
+            对话自己滚（.focus-scroll），顶栏和左右两栏不跟着走——
+            跟机会线详情页一个结构。以前没这层，聊长了整页一起滚，
+            左边那张名片和右边的草稿全被推出视野。 */}
         <section className="fc-m">
-          {/* 「人是独立一层、两区共用同一张名片」看得见的样子 */}
-          {c.pursuits?.length > 0 && (
-            <div className="pf-lines">
-              <span className="pf-k">他挂着的机会线</span>
-              {c.pursuits.map((p) => (
-                <button key={p.id} className="lnk" onClick={() => onOpenPursuit?.(p.id)}>{p.title}</button>
-              ))}
-            </div>
-          )}
-
-          {talk.length ? (
-            <div className="pf-msgs">
-              {talk.map((m) => (
-                <div key={m.id} className={'pf-msg' + (m.role === 'note' ? ' note' : '')}>
-                  <div className="pf-who">
-                    {m.role === 'note' ? '你记的一笔' : m.role === 'artist' ? '你' : 'Fairwind'}
-                    <span className="pf-note"> · {day(m.created_at)}</span>
-                  </div>
-                  <div className="pf-body">{m.content}</div>
+          <div className="focus-scroll">
+            <div className="focus-inner">
+              {/* 「人是独立一层、两区共用同一张名片」看得见的样子 */}
+              {c.pursuits?.length > 0 && (
+                <div className="pf-lines">
+                  <span className="pf-k">他挂着的机会线</span>
+                  {c.pursuits.map((p) => (
+                    <button key={p.id} className="lnk" onClick={() => onOpenPursuit?.(p.id)}>{p.title}</button>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="pf-note">还没商量过什么。下面说一句，或者记一笔线下见面。</p>
-          )}
+              )}
 
-          {busy === 'talk' && <p className="pf-note">Fairwind 在想…</p>}
+              {talk.length ? (
+                <div className="pf-msgs">
+                  {talk.map((m) => (
+                    <div key={m.id} className={'pf-msg' + (m.role === 'note' ? ' note' : '')}>
+                      <div className="pf-who">
+                        {m.role === 'note' ? '你记的一笔' : m.role === 'artist' ? '你' : 'Fairwind'}
+                        <span className="pf-note"> · {day(m.created_at)}</span>
+                      </div>
+                      {/* 库里存的是 markdown。不渲的话「**这一类事**」在页面上
+                          就是四个星号明晃晃摆着——同一份内容在机会线上是粗体，
+                          在这儿是乱码，丑的那个看起来像坏了。 */}
+                      <div className="pf-body md"><Md>{m.content}</Md></div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="pf-note">还没商量过什么。下面说一句，或者记一笔线下见面。</p>
+              )}
 
-          <div className="pf-say">
-            <textarea rows={2} value={text} placeholder="跟 Fairwind 说一句…"
-                      onChange={(e) => setText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); say() }
-                      }} />
-            <div className="pf-say-btns">
-              <button className="lnk" onClick={say} disabled={busy || !text.trim()}>说</button>
-              <button className="lnk" onClick={jot} disabled={busy || !text.trim()}>记一笔</button>
+              {busy === 'talk' && <p className="pf-note">Fairwind 在想…</p>}
             </div>
           </div>
-          <p className="pf-note">
-            「说」= 让它想（⌘↵）；「记一笔」= 直接落进上面这条时间线，
-            并把「上次碰」记成今天——线下见了面按这个。
-          </p>
+
+          {/* 输入框钉在底部，不跟着对话滚走 */}
+          <div className="pf-composer">
+            <div className="pf-say">
+              <textarea rows={2} value={text} placeholder="跟 Fairwind 说一句…"
+                        onChange={(e) => setText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); say() }
+                        }} />
+              <div className="pf-say-btns">
+                <button className="lnk" onClick={say} disabled={busy || !text.trim()}>说</button>
+                <button className="lnk" onClick={jot} disabled={busy || !text.trim()}>记一笔</button>
+              </div>
+            </div>
+            <p className="pf-note">
+              「说」= 让它想（⌘↵）；「记一笔」= 直接落进上面这条时间线，
+              并把「上次碰」记成今天——线下见了面按这个。
+            </p>
+          </div>
         </section>
 
         {/* ── 右 · 要发的信 ───────────────────────────────────── */}
