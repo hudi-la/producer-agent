@@ -298,9 +298,14 @@ export default function App() {
   //   详情页  Fairwind · 这条线的名字 / 这个人的名字 / 这家机构
   // 名字取 pl/ct 里最新那一份（跟 openedPursuit 一个道理）：改完标题、
   // 改完名字，标签上那行也得跟着变。
+  //
+  // **抽屉不改名**：抽屉是「看板旁边多开的一块地方」，看板还在，你还在
+  // 一张接一张地过——这个标签页装的仍然是看板。改成某条线的名字，等于
+  // 说这一张标签页现在归那条线了，而下一秒你就点开了另一张。
+  // 只有整页（新开的那种标签页）才真的只装一件东西，也只有它需要名字。
   useEffect(() => {
     let what
-    if (view.name === 'pursuit') {
+    if (view.name === 'pursuit' && view.mode !== 'drawer') {
       what = pl?.pursuits.find((x) => x.id === view.pursuit.id)?.title || view.pursuit.title
     } else if (view.name === 'person') {
       what = ct?.contacts?.find((x) => x.id === view.person.id)?.name || view.person.name || '未具名联系人'
