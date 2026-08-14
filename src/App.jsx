@@ -12,6 +12,7 @@ import PersonFocus from './components/PersonFocus.jsx'
 import OrgFocus from './components/OrgFocus.jsx'
 import { loadContacts } from './lib/loadContacts.js'
 import { md as mdOf, setTz } from './lib/when.js'
+import { toUrl, fromUrl } from './lib/route.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
@@ -118,7 +119,7 @@ export default function App() {
   const cancelPick = () => { setPicking(false); setPicked(new Set()) }
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
   const [brain, setBrain] = useState(null)
-  const focusedOnceRef = useRef(false)
+  const restoredRef = useRef(false)
   const migratedRef = useRef(false)
 
   // 「读到这儿了」写进库（0030 的 pursuit_seen）。跟卡走，不跟浏览器走。
@@ -239,34 +240,53 @@ export default function App() {
     return () => clearInterval(iv)
   }, [])
 
-  // 从 URL 的 ?p=<id> 直接进到那条机会线（新标签页打开时用）。只做一次。
-  useEffect(() => {
-    if (!pl || focusedOnceRef.current) return
-    const pid = new URLSearchParams(window.location.search).get('p')
-    if (!pid) { focusedOnceRef.current = true; return }
-    const p = pl.pursuits.find((x) => x.id === pid)
-    // 带 ?p= 打开的标签页是「整页」那一档——你专门为这条线开了个标签页，
-    // 就别再给它旁边塞半个看板。
-    if (p) { focusedOnceRef.current = true; markSeen(pid); setView({ name: 'pursuit', pursuit: p, mode: 'page' }) }
-  }, [pl])
+  // ── 地址栏 ⇄ 你在哪 ──────────────────────────────────────
+  //
+  // 两个方向：进来时按地址恢复，之后每次换页把地址改掉。
+  // 在这之前只有「整页机会线」写过 ?p=，别的一律不写，于是**刷新一下
+  // 不管你在哪都弹回首页**——你刚才在做的事就这么没了。
+  // 手上的位置也是信息，跟队列、跟卡一样不许静静消失。
 
-  // 带 ?c=<contact_id> / ?o=<机构名> 打开的标签页：直接落在那张卡上。
-  // 单独一个 effect，因为人这一层的数据（ct）跟机会线（pl）不是同时到的。
-  const cardOnceRef = useRef(false)
+  // ① 进来时恢复。只做一次，而且要等对应那份数据到了才做得成：
+  //    ?p= 要 pl，?c=/?o= 要 ct，两者不是同时回来的。
   useEffect(() => {
-    if (!ct || cardOnceRef.current) return
-    const q = new URLSearchParams(window.location.search)
-    const cid = q.get('c')
-    const org = q.get('o')
-    if (!cid && !org) { cardOnceRef.current = true; return }
-    if (cid) {
-      const c = ct.contacts.find((x) => x.id === cid)
-      if (c) { cardOnceRef.current = true; setArea('people'); setView({ name: 'person', person: c }) }
+    if (restoredRef.current) return
+    const { area: a, card } = fromUrl()
+    if (a) setArea(a)
+    if (!card) { restoredRef.current = true; return }
+
+    const done = () => { restoredRef.current = true }
+    if (card.kind === 'pursuit') {
+      if (!pl) return
+      const p = pl.pursuits.find((x) => x.id === card.id)
+      // 找不到也得收手 —— 卡被删了/换了库，不能让它一直等下去，
+      // 那会让「恢复」永远悬着，之后你换页地址栏也不跟着动。
+      if (p) { done(); setArea('pursue'); markSeen(p.id)
+               setView({ name: 'pursuit', pursuit: p, mode: card.drawer ? 'drawer' : 'page' }) }
+      else if (pl.pursuits.length) done()
+    } else if (card.kind === 'contact') {
+      if (!ct) return
+      const c = ct.contacts.find((x) => x.id === card.id)
+      if (c) { done(); setArea('people'); setView({ name: 'person', person: c }) }
+      else if (ct.contacts.length) done()
     } else {
-      const o = ct.orgs.find((x) => x.org === org)
-      if (o) { cardOnceRef.current = true; setArea('people'); setView({ name: 'org', org: o }) }
+      if (!ct) return
+      const o = ct.orgs.find((x) => x.org === card.id)
+      if (o) { done(); setArea('people'); setView({ name: 'org', org: o }) }
+      else if (ct.orgs.length) done()
     }
-  }, [ct])
+  }, [pl, ct])
+
+  // ② 之后每次换页把地址改掉。**恢复完成之前一个字都不写**——
+  //    不然首帧那个 {name:'home'} 会把你带进来的 ?c= 当场抹掉，
+  //    然后第①步就再也找不到要恢复什么了。
+  useEffect(() => {
+    if (!restoredRef.current) return
+    const next = toUrl(area, view)
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, '', next)
+    }
+  }, [area, view])
 
   // 「已看」不再走 localStorage —— 它在库里，8 秒一次的轮询自然会把别处的阅读
   // 带过来，而且跨浏览器、跨机器都算数（原来只有同一个浏览器的标签页之间才同步）。
@@ -289,8 +309,7 @@ export default function App() {
       // 也标已看、也把 ?p= 从地址栏抹掉。原来它只换了 view，小红点会赖着不走。
       else if (view.name === 'pursuit') {
         markSeen(view.pursuit.id)
-        window.history.replaceState(null, '', window.location.pathname)
-        setView({ name: 'home' })
+        setView({ name: 'home' })      // 地址栏归上面那个同步 effect 管
       }
       else if (view.name === 'person' || view.name === 'org') setView({ name: 'home' })
     }
@@ -325,8 +344,7 @@ export default function App() {
   }
   const closePursuit = () => {
     if (view.name === 'pursuit') markSeen(view.pursuit.id)
-    window.history.replaceState(null, '', window.location.pathname)
-    setView({ name: 'home' })
+    setView({ name: 'home' })          // 地址栏归上面那个同步 effect 管
   }
   // 你离开期间 Fairwind 说了话、你还没读到的卡。判据在库里算（0030 的 v_pa_pursuits.unread）：
   // 最后一条是 Fairwind 说的、不是建卡那份 brief、且晚于你上次读这条线。
