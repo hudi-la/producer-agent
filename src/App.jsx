@@ -250,6 +250,24 @@ export default function App() {
     if (p) { focusedOnceRef.current = true; markSeen(pid); setView({ name: 'pursuit', pursuit: p, mode: 'page' }) }
   }, [pl])
 
+  // 带 ?c=<contact_id> / ?o=<机构名> 打开的标签页：直接落在那张卡上。
+  // 单独一个 effect，因为人这一层的数据（ct）跟机会线（pl）不是同时到的。
+  const cardOnceRef = useRef(false)
+  useEffect(() => {
+    if (!ct || cardOnceRef.current) return
+    const q = new URLSearchParams(window.location.search)
+    const cid = q.get('c')
+    const org = q.get('o')
+    if (!cid && !org) { cardOnceRef.current = true; return }
+    if (cid) {
+      const c = ct.contacts.find((x) => x.id === cid)
+      if (c) { cardOnceRef.current = true; setArea('people'); setView({ name: 'person', person: c }) }
+    } else {
+      const o = ct.orgs.find((x) => x.org === org)
+      if (o) { cardOnceRef.current = true; setArea('people'); setView({ name: 'org', org: o }) }
+    }
+  }, [ct])
+
   // 「已看」不再走 localStorage —— 它在库里，8 秒一次的轮询自然会把别处的阅读
   // 带过来，而且跨浏览器、跨机器都算数（原来只有同一个浏览器的标签页之间才同步）。
   // 队列还在本地，所以这个监听留着。
@@ -292,6 +310,17 @@ export default function App() {
   const expandPursuit = (p) => {
     const url = new URL(window.location.href)
     url.searchParams.set('p', p.id)
+    window.open(url.toString(), '_blank')
+  }
+  // 名片和机构卡也各开一个标签页（?c= / ?o=）。
+  //
+  // 为什么不在原地换页：你多半是**边看今天该动的边点开某个人**——
+  // 原地换掉的话回来还得重新找位置，而且几个人没法并排比。
+  // 跟机会线那条「整页」是同一个套路，所以参数命名也照着走。
+  const openInTab = (key, value) => {
+    const url = new URL(window.location.href)
+    url.search = ''                     // 别把上一个人的 ?c= 也带上
+    url.searchParams.set(key, value)
     window.open(url.toString(), '_blank')
   }
   const closePursuit = () => {
@@ -464,7 +493,7 @@ export default function App() {
 
   return (
    <ProfileContext.Provider value={profile}>
-    <div className={'wrap' + (drawered ? ' drawered' : '') + (bookOpen && area === 'people' ? ' bookopen' : '')}>
+    <div className={'wrap' + (drawered ? ' drawered' : '') + (bookOpen && area === 'people' && view.name === 'home' ? ' bookopen' : '')}>
       <header className="app-top">
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label="主区">
@@ -559,8 +588,8 @@ export default function App() {
             strangers={ct?.strangers || []}
             msgsByContact={ct?.msgsByContact || {}}
             fellBack={ct?.reason || null}
-            onOpen={(c) => { setBookOpen(false); setView({ name: 'person', person: c }) }}
-            onOpenOrg={(o) => { setBookOpen(false); setView({ name: 'org', org: o }) }}
+            onOpen={(c) => openInTab('c', c.id)}
+            onOpenOrg={(o) => openInTab('o', o.org)}
             onAdded={reloadContacts}
             bookOpen={bookOpen}
             onCloseBook={() => setBookOpen(false)}
