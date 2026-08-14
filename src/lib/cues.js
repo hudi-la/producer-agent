@@ -1,3 +1,5 @@
+import { md, day as dayOf } from './when.js'
+
 // 由头 —— 「现在为什么该动这个人」。
 //
 // 设计稿：docs/specs/2026-08-08-people-layer-design.md 第四节
@@ -13,24 +15,13 @@
 // 那个人名下的消息，回一句**带日期带来源**的人话，或者 null。
 // 存下来的东西会跟事实分叉，算出来的不会。
 
-/**
- * 日期 → '8/6'。两位数的月日都要去前导零，不能出现「8/06」。
- *
- * **按 UTC 取月日，不按本地时区。** 库里的 last_touch_at 是 created_at::date
- * 算出来的（UTC 日），名片和通讯录都显示那一个。这儿要是按本地时区格式化，
- * 一封 UTC 凌晨到的信会被说成前一天——于是由头写着「8/5 他回你了」，
- * 同一页的通讯录那行写着「8/6」。同一封信两个日期，你不知道该信哪个。
- */
-const md = (x) => {
-  const d = x instanceof Date ? x : new Date(x)
-  return Number.isNaN(+d) ? '?' : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
-}
-/** 日期 → 'YYYY-MM-DD'（UTC）。由头的**身份**靠它 —— 见下面 at 那一段。 */
-const dayOf = (x) => {
-  const d = x instanceof Date ? x : new Date(x)
-  return Number.isNaN(+d) ? null : d.toISOString().slice(0, 10)
-}
-
+// 日期一律走 lib/when.js —— **全 app 只有那一份**。
+//
+// 这儿本来自己写了一个按 UTC 取月日的 md()。当时是为了跟库里 last_touch_at
+// （created_at::date，UTC 日）对上，免得同一封信在同一页上两个日期。
+// 对是对了，但对齐到了**错的那一边**：你 8/13 傍晚记的一笔，
+// UTC 那边已经是 8/14，于是卡上写着 8/14——而你明明是十三号写的。
+// 现在两边都按你住的地方（洛杉矶）算，一致而且是真的。
 const DAY = 86400000
 const daysSince = (from, to) => Math.floor((to - new Date(from)) / DAY)
 

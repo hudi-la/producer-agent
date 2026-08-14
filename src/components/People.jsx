@@ -1,3 +1,4 @@
+import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import { cuesFor, cueKey } from '../lib/cues.js'
 import { loadOff, turnOff, turnAllOn } from '../lib/cueoff.js'
@@ -20,11 +21,6 @@ import Strangers from './Strangers.jsx'
 const SRC = { email: '来自那封信', checkin: '你打的卡', meet: '你记的一笔' }
 const CH  = { email: '邮箱', wechat: '微信', sms: '短信', whatsapp: 'WhatsApp', ig: 'IG', phone: '电话' }
 
-const md = (s) => {
-  if (!s) return null
-  const [, m, d] = String(s).split('-')
-  return `${Number(m)}/${Number(d)}`
-}
 
 /** 用什么找他。channels 空着就退回 email 那一列——它一直是主渠道。 */
 function channelsOf(c) {

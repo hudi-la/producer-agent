@@ -11,6 +11,7 @@ import People from './components/People.jsx'
 import PersonFocus from './components/PersonFocus.jsx'
 import OrgFocus from './components/OrgFocus.jsx'
 import { loadContacts } from './lib/loadContacts.js'
+import { md as mdOf, setTz } from './lib/when.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
@@ -32,14 +33,7 @@ const AREAS = [
   ['profile', '我的档案'],
 ]
 
-// '2026-08-06' → '8/6'。两位数的月日都要去掉前导零，
-// 直接 slice + 一次 replace 只去得掉月份那个，会写出「8/06」。
-const mdOf = (s) => {
-  if (!s) return null
-  const [, m, d] = s.split('-')
-  return `${Number(m)}/${Number(d)}`
-}
-
+// 日期一律走 lib/when.js —— 全 app 只有那一份，按你住的地方算。
 export default function App() {
   const [lib, setLib] = useState(null)
   const [pl, setPl] = useState(null)
@@ -147,7 +141,12 @@ export default function App() {
     loadLibrary().then(setLib)
     loadPursuits().then(setPl)
     loadTasks().then(setTk)
-    loadProfile().then(setProfile)
+    loadProfile().then((p) => {
+      setProfile(p)
+      // 日期按**你住的地方**算，不按服务器（UTC）也不按浏览器。
+      // 档案里没写就退回洛杉矶（location 里第一个）。
+      setTz(p?.data?.tz || 'America/Los_Angeles')
+    })
     loadContacts().then(setCt)
   }, [])
 

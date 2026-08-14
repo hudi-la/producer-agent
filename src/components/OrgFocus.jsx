@@ -1,3 +1,4 @@
+import { md, day } from '../lib/when.js'
 import React, { useEffect, useState, useCallback } from 'react'
 import { supa } from '../lib/backends.js'
 
@@ -13,7 +14,6 @@ import { supa } from '../lib/backends.js'
 // 三栏骨架跟名片一样，但中栏不给 Fairwind 讲话（你不跟一个机构商量事，
 // 你跟里面的人商量），改成往来本身。
 
-const day = (t) => (t ? String(t).slice(0, 10) : '?')
 
 export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
   const [msgs, setMsgs] = useState(null)
