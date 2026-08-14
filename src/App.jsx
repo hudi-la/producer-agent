@@ -288,6 +288,30 @@ export default function App() {
     }
   }, [area, view])
 
+  // ③ 标签页叫什么 = 这个标签页里看的是什么。
+  //
+  // 「整页」一律新开标签页（openInTab），你手上常常并排开着三四张。可它们
+  // 全叫「Fairwind · Producer」——一排一模一样的标签，等于没有名字，
+  // 要找回刚才那个人只能一张张点过去。地址栏已经说清了你在哪（第②步），
+  // 标签名就照着说一遍，说给眼睛听。
+  //   首页    Fairwind · Producer / PR / 我的档案（跟着主区走）
+  //   详情页  Fairwind · 这条线的名字 / 这个人的名字 / 这家机构
+  // 名字取 pl/ct 里最新那一份（跟 openedPursuit 一个道理）：改完标题、
+  // 改完名字，标签上那行也得跟着变。
+  useEffect(() => {
+    let what
+    if (view.name === 'pursuit') {
+      what = pl?.pursuits.find((x) => x.id === view.pursuit.id)?.title || view.pursuit.title
+    } else if (view.name === 'person') {
+      what = ct?.contacts?.find((x) => x.id === view.person.id)?.name || view.person.name || '未具名联系人'
+    } else if (view.name === 'org') {
+      what = view.org.org
+    } else {
+      what = area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : 'Producer'
+    }
+    document.title = 'Fairwind · ' + what
+  }, [view, area, pl, ct])
+
   // 「已看」不再走 localStorage —— 它在库里，8 秒一次的轮询自然会把别处的阅读
   // 带过来，而且跨浏览器、跨机器都算数（原来只有同一个浏览器的标签页之间才同步）。
   // 队列还在本地，所以这个监听留着。
