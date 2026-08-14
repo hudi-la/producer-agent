@@ -41,7 +41,9 @@ export default function App() {
   // 人这一层。名片 + 他名下的往来 —— 人际管理页和过卡队列都靠它。
   const [ct, setCt] = useState(null)
   // 通讯录抽屉开着没有。放在这儿是因为开关在工具条上——跟项目争取那边一个位置。
-  const [bookOpen, setBookOpen] = useState(false)
+  // **默认开着**：找人是这一页的日常动作，每次都要先点一下才看得到，
+  // 那一下就是白收的过路费。想专心看今天的活再收起来。
+  const [bookOpen, setBookOpen] = useState(true)
   // 关于你自己的事实。卡片、详情页、档案页都要用，所以走 context 而不是一路当 prop 传。
   const [profile, setProfile] = useState(PROFILE_FALLBACK)
   const [view, setView] = useState({ name: 'home' })
@@ -513,14 +515,20 @@ export default function App() {
         />
       )}
 
-      {/* 人际管理的工具条。位置跟项目争取那条一样——同一层的东西长在同一个地方。 */}
+      {/* 人际管理的工具条。跟项目争取那条同一套：**左边镜头，右边动作**。
+          这一页还没有镜头（没有筛选），左边就空着——空着可以，假着不行。
+          按钮用同一个 .wbtn，不另造一种长相：同一层的东西该长得一样。 */}
       {area === 'people' && view.name === 'home' && (
         <div className="subbar">
-          {/* 按钮放左边：抽屉从右边盖过来，开关放右边等于自己把开关藏起来 */}
-          <button className="lnk" onClick={() => setBookOpen((v) => !v)}>
-            {bookOpen ? '收起通讯录' : `通讯录 ${ct?.contacts?.length ?? 0} 人 · ${ct?.orgs?.length ?? 0} 机构`}
-          </button>
           <span className="sp" />
+          <button
+            type="button"
+            className={'wbtn' + (bookOpen ? ' on' : '')}
+            aria-pressed={bookOpen}
+            onClick={() => setBookOpen((v) => !v)}
+          >
+            通讯录
+          </button>
         </div>
       )}
 

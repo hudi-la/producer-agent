@@ -1075,3 +1075,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    比没有这个按钮更糟，你会以为它坏了。 */
 .wrap.bookopen .page,
 .wrap.bookopen .subbar { padding-right: calc(var(--drawer-w) + 20px); }
+/* 按下去的工具条按钮（通讯录开着的时候）。跟 .tab.on 一个语气：
+   是「现在开着」，不是「有个新东西」——所以只描边，不填色。 */
+.wbtn.on { border-color: var(--accent); color: var(--accent); }
