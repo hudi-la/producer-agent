@@ -138,7 +138,7 @@ export async function incremental({ fallbackWindow = '30d', log = console.log } 
   if (!ids.length) {
     await setCursor(acct.id, historyId)
     log('  没有新信。')
-    return { added: 0, listed: 0, rebuilt, historyId, note: '没有新信' }
+    return { added: 0, listed: 0, rebuilt, historyId, touched: [], note: '没有新信' }
   }
 
   const msgs = await getMetadata(gmail, ids, {
@@ -148,6 +148,12 @@ export async function incremental({ fallbackWindow = '30d', log = console.log } 
   const written = await flush(rows, log)
   await setCursor(acct.id, historyId)
 
+  // 这一轮碰到了哪些对方地址。下一步（搬进对话表）只看这些，不用全扫。
+  // 报的是 rows 而不是「真正新增的那几行」——putHeaders 只回总数，分不出
+  // 是哪几行。宁可多报几个：多搬一次是空转（账本里没有待搬的就立刻返回），
+  // 少报一个是那封信从此看不见。
+  const touched = [...new Set(rows.map((r) => r.counterpart_email).filter(Boolean))]
+
   log(`  收到 ${ids.length} 封，入库 ${rows.length} 行，其中新增 ${written}`)
-  return { added: written, listed: ids.length, parsed: rows.length, dropped, rebuilt, historyId }
+  return { added: written, listed: ids.length, parsed: rows.length, dropped, rebuilt, historyId, touched }
 }

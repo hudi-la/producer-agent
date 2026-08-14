@@ -11,7 +11,7 @@ import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
 import { query, createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
-import { toText, slice } from './files.js'
+import { read, slice, imageBudget, isImage, IMG_CAP } from './files.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 
@@ -340,8 +340,8 @@ const RUNS = new Map()
 // atts 是这条线的附件清单，写死在函数里。别条线的文件、磁盘上别的东西，
 // 不是「不许它碰」，是它够不到——跟 0009 / 0027 那套一样，结构上做不到。
 //
-// 三种格式一视同仁：从它那边看只有「给名字，拿文字」。PDF 要解析、
-// Excel 要遍历工作表、MD 直接就是文本——这些差别只活在 files.js 里。
+// 格式一视同仁：从它那边看只有「给名字，拿回能读的东西」。PDF 要解析、
+// Excel 要遍历工作表、图片原样交给模型自己看——这些差别只活在 files.js 里。
 const FILE_TOOL = 'mcp__pursuit_files__open_file'
 
 function filesServer(atts) {
@@ -350,15 +350,20 @@ function filesServer(atts) {
     return atts.find((a) => a.filename.toLowerCase() === n)
       || atts.find((a) => a.filename.toLowerCase().includes(n))   // 说个大概也认
   }
+  // 图片的额度，跟着这一次对话活。造在这儿而不是模块顶上——
+  // 放模块顶上的话它会跨对话累加，聊到第四条线就再也开不了图了。
+  const budget = imageBudget()
   return createSdkMcpServer({
     name: 'pursuit_files',
     tools: [
       tool(
         'open_file',
-        '打开这条机会线上的一份文件，拿到里面的文字。文件清单在 prompt 里给了；要用哪份才开哪份，别一上来全开一遍。文件太长会分段给你，按提示用 from 接着要下一段。',
+        `打开这条机会线上的一份文件。文本类拿回文字，图片类你直接看得见。文件清单在 prompt 里给了；要用哪份才开哪份，别一上来全开一遍。文件太长会分段给你，按提示用 from 接着要下一段。
+
+图片格外要克制：一段文字开完就沉进历史，一张图**进来就一直占着上下文，后面每一轮都重付一次**。所以图只在真要看它才开——判断得靠图里的东西（作品长什么样、海报上的日期、截图里的报错）才开；光是"这条线上有张图"不是理由。一条对话最多 ${IMG_CAP} 张。`,
         {
           name: z.string().describe('文件名，跟清单里写的一致（写个能认出来的片段也行）'),
-          from: z.number().optional().describe('从第几个字接着看。第一次不用传'),
+          from: z.number().optional().describe('从第几个字接着看。第一次不用传。图片没有分段，不用传'),
         },
         async ({ name, from }) => {
           const a = find(name)
@@ -373,8 +378,29 @@ function filesServer(atts) {
             const dl = await db.storage.from('pursuit-files').download(a.storage_key)
             if (dl.error) throw new Error(dl.error.message)
             const buf = Buffer.from(await dl.data.arrayBuffer())
-            const text = await toText(buf, a.filename, a.mime)
-            const { body, note } = slice(text, from || 0)
+            const got = await read(buf, a.filename, a.mime)
+
+            if (got.kind === 'image') {
+              // 闸门在这儿，不在提示词里。上面那段描述是劝它省着开，
+              // 这一句是它没听进去时真的拦下来。
+              const pass = budget.admit(a.filename)
+              if (!pass.ok) {
+                console.log(`  ↳ 它想再开一次《${a.filename}》，挡了：${pass.why}`)
+                return { content: [{ type: 'text', text: pass.why }] }
+              }
+              console.log(`  ↳ 它开了《${a.filename}》（图，进上下文了）`)
+              // 先给一行字说明这是哪张图——不然它看到一张没头没尾的图，
+              // 不知道这是这条线上的哪一份。
+              return {
+                content: [
+                  { type: 'text', text: `# ${a.filename}` },
+                  { type: 'image', data: got.data, mimeType: got.mimeType },
+                ],
+              }
+            }
+
+            budget.text()
+            const { body, note } = slice(got.text, from || 0)
             console.log(`  ↳ 它开了《${a.filename}》${from ? `（从 ${from} 字接着）` : ''}`)
             return { content: [{ type: 'text', text: `# ${a.filename}\n\n${body}${note}` }] }
           } catch (err) {
@@ -391,12 +417,21 @@ function filesServer(atts) {
 function filesBlock(atts) {
   if (!atts?.length) return []
   const lines = ['## 这条线上的文件']
+  let anyImage = false
   for (const a of atts) {
+    const img = isImage(a.filename, a.mime)
+    if (img) anyImage = true
     const size = a.bytes ? `${(a.bytes / 1024).toFixed(0)} KB` : ''
-    const bits = [size, a.source === 'mail' ? '从一封信的附件来' : '他传的'].filter(Boolean).join(' · ')
+    // 标出哪份是图：不标的话「按需开」是句空话——它得先知道哪几份开起来是贵的
+    const bits = [img ? '图' : '', size, a.source === 'mail' ? '从一封信的附件来' : '他传的']
+      .filter(Boolean).join(' · ')
     lines.push(`- ${a.filename}${bits ? `（${bits}）` : ''}`)
   }
-  lines.push('要看里面写了什么，用 open_file 开。别猜内容——没开过就说没看过。', '')
+  lines.push('要看里面写了什么，用 open_file 开。别猜内容——没开过就说没看过。')
+  if (anyImage) {
+    lines.push(`标了「图」的那几份你能直接看见，但它们进来就一直占着上下文、每一轮都重付——只在真需要看图里的东西时才开，一条对话最多 ${IMG_CAP} 张。`)
+  }
+  lines.push('')
   return lines
 }
 
