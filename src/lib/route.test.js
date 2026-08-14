@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { toUrl, fromUrl } from './route.js'
+import { toUrl, fromUrl, tabUrl } from './route.js'
 
 const P = '/'
 const V = { home: { name: 'home' } }
@@ -71,4 +71,23 @@ test('转一圈回来还是同一个地方', () => {
     if (view.name === 'home') assert.equal(back.card, null, `不该有卡：${u}`)
     else assert.ok(back.card, `卡丢了：${u}`)
   }
+})
+
+// ── 新标签页的地址 ──────────────────────────────────────────────
+// 这两条是为一个真 bug 写的回归测试：抽屉打开一条线时地址是 ?p=xxx&d=1，
+// 「整页」按钮拿当前地址复制一份再设 p，于是 d=1 跟着过去——
+// 新标签页打开的还是抽屉，用户看到的是「整页按钮不灵了」。
+
+test('整页链接不许带 d=1 —— 带了就还是抽屉', () => {
+  const u = tabUrl('p', 'p1', P)
+  assert.equal(u, '/?p=p1')
+  assert.equal(fromUrl(u.slice(u.indexOf('?'))).card.drawer, false)
+})
+
+test('开一张新卡不许捎上别的参数', () => {
+  const u = tabUrl('c', 'c2', P)
+  assert.equal(u, '/?c=c2')
+  const back = fromUrl(u.slice(u.indexOf('?')))
+  assert.equal(back.card.kind, 'contact')
+  assert.equal(back.area, null)          // 上一个 ?a= 也不该跟过来
 })

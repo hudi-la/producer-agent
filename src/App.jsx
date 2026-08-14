@@ -12,7 +12,7 @@ import PersonFocus from './components/PersonFocus.jsx'
 import OrgFocus from './components/OrgFocus.jsx'
 import { loadContacts } from './lib/loadContacts.js'
 import { md as mdOf, setTz } from './lib/when.js'
-import { toUrl, fromUrl } from './lib/route.js'
+import { toUrl, fromUrl, tabUrl } from './lib/route.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
@@ -326,22 +326,14 @@ export default function App() {
   // 看完接着看下一张。整页换掉太重。
   const openPursuit = (p) => setView({ name: 'pursuit', pursuit: p, mode: 'drawer' })
   // 「整页」：还是新开一个标签页（?p=<id>）。好处是几条线可以各占一个标签页并排看。
-  const expandPursuit = (p) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('p', p.id)
-    window.open(url.toString(), '_blank')
-  }
-  // 名片和机构卡也各开一个标签页（?c= / ?o=）。
+  // 在新标签页里开一张卡。**先把地址清干净**再设参数——
+  // 拿当前地址复制一份的话，上一张卡的参数会跟着过去（见 route.js 的 tabUrl）。
   //
   // 为什么不在原地换页：你多半是**边看今天该动的边点开某个人**——
   // 原地换掉的话回来还得重新找位置，而且几个人没法并排比。
-  // 跟机会线那条「整页」是同一个套路，所以参数命名也照着走。
-  const openInTab = (key, value) => {
-    const url = new URL(window.location.href)
-    url.search = ''                     // 别把上一个人的 ?c= 也带上
-    url.searchParams.set(key, value)
-    window.open(url.toString(), '_blank')
-  }
+  const openInTab = (key, value) => window.open(tabUrl(key, value), '_blank')
+  // 「整页」：新开一个标签页。不带 d=1，所以落地是整页不是抽屉。
+  const expandPursuit = (p) => openInTab('p', p.id)
   const closePursuit = () => {
     if (view.name === 'pursuit') markSeen(view.pursuit.id)
     setView({ name: 'home' })          // 地址栏归上面那个同步 effect 管

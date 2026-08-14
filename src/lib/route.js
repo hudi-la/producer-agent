@@ -58,3 +58,17 @@ export function fromUrl(search = window.location.search) {
 
   return { area, card }
 }
+
+/**
+ * 「在新标签页里开这一个」该跳到哪。
+ *
+ * 关键是**先把地址清干净**再设参数，别拿当前地址复制一份就用。
+ * 踩过一次：抽屉打开一条线时地址是 ?p=xxx&d=1，「整页」按钮复制它再设 p，
+ * 于是 d=1 跟着过去了——新标签页打开的还是抽屉，看着就是「按了没反应」。
+ * 同理点第二个人时会带着上一个的 ?c= 一起走。
+ */
+export function tabUrl(key, value, pathname = window.location.pathname) {
+  const q = new URLSearchParams()
+  q.set(key, value)
+  return `${pathname}?${q.toString()}`
+}
