@@ -1102,3 +1102,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 往来里「你记的」那种：不是邮件，是当面/电话/微信。
    虚线跟邮件区分开——你得一眼看出这条的来源是你的记忆，不是信箱。 */
 .pf-msg.note { border-left: 2px dashed var(--line-2); padding-left: 9px; }
+
+/* 往来折叠：「更早的」按钮在最上面 —— 折起来的东西在哪儿，按钮就该在哪儿 */
+.pf-more { display: block; width: 100%; text-align: left; font-size: 11.5px;
+  padding: 5px 0 9px; border-bottom: 1px dashed var(--line); margin-bottom: 12px; }

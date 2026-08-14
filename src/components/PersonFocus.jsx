@@ -69,6 +69,7 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const [touchText, setTouchText] = useState('')
   const taRef = useRef(null)
   const [claim, setClaim] = useState('')
+  const [allMail, setAllMail] = useState(false)   // 往来展开了没有
   const [note, setNote] = useState(null)      // 收信结果那句实话
 
   const reload = useCallback(async () => {
@@ -95,6 +96,12 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   // role='artist' 两种情况都有（你发的邮件、你跟 Fairwind 说的话），
   // 所以判据是「有没有 gmail_message_id」而不是 role。
   const mails = (msgs || []).filter((m) => m.gmail_message_id || m.role === 'note')
+  // 往来会很长（Stacy 名下 59 封）。默认只摆最近 10 条，早的折起来。
+  // 顺序不动——还是老的在上、新的在下，跟邮件线程和中栏一致。
+  // 「更早的」那个按钮放在**最上面**：折起来的东西在哪儿，按钮就该在哪儿。
+  const MAIL_HEAD = 10
+  const hidden = Math.max(0, mails.length - MAIL_HEAD)
+  const shownMails = allMail ? mails : mails.slice(-MAIL_HEAD)
   const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
   const cues  = cuesFor(c, msgs || [], { introName: c.intro_by_name })
 
@@ -323,7 +330,12 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                ? <p className="pf-note">还没有往来。认领一条 thread，或者起草一封发出去，它就接上了。</p>
                : (
                  <div className="pf-msgs">
-                   {mails.map((m) => (
+                   {hidden > 0 && (
+                     <button className="lnk pf-more" onClick={() => setAllMail((v) => !v)}>
+                       {allMail ? `收起早的（只看最近 ${MAIL_HEAD} 条）` : `还有 ${hidden} 条更早的 · 展开`}
+                     </button>
+                   )}
+                   {shownMails.map((m) => (
                      <div key={m.id} className={'pf-msg' + (m.role === 'note' ? ' note' : '')}>
                        <div className="pf-who">
                          {m.role === 'note' ? '你记的' : m.role === 'artist' ? '你' : (m.meta?.from_name || '对方')}
