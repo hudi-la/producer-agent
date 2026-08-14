@@ -25,13 +25,20 @@ export async function loadContacts() {
     if (!contacts?.length) return empty(FELL_BACK.EMPTY)
 
     // 他挂在哪几条机会线上 —— 这是「人是独立一层、两区共用同一张名片」
-    // 落地之后你**看得见**的样子。Kirk 挂着三条线，名片上就该是三条。
+    // 落地之后你**看得见**的样子。
+    //
+    // 按**班底**算，不是按 pursuits.contact_id。那个字段是单数，一条线只能
+    // 指一个人；可一条线的对面从来不止一个：ASU 那条博士线上有三个。
+    // 按 contact_id 读的话，另外两位打开卡是「没挂机会线」——而她们正是
+    // 这条线接下来要写信的对象。
     const { data: pursuits } = await supa
-      .from('v_pa_pursuits').select('id,title,stage,contact_id')
+      .from('v_pa_contact_lines').select('contact_id,pursuit_id,title,stage,note')
     const lines = {}
     for (const p of pursuits || []) {
       if (!p.contact_id) continue
-      ;(lines[p.contact_id] ||= []).push({ id: p.id, title: p.title, stage: p.stage })
+      ;(lines[p.contact_id] ||= []).push({
+        id: p.pursuit_id, title: p.title, stage: p.stage, note: p.note,
+      })
     }
 
     // 多个邮箱 + 多个机构，各带起止日期。
