@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react'
-import { cuesFor } from '../lib/cues.js'
-import { upsertContact } from '../lib/people.js'
+import React, { useEffect, useMemo, useState } from 'react'
+import { cuesFor, cueKey } from '../lib/cues.js'
+import { loadOff, turnOff, turnAllOn } from '../lib/cueoff.js'
 import Strangers from './Strangers.jsx'
 
 // 「人际管理」—— 人这一层。
@@ -36,11 +36,12 @@ function channelsOf(c) {
 export default function People({
   contacts = [], orgs = [], strangers = [], msgsByContact = {},
   fellBack = null, onOpen, onOpenOrg, onAdded,
+  // 抽屉的开关在顶栏（工具条）上，跟项目争取那边一个位置，所以状态在 App 手里
+  bookOpen = false, onCloseBook,
 }) {
   const [q, setQ] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', org: '', intro_by: '' })
-  const [busy, setBusy] = useState(false)
+  // 你关掉的那些由头。存 localStorage —— 关掉不是事实，是「先不看它」。
+  const [off, setOff] = useState(loadOff)
 
   const byId = useMemo(() => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts])
 
@@ -55,13 +56,29 @@ export default function People({
     // 停了的（碰满三次那种）排后面、灰着：不吵你，但不许消失。
     return out.sort((a, b) => (a.cue.stopped ? 1 : 0) - (b.cue.stopped ? 1 : 0))
   }, [contacts, msgsByContact, byId])
-  const live = acting.filter((x) => !x.cue.stopped).length
+
+  const shown = acting.filter((x) => !off.has(cueKey(x.c.id, x.cue)))
+  const hidden = acting.length - shown.length
+  const live = shown.filter((x) => !x.cue.stopped).length
 
   // 通讯录装的是**你会写信的对象**，不是只装人。机构和它的共享信箱也在里面。
   const entries = useMemo(() => [
     ...contacts.map((c) => ({ kind: 'person', id: c.id, c, at: c.last_touch_at })),
     ...orgs.map((o) => ({ kind: 'org', id: o.org, o, at: o.last_touch_at })),
   ].sort((a, b) => String(b.at || '').localeCompare(a.at || '')), [contacts, orgs])
+
+  // Esc 收起抽屉。搜索框里打了字的话，第一下 Esc 先清搜索——
+  // 一下把整个抽屉关掉，你刚打的那几个字就白打了。
+  useEffect(() => {
+    if (!bookOpen) return
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      if (q) setQ('')
+      else onCloseBook?.()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [bookOpen, q, onCloseBook])
 
   const key = q.trim().toLowerCase()
   const hit = (e) => {
@@ -74,26 +91,6 @@ export default function People({
   }
   const found = key ? entries.filter(hit) : null
 
-  const add = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim() || busy) return
-    setBusy(true)
-    try {
-      await upsertContact({
-        name: form.name.trim(),
-        email: form.email.trim() || null,
-        org: form.org.trim() || null,
-        intro_by: form.intro_by || null,
-      })
-      setForm({ name: '', email: '', org: '', intro_by: '' })
-      setAdding(false)
-      onAdded?.()
-    } catch (err) {
-      alert('没加上：' + err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   /** 现在挂着的机构（离开了的不在这儿显示，那是名片里的事）。 */
   const nowOrg = (c) => {
@@ -135,95 +132,94 @@ export default function People({
         <header className="page-head">
           <h1>人际管理</h1>
           <p className="note">
-            一份能搜的通讯录，加上<b>现在该动的那几个</b>。推着走的不是阶段和截止，是由头——
+            这一页只递一件事：<b>现在该动的那几个</b>。推着走的不是阶段和截止，是由头——
             他回你了 / 该 bump 了 / 到日子了 / 还没回谢介绍人 / 见面 48 小时信。
           </p>
         </header>
-
-        <div className="pfind">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-               stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-            <circle cx="6" cy="6" r="4.4" /><path d="M9.3 9.3 13 13" />
-          </svg>
-          <input value={q} onChange={(e) => setQ(e.target.value)}
-                 placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
-        </div>
-
-        {adding && (
-          <form className="padd" onSubmit={add}>
-            <input autoFocus placeholder="名字（必填）" value={form.name}
-                   onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <input placeholder="邮箱" value={form.email}
-                   onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <input placeholder="机构" value={form.org}
-                   onChange={(e) => setForm({ ...form, org: e.target.value })} />
-            {/* 谁介绍的：warm intro 是有分量的资产，而且它撑着「还没回谢」那条由头。 */}
-            <select value={form.intro_by}
-                    onChange={(e) => setForm({ ...form, intro_by: e.target.value })}>
-              <option value="">谁介绍的（可不填）</option>
-              {contacts.map((c) => <option key={c.id} value={c.id}>{c.name || '未具名'}</option>)}
-            </select>
-            <button className="lnk" disabled={busy || !form.name.trim()}>
-              {busy ? '加着…' : '加进去'}
-            </button>
-          </form>
-        )}
 
         {/* 空页可以，骗人不行 —— 说清是「库里真没有」还是「没连上」。 */}
         {!contacts.length && (
           <p className="pnone">
             {fellBack === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
              : fellBack === 'query-failed' ? '连上了但查询报错——名片读不出来，不是库里没人。'
-             : '库里一个人都没有。右边通讯录那栏粘个邮箱，我去信箱里查他是谁。'}
+             : '库里一个人都没有。上面工具条拉开通讯录，粘个邮箱，我去信箱里查他是谁。'}
           </p>
         )}
 
-        {found ? (
-          <section className="psect">
-            <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
-            <div className="prows">
-              {found.length
-                ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
-                : <p className="pnone">没有叫这个的。清空搜索框，在通讯录那栏粘他的邮箱加进来。</p>}
+        <section className="psect">
+          <div className="psect-h"><h2>现在该动的</h2><span className="pcount">{live} 件</span></div>
+          {shown.length ? shown.map(({ c, cue }) => (
+            <div key={c.id + cue.via} className={'pcue' + (cue.stopped ? ' stopped' : '')}>
+              <button className="pcue-open" onClick={() => onOpen?.(c)}>
+                <span className="prow-n">{c.name || '未具名联系人'}</span>
+                <span className="pcue-w">{cue.why}</span>
+              </button>
+              {/* 关掉这一条。**不改任何事实**——那封信、那个日期原样都在，
+                  只是这台机器上先不看它。他再回你一封新的，这条会重新出现
+                  （键锚在事实的日期上，见 cues.js 的 cueKey）。 */}
+              <button className="pcue-x" title="先不看这条"
+                      onClick={() => setOff((o) => turnOff(o, cueKey(c.id, cue)))}>✕</button>
             </div>
-          </section>
-        ) : (
-          /* 两栏：左边是你现在要做的，右边是通讯录。
-             这两件事的性质不一样——左边是**今天的活**，右边是**你认识谁**。
-             上下堆着的时候，通讯录一长，「现在该动的」就被顶出视野，
-             而它才是你打开这一页的原因。
+          )) : (
+            <p className="pnone">
+              {acting.length ? '该动的都被你关掉了。' : '现在没有该动的。这是好事，不是漏了什么。'}
+            </p>
+          )}
 
-             「等你点头 / 它判掉的」那一段撤了：那是导入那一次的活，
-             判完就没有下一次。组件还留在 components/Greetable.jsx，
-             哪天又要导一批，接回来就行。 */
-          <div className="ppl-cols">
-            <section className="psect ppl-do">
-              <div className="psect-h"><h2>现在该动的</h2><span className="pcount">{live} 件</span></div>
-              {acting.length ? acting.map(({ c, cue }) => (
-                <button key={c.id + cue.via}
-                        className={'pcue' + (cue.stopped ? ' stopped' : '')}
-                        onClick={() => onOpen?.(c)}>
-                  <span className="prow-n">{c.name || '未具名联系人'}</span>
-                  <span className="pcue-w">{cue.why}</span>
-                </button>
-              )) : <p className="pnone">现在没有该动的。这是好事，不是漏了什么。</p>}
-            </section>
-
-            <section className="psect ppl-book">
-              <div className="psect-h">
-                <h2>通讯录</h2>
-                <span className="pcount">
-                  {contacts.length} 人 · {orgs.length} 机构 · 按上次碰排
-                </span>
-              </div>
-              {/* 加人：粘个邮箱，Fairwind 去读信、认出他是谁，你点头。
-                  它属于通讯录这一栏——加人是往这儿加。 */}
-              <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
-              <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
-            </section>
-          </div>
-        )}
+          {/* 关掉多少条都得说出来，而且永远留一条放回来的路。
+              静默藏起来 = 你以为没有，其实有 —— 那是这个项目最不能忍的那种谎。 */}
+          {hidden > 0 && (
+            <p className="pnone pcue-off">
+              还有 {hidden} 条被你关掉了。
+              <button className="lnk" onClick={() => setOff(turnAllOn())}>都放回来</button>
+            </p>
+          )}
+        </section>
       </div>
+
+      {/* ── 通讯录抽屉 ─────────────────────────────────────────
+          跟机会线那个抽屉同一套（.drawer：右侧固定、滑入、Esc 收起）。
+          长得一样是故意的——它们是同一种东西：你临时拉开看一眼，看完收起。 */}
+      {bookOpen && (
+        <aside className="drawer ppl-drawer" aria-label="通讯录">
+          <div className="pdrawer">
+            <div className="pdrawer-h">
+              <button className="back" onClick={() => onCloseBook?.()} aria-label="收起">
+                <span aria-hidden="true">✕</span><span className="t"> 收起</span>
+              </button>
+              <h2>通讯录</h2>
+              <span className="pcount">{contacts.length} 人 · {orgs.length} 机构</span>
+            </div>
+
+            <div className="pdrawer-body">
+              <div className="pfind">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                     stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                  <circle cx="6" cy="6" r="4.4" /><path d="M9.3 9.3 13 13" />
+                </svg>
+                <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+                       placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
+              </div>
+
+              {/* 加人是往通讯录里加，所以它在这儿 */}
+              {!found && <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />}
+
+              {found ? (
+                <>
+                  <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
+                  <div className="prows">
+                    {found.length
+                      ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
+                      : <p className="pnone">没有叫这个的。清空搜索框，粘他的邮箱加进来。</p>}
+                  </div>
+                </>
+              ) : (
+                <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
+              )}
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   )
 }

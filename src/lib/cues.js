@@ -25,6 +25,12 @@ const md = (x) => {
   const d = x instanceof Date ? x : new Date(x)
   return Number.isNaN(+d) ? '?' : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
 }
+/** 日期 → 'YYYY-MM-DD'（UTC）。由头的**身份**靠它 —— 见下面 at 那一段。 */
+const dayOf = (x) => {
+  const d = x instanceof Date ? x : new Date(x)
+  return Number.isNaN(+d) ? null : d.toISOString().slice(0, 10)
+}
+
 const DAY = 86400000
 const daysSince = (from, to) => Math.floor((to - new Date(from)) / DAY)
 
@@ -81,7 +87,7 @@ function repliedCue(contact, msgs, today) {
       new Date(contact.last_touch_at + 'T23:59:59') >= new Date(last.created_at)) return null
   const d = daysSince(last.created_at, today)
   return {
-    via: 'replied',
+    via: 'replied', at: dayOf(last.created_at),
     why: d <= 0 ? `${md(last.created_at)} 他回你了，还没回`
        : `${md(last.created_at)} 他回你了，${d} 天没回`,
   }
@@ -96,14 +102,14 @@ function bumpCue(msgs, today) {
   // 消失 = 你以为系统还在管，其实它早放弃了 —— 那是「红点撒谎」的同一件事。
   if (bumps >= BUMP_WAIT.length) {
     return {
-      via: 'bump', stopped: true,
+      via: 'bump', stopped: true, at: dayOf(last.created_at),
       why: `已经碰过 ${bumps} 次，停了（最后一次 ${md(last.created_at)}）`,
     }
   }
   const waited = daysSince(last.created_at, today)
   if (waited < BUMP_WAIT[bumps]) return null
   return {
-    via: 'bump',
+    via: 'bump', at: dayOf(last.created_at),
     why: `${md(last.created_at)} 发出去，${waited} 天没回音（第 ${bumps + 1} 次碰）`,
   }
 }
@@ -117,7 +123,7 @@ function circlebackCue(contact, today) {
   const at = new Date(contact.next_touch_at + 'T00:00:00')
   if (Number.isNaN(+at) || at > today) return null
   return {
-    via: 'circleback',
+    via: 'circleback', at: contact.next_touch_at,
     // 日期永远说得出出处：要么是对方的原话，要么是你自己定的。没有第三种。
     why: contact.next_touch_why
       ? `${contact.next_touch_why} → ${md(at)} 到了`
@@ -135,6 +141,8 @@ function thanksCue(contact, msgs, introName) {
   if (!mailsOf(msgs).some((m) => m.role === 'org')) return null
   return {
     via: 'thanks',
+    // 依据是「他回过你了」，锚在他最后那封回信上
+    at: dayOf(mailsOf(msgs).filter((m) => m.role === 'org').at(-1)?.created_at),
     why: `跟 ${contact.name || '他'} 聊上了，还没回谢 ${introName || '介绍人'}`,
   }
 }
@@ -153,7 +161,7 @@ function metCue(msgs, today) {
   if (sentAfter) return null
   const hrs = Math.floor((today - new Date(last.created_at)) / 3600000)
   return {
-    via: 'met',
+    via: 'met', at: dayOf(last.created_at),
     why: hrs > MEET_HOURS
       ? `${md(last.created_at)} 见的，已经过 ${MEET_HOURS} 小时了，follow-up 还没发`
       : `${md(last.created_at)} 见过，48 小时信还没发`,
@@ -175,6 +183,16 @@ export function cuesFor(contact, msgs, { today = new Date(), introName = null } 
     metCue(msgs, today),
   ].filter(Boolean)
 }
+
+/**
+ * 一条由头的**身份**：谁 + 哪一种 + 依据哪天的事实。
+ *
+ * 关掉一条由头要存下来，就得有个稳定的键。不能拿 why 当键——
+ * 「3 天没回」明天变成「4 天没回」，你今天关掉的明天又冒出来。
+ * 拿 at（依据那条事实的日期）当键就对了：**他再回你一封新的，
+ * at 就变了，这条由头理应重新出现**——那是新事实，不是你关过的那条。
+ */
+export const cueKey = (contactId, cue) => `${contactId}|${cue.via}|${cue.at || ''}`
 
 /** 该进队列的那些 —— 停了的只在卡上显示，不塞进你手头这摊活。 */
 export const actionable = (cues) => (cues || []).filter((c) => !c.stopped)
