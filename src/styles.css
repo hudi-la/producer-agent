@@ -1078,3 +1078,23 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 按下去的工具条按钮（通讯录开着的时候）。跟 .tab.on 一个语气：
    是「现在开着」，不是「有个新东西」——所以只描边，不填色。 */
 .wbtn.on { border-color: var(--accent); color: var(--accent); }
+
+/* 名片中栏：对话和输入框跟机会线那边同一套（.msg / .who / .bubble / .composer）。
+   两个地方长得不一样的话，你会以为它们是两种东西——它们不是。 */
+.fc-m > .focus-scroll > .focus-inner > .msg:first-child { margin-top: 0; }
+/* 你自己记的一次接触：不是对话，是台账。左边一道竖线跟气泡区分开。 */
+.msg.note .bubble { background: transparent; border: 1px dashed var(--line-2);
+  color: var(--ink-2); }
+.fc-m { position: relative; }          /* .composer 是绝对定位的，得有个落脚点 */
+/* 输入框浮在底部，所以滚动区底下要留出它的位置，不然最后一条被压住 */
+.focus.page .fc-m .focus-inner { padding-bottom: 96px; }
+.pf-howto { font-size: 11.5px; line-height: 1.8; color: var(--ink-3);
+  margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pf-howto b { color: var(--ink-2); }
+
+/* 上次碰那一句：日期底下把「上次到底发生了啥」摆出来。
+   只有日期的话（「8/10 · 你记的一笔」）等于没说。 */
+.pf-touch { font-size: 11.5px; line-height: 1.6; color: var(--ink-2);
+  margin: 4px 0 2px; padding-left: 9px; border-left: 2px solid var(--line-2);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pf-touch.none { color: var(--ink-3); font-style: italic; border-left-style: dashed; }

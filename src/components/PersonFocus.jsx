@@ -1,5 +1,5 @@
 import { md, day } from '../lib/when.js'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchContactMessages } from '../lib/chat.js'
 import { cuesFor } from '../lib/cues.js'
 import Md from './Md.jsx'
@@ -65,6 +65,9 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const [dels, setDels] = useState([])
   const [busy, setBusy] = useState(null)      // 'sync' | 'talk' | 'gmail' | null
   const [text, setText] = useState('')
+  const [touching, setTouching] = useState(false)   // 「刚聊过」展开了输入
+  const [touchText, setTouchText] = useState('')
+  const taRef = useRef(null)
   const [claim, setClaim] = useState('')
   const [note, setNote] = useState(null)      // 收信结果那句实话
 
@@ -82,6 +85,17 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const mails = (msgs || []).filter((m) => m.gmail_message_id)
   const talk  = (msgs || []).filter((m) => !m.gmail_message_id)
   const cues  = cuesFor(c, msgs || [], { introName: c.intro_by_name })
+
+  // 「上次碰」光有日期是没用的。「8/10 · 你记的一笔」等于没说——
+  // 你想知道的是**上次到底发生了啥**：哪封信说了什么、那次见面聊了什么。
+  //
+  // 所以把产生那个日期的那条记录找出来，把它那句话摆上去。
+  // 对不上日子的（你按了「聊过了」但没写内容）就老实说没记内容，
+  // 不拿一句「你记的一笔」糊弄过去。
+  const touches = (msgs || []).filter((m) => m.gmail_message_id || m.role === 'note')
+  const lastTouch = touches.length ? touches[touches.length - 1] : null
+  const touchShown = lastTouch && c.last_touch_at && day(lastTouch.created_at) === c.last_touch_at
+    ? lastTouch : null
 
   const save = async (patch) => { await upsertContact({ id: c.id, ...patch }); onChanged?.() }
 
@@ -107,12 +121,30 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
     catch (e) { alert(e.message); setText(t) } finally { setBusy(null) }
   }
 
-  const jot = async () => {
-    const t = text.trim()
-    if (!t || busy) return
-    setBusy('talk'); setText('')
-    try { await logMeet(c.id, t); await reload(); onChanged?.() }
-    catch (e) { alert('没记上：' + e.message); setText(t) } finally { setBusy(null) }
+  /**
+   * 记一次接触。**这是「往来」，不是「关系记忆」。**
+   *
+   * 两件事本来混在一个「记一笔」按钮里，于是时间线上多出些不知道算什么的卡片：
+   *   · 一次接触（8/13 跟他通了话，聊了申请的事）→ 有时间、有先后，归时间线，
+   *     并且它就是「上次碰」那个日期的来源
+   *   · 对他的认识（他在找能一起做影像的人）→ 累积的、会被改写，归左栏关系记忆
+   *
+   * 不让 AI 猜这两者：判错的代价是记忆被污染，而这个区别你一眼就知道。
+   */
+  const logTouch = async (t, after) => {
+    if (!t.trim() || busy) return
+    setBusy('talk')
+    try { await logMeet(c.id, t.trim()); await reload(); onChanged?.(); after?.() }
+    catch (e) { alert('没记上：' + e.message) } finally { setBusy(null) }
+  }
+  const jot = () => logTouch(text, () => setText(''))
+
+  // 「刚聊过」：**一定顺手写一句**。空打卡只留一个日期，
+  // 而一个说不出内容的日期正是「上次碰」原来那么难用的原因。
+  const doTouch = async () => {
+    const t = touchText.trim()
+    if (t) await logTouch(t, () => { setTouchText(''); setTouching(false) })
+    else { await checkin(c.id); onChanged?.(); setTouching(false) }
   }
 
   const toGmail = async (id) => {
@@ -200,16 +232,37 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
           )}
 
           {/* 日期永远说得出出处。没有来源的日期是来路不明的数字。 */}
+          {/* 上次碰：日期 + 渠道 + **那一次说了什么**。
+              只有日期的话（「8/10 · 你记的一笔」）等于没说，你还得自己去翻。 */}
           <div className="pf-cell">
             <div className="pf-k">上次碰</div>
-            <div className="pf-v">
-              {c.last_touch_at
-                ? <>{md(c.last_touch_at)}<span className="pf-note"> · {SRC[c.last_touch_src] || '来源不明'}</span></>
-                : <span className="pf-empty">还没碰过</span>}
-              {/* 微信 / 电话 / 线下系统看不见 —— 它不知道就不假装知道，靠你这一下。 */}
-              <button className="lnk pf-inline"
-                      onClick={async () => { await checkin(c.id); onChanged?.() }}>聊过了</button>
-            </div>
+            {c.last_touch_at ? (
+              <>
+                <div className="pf-v">
+                  {md(c.last_touch_at)}
+                  <span className="pf-note"> · {SRC[c.last_touch_src] || '来源不明'}</span>
+                </div>
+                {touchShown
+                  ? <div className="pf-touch">{touchShown.content}</div>
+                  : <div className="pf-touch none">这次没记内容——只按了「聊过了」</div>}
+              </>
+            ) : <div className="pf-empty">还没碰过</div>}
+
+            {/* 微信 / 电话 / 线下系统看不见，靠你这一下。但**一定顺手写一句**：
+                空打卡只留个日期，而说不出内容的日期正是上面那行原来那么难用的原因。 */}
+            {touching ? (
+              <div className="pf-field">
+                <input autoFocus value={touchText} placeholder="刚才聊了什么？一句话"
+                       onChange={(e) => setTouchText(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === 'Escape') { setTouchText(''); setTouching(false) }
+                         if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); doTouch() }
+                       }} />
+                <button className="lnk" onClick={doTouch} disabled={busy === 'talk'}>记下</button>
+              </div>
+            ) : (
+              <button className="lnk pf-inline" onClick={() => setTouching(true)}>刚聊过</button>
+            )}
           </div>
 
           <Cell label="下次碰" value={c.next_touch_at} placeholder="没定" type="date"
@@ -290,45 +343,73 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
               )}
 
               {talk.length ? (
-                <div className="pf-msgs">
-                  {talk.map((m) => (
-                    <div key={m.id} className={'pf-msg' + (m.role === 'note' ? ' note' : '')}>
-                      <div className="pf-who">
-                        {m.role === 'note' ? '你记的一笔' : m.role === 'artist' ? '你' : 'Fairwind'}
-                        <span className="pf-note"> · {day(m.created_at)}</span>
-                      </div>
+                talk.map((m) => {
+                  // 谁在说话得说准，跟机会线那边一个判据。
+                  const mine = m.role === 'artist'
+                  const isNote = m.role === 'note'
+                  return (
+                    <div key={m.id} className={'msg' + (mine ? ' you' : isNote ? ' note' : ' producer')}>
+                      <span className="who">
+                        {isNote ? '你记的一次接触' : mine ? '你' : 'Fairwind'}
+                        <span className="viamail"> · {md(m.created_at)}</span>
+                      </span>
                       {/* 库里存的是 markdown。不渲的话「**这一类事**」在页面上
                           就是四个星号明晃晃摆着——同一份内容在机会线上是粗体，
                           在这儿是乱码，丑的那个看起来像坏了。 */}
-                      <div className="pf-body md"><Md>{m.content}</Md></div>
+                      <div className="bubble md"><Md>{m.content}</Md></div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })
               ) : (
-                <p className="pf-note">还没商量过什么。下面说一句，或者记一笔线下见面。</p>
+                <p className="pf-note">还没商量过什么。下面说一句，或者记一次接触。</p>
               )}
 
-              {busy === 'talk' && <p className="pf-note">Fairwind 在想…</p>}
+              {busy === 'talk' && (
+                <div className="msg producer">
+                  <span className="who">Fairwind</span>
+                  <div className="bubble thinking"><i /><i /><i /></div>
+                </div>
+              )}
+
+              {/* 同一个框两个去处，说清楚区别，别让你猜：
+                  一次接触有时间有先后 → 时间线；对他的认识是累积的 → 左栏关系记忆。 */}
+              <p className="pf-howto">
+                回车 = 跟 Fairwind 说。线下见了面、通了电话？
+                <button className="lnk" onClick={jot}
+                        disabled={busy === 'talk' || !text.trim()}>记成一次接触</button>
+                ——进时间线，并把「上次碰」记成今天。
+                对他的认识（他在找什么、答应过什么）写进左栏的<b>关系记忆</b>。
+              </p>
             </div>
           </div>
 
-          {/* 输入框钉在底部，不跟着对话滚走 */}
-          <div className="pf-composer">
-            <div className="pf-say">
-              <textarea rows={2} value={text} placeholder="跟 Fairwind 说一句…"
-                        onChange={(e) => setText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); say() }
-                        }} />
-              <div className="pf-say-btns">
-                <button className="lnk" onClick={say} disabled={busy || !text.trim()}>说</button>
-                <button className="lnk" onClick={jot} disabled={busy || !text.trim()}>记一笔</button>
-              </div>
-            </div>
-            <p className="pf-note">
-              「说」= 让它想（⌘↵）；「记一笔」= 直接落进上面这条时间线，
-              并把「上次碰」记成今天——线下见了面按这个。
-            </p>
+          {/* 输入框跟机会线那个一模一样：浮在底部、一行装不下自己长高、
+              Enter 发送 Shift+Enter 换行。isComposing 那句不能删——
+              中文输入法选词也敲 Enter，不挡的话你选个词就把半句话发出去了。 */}
+          <div className="composer">
+            <textarea
+              ref={taRef}
+              className="ph"
+              rows={1}
+              value={text}
+              disabled={busy === 'talk'}
+              placeholder={busy === 'talk'
+                ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
+                : '一起想点什么…… Fairwind 带着这个人的全部往来，你不用重讲'}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+                e.preventDefault()
+                say()
+              }}
+            />
+            <button className="send" aria-label="发送" onClick={say}
+                    disabled={busy === 'talk' || !text.trim()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6"
+                      strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
         </section>
 
