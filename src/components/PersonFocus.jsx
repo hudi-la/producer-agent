@@ -81,9 +81,21 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   }, [c.id])
   useEffect(() => { reload() }, [reload])
 
-  // 邮件归左边卷宗，跟 Fairwind 的商量 + 你记的一笔归中栏。两边都放就成了重复。
-  const mails = (msgs || []).filter((m) => m.gmail_message_id)
-  const talk  = (msgs || []).filter((m) => !m.gmail_message_id)
+  // 两个去处，没有第三个：
+  //
+  //   往来（左栏）  = 跟**这个人**真实来往过的每一次。邮件是一次，
+  //                  见面/通话/微信聊了也是一次——只是渠道不同。
+  //   商量（中栏）  = 你跟 **Fairwind** 说的话。它不是往来。
+  //
+  // 一开始把「记一笔」塞进了中栏，理由是 Dossier 那条规矩：「只把邮件收进
+  // 卷宗，线下备注留在中栏的时间线里」。那条规矩是**机会线**的——那儿中栏
+  // 是这条线的叙事。搬到人身上就给出了错答案：跟人见了一面，那是往来，
+  // 不是叙事。于是往来那栏缺了半截，中栏多出两张不知道算什么的卡片。
+  //
+  // role='artist' 两种情况都有（你发的邮件、你跟 Fairwind 说的话），
+  // 所以判据是「有没有 gmail_message_id」而不是 role。
+  const mails = (msgs || []).filter((m) => m.gmail_message_id || m.role === 'note')
+  const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
   const cues  = cuesFor(c, msgs || [], { introName: c.intro_by_name })
 
   // 「上次碰」光有日期是没用的。「8/10 · 你记的一笔」等于没说——
@@ -312,10 +324,11 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                : (
                  <div className="pf-msgs">
                    {mails.map((m) => (
-                     <div key={m.id} className="pf-msg">
+                     <div key={m.id} className={'pf-msg' + (m.role === 'note' ? ' note' : '')}>
                        <div className="pf-who">
-                         {m.role === 'artist' ? '你' : (m.meta?.from_name || '对方')}
+                         {m.role === 'note' ? '你记的' : m.role === 'artist' ? '你' : (m.meta?.from_name || '对方')}
                          <span className="pf-note"> · {day(m.created_at)}</span>
+                         {m.role === 'note' && <span className="pf-tag">当面 / 电话 / 微信</span>}
                        </div>
                        <div className="pf-body sm">{m.content}</div>
                      </div>
@@ -361,7 +374,7 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                   )
                 })
               ) : (
-                <p className="pf-note">还没商量过什么。下面说一句，或者记一次接触。</p>
+                <p className="pf-note">还没跟 Fairwind 商量过什么。下面说一句。（跟他本人的来往在左栏）</p>
               )}
 
               {busy === 'talk' && (
@@ -374,11 +387,12 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
               {/* 同一个框两个去处，说清楚区别，别让你猜：
                   一次接触有时间有先后 → 时间线；对他的认识是累积的 → 左栏关系记忆。 */}
               <p className="pf-howto">
-                回车 = 跟 Fairwind 说。线下见了面、通了电话？
+                回车 = 跟 <b>Fairwind</b> 商量（这一栏只装商量，不算往来）。
+                <br />线下见了面、通了电话、微信聊了？
                 <button className="lnk" onClick={jot}
-                        disabled={busy === 'talk' || !text.trim()}>记成一次接触</button>
-                ——进时间线，并把「上次碰」记成今天。
-                对他的认识（他在找什么、答应过什么）写进左栏的<b>关系记忆</b>。
+                        disabled={busy === 'talk' || !text.trim()}>记进往来</button>
+                ——它跟邮件一样是一次真实来往，进<b>左栏的往来</b>，并把「上次碰」记成今天。
+                <br />他在找什么、答应过什么这类<b>认识</b>，写进左栏的<b>关系记忆</b>——那儿是累积的。
               </p>
             </div>
           </div>
