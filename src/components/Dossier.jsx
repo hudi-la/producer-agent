@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import Cast from './Cast.jsx'
 import { fetchPursuitMail } from '../lib/pursuitCast.js'
 import Pool from './Pool.jsx'
+import Mail from './Mail.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 
 // 左栏：卷宗。
@@ -36,37 +37,6 @@ function Aside({ items, onJump }) {
   )
 }
 
-function Mail({ m, onJump }) {
-  const [open, setOpen] = useState(false)
-  const mine = m.role === 'artist'
-  const hasRaw = !!m.body_raw
-  return (
-    <div id={'dmail-' + m.id} className={'mail' + (open ? ' open' : '')}>
-      <div className="mail-top">
-        {/* 推导来的那些没有 meta.from_name（它们没经过 /sync 那条路），
-            但视图给了 who。缺了就退回「对方」，不留空。 */}
-        <span className={'who ' + (mine ? 'you' : 'org')}>{mine ? '你' : (m.meta?.from_name || m.who || '对方')}</span>
-        <span className="when">{fmtDate(m.created_at)}</span>
-        {m.meta?.unanswered && <span className="flag">未回</span>}
-      </div>
-      <div className="mail-sum">{m.content}</div>
-      <div className="mail-acts">
-        {hasRaw && (
-          <button className="lnk" onClick={() => setOpen((o) => !o)}>
-            {open ? '收起 ▴' : '原文 ▾'}
-          </button>
-        )}
-        {onJump && <button className="lnk" onClick={() => onJump(m.id)}>在时间线上定位</button>}
-      </div>
-      {open && hasRaw && (
-        <div className="mail-full">
-          {m.meta?.subject && <div className="hdr">{m.meta.subject}</div>}
-          {m.body_raw}
-        </div>
-      )}
-    </div>
-  )
-}
 
 const fmtSize = (b) => {
   if (!b && b !== 0) return ''
@@ -162,6 +132,9 @@ export default function Dossier({
   // 它们是这条线的叙事，两边都放就成了重复，而重复比缺失更难发现。
   // 两个来源合起来去重：盖过 pursuit_id 的老信 + 推导出来的。
   // 一封信可能两边都有，按 gmail_message_id 认；没有 id 的按行 id 认。
+  // 你在某个人名片上记的一次接触，如果挂在了这条线上，这儿也该看得见。
+  // **不是搬过去**——它长在那个人身上，这儿是「也显示」。
+  const notes = msgs.filter((m) => m.role === 'note')
   const own = msgs.filter((m) => m.kind === 'email')
   const seen = new Set(own.map((m) => m.gmail_message_id || m.id))
   const extra = (derived || []).filter((m) => !seen.has(m.gmail_message_id || m.id))
@@ -232,6 +205,17 @@ export default function Dossier({
               也不摊开——摊开这条线就混着别的项目的事。 */}
           {aside.length > 0 && <Aside items={aside} onJump={onJump} />}
         </Pool>
+
+        {/* 你当面聊的、通电话聊的，只要记的时候挂了这条线，这儿也看得见。
+            跟邮件分开摆是因为两种材料分量不一样：邮件有原文可查，
+            我记的只有你那一句。写申请时你得分得清哪句有凭据。 */}
+        {notes.length > 0 && (
+          <Pool title="我记的" count={`${notes.length} 条`}>
+            <div className="mails">
+              {notes.map((m) => <Mail m={m} key={m.id} onJump={onJump} />)}
+            </div>
+          </Pool>
+        )}
       </div>
 
       {/* 原来这儿有个「人 / 主对接」格，只显示一个名字、点不动、也不带往来数。

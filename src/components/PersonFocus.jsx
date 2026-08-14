@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchContactMessages } from '../lib/chat.js'
 import { cuesFor } from '../lib/cues.js'
 import Md from './Md.jsx'
+import Pool from './Pool.jsx'
+import { MailList } from './Mail.jsx'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
   fetchThreads, fetchContactDeliverables,
@@ -69,7 +71,7 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const [touchText, setTouchText] = useState('')
   const taRef = useRef(null)
   const [claim, setClaim] = useState('')
-  const [allMail, setAllMail] = useState(false)   // 往来展开了没有
+  const [onLine, setOnLine] = useState('')        // 这次接触也算在哪条线上
   const [note, setNote] = useState(null)      // 收信结果那句实话
 
   const reload = useCallback(async () => {
@@ -95,13 +97,13 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   //
   // role='artist' 两种情况都有（你发的邮件、你跟 Fairwind 说的话），
   // 所以判据是「有没有 gmail_message_id」而不是 role。
+  // 往来 = 跟这个人真实来往过的每一次：邮件是一次，见面/通话/微信也是一次。
   const mails = (msgs || []).filter((m) => m.gmail_message_id || m.role === 'note')
-  // 往来会很长（Stacy 名下 59 封）。默认只摆最近 10 条，早的折起来。
-  // 顺序不动——还是老的在上、新的在下，跟邮件线程和中栏一致。
-  // 「更早的」那个按钮放在**最上面**：折起来的东西在哪儿，按钮就该在哪儿。
-  const MAIL_HEAD = 10
-  const hidden = Math.max(0, mails.length - MAIL_HEAD)
-  const shownMails = allMail ? mails : mails.slice(-MAIL_HEAD)
+  // 往来分两格。**这个区别 Fairwind 也要知道**：
+  // 邮件是有凭据的（库里有原文），我记的是你的记忆（只有你那一句）。
+  // 它给你写回信的时候，这两种材料的分量不一样。
+  const emails = mails.filter((m) => m.gmail_message_id)
+  const notes  = mails.filter((m) => m.role === 'note')
   const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
   const cues  = cuesFor(c, msgs || [], { introName: c.intro_by_name })
 
@@ -153,7 +155,7 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const logTouch = async (t, after) => {
     if (!t.trim() || busy) return
     setBusy('talk')
-    try { await logMeet(c.id, t.trim()); await reload(); onChanged?.(); after?.() }
+    try { await logMeet(c.id, t.trim(), onLine || null); await reload(); onChanged?.(); after?.() }
     catch (e) { alert('没记上：' + e.message) } finally { setBusy(null) }
   }
   const jot = () => logTouch(text, () => setText(''))
@@ -301,52 +303,45 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
             </div>
           )}
 
-          {/* ── 往来。只收邮件，备注在中栏。 ── */}
+          {/* ── 往来：跟这个人真实来往过的每一次 ──
+              分两格是因为两种材料分量不一样：邮件有凭据（库里存着原文），
+              我记的只有你那一句。Fairwind 写回信时要分得清。 */}
           <div className="pf-sect">
             <div className="pf-sect-h">
               <span>往来</span>
               <button className="lnk" onClick={doSync} disabled={busy === 'sync'}
-                      title="去 Gmail 拉这个人认领过的往来的新信">
+                      title="去 Gmail 拉这个人所有地址下的往来">
                 {busy === 'sync' ? '收信中…' : '收信'}
               </button>
             </div>
-            <div className="pf-note">
-              认领了 {threads.length} 条{threads.length ? '' : ' —— 认领一条才收得到信'}
-            </div>
             {note && <div className={'pf-syncnote' + (note.startsWith('收信失败') ? ' bad' : '')}>{note}</div>}
 
-            <div className="pf-field">
-              <input placeholder="贴 Gmail thread id" value={claim}
-                     onChange={(e) => setClaim(e.target.value)} />
-              <button className="lnk" disabled={!claim.trim()}
-                      onClick={async () => {
-                        try { await claimThread(c.id, claim.trim()); setClaim(''); await reload() }
-                        catch (e) { alert('没认上：' + e.message) }
-                      }}>认领</button>
-            </div>
+            {msgs === null ? <p className="pf-note">读着…</p> : (
+              <>
+                <Pool title="邮件" count={`${emails.length} 封`} defaultOpen={emails.length > 0}>
+                  {emails.length
+                    ? <MailList items={emails} head={3} />
+                    : <p className="empty">还没有邮件往来。上面「收信」去他的地址下找一遍。</p>}
+                </Pool>
 
-            {msgs === null ? <p className="pf-note">读着…</p>
-             : mails.length === 0
-               ? <p className="pf-note">还没有往来。认领一条 thread，或者起草一封发出去，它就接上了。</p>
-               : (
-                 <div className="pf-msgs">
-                   {hidden > 0 && (
-                     <button className="lnk pf-more" onClick={() => setAllMail((v) => !v)}>
-                       {allMail ? `收起早的（只看最近 ${MAIL_HEAD} 条）` : `还有 ${hidden} 条更早的 · 展开`}
-                     </button>
-                   )}
-                   {shownMails.map((m) => (
-                     <div key={m.id} className={'pf-msg' + (m.role === 'note' ? ' note' : '')}>
-                       <div className="pf-who">
-                         {m.role === 'note' ? '你记的' : m.role === 'artist' ? '你' : (m.meta?.from_name || '对方')}
-                         <span className="pf-note"> · {day(m.created_at)}</span>
-                         {m.role === 'note' && <span className="pf-tag">当面 / 电话 / 微信</span>}
-                       </div>
-                       <div className="pf-body sm">{m.content}</div>
-                     </div>
-                   ))}
-                 </div>
-               )}
+                <Pool title="我记的" count={`${notes.length} 条`} defaultOpen={notes.length > 0}>
+                  {notes.length
+                    ? <MailList items={notes} head={3} />
+                    : <p className="empty">当面聊了、通了电话、微信说了——在中栏记一条，它会长在这儿。</p>}
+                </Pool>
+
+                <div className="pf-field">
+                  <input placeholder="贴 Gmail thread id" value={claim}
+                         onChange={(e) => setClaim(e.target.value)} />
+                  <button className="lnk" disabled={!claim.trim()}
+                          onClick={async () => {
+                            try { await claimThread(c.id, claim.trim()); setClaim(''); await reload() }
+                            catch (e) { alert('没认上：' + e.message) }
+                          }}>认领</button>
+                </div>
+                <div className="pf-note">认领了 {threads.length} 条 thread</div>
+              </>
+            )}
           </div>
         </aside>
 
@@ -403,6 +398,20 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                 <br />线下见了面、通了电话、微信聊了？
                 <button className="lnk" onClick={jot}
                         disabled={busy === 'talk' || !text.trim()}>记进往来</button>
+                {/* 这次聊的常常就是某条线的事。挂上去之后那条线的卷宗里也看得见——
+                    **同时挂两边，不是搬过去**。不让 AI 猜是哪条：他可能挂着三条，
+                    猜错了那段记忆就长在错的项目上，而项目卡是你写申请时照着看的。 */}
+                {c.pursuits?.length > 0 && (
+                  <>
+                    ，也算在
+                    <select className="pf-online" value={onLine}
+                            onChange={(e) => setOnLine(e.target.value)}>
+                      <option value="">（不挂线）</option>
+                      {c.pursuits.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                    </select>
+                    上
+                  </>
+                )}
                 ——它跟邮件一样是一次真实来往，进<b>左栏的往来</b>，并把「上次碰」记成今天。
                 <br />他在找什么、答应过什么这类<b>认识</b>，写进左栏的<b>关系记忆</b>——那儿是累积的。
               </p>

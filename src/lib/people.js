@@ -37,9 +37,16 @@ export const claimThread = (contactId, threadId) =>
  * 线下见了一面，记一笔。
  * 一条记录同时干三件事：更新「上次碰」、触发 48 小时由头、留下「上次聊到哪」。
  */
-export const logMeet = (contactId, text) =>
+/**
+ * 记一次接触。pursuitId 可选——这次聊的跟某条线有关就一起挂上。
+ *
+ * **同时挂两边，不是搬过去**：它长在人身上（你是跟这个人见的面），
+ * 那条线的卷宗里也看得见（那次聊的正是那个项目的事）。
+ */
+export const logMeet = (contactId, text, pursuitId = null) =>
   rpc('pa_add_contact_message', {
     p_contact_id: contactId, p_role: 'note', p_kind: 'meet', p_content: text,
+    p_pursuit_id: pursuitId,
   })
 
 /** 微信 / 电话 / 线下聊完了，打个卡。系统看不见那些渠道，所以靠你这一下。 */
