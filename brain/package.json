@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "exceljs": "^4.4.0",
     "googleapis": "^174.0.1",
+    "marked": "^18.0.9",
     "unpdf": "^1.8.0",
     "zod": "^4.4.3"
   }
