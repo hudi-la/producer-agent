@@ -1,4 +1,5 @@
 import { supa, BRAIN } from './backends.js'
+import { streamChat, NoStream } from './chat.js'
 
 // 人这一层的写口。分工跟 chat.js 一模一样：
 //  · 「你自己改自己名片上的字段」—— 浏览器直连走 anon，靠 security definer 函数，
@@ -140,6 +141,19 @@ export const refreshContact = (id) => post('/refresh', { contact_id: id })
 
 /** 跟 Fairwind 说一句（起草回信就是从这儿来的）。 */
 export const sayToContact = (id, text) => post('/chat', { contact_id: id, text })
+
+/**
+ * 同上，但边想边出字。脑子是旧的就退回上面那条 —— 慢，但不至于说不了话。
+ * 读流那套在 chat.js 里，跟机会线共用一份。
+ */
+export async function sayToContactStream(id, text, runId, onEvent) {
+  try {
+    return await streamChat({ contact_id: id, text, ...(runId ? { run_id: runId } : {}) }, onEvent)
+  } catch (e) {
+    if (e instanceof NoStream) return sayToContact(id, text)
+    throw e
+  }
+}
 
 /**
  * 把一份定了稿的信放进 Gmail 草稿箱。

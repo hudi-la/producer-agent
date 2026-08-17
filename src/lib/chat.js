@@ -4,6 +4,7 @@
 //  · 「 Fairwind 去想」(chat / brief) —— 走本机 sidecar，因为那需要 service_role
 //    往往来历史里写消息，且要跑 agent。
 import { supa, BRAIN } from './backends.js'
+import { frameSplitter, frameData } from './sse.js'
 
 /** 拉这条机会线最新的往来。没连库时返回 null（保留调用方手上的种子数据）。 */
 export async function fetchMessages(pursuitId) {
@@ -56,6 +57,107 @@ export async function sendMessage(pursuitId, text, meta, runId) {
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error || `脑子出错了（${res.status}）`)
   return body   // { mine, reply } —— 你按了终止的话 reply 是 null、带 aborted: true
+}
+
+/** 脑子还没有 /chat/stream（没重启）—— 认得出来，好退回老路子。 */
+class NoStream extends Error {}
+
+/**
+ * 说一句话，边想边收字。
+ *
+ * 底层是 SSE，但用 fetch 手读而不是 EventSource —— 后者只会发 GET，
+ * 而我们要把一整段话发过去。
+ *
+ * onEvent 收到的就是脑子那边发的帧：
+ *   { t:'mine', row }   你那条落库了（拿它把乐观插入的临时条换成真的）
+ *   { t:'tool', name }  它去动工具了（这一轮不产字，得有个交代）
+ *   { t:'delta', text } 又出了一截
+ * 最后返回 { mine, reply, aborted } —— 跟 sendMessage 的返回长一样，
+ * 调用方两条路都能接。
+ *
+ * **reply 是脑子落库后发回来的正式那条，不是攒起来的 delta。** delta 只是预览，
+ * 会丢会乱；进时间线的必须是库里那份。
+ */
+export async function streamChat(body, onEvent) {
+  let res
+  try {
+    res = await fetch(`${BRAIN}/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (_) {
+    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
+  }
+  if (res.status === 404) throw new NoStream()
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}))
+    throw new Error(b.error || `脑子出错了（${res.status}）`)
+  }
+
+  const reader = res.body.getReader()
+  const dec = new TextDecoder()
+  const frames = frameSplitter()
+  let mine = null, reply = null, aborted = false, err = null
+
+  const take = (frame) => {
+    const e = frameData(frame)
+    if (!e) return
+    if (e.t === 'mine') mine = e.row
+    else if (e.t === 'done') { reply = e.reply || null; aborted = !!e.aborted }
+    else if (e.t === 'error') err = e.error
+    onEvent?.(e)
+  }
+
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    for (const f of frames.push(dec.decode(value, { stream: true }))) take(f)
+  }
+  take(frames.rest())
+
+  // 流断在半路上（脑子挂了、网线拔了）：没有 done 帧就是没想完，
+  // 不能静悄悄返回一个空回复——那看起来像它想完了但什么都没说。
+  if (err) throw new Error(err)
+  if (!reply && !aborted) throw new Error('Fairwind 那边断了 —— 再说一次让它重想')
+  return { mine, reply, aborted }
+}
+
+/**
+ * 机会线上说一句，边想边出字。
+ *
+ * 脑子是旧的（还没有 /chat/stream）就退回原来那条路 —— 一次改动不该让
+ * 没重启 brain 的人连话都说不了，只是没有流而已。
+ */
+export async function sendMessageStream(pursuitId, text, meta, runId, onEvent) {
+  try {
+    return await streamChat(
+      { pursuit_id: pursuitId, text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) },
+      onEvent,
+    )
+  } catch (e) {
+    if (e instanceof NoStream) return sendMessage(pursuitId, text, meta, runId)
+    throw e
+  }
+}
+
+export { NoStream }
+
+/**
+ * 「重说」：把你点的那句和它之后的对话撤掉。返回撤了几条。
+ *
+ * 走浏览器直连，跟 setBall / setStage 一路 —— 这是**你在整理自己的对话**，
+ * 脑子开没开不该影响你撤掉自己说错的话。
+ *
+ * 撤掉的话库里还在（打了 deleted_at 的标），只是读面全部滤掉：界面看不见，
+ * Fairwind 的 prompt 里也没有。后者才是重点 —— 不然你以为撤干净了，
+ * 它却仍在按那句错话想事情。见 0066 那道迁移。
+ */
+export async function rewindChat(msgId) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { data, error } = await supa.rpc('pa_rewind_chat', { p_msg_id: msgId })
+  if (error) throw new Error(error.message)
+  return data ?? 0
 }
 
 /**
