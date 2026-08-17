@@ -1,6 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { fetchMessages, sendMessage, stopThinking } from '../lib/chat.js'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchMessages, sendMessageStream, stopThinking, rewindChat } from '../lib/chat.js'
+import { useLiveReply } from '../lib/useLiveReply.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
+import { dropFrom } from '../lib/rewind.js'
+import SayBubble from './Resay.jsx'
 
 import {
   fetchDeliverables, fetchAttachments, setFinal, syncMail,
@@ -8,6 +11,8 @@ import {
 } from '../lib/deliverables.js'
 import Dossier from './Dossier.jsx'
 import Deliverables from './Deliverables.jsx'
+// 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏产出。
+import LetterCard from './LetterCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
@@ -70,7 +75,7 @@ function Deadline({ p }) {
   )
 }
 
-function Message({ m }) {
+function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay, owner, onAdopted }) {
   // 备注不是谁在说话。role='note' 是这条线上的一笔记录（线下发生的事、一个决定），
   // 原来它也走「其余一律显示 Fairwind」那条路，于是你自己记的事看起来像 Fairwind 说的。
   if (m.role === 'note') {
@@ -117,7 +122,24 @@ function Message({ m }) {
       <span className="who">{who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
         {bc && <span className="viamail"> · 同时发给了 {bc.count} 条线</span>}
       </span>
-      <div className="bubble md"><Md>{m.content}</Md></div>
+      {/* 你自己说的那句能改了重说；别人的（它的回复、机构来信）不能——
+          改别人说过的话是伪造记录，不是「重说」。 */}
+      {mine ? (
+        <SayBubble
+          m={m} msgs={msgs} editing={editing} disabled={!canEdit}
+          onStart={onStartEdit} onCancel={onCancelEdit} onResay={onResay}
+        />
+      ) : (
+        <div className="bubble md"><Md>{m.content}</Md></div>
+      )}
+      {/* 它写的是一封信 —— 紧跟在气泡后面摆一张卡，点一下就落进右栏产出。
+          在这之前这封信只能靠你选中、复制、切去 Gmail 粘贴。 */}
+      {m.meta?.letter && (
+        <LetterCard
+          letter={m.meta.letter} body={m.content}
+          owner={owner} onAdopted={onAdopted}
+        />
+      )}
     </div>
   )
 }
@@ -170,7 +192,12 @@ export default function PursuitFocus({
   const [msgs, setMsgs] = useState(messages || [])
   const [text, setText] = useState('')
   const [thinking, setThinking] = useState(false)
+  // 它正在打的那段字（还没落库）。live 有内容就渲染成一个真气泡，
+  // 而不是三个点——你能一行一行看着它想。
+  const { live, act, onEvent: onLive, reset: resetLive } = useLiveReply()
   const [err, setErr] = useState(null)
+  // 正在就地改的那一句。库里还什么都没动——见 Resay.jsx 顶上那段。
+  const [editId, setEditId] = useState(null)
   const [stage, setStageLocal] = useState(p.stage)
   // 球权本地先动，写库由 App 负责回滚。装的是「球在谁那边」这个答案本身，
   // 不是「你有没有手动改过」——后者不是你要看的东西。
@@ -181,6 +208,12 @@ export default function PursuitFocus({
   // 永远不会更新的字。要不要重做那套是另一场讨论。
   // 见 docs/specs/2026-08-12-four-signals-design.md
   const endRef = useRef(null)
+  const scrollRef = useRef(null)    // 对话那一栏本体，用来判断你是不是贴着底在看
+  // 你是不是贴着底。贴着才跟着新内容往下走；你往上翻去看旧的，就别再拽你。
+  //
+  // 原来是无条件跟：它一边出字，页面一边往下拽，你想回头看上一段根本按不住。
+  // 出字那一轮一秒好几帧，等于每秒被拽好几次。
+  const stick = useRef(true)
   const taRef = useRef(null)        // 输入框本体，用来按内容撑高
   const runIdRef = useRef(null)     // 正在跑的那一次，「终止」靠它找到对应的活
   // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
@@ -218,15 +251,35 @@ export default function PursuitFocus({
     setStageLocal(p.stage)
     setBallLocal(ballOf(p))
     setErr(null)
+    setEditId(null)   // 换了条线，上一条上改到一半的那句跟着收掉
     fetchMessages(p.id).then((rows) => {
       if (alive && rows) setMsgs(rows)
     })
     return () => { alive = false }
   }, [p.id])
 
+  // 你滚一下我就记一下：离底还有多远。120px 是「基本贴着」的宽容度——
+  // 要求分毫不差贴底的话，一点惯性余量就会被判成「你在往上看」。
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }, [])
+
+  // 换一条线：重新贴底（新开一张卡当然从最新那条看起）。
+  useEffect(() => { stick.current = true }, [p.id])
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    if (stick.current) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [msgs.length, thinking])
+
+  // 出字期间单独跟一下底。不能用 smooth——一秒好几帧的平滑滚动会打架，
+  // 页面抖得没法读。这里要的是「一直贴着底」，不是动画。
+  //
+  // 而**你往上翻走了就一下都不跟**。它出字那一轮一秒好几帧，无条件跟的话
+  // 等于每秒把你拽回底部好几次，你想回头看上一段根本按不住。
+  useEffect(() => {
+    if (live && stick.current) endRef.current?.scrollIntoView({ block: 'end' })
+  }, [live])
 
   // 输入框按内容撑高。必须先归零再量 scrollHeight——不归零的话 scrollHeight
   // 永远不小于当前高度，删字的时候框只会长不会缩。上限在 CSS 的 max-height，
@@ -312,10 +365,15 @@ export default function PursuitFocus({
     return () => clearInterval(iv)
   }, [p.id])
 
-  async function send() {
-    const t = text.trim()
+  // said 是「重说」交过来的那句改完的话。不传就是输入框里那句。
+  // 两条路必须共用这一个函数：乐观插入、换掉临时条、失败时话还不还给你——
+  // 那三件事分两份写，迟早有一边漏掉，而漏掉的那边会静悄悄吞掉你打的字。
+  async function send(said) {
+    const t = (said ?? text).trim()
     if (!t || busy) return
-    setText('')
+    // 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底。
+    stick.current = true
+    if (said == null) setText('')
     setErr(null)
     setThinking(true)
     // run_id 在这儿生成，跟着请求一起发过去——不能等回来再拿：
@@ -324,11 +382,26 @@ export default function PursuitFocus({
     runIdRef.current = runId
     const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: t }
     setMsgs((m) => [...m, tmp])
+    let landedMine = null
     try {
-      const { mine, reply, aborted } = await sendMessage(p.id, t, undefined, runId)
+      const { mine, reply, aborted } = await sendMessageStream(p.id, t, undefined, runId, (e) => {
+        // 你那条一落库就回来了：拿真的换掉临时那条（临时的没有 id、没有时间）。
+        // 换早一点，3 秒轮询就不会跟它撞出两条一样的。
+        if (e.t === 'mine') {
+          landedMine = e.row
+          setMsgs((m) => m.map((x) => (x.id === tmp.id ? e.row : x)))
+        } else {
+          onLive(e)
+        }
+      })
       // 终止了就只留你那条：它没写回复，reply 是 null。
-      setMsgs((m) => [...m.filter((x) => x.id !== tmp.id), mine, ...(reply ? [reply] : [])])
-      if (aborted) setStoppedId(mine.id)
+      const you = mine || landedMine
+      setMsgs((m) => [
+        ...m.filter((x) => x.id !== tmp.id && x.id !== you?.id),
+        ...(you ? [you] : []),
+        ...(reply ? [reply] : []),
+      ])
+      if (aborted && you) setStoppedId(you.id)
     } catch (e) {
       // 脑子是先存你的话、再去想的，所以失败有两种：
       //   连不上 → 一个字都没存 → 把内容还回输入框，别让你白打
@@ -345,8 +418,33 @@ export default function PursuitFocus({
       }
     } finally {
       setThinking(false)
+      resetLive()
       runIdRef.current = null
     }
+  }
+
+  /**
+   * 重说：撤掉这句和它之后的对话，然后把改完的这句照常发出去。
+   *
+   * 顺序不能反。先撤再发的话，Fairwind 拿到的是干净的往来；先发再撤，
+   * 它已经带着那句错话想过一轮了——而那正是你按这个按钮要躲开的事。
+   *
+   * 撤失败就停在编辑态：话还在框里，错话摆在下面，你可以再按一次。
+   * （照 EditRow 那条规矩：存不上不退回原值，退了你刚写的就没了。）
+   */
+  async function resay(id, said) {
+    const t = said.trim()
+    if (!t || busy) return
+    setErr(null)
+    try {
+      await rewindChat(id)
+    } catch (e) {
+      setErr('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
+      return
+    }
+    setEditId(null)
+    setMsgs((cur) => dropFrom(cur, id))
+    await send(t)
   }
 
   // 终止：掐掉正在跑的那一次，不写回复。你说的那句留着——它是你说的话，不是它想的。
@@ -357,6 +455,8 @@ export default function PursuitFocus({
     const rid = runIdRef.current
     if (lastMsg) setStoppedId(lastMsg.id)
     setThinking(false)
+    // 打到一半的那段也一起收掉：它不会落库，留在屏幕上等于给你看一份不存在的回复。
+    resetLive()
     runIdRef.current = null
     if (rid) await stopThinking(rid)
   }
@@ -381,7 +481,7 @@ export default function PursuitFocus({
   // 只是三栏把它塞进中间那格，抽屉直接铺满。
   const body = (
     <>
-      <div className="focus-scroll">
+      <div className="focus-scroll" ref={scrollRef} onScroll={onScroll}>
         <div className="focus-inner">
           <div className="fh">
             {/* 整页时事实搬去了左栏卷宗，这儿不再重复一遍；抽屉没有卷宗，照旧显示 */}
@@ -407,7 +507,19 @@ export default function PursuitFocus({
                 }
                 const promoted = threeCol && promotedFrom.get(m.id)
                 if (promoted) return <PromotedAnchor m={m} title={promoted} key={m.id || i} />
-                return <Message m={m} key={m.id || i} />
+                return (
+                  <Message
+                    m={m} msgs={msgs} key={m.id || i}
+                    owner={{ pursuitId: p.id }}
+                    onAdopted={reloadDeliv}
+                    editing={editId === m.id}
+                    /* 在想的时候不给改：那会撤掉一条它还在写的回复 */
+                    canEdit={!busy}
+                    onStartEdit={setEditId}
+                    onCancelEdit={() => setEditId(null)}
+                    onResay={resay}
+                  />
+                )
               })}
               {/* 没在想、又确实欠着一条回复——说实话，别拿三个点糊弄过去 */}
               {stalled && (
@@ -416,10 +528,18 @@ export default function PursuitFocus({
                   <b>再说一次就行</b>——它带着这条线的全部往来，你不用重讲。
                 </div>
               )}
+              {/* 已经在出字了就直接渲染成气泡，一行一行看着它想；还没出字
+                  （多半在查资料）才是三个点，旁边说清楚它在动什么。
+                  这段字还没落库，最后会被库里那条正式的换掉。 */}
               {busy && (
                 <div className="msg producer">
                   <span className="who">Fairwind</span>
-                  <div className="bubble thinking"><i /><i /><i /></div>
+                  {live ? (
+                    <div className="bubble md streaming"><Md>{live}</Md></div>
+                  ) : (
+                    <div className="bubble thinking"><i /><i /><i /></div>
+                  )}
+                  {act && !live && <span className="thinking-act">{act}</span>}
                 </div>
               )}
             </div>
@@ -453,7 +573,9 @@ export default function PursuitFocus({
             <svg width="15" height="15" viewBox="0 0 16 16"><rect x="4.5" y="4.5" width="7" height="7" rx="1.4" fill="#fff" /></svg>
           </button>
         ) : (
-          <button className="send" aria-label="发送" onClick={send} disabled={!text.trim()}>
+          // 必须包一层箭头函数：onClick={send} 会把鼠标事件当第一个参数塞进去，
+          // 而 send 的第一个参数现在是「重说」交过来的那句话。
+          <button className="send" aria-label="发送" onClick={() => send()} disabled={!text.trim()}>
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         )}

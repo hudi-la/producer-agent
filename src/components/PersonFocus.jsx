@@ -1,15 +1,20 @@
 import { md, day } from '../lib/when.js'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchContactMessages } from '../lib/chat.js'
+import { fetchContactMessages, rewindChat } from '../lib/chat.js'
 import { cuesFor } from '../lib/cues.js'
+import { dropFrom } from '../lib/rewind.js'
 import Md from './Md.jsx'
+import SayBubble from './Resay.jsx'
 import Pool from './Pool.jsx'
 import { MailList } from './Mail.jsx'
+// 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
+import LetterCard from './LetterCard.jsx'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
   fetchThreads, fetchContactDeliverables,
-  refreshContact, sayToContact, draftToGmail,
+  refreshContact, sayToContactStream, draftToGmail,
 } from '../lib/people.js'
+import { useLiveReply } from '../lib/useLiveReply.js'
 
 // 名片 —— 人这一层的详情页。
 //
@@ -66,6 +71,29 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const [threads, setThreads] = useState([])
   const [dels, setDels] = useState([])
   const [busy, setBusy] = useState(null)      // 'sync' | 'talk' | 'gmail' | null
+  // 正在就地改的那一句。库里还什么都没动——见 Resay.jsx 顶上那段。
+  const [editId, setEditId] = useState(null)
+  // 它正在打的那段字（还没落库），跟机会线那边同一套
+  const { live, act, onEvent: onLive, reset: resetLive } = useLiveReply()
+
+  // 「记一笔」旁边那层说明：悬停一秒才出来。
+  //
+  // 一秒是故意的——手划过去不该弹东西，只有停下来看才算在问。
+  // 收起来留 240ms 缓冲：从按钮挪到说明层上，中间那几像素的空隙不该把它关掉。
+  // pinRef 是给下拉框用的：原生下拉展开时鼠标其实已经离开了这一层，
+  // 不按住就会选到一半自己关掉。
+  const [howto, setHowto] = useState(false)
+  const howtoT = useRef(0)
+  const pinRef = useRef(false)
+  const howtoIn = () => {
+    clearTimeout(howtoT.current)
+    if (!howto) howtoT.current = setTimeout(() => setHowto(true), 1000)
+  }
+  const howtoOut = () => {
+    clearTimeout(howtoT.current)
+    howtoT.current = setTimeout(() => { if (!pinRef.current) setHowto(false) }, 240)
+  }
+  useEffect(() => () => clearTimeout(howtoT.current), [])
   const [text, setText] = useState('')
   const [touching, setTouching] = useState(false)   // 「刚聊过」展开了输入
   const [touchText, setTouchText] = useState('')
@@ -83,6 +111,8 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
     setDels(d)
   }, [c.id])
   useEffect(() => { reload() }, [reload])
+  // 换了个人，上一张名片上改到一半的那句跟着收掉
+  useEffect(() => { setEditId(null) }, [c.id])
 
   // 两个去处，没有第三个：
   //
@@ -134,12 +164,62 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
     } catch (e) { setNote('收信失败：' + e.message) } finally { setBusy(null) }
   }
 
-  const say = async () => {
-    const t = text.trim()
+  // said 是「重说」交过来的那句改完的话。不传就是输入框里那句。
+  // 跟机会线那边同一个道理：两条路共用一份，分开写迟早有一边吞掉你打的字。
+  const say = async (said) => {
+    const t = (said ?? text).trim()
     if (!t || busy) return
-    setBusy('talk'); setText('')
-    try { await sayToContact(c.id, t); await reload() }
-    catch (e) { alert(e.message); setText(t) } finally { setBusy(null) }
+    setBusy('talk'); if (said == null) setText('')
+    // run_id 不是给「终止」用的（这一栏没有终止按钮），是给「你把页面关了」用的：
+    // 脑子那边靠它把没人等的那一次掐掉。
+    const runId = crypto.randomUUID()
+    // 你说的话立刻上屏，不等它想完。
+    //
+    // 这一栏原来是 await 完再 reload()，于是**你自己发的那句要等它想完才出现**
+    // ——十几秒里屏幕上只有三个点，你连自己按没按下去都不知道。
+    // 机会线那边一直是乐观插入的，这儿是漏了。
+    const tmp = { id: 'tmp-' + Date.now(), role: 'artist', content: t, created_at: new Date().toISOString() }
+    setMsgs((m) => [...(m || []), tmp])
+    try {
+      await sayToContactStream(c.id, t, runId, (e) => {
+        // 落库了就把临时那条换成真的（带真 id、真时间），免得等下 reload 撞出两条
+        if (e.t === 'mine') setMsgs((m) => (m || []).map((x) => (x.id === tmp.id ? e.row : x)))
+        else onLive(e)
+      })
+      await reload()
+    } catch (err) {
+      // 脑子是先存你的话、再去想的，所以失败有两种：
+      //   连不上 → 一个字都没存 → 把话还回输入框，别让你白打
+      //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
+      const rows = await fetchContactMessages(c.id)
+      const landed = rows?.some((m) => m.role === 'artist' && m.content === t)
+      if (rows) setMsgs(rows)
+      else setMsgs((m) => (m || []).filter((x) => x.id !== tmp.id))
+      if (!landed) setText((cur) => cur || t)   // 期间你要是又打了别的，就别覆盖
+      alert(err.message + (landed
+        ? '（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）'
+        : '（你的话还在框里，没丢）'))
+    } finally { setBusy(null); resetLive() }
+  }
+
+  /**
+   * 重说：撤掉这句和它之后的对话，再把改完的这句发出去。跟机会线那边一套规矩。
+   *
+   * 顺序不能反 —— 先撤再发，Fairwind 拿到的才是干净的往来。
+   */
+  const resay = async (id, said) => {
+    const t = said.trim()
+    if (!t || busy) return
+    try {
+      await rewindChat(id)
+    } catch (e) {
+      // 停在编辑态：你改的字还在框里，可以再按一次
+      alert('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
+      return
+    }
+    setEditId(null)
+    setMsgs((cur) => dropFrom(cur || [], id))
+    await say(t)
   }
 
   /**
@@ -376,7 +456,28 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                       {/* 库里存的是 markdown。不渲的话「**这一类事**」在页面上
                           就是四个星号明晃晃摆着——同一份内容在机会线上是粗体，
                           在这儿是乱码，丑的那个看起来像坏了。 */}
-                      <div className="bubble md"><Md>{m.content}</Md></div>
+                      {/* 你自己说的那句能改了重说。它的回复、你记的一笔都不能——
+                          前者是它说的话，后者是你记下的事实。 */}
+                      {mine ? (
+                        <SayBubble
+                          m={m} msgs={msgs || []} editing={editId === m.id}
+                          disabled={busy === 'talk'}
+                          onStart={setEditId}
+                          onCancel={() => setEditId(null)}
+                          onResay={resay}
+                        />
+                      ) : (
+                        <div className="bubble md"><Md>{m.content}</Md></div>
+                      )}
+                      {/* 它写的是一封信。在这之前这一栏的信只能靠你选中、复制、
+                          切去 Gmail 粘贴——右栏那句「它写的草稿会出现在这儿」
+                          从来没兑现过，因为模型根本没有建产出的口。 */}
+                      {m.meta?.letter && (
+                        <LetterCard
+                          letter={m.meta.letter} body={m.content}
+                          owner={{ contactId: c.id }} onAdopted={reload}
+                        />
+                      )}
                     </div>
                   )
                 })
@@ -384,67 +485,101 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                 <p className="pf-note">还没跟 Fairwind 商量过什么。下面说一句。（跟他本人的来往在左栏）</p>
               )}
 
+              {/* 出字了就渲染成气泡（一行一行看着它想），还没出字才是三个点。
+                  跟机会线那边同一套判断。 */}
               {busy === 'talk' && (
                 <div className="msg producer">
                   <span className="who">Fairwind</span>
-                  <div className="bubble thinking"><i /><i /><i /></div>
+                  {live ? (
+                    <div className="bubble md streaming"><Md>{live}</Md></div>
+                  ) : (
+                    <div className="bubble thinking"><i /><i /><i /></div>
+                  )}
+                  {act && !live && <span className="thinking-act">{act}</span>}
                 </div>
               )}
 
-              {/* 同一个框两个去处，说清楚区别，别让你猜：
-                  一次接触有时间有先后 → 时间线；对他的认识是累积的 → 左栏关系记忆。 */}
-              <p className="pf-howto">
-                回车 = 跟 <b>Fairwind</b> 商量（这一栏只装商量，不算往来）。
-                <br />线下见了面、通了电话、微信聊了？
-                <button className="lnk" onClick={jot}
-                        disabled={busy === 'talk' || !text.trim()}>记进往来</button>
-                {/* 这次聊的常常就是某条线的事。挂上去之后那条线的卷宗里也看得见——
-                    **同时挂两边，不是搬过去**。不让 AI 猜是哪条：他可能挂着三条，
-                    猜错了那段记忆就长在错的项目上，而项目卡是你写申请时照着看的。 */}
-                {c.pursuits?.length > 0 && (
-                  <>
-                    ，也算在
-                    <select className="pf-online" value={onLine}
-                            onChange={(e) => setOnLine(e.target.value)}>
-                      <option value="">（不挂线）</option>
-                      {c.pursuits.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-                    </select>
-                    上
-                  </>
-                )}
-                ——它跟邮件一样是一次真实来往，进<b>左栏的往来</b>，并把「上次碰」记成今天。
-                <br />他在找什么、答应过什么这类<b>认识</b>，写进左栏的<b>关系记忆</b>——那儿是累积的。
-              </p>
             </div>
           </div>
 
-          {/* 输入框跟机会线那个一模一样：浮在底部、一行装不下自己长高、
-              Enter 发送 Shift+Enter 换行。isComposing 那句不能删——
-              中文输入法选词也敲 Enter，不挡的话你选个词就把半句话发出去了。 */}
-          <div className="composer">
-            <textarea
-              ref={taRef}
-              className="ph"
-              rows={1}
-              value={text}
-              disabled={busy === 'talk'}
-              placeholder={busy === 'talk'
-                ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
-                : '一起想点什么…… Fairwind 带着这个人的全部往来，你不用重讲'}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
-                e.preventDefault()
-                say()
-              }}
-            />
-            <button className="send" aria-label="发送" onClick={say}
-                    disabled={busy === 'talk' || !text.trim()}>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6"
-                      strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+          {/* 输入框和「记一笔」是一组，一起浮在底部。
+              「记一笔」处置的是**输入框里那句话**，不是对话里的某条——所以它得跟着
+              输入框走。原来它挂在时间线末尾，于是你打完字要抬头去够一个滚走了的按钮。 */}
+          <div className="composer-dock">
+            {/* 输入框跟机会线那个一模一样：一行装不下自己长高、Enter 发送
+                Shift+Enter 换行。isComposing 那句不能删——中文输入法选词也敲
+                Enter，不挡的话你选个词就把半句话发出去了。 */}
+            <div className="composer">
+              <textarea
+                ref={taRef}
+                className="ph"
+                rows={1}
+                value={text}
+                disabled={busy === 'talk'}
+                placeholder={busy === 'talk'
+                  ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
+                  : '一起想点什么…… Fairwind 带着这个人的全部往来，你不用重讲'}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+                  e.preventDefault()
+                  say()
+                }}
+              />
+                {/* 必须包一层箭头函数：onClick={say} 会把鼠标事件当第一个参数塞进去，
+                    而 say 的第一个参数现在是「重说」交过来的那句话。 */}
+                <button className="send" aria-label="发送" onClick={() => say()}
+                        disabled={busy === 'talk' || !text.trim()}>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6"
+                          strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+            </div>
+
+            {/* 回车 = 跟 Fairwind 商量；这一行 = 把同一句话记成一次真实来往。
+                同一个框两个去处，这个区别值得说清楚——但只值得说一次，所以原委
+                收进悬停一秒才出来的那层，平时这儿只有三个字。
+
+                下拉框跟着进悬浮层，没有删掉：它是**控件**不是说明。这次聊的常常
+                就是某条线的事，挂上去那条线的卷宗里也看得见（同时挂两边，不是搬
+                过去）。不让 AI 猜是哪条：他可能挂着三条，猜错了那段记忆就长在错
+                的项目上，而项目卡是你写申请时照着看的。 */}
+            <div className="jot-row"
+                 onMouseEnter={howtoIn} onMouseLeave={howtoOut}
+                 onFocusCapture={() => setHowto(true)}>
+              {/* 点完就把说明收掉：点击会让按钮拿到焦点，不收的话你刚记完
+                  它反而弹出来解释「记一笔是什么」——你显然已经知道了。 */}
+              <button className="lnk jot-go"
+                      onClick={() => { clearTimeout(howtoT.current); setHowto(false); jot() }}
+                      disabled={busy === 'talk' || !text.trim()}>记一笔</button>
+              {howto && (
+                <div className="jot-howto" role="tooltip"
+                     onMouseEnter={howtoIn} onMouseLeave={howtoOut}>
+                  <p>回车 = 跟 <b>Fairwind</b> 商量（这一栏只装商量，不算往来）。</p>
+                  <p>
+                    线下见了面、通了电话、微信聊了？写一句按 <b>记一笔</b>——
+                    它跟邮件一样是一次真实来往，进<b>左栏的往来</b>，并把「上次碰」记成今天。
+                  </p>
+                  {c.pursuits?.length > 0 && (
+                    <p className="jot-online">
+                      也算在
+                      <select className="pf-online" value={onLine}
+                              onMouseDown={() => { pinRef.current = true }}
+                              onBlur={() => { pinRef.current = false }}
+                              onChange={(e) => setOnLine(e.target.value)}>
+                        <option value="">（不挂线）</option>
+                        {c.pursuits.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                      </select>
+                      上
+                    </p>
+                  )}
+                  <p>他在找什么、答应过什么这类<b>认识</b>，写进左栏的<b>关系记忆</b>——那儿是累积的。</p>
+                  {/* 按钮灰着却不说为什么，是最招人烦的一种沉默 */}
+                  {!text.trim() && <p className="jot-need">现在灰着，是因为下面还没写字。</p>}
+                </div>
+              )}
+            </div>
           </div>
         </section>
 

@@ -247,6 +247,32 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .msg.you { align-items: flex-end; }
 .msg.you .bubble { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); max-width: 84%; }
 
+/* ── 重说：把说错的那句改了重来 ─────────────────────────────────
+   气泡本身一个像素没动。「改这句」浮在气泡左边（你的气泡靠右，左边正好空着），
+   停在这条上才出来——常驻的话每条消息旁边挂一个按钮，一屏全是钩子。
+   max-width 从 .bubble 挪到外面这层：套一层之后 84% 会变成 84% 的 84%，
+   你的气泡会一次比一次窄。 */
+.msg.you .saywrap { position: relative; max-width: 84%; }
+.msg.you .saywrap .bubble { max-width: 100%; }
+.resay-btn { position: absolute; right: 100%; top: 50%; transform: translateY(-50%);
+  margin-right: 8px; white-space: nowrap; font-size: 11.5px; color: var(--ink-3);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px 9px; cursor: pointer; opacity: 0; transition: opacity .15s, color .15s; }
+.saywrap:hover .resay-btn, .resay-btn:focus-visible { opacity: 1; }
+.resay-btn:hover { color: var(--ink); border-color: var(--line-2); }
+
+/* 编辑态：改的就是你正看着的那句，位置和宽度都跟气泡对齐。
+   底色换成纸白（气泡是品牌淡色）——一眼看得出这会儿是能打字的，不是一条消息。 */
+.resay { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+.resay-in { width: 100%; font-family: inherit; font-size: 13.5px; line-height: 1.58;
+  color: var(--ink); background: var(--paper-2); border: 1px solid var(--accent);
+  border-radius: 10px; padding: 11px 14px; outline: none; resize: none;
+  max-height: 38vh; overflow-y: auto; }
+.resay .ed-act { justify-content: flex-end; margin-top: 0; }
+/* 按下去会没掉什么，先说清楚。它必须在按钮**下面**：说在按钮上面的话，
+   你的视线是从字往下走到按钮，看完就点了；说在下面才会在按之前扫到。 */
+.resay-warn { text-align: right; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
+
 .briefcard { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 15px 16px; box-shadow: var(--shadow); }
 .byline { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .pdot { width: 17px; height: 17px; border-radius: 50%; background: var(--grad); flex: none; box-shadow: 0 0 9px -3px var(--g2); }
@@ -288,6 +314,24 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .bubble.thinking i:nth-child(3) { animation-delay: .36s; }
 @keyframes bth { 0%, 60%, 100% { opacity: .28; transform: translateY(0); } 30% { opacity: .85; transform: translateY(-3px); } }
 
+/* 正在出字的那个气泡。跟落库后的普通气泡长得一样——它就是同一段话，
+   只是还没写完，所以末尾跟一个闪的光标。不换背景色、不加边框：
+   那会让人以为这是另一种消息，而它下一秒就变成普通那条了。 */
+.bubble.streaming > :last-child::after {
+  content: ''; display: inline-block; width: 2px; height: 1em; margin-left: 2px;
+  vertical-align: text-bottom; background: var(--ink-3); animation: bcaret 1s steps(1) infinite;
+}
+@keyframes bcaret { 0%, 50% { opacity: .8; } 50.01%, 100% { opacity: 0; } }
+
+/* 它在动工具那一轮一个字都不产，得说清楚在动什么——不然那段最长的等待
+   跟「卡死了」看起来一模一样。 */
+.thinking-act { display: block; margin-top: 4px; font-size: 11.5px; color: var(--ink-3); }
+
+/* 手不想看动画就别动。光标闪成静止的一根竖线，还是看得出「在写」。 */
+@media (prefers-reduced-motion: reduce) {
+  .bubble.streaming > :last-child::after { animation: none; opacity: .8; }
+}
+
 /* ── 一级页面（我的档案 / 人际管理）──
    原来「战绩信息库」是右边划出来的抽屉。抽屉的毛病是：它默认你只是来瞄一眼。
    但这里是渡判断匹配、写申请的全部弹药，值得一整页。 */
@@ -314,6 +358,31 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .page-head .note { margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.6; }
 .page-head .note b { color: var(--ink-2); font-weight: 600; }
 .page-head .note .bx { color: var(--accent); }
+
+/* 档案页：左边一列格名，右边一次开一格。
+   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。 */
+.page-inner.wide { max-width: 1040px; }
+.lib-two { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 30px; margin-top: 26px; align-items: start; }
+.lib-rail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; }
+.rail-b { display: flex; align-items: center; gap: 10px; width: 100%; font: inherit; font-size: 13px; text-align: left;
+  padding: 8px 11px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-3);
+  cursor: pointer; transition: color .14s, background .14s; }
+.rail-b:hover:not(.on) { color: var(--ink-2); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.rail-b.on { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
+.rail-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rail-l { flex: 1; min-width: 0; }
+.rail-n { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lib-pane .kind { margin-top: 0; }
+
+/* 窄屏退回单栏：格名变成顶上一条横着滚的 chip 行。
+   -webkit-overflow-scrolling 之外不做别的——这条 rail 短，不值得再加箭头。 */
+@media (max-width: 860px) {
+  .page-inner.wide { max-width: 720px; }
+  .lib-two { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .lib-rail { position: static; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  .rail-b { width: auto; flex: none; border-color: var(--line); }
+  .rail-l { flex: none; white-space: nowrap; }
+}
 
 /* 还没做的页面：说清楚将来是什么，别假装这儿有东西 */
 .soon { margin-top: 26px; border: 1px dashed var(--line-2); border-radius: 14px; padding: 20px 22px 18px; }
@@ -345,6 +414,39 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .idhint.bad { color: var(--g2); }
 .idnote { margin-top: 10px; font-size: 11.5px; color: var(--ink-3); }
 
+/* 条目展开后那块「这条的字段」。复用上面 idrow 那一套 —— 关于你和条目
+   是同一种编辑手感，样式分两份的话它们迟早长得不一样。 */
+.efields { display: grid; gap: 2px; padding-bottom: 4px; }
+.efields .idrow { grid-template-columns: 52px 1fr; padding: 6px 0; }
+/* 只读（连不上库、看的是示范数据）：值照常显示，但不长成可改的样子 */
+.idval.ro { cursor: default; color: var(--ink-2); }
+.idval.ro:hover { background: none; }
+
+/* ── 改一格：双击进编辑，点「确定」才存 ──
+   不做失焦存 —— 那等于「点走 = 落库」，误触就写进去了，而且没有提示。 */
+.idval { cursor: default; }              /* 双击才动，别摆出单击可编辑的样子 */
+.idval:not(.ro):hover { background: var(--paper-3); }
+.ed-act { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.ed-ok, .ed-no { font: inherit; font-size: 11.5px; padding: 3px 12px; border-radius: 6px; cursor: pointer; }
+.ed-ok { background: var(--accent); color: var(--paper); border: 1px solid var(--accent); font-weight: 600; }
+.ed-ok:disabled, .ed-no:disabled { opacity: .55; cursor: default; }
+.ed-no { background: none; color: var(--ink-3); border: 1px solid var(--line-2); }
+.ed-no:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
+.ed-err { font-size: 11.5px; color: var(--g2); }
+
+/* 就地编辑：正文本身就是编辑面（条目的标题和描述） */
+.inl-can { cursor: default; border-radius: 5px; padding: 1px 5px; margin-left: -5px; }
+.inl-can:hover { background: var(--paper-3); }
+.inl-empty { color: var(--ink-3); font-style: italic; }
+.inl-edit { margin: 2px 0 4px; }
+.inl-in { display: block; width: 100%; padding: 3px 6px; margin-left: -6px;
+  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 5px;
+  color: var(--ink); resize: vertical; }
+.inl-in:focus { outline: none; }
+/* 编辑态沿用显示态的字号行高，双击的瞬间整行才不会抖 */
+.inl-in.w-t { font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
+.inl-in.w-d { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+
 .kind { margin-top: 26px; }
 .kind:first-child { margin-top: 14px; }
 .kind-h { font-family: var(--serif); font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: .02em; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
@@ -353,6 +455,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .cn-h { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 10px; }
 .works { display: flex; flex-direction: column; gap: 8px; }
 .work { border: 1px solid var(--line); border-radius: 11px; background: var(--paper-2); box-shadow: var(--shadow); overflow: hidden; }
+/* 以前是 <button>，现在是 div —— 标题和描述要能就地双击编辑，套在按钮里不行。
+   点空白处照旧展开/收起；键盘走右边那个真按钮（.chev）。 */
 .work-hd { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 12px 13px; }
 .work-hd:hover { background: color-mix(in srgb, var(--paper-2) 70%, var(--paper-3)); }
 .work-main { flex: 1; min-width: 0; }
@@ -366,7 +470,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .boxchip.filled { border-style: solid; border-color: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 .w-medium { font-size: 11px; color: var(--ink-3); }
 .src-tag { font-size: 10.5px; color: var(--ink-3); letter-spacing: .05em; }
-.chev { color: var(--ink-3); font-size: 20px; line-height: 1; transition: transform .18s; margin-top: 2px; }
+.chev { color: var(--ink-3); font-size: 20px; line-height: 1; transition: transform .18s; margin-top: 2px;
+  background: none; border: 0; padding: 0 2px; cursor: pointer; font-family: inherit; }
 .chev.open { transform: rotate(90deg); }
 .box { border-top: 1px dashed var(--line); padding: 13px 13px 14px; display: grid; gap: 8px; }
 .bx-h { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
@@ -694,6 +799,17 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .mailanchor::before { content: ""; height: 1px; background: var(--line); width: 18px; flex: none; }
 .mailanchor::after { content: ""; height: 1px; background: var(--line); flex: 1; }
 .mailanchor b { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+/* 它写的那条其实是一封信 —— 紧跟在气泡后面摆一张卡。
+   刻意做得比气泡轻：这是一个动作，不是一条新的发言。 */
+.lcard { margin: 6px 0 14px; padding: 10px 12px; border: 1px dashed var(--line-2);
+  border-radius: 10px; background: var(--paper-2); max-width: 640px; }
+.lcard-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 11.5px; }
+.lcard-tag { font-weight: 600; color: var(--ink-2); }
+/* 收件人一直摆在脸上：发错人是这条路上唯一撤不回来的错 */
+.lcard-to { color: var(--ink-3); }
+.lcard-sub { margin: 4px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.lcard-err { margin-bottom: 8px; font-size: 12px; color: var(--accent); }
+.lcard-ok { font-size: 12px; color: var(--ink-3); }
 .flash { animation: flash 1.6s ease-out; border-radius: 10px; }
 @keyframes flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
 
@@ -1088,9 +1204,41 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .fc-m { position: relative; }          /* .composer 是绝对定位的，得有个落脚点 */
 /* 输入框浮在底部，所以滚动区底下要留出它的位置，不然最后一条被压住 */
 .focus.page .fc-m .focus-inner { padding-bottom: 96px; }
-.pf-howto { font-size: 11.5px; line-height: 1.8; color: var(--ink-3);
-  margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
-.pf-howto b { color: var(--ink-2); }
+/* 名片那栏底下还多一行「记一笔」，得再让出它的高度。
+   用 :has 认那个壳，而不是给名片再加个 class——.fc-m 是两边共用的，
+   多一个只在一边出现的修饰类，下次改的人得先搞清楚它凭什么在那儿。 */
+.focus.page .fc-m:has(.composer-dock) .focus-inner { padding-bottom: 124px; }
+/* 名片中栏：输入框和「记一笔」是一组，一起浮在底部。
+   「记一笔」处置的是输入框里那句话，所以它跟着输入框走，不跟着对话走 ——
+   挂在时间线末尾的话，你打完字得抬头去够一个已经滚走了的按钮。
+   .composer 本身的绝对定位在这儿交给这个壳，免得动到机会线那边共用的那份。 */
+.composer-dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px;
+  width: min(var(--focus-col), calc(100% - 2 * var(--focus-pad))); z-index: 3; }
+.composer-dock .composer { position: static; transform: none; width: 100%; }
+
+/* 「记一笔」那一行。原来这儿摊着一整段说明，第一次之后就是每天要略过的一堵字，
+   所以缩成一个动作，原委收进悬停一秒才出来的那层。 */
+.jot-row { padding: 7px 18px 0; }
+.jot-go { font-size: 11.5px; }
+.jot-go:disabled { opacity: .45; cursor: default; }
+
+/* 说明往上开（底下没地方了），而且锚在**整组**上方而不是这一行上方——
+   锚在行上会正好糊住输入框，你看说明的时候就看不见自己写的那句话了。
+   .jot-row 不设 position，于是这里的绝对定位落在 .composer-dock 上。 */
+.jot-howto { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 20;
+  width: 340px; max-width: calc(100vw - 48px);
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--paper); border: 1px solid var(--line);
+  box-shadow: 0 6px 22px #241f1b1f;
+  font-size: 11.5px; line-height: 1.75; color: var(--ink-3);
+  animation: jotin .14s ease-out; }
+.jot-howto p { margin: 0 0 7px; }
+.jot-howto p:last-child { margin-bottom: 0; }
+.jot-howto b { color: var(--ink-2); }
+.jot-online { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.jot-need { color: var(--ink-2); }
+@keyframes jotin { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .jot-howto { animation: none; } }
 
 /* 上次碰那一句：日期底下把「上次到底发生了啥」摆出来。
    只有日期的话（「8/10 · 你记的一笔」）等于没说。 */
