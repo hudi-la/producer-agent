@@ -6,13 +6,18 @@ import { createClient } from '@supabase/supabase-js'
 // 「通不通」这件事没有一个统一的说法，所以界面只能笼统显示「种子数据」。
 // 现在集中在这儿，好让出问题时能说清是哪儿出的问题。
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+// import.meta.env 是 Vite 注进来的，`node --test` 里没有这东西——不兜的话，
+// 任何 import 到这儿的模块一进测试就崩在第 9 行，于是「碰库的模块一律测不了」。
+// 兜住之后 supa 是 null，跟「没填 .env.local」同一条路，测试里正好当没连库使。
+const env = import.meta.env || {}
+
+const url = env.VITE_SUPABASE_URL
+const anon = env.VITE_SUPABASE_ANON_KEY
 
 export const supa = url && anon ? createClient(url, anon) : null
 export const DB_CONFIGURED = !!supa
 
-export const BRAIN = import.meta.env.VITE_BRAIN_URL || 'http://localhost:8788'
+export const BRAIN = env.VITE_BRAIN_URL || 'http://localhost:8788'
 
 /** 退回种子数据的原因。null = 没退，看到的是真数据。 */
 export const FELL_BACK = {
@@ -30,7 +35,7 @@ export const FELL_BACK = {
 // 而界面完全看不出来——这已经害过一次：把「讲懂」改成后台扫之后，前端触发器删了、
 // 后台扫描没跑起来，整整一天没有一张新卡被读过，谁也没发现。
 // 所以两边各存一个日期，对不上就提示重启。改 brain/server.js 的行为时两处一起改。
-export const BRAIN_BUILD = '2026-08-12c'
+export const BRAIN_BUILD = '2026-08-16b'
 
 export async function checkBrain() {
   try {

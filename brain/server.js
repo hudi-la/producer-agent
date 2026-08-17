@@ -11,7 +11,18 @@ import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
 import { query, createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
-import { read, slice, imageBudget, isImage, IMG_CAP } from './files.js'
+import { read, slice, imageBudget, IMG_CAP } from './files.js'
+// 拼 prompt 的活儿全在 prompt.js —— 纯函数，所以有 prompt.test.js 按着。
+// 那边把一次对话切成三档：静态 systemPrompt（人格 + 档案 + 信息库，跨会话缓存）、
+// 动态 systemPrompt（这条线自己的资料）、user message（往来 + 你刚说的那句）。
+import {
+  artistOf, idOf, mailboxOf, systemFor,
+  buildSystem, buildUser, buildBriefSystem, buildBriefUser,
+} from './prompt.js'
+// 从一次「想」里挑出给人看的那一段：动工具之前说的都是工作稿。
+import { foldReply } from './reply.js'
+// 它写完一封信会在末尾报一声。摘出来存进 meta，正文里不留那行机器读的字。
+import { extractLetter } from './letter.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 
@@ -24,7 +35,7 @@ import { promote } from './mail/adopt.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-12c'
+export const BRAIN_BUILD = '2026-08-16b'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -111,187 +122,6 @@ async function addMessage(owner, role, content, kind = 'message', meta = null) {
   )
   if (error) throw new Error(`存${role === 'artist' ? '你的话' : 'Fairwind 的回复'}失败：` + error.message)
   return data
-}
-
-// 「你服务的谁」是**数据**，不是常量。原来这儿写死着 "Hu Di / hudiworks.com"，
-// 而同一批事实在 producer.profile 里也存着一份 —— 两份会飘，而且改的时候只有
-// 开 SQL 一条路。现在只有库里那一份是真的；这里每次开工现读。
-//
-// 读不到就退回一句不认人的话：宁可它说"这位艺术家"，也不要它张口就叫错名字。
-// 档案里没填就退回不认人的说法 —— 宁可说「这位艺术家」，也不要编一个。
-const artistOf  = (profile) => profile?.name || '这位艺术家'
-const idOf      = (profile) => {
-  const d = profile?.data || {}
-  const loc = Array.isArray(d.location) ? d.location.join(' / ') : d.location
-  return [d.visa, loc && `常住 ${loc}`].filter(Boolean).join('，')
-}
-const mailboxOf = (profile) => profile?.data?.email || null
-
-const systemFor = (profile) => {
-  const name = profile?.name
-  const site = profile?.website
-  const who = name ? `你服务的艺术家是 ${name}${site ? `，作品站 ${site}` : ''}。` : ''
-  return `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。${who}
-
-你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
-
-怎么做事：
-- 你是**一起想的搭档，不是自动化按钮**。你提议，动手和拍板的是 ta。
-- 协作弧：讲懂 → 一起挑作品 → 一起写。别跳步。
-- **一次只递一件事**。别一口气抛出五个待办；挑最该现在想的那一件，把它说透。
-- 你带着这条线的全部往来，所以别让 ta 重讲已经说过的事。
-- 你握着 ta 的作品网和履历（下面会给），挑作品时用它，别泛泛而谈。
-- 该查就查：机构背景、往届名单、申请要求、截止日期，用联网工具去核实，别猜。
-- 说话像个熟悉这行的人，不是客服。中文对话；给机构的草稿按对方语言写。
-- 拿不准就问 ta，别自己替 ta 决定。
-
-你不能做的：你改不了这条线的阶段、也改不了作品盒子。要动这些，说出来让 ta 点。`
-}
-
-// 履历那些「一条」的关键事实——学校名、机构、起止年份、地点——存在 meta 这个
-// jsonb 里，不是表上的列。所以这里必须按 kind 摊开：不摊，education / credit / job
-// 在 prompt 里就只剩一个光秃秃的标题，Fairwind 会如实汇报「你档案里没有这些」，
-// 而界面上明明白白写着。（这已经害过一次：它跟 Hu Di 说「教育那栏空得有点厉害」。）
-//
-// 界面上那份对应实现是 src/data/schema.js 的 subInfo()——改一边记得改另一边。
-// 故意没有共用一份：brain 是独立进程，跨包 import 前端源码是另一件事；而且两边
-// 需求不同（见下面 credit 那条）。
-//
-// 注：原来还有一条理由是「import 会连 57 条种子数据一起拖进来」——
-// 2026-08-13 骨架/血肉分家之后那条不成立了，schema.js 里一条内容都没有。
-// 要不要合成一份是独立的一刀，见 docs/specs/2026-08-13-skeleton-and-flesh-design.md 第九节。
-function entryFacts(e) {
-  const m = e.meta || {}
-  const keep = (xs) => xs.filter((x) => x && x !== '（待补）')
-  const period = keep([m.start, m.end]).join(' – ')
-  switch (e.kind) {
-    case 'education': return keep([m.school, m.year, m.location])
-    case 'job':       return keep([m.org, period, m.location])
-    case 'credit':    return keep([m.org, m.year, m.location])
-    case 'statement': return keep([m.scope])
-    default:          return []                // work / skill / offer 的事实在真列上
-  }
-}
-
-// 「战绩信息库」那一段。chat 和 brief 两条路都用它——本来是两份一模一样的复制，
-// 漏改一份就是一条路瞎、另一条路不瞎，最难查。
-function entriesBlock(entries) {
-  if (!entries.length) return []
-  const lines = ['## Ta 的作品与履历（战绩信息库）']
-  for (const e of entries) {
-    // credit 的「个展 / 群展 / 驻地 / grant / 策展」在界面上是分组标题，prompt 里
-    // 没有分组，所以要挂到 kind 标签上——不然它分不出这是个展还是群展。
-    const label = e.kind === 'credit' && e.meta?.type ? `credit · ${e.meta.type}` : e.kind
-    const bits = [e.year, e.medium, e.concern, ...entryFacts(e)].filter(Boolean).join(' · ')
-    const tags = e.tags?.length ? `〔标签：${e.tags.join(' / ')}〕` : ''
-    lines.push(`- [${label}] ${e.title}${bits ? ` (${bits})` : ''}${e.body ? ` — ${e.body}` : ''}${tags}`)
-  }
-  lines.push('')
-  return lines
-}
-
-// incoming 那句刚已经落库了，所以要从「之前的往来」里摘出去（exceptId），
-// 否则它会在 prompt 里出现两次。
-function buildPrompt({ p, msgs, entries, profile, kind, raw }, incoming, exceptId) {
-  const fact = (k, v) => (v ? `${k}：${v}\n` : '')
-  const lines = []
-
-  if (profile) {
-    lines.push('## 关于这位艺术家')
-    lines.push(JSON.stringify(profile, null, 2))
-    lines.push('')
-  }
-
-  lines.push(...entriesBlock(entries))
-  lines.push(...filesBlock(raw?.attachments))
-
-  // 一个人和一条机会线是两种东西：线有阶段和截止推着，人只有「你们是什么关系」。
-  // 所以这一段分岔，往来那一段以下完全共用。
-  if (kind === 'contact') {
-    lines.push('## 这个人')
-    lines.push(
-      fact('名字', p.name) + fact('机构', p.org) + fact('他管什么', p.role) +
-      fact('邮箱', p.email) + fact('谁介绍的', p.intro_by_name) +
-      fact('上次碰', p.last_touch_at && `${p.last_touch_at}（${
-        { email: '来自那封信', checkin: '你打的卡', meet: '你记的一笔' }[p.last_touch_src] || '来源不明'}）`) +
-      fact('说好什么时候再碰', p.next_touch_at && `${p.next_touch_at}${p.next_touch_why ? ` —— ${p.next_touch_why}` : ''}`) +
-      fact('关系记忆', p.notes) +
-      fact('他挂着的机会线', (p.pursuits || []).map((x) => x.title).join('、'))
-    )
-    lines.push('')
-    lines.push('写给他的信按对方语言写。**别写纯问候**——在美国，「just checking in」/「hope you\'re well」' +
-               '是公认最没用的邮件。每一封都得带一个由头：有新作品 / 看到个东西想到他 / 要去他的城市 / 恭喜他那个展。')
-    lines.push('')
-  } else {
-    lines.push('## 这条机会线')
-    lines.push(
-      fact('标题', p.title) + fact('机构', p.org) + fact('地点', p.location) +
-      fact('类型', p.kind) + fact('资助', p.funding) + fact('截止', p.deadline) +
-      fact('官方页面', p.url) + fact('当前阶段', p.stage) +
-      fact('为什么可能合适', p.why) + fact('备注', p.notes) +
-      (p.eligible === false
-        ? `⚠️ 资格搁置：目前身份${idOf(profile) ? `（${idOf(profile)}）` : ''}不满足这条线的要求，先别推进申请。\n`
-        : '')
-    )
-  }
-
-  const history = msgs.filter((m) => m.id !== exceptId)
-  if (history.length) {
-    lines.push('## 你们之前的往来（从早到晚）')
-    for (const m of history) {
-      const who = m.role === 'artist' ? artistOf(profile) : m.role === 'producer' ? '你（Fairwind）' : m.role
-      const tag = m.kind && m.kind !== 'message' ? `〔${m.kind}〕` : ''
-      lines.push(`${who}${tag}：${m.content}`)
-    }
-    lines.push('')
-  } else {
-    lines.push('（还没有往来，刚开始。）\n')
-  }
-
-  lines.push('## Ta 刚说')
-  lines.push(incoming)
-  lines.push('')
-  lines.push('回应 ta。直接说话，不要写「好的，我来回应」这类前言，也不要复述上面的资料。')
-  return lines.join('\n')
-}
-
-// 「讲懂」：新卡进来，Fairwind 去官方渠道核实并写一段大致了解。
-function buildBriefPrompt({ p, entries, profile }) {
-  const fact = (k, v) => (v ? `${k}：${v}\n` : '')
-  const lines = []
-
-  if (profile) {
-    lines.push('## 关于这位艺术家')
-    lines.push(JSON.stringify(profile, null, 2))
-    lines.push('')
-  }
-  lines.push(...entriesBlock(entries))
-
-  lines.push('## 要讲懂的机会（卡上现有信息，可能不全或过时）')
-  lines.push(
-    fact('标题', p.title) + fact('机构', p.org) + fact('地点', p.location) +
-    fact('类型', p.kind) + fact('资助', p.funding) + fact('截止（未必准）', p.deadline) +
-    fact('已有链接', p.url) + fact('来源', p.source) + fact('备注', p.notes)
-  )
-  lines.push('')
-  lines.push(`## 你的任务：把这个机会「讲懂」
-去官方渠道核实（用 WebSearch / WebFetch，别猜）：
-1. 这一届/这一轮是不是真的开放？找到官方页面。
-2. 真实截止日期——聚合站上的常是上一届残留，以官方为准。
-3. 申请要什么（材料、流程）。
-4. 有没有国籍 / 居留 / 工作权限制——对照这位艺术家的身份（${idOf(profile) || '档案里没填，别猜；拿不准就说需要确认'}）。ta 能不能申？
-5. 跟 ta 的作品和方向契合吗？值不值得投？
-
-然后用简洁中文写一段「讲懂」给 ta 看——像个熟这行的搭档在讲，不是复述资料。一次只递这一件事：说清楚"这机会到底是什么、关键事实、能不能申、值不值得"，最后给一句"要不要批准往下走"。别写前言。
-
-写完，另起一行，在**最后只输出一行**机器读的事实（查不到就填 null，绝不编造）：
-[[FACTS]]{"url":"官方页面URL或null","deadline":"截止的原文或null","deadline_at":"YYYY-MM-DD或null","opens_at":"YYYY-MM-DD或null","eligible":true或false}
-
-关于这几个日期：
-- deadline 填**官方的原话**（"March 15, 2027"、"spring 2027"、"rolling" 都照抄）
-- deadline_at 只在能定到具体某一天时才填；"spring 2027" 这种定不下来就填 null，别猜一个
-- opens_at 是**开始接受申请**的日子。已经开放了就填 null——已经开的门不用再报开门时间`)
-  return lines.join('\n')
 }
 
 // 从 Fairwind 的回复尾部摘出机器读的事实行，并把它从展示文本里去掉。
@@ -413,58 +243,147 @@ function filesServer(atts) {
   })
 }
 
-// prompt 里那份清单：只有名字/类型/多大/哪来的，**没有内容**。
-function filesBlock(atts) {
-  if (!atts?.length) return []
-  const lines = ['## 这条线上的文件']
-  let anyImage = false
-  for (const a of atts) {
-    const img = isImage(a.filename, a.mime)
-    if (img) anyImage = true
-    const size = a.bytes ? `${(a.bytes / 1024).toFixed(0)} KB` : ''
-    // 标出哪份是图：不标的话「按需开」是句空话——它得先知道哪几份开起来是贵的
-    const bits = [img ? '图' : '', size, a.source === 'mail' ? '从一封信的附件来' : '他传的']
-      .filter(Boolean).join(' · ')
-    lines.push(`- ${a.filename}${bits ? `（${bits}）` : ''}`)
-  }
-  lines.push('要看里面写了什么，用 open_file 开。别猜内容——没开过就说没看过。')
-  if (anyImage) {
-    lines.push(`标了「图」的那几份你能直接看见，但它们进来就一直占着上下文、每一轮都重付——只在真需要看图里的东西时才开，一条对话最多 ${IMG_CAP} 张。`)
-  }
-  lines.push('')
-  return lines
-}
+/**
+ * 让它想。
+ *
+ * onEvent 传了，就一边想一边把字报出去（SDK 的 includePartialMessages）。
+ * 不传的行为跟以前一模一样 —— 「讲懂」「认人」这些后台活没人盯着屏幕，
+ * 不该为一份没人看的预览多解析一遍事件。
+ *
+ * **报出去的字和存进库的字是两份。** 库里那份仍旧从 assistant 消息的 text 块攒
+ * （下面的 out），delta 只是给眼睛看的预览。delta 可能丢、可能顺序怪，
+ * 落库的内容不能将就这个。
+ */
+/**
+ * system 收三种东西，都认：
+ *   · 块数组 ['静态', BOUNDARY, '动态']  —— 新路子。静态块拿的是跨会话的缓存作用域。
+ *   · 一段字符串                        —— 直接当 systemPrompt 使。
+ *   · profile 对象 / null               —— 老路子，等于「只要人格」。
+ *
+ * 第三种是给后台那五处活儿（收信 / 认人 / 查 thread / 消化 / 建草稿）留的：
+ * 它们的 prompt 里本来就没有战绩信息库，不能因为改缓存反倒给它们每次塞进两万字符。
+ * 一个字都不用改，是这条兜底的全部意义。
+ */
+const asSystem = (s) => (typeof s === 'string' || Array.isArray(s) ? s : systemFor(s))
 
-async function think(prompt, tools = READ_TOOLS, profile = null, abortController = null, mcpServers = null) {
-  const out = []
+async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null) {
+  // 按发生顺序收下 text / tool_use 两种块，最后交给 foldReply 挑出「给人看的那段」。
+  // 原来这儿是 out.push(b.text) 无差别攒 —— 于是 20 轮的英文工作稿全被拼进落库的回复。
+  const blocks = []
   let usage = null
+  // 界面那头断了不该带崩这一轮 —— 它还得把回复写进库里。
+  const tell = onEvent ? (e) => { try { onEvent(e) } catch (_) {} } : null
+  let said = false   // 已经报过字没有：决定要不要在下一块前面补个换行
+  const toldTools = new Set()   // 已经报过的 tool_use id，挡住流和消息两条路的重复
+
+  // 「首字多久到」是这条路唯一要紧的健康指标。总耗时看不出问题：
+  // 边想边出字的意义全在第一个字来得早，而它可能被思考、被工具、被
+  // 一大坨上下文的 TTFT 推后——不记时间就只能猜是哪一个。
+  const t0 = Date.now()
+  const secs = () => ((Date.now() - t0) / 1000).toFixed(1) + 's'
+  let firstAt = null, thoughtAt = null
   for await (const m of query({
     prompt,
     options: {
-      systemPrompt: systemFor(profile),   // 完全自定义人格，不加载 Claude Code 那套编码 prompt
+      // 完全自定义人格，不加载 Claude Code 那套编码 prompt。
+      // 传数组时每一块拿自己的缓存作用域——分界标记之前的是全局的（跨会话、
+      // 跨这个进程重启都可能命中），之后的只活在这一次。
+      systemPrompt: asSystem(system),
       allowedTools: tools,
       permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
       maxTurns: 20,
+      ...(tell ? { includePartialMessages: true } : {}),
       ...(abortController ? { abortController } : {}),
       ...(mcpServers ? { mcpServers } : {}),
     },
   })) {
+    // 边想边报。out 是按 text 块攒、最后 join('\n') 的，所以第二块起要先补个
+    // 换行，不然预览比最终文本少几个换行，最后换那一下页面会跳。
+    if (tell && m.type === 'stream_event') {
+      const ev = m.event
+      if (ev?.type === 'content_block_start' && ev.content_block?.type === 'text' && said) {
+        tell({ t: 'delta', text: '\n' })
+      }
+      if (ev?.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && ev.delta.text) {
+        if (firstAt === null) { firstAt = Date.now() - t0; console.log(`  ↳ 首字 ${secs()}`) }
+        said = true
+        tell({ t: 'delta', text: ev.delta.text })
+      }
+      // 工具块一开始就报，不等这一轮生成完。
+      //
+      // 为什么要抢这半秒：界面收到 tool 就把刚画出来的字抹掉（那是工作稿）。
+      // 等 assistant 消息到了才报的话，开场白那行英文早已经在屏幕上待了一会儿，
+      // 抹掉也来不及了——人已经看见了。
+      if (ev?.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+        const id = ev.content_block.id
+        if (!toldTools.has(id)) {
+          toldTools.add(id)
+          console.log(`  ↳ 动工具 ${secs()}：${ev.content_block.name}`)
+          tell({ t: 'tool', name: ev.content_block.name })
+        }
+      }
+      // 它在想（自适应思考）。思考不产可见的字，是「首字为什么这么晚」
+      // 最可能的答案之一——记一笔，好把它跟工具、跟 TTFT 分开。
+      if (ev?.type === 'content_block_delta' && ev.delta?.type === 'thinking_delta' && thoughtAt === null) {
+        thoughtAt = Date.now() - t0
+        console.log(`  ↳ 开始想 ${secs()}`)
+        tell({ t: 'thinking' })
+      }
+    }
     if (m.type === 'assistant') {
-      for (const b of m.message.content) if (b.type === 'text') out.push(b.text)
+      for (const b of m.message.content) {
+        if (b.type === 'text' || b.type === 'tool_use') blocks.push(b)
+        // 兜底：上面那条走的是 partial 流，万一某个版本的 SDK 不发 tool_use 的
+        // content_block_start，这儿还能补报一次。toldTools 挡住重复。
+        // 联网查资料那一轮一个字都不产。不报工具的话，界面在最长的那段等待里
+        // 跟改之前一模一样 —— 三个死点，看不出它到底在干嘛。
+        if (tell && b.type === 'tool_use' && !toldTools.has(b.id)) {
+          toldTools.add(b.id)
+          console.log(`  ↳ 动工具 ${secs()}：${b.name}`)
+          tell({ t: 'tool', name: b.name })
+        }
+      }
     }
     if (m.type === 'result') {
-      usage = { ms: m.duration_ms, turns: m.num_turns, subtype: m.subtype }
+      // 记账。原来这儿只留了耗时和轮数，把 SDK 给的 token 数直接扔了——
+      // 于是「这个月怎么涨这么快」只能靠猜，改完也不知道有没有改对。
+      // cacheRead 是这次改动的验收指标：静态块要是真跨会话命中了，
+      // 它应该稳定在信息库那个量级上；一直接近 0 就是断点没落到该落的地方。
+      const u = m.usage || {}
+      usage = {
+        ms: m.duration_ms, turns: m.num_turns, subtype: m.subtype, firstMs: firstAt,
+        inp: u.input_tokens || 0,
+        cacheRead: u.cache_read_input_tokens || 0,
+        cacheWrite: u.cache_creation_input_tokens || 0,
+        out: u.output_tokens || 0,
+        usd: m.total_cost_usd || 0,
+      }
       if (m.subtype !== 'success') throw new Error('Fairwind 没想完：' + m.subtype)
     }
   }
-  const text = out.join('\n').trim()
+  // 每一次动模型都报一次账，不只是聊天那条路——「讲懂」「收信」「消化」
+  // 也在花钱，而它们全在后台跑，没人盯着屏幕。不报的话，涨得快是查不出来源的。
+  const n = (x) => x.toLocaleString('en-US')
+  console.log(`  ↳ token：新读 ${n(usage.inp)} / 缓存读 ${n(usage.cacheRead)} / 缓存写 ${n(usage.cacheWrite)} / 出 ${n(usage.out)}` +
+              (usage.usd ? ` / $${usage.usd.toFixed(4)}` : ''))
+
+  // 动工具之前说的话都是工作稿，不是回答（判据见 reply.js）。工作稿不扔，
+  // 跟着 notes 回去存进消息的 meta —— 里面是真查到的东西，只是不该摆在她眼前，
+  // 也不该每轮都重新塞进 prompt。
+  const { text, notes, recovered } = foldReply(blocks)
+  if (notes.length) {
+    const 字 = notes.reduce((n, s) => n + s.length, 0)
+    console.log(`  ↳ 工作稿 ${notes.length} 段 / ${n(字)} 字符 —— 收进 meta，不进回复也不进下一轮 prompt`)
+  }
+  // 顶上来的必须说出来。悄悄把工作稿当回答端出去，就是这次要治的那个病本身。
+  if (recovered) console.log('  ⚠️ 最后一轮它一个字没说，拿最后一段工作稿顶上了')
   if (!text) throw new Error('Fairwind 没说话（空回复）')
-  return { text, usage }
+  return { text, usage, notes, recovered }
 }
 
 // ── HTTP ────────────────────────────────────────────────────
 
-async function handleChat(body) {
+async function handleChat(body, onEvent = null) {
   const { text, meta, run_id } = body
   const owner = ownerOf(body)
   if (!owner || !text?.trim()) throw new Error('要有 pursuit_id 或 contact_id，外加 text')
@@ -473,6 +392,8 @@ async function handleChat(body) {
   // meta 只贴在**你这条**上——它记的是「你这句是怎么发出来的」（群发/单发），
   // 不是这条线的属性，更不是 Fairwind 回复的属性。
   const mine = await addMessage(owner, 'artist', text.trim(), 'message', meta || null)
+  // 早点报出去：界面拿它把乐观插入的那条临时消息换成真的（带 id、带时间）。
+  onEvent?.({ t: 'mine', row: mine })
 
   const ctx = await loadOwnerContext(owner)
   // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件。
@@ -486,10 +407,11 @@ async function handleChat(body) {
 
   const ac = run_id ? new AbortController() : null
   if (ac) RUNS.set(run_id, ac)
-  let reply, usage
+  let reply, usage, notes, recovered
   try {
-    ;({ text: reply, usage } = await think(
-      buildPrompt(ctx, text.trim(), mine.id), tools, ctx.profile, ac, servers,
+    ;({ text: reply, usage, notes, recovered } = await think(
+      // user message 只剩往来 + 你刚说的那句；档案、信息库、卡上字段都进了 systemPrompt。
+      buildUser(ctx, text.trim(), mine.id), tools, buildSystem(ctx), ac, servers, onEvent,
     ))
   } catch (err) {
     // 你按了终止：不写回复，也不算出错。你那条留着（是你说的话，不是它想的）。
@@ -501,9 +423,23 @@ async function handleChat(body) {
   } finally {
     if (run_id) RUNS.delete(run_id)
   }
-  console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
+  // 首字比总耗时要紧：边想边出字的意义全在第一个字来得早。
+  const firstSay = usage.firstMs != null ? ` / 首字 ${(usage.firstMs / 1000).toFixed(1)}s` : ''
+  console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s${firstSay}`)
 
-  const theirs = await addMessage(owner, 'producer', reply)
+  // 信封摘出来存进 meta，**正文里不留那行机器读的字**——留着的话，你从
+  // 气泡里复制走的时候会把它一起粘进 Gmail。界面据 meta.letter 画那张信卡。
+  const { clean: shown, letter } = extractLetter(reply)
+
+  // 工作稿存进 meta：不摆在她眼前、不进下一轮 prompt，但一个字都没销毁，
+  // 查得回来。recovered 也记一笔——那条回复是拿工作稿顶上的，将来看日志得认得出。
+  const extra = {
+    ...(notes?.length ? { notes } : {}),
+    ...(recovered ? { recovered: true } : {}),
+    ...(letter ? { letter } : {}),
+  }
+  const theirs = await addMessage(owner, 'producer', shown, 'message',
+    Object.keys(extra).length ? extra : null)
   return { mine, reply: theirs }
 }
 
@@ -550,7 +486,7 @@ async function handleBrief(body) {
   const existing = ctx.msgs.find((m) => m.kind === 'brief')
   if (existing) return { brief: existing, skipped: true }
 
-  const { text, usage } = await think(buildBriefPrompt(ctx), READ_TOOLS, ctx.profile)
+  const { text, usage, notes } = await think(buildBriefUser(ctx), READ_TOOLS, buildBriefSystem(ctx))
   const { clean, facts } = extractFacts(text)
 
   // 日期只认 YYYY-MM-DD。模型偶尔会把 "spring 2027" 塞进日期字段，
@@ -571,7 +507,9 @@ async function handleBrief(body) {
     else console.log(`  ↳ 回填：${JSON.stringify(facts)}`)
   }
 
-  const brief = await addMessage(pursuit_id, 'producer', clean, 'brief')
+  // 「讲懂」是联网活儿，工作稿只多不少（八条中招的里面六条是 brief）。同样收进 meta。
+  const brief = await addMessage(pursuit_id, 'producer', clean, 'brief',
+    notes?.length ? { notes } : null)
   return { brief, facts, usage }
 }
 
@@ -1123,6 +1061,59 @@ const server = http.createServer(async (req, res) => {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })
       }
+    })
+    return
+  }
+
+  // 同一件事，只是边想边吐字。跟 /chat 共用 handleChat —— 不复制一份业务逻辑，
+  // 复制了两条路早晚走岔（一条落了库另一条没落，这种岔子最难发现）。
+  //
+  // /chat 没有下岗：群发是对 N 条线并行说同一句，没有哪条时间线能流给你看。
+  if (req.method === 'POST' && req.url === '/chat/stream') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      res.writeHead(200, {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache, no-transform',
+        connection: 'keep-alive',
+        'x-accel-buffering': 'no',
+      })
+      // 界面那头断了写不进去是常事（关页面、切走）。写不进去不该往上抛：
+      // 这一轮还得想完、还得把回复落库——没人看着不等于这次活白干。
+      const frame = (o) => {
+        if (res.writableEnded || res.destroyed) return
+        try { res.write(`data: ${JSON.stringify(o)}\n\n`) } catch (_) {}
+      }
+      let body = {}
+      try {
+        body = JSON.parse(raw || '{}')
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}（流）`)
+        console.log(`  ${String(body.text).slice(0, 50)}`)
+      } catch (err) {
+        frame({ t: 'error', error: '请求读不动：' + err.message })
+        return res.end()
+      }
+
+      // 你把页面关了 / 切走了：这一次也掐掉。不掐的话它继续想完、继续写库，
+      // 而没有任何人在等这份回复。
+      let done = false
+      res.on('close', () => {
+        if (done || !body.run_id) return
+        const ac = RUNS.get(body.run_id)
+        if (ac) { console.log('  ↳ 界面断了，掐掉这一次'); ac.abort(); RUNS.delete(body.run_id) }
+      })
+
+      try {
+        const out = await handleChat(body, frame)
+        done = true
+        frame(out.aborted ? { t: 'done', aborted: true } : { t: 'done', reply: out.reply })
+      } catch (err) {
+        done = true
+        console.error('✗', err.message)
+        frame({ t: 'error', error: err.message })
+      }
+      res.end()
     })
     return
   }
