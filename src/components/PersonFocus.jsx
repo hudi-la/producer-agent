@@ -9,6 +9,7 @@ import Pool from './Pool.jsx'
 import { MailList } from './Mail.jsx'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
+import { sendLetterNow } from '../lib/letters.js'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
   fetchThreads, fetchContactDeliverables,
@@ -254,8 +255,27 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
     try {
       const out = await draftToGmail(id)
       await reload()
-      alert(`放进草稿箱了${out.to ? `（收信人 ${out.to}）` : ''}。去 Gmail 里改完按发送——系统没有发送这个能力。`)
+      // 这条是**退路**，不是主路：要加附件（作品集 PDF）的信走它。
+      // 主路是右栏那颗「发送」，那颗直接发，发完当场记进左栏往来。
+      alert(`放进草稿箱了${out.to ? `（收信人 ${out.to}）` : ''}。去 Gmail 里挂上附件再按发送。`)
     } catch (e) { alert(e.message) } finally { setBusy(null) }
+  }
+
+  // 真发。两段确认：armed 是「上膛」，再按一下才出去。
+  const [armed, setArmed] = useState(null)
+  const doSend = async (id) => {
+    if (busy) return
+    setBusy('send')
+    try {
+      await sendLetterNow({ contactId: c.id }, id)
+      setArmed(null)
+      await reload()
+      onChanged?.()
+    } catch (e) {
+      setArmed(null)
+      // 授权掉了要说人话，别让你对着一句 HTTP 401 猜
+      alert(e.needsAuth && e.fix ? `${e.message}\n\n${e.fix}` : e.message)
+    } finally { setBusy(null) }
   }
 
   const channels = (Array.isArray(c.channels) && c.channels.length)
@@ -588,7 +608,8 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
           <div className="pf-sect-h"><span>要发的信</span></div>
           {dels.length === 0 ? (
             <p className="pf-note">
-              还没有要发的信。在中栏跟 Fairwind 说「帮我回他」，它写的草稿会出现在这儿。
+              还没有要发的信。在中栏跟 Fairwind 说「帮我回他」——它写完会在那条回复下面
+              摆一张信卡，点「收进产出」，信就落到这儿，改完在这儿发。
             </p>
           ) : dels.map((d) => (
             <div key={d.id} className="pf-del">
@@ -597,15 +618,27 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                 <span className="pf-tag">{d.status === 'final' ? '已定稿' : '草稿'}</span>
               </div>
               <div className="pf-body">{d.body}</div>
-              {/* 只建草稿，不发送 —— 不是我们关掉的，是 Gmail 连接器整套工具里就没有 send。
-                  最后那下发送永远是你的手。 */}
-              <button className="lnk" disabled={busy === 'gmail' || !d.body?.trim()}
-                      onClick={() => toGmail(d.id)}>
-                {d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进 Gmail 草稿箱'}
+              {/* 发送键在你手上：这个口**不在模型的工具白名单里**，
+                  只有这颗按钮能触发它。它写得出信，按不了发送键。
+                  收件人明摆在按钮上——发错人是这条路上唯一撤不回来的错。 */}
+              <button className="lnk send"
+                      disabled={busy || !d.body?.trim() || !d.meta?.to}
+                      onClick={() => (armed === d.id ? doSend(d.id) : setArmed(d.id))}
+                      onBlur={() => setArmed(null)}>
+                {busy === 'send' ? '正在发……'
+                  : armed === d.id ? `确认发给 ${d.meta.to}`
+                  : d.meta?.to ? `发送 → ${d.meta.to}` : '发送（没有收件人）'}
               </button>
-              {d.meta?.gmail_draft_id && (
-                <div className="pf-note">草稿箱里有一份。<b>发送要你自己在 Gmail 里按。</b></div>
-              )}
+              {armed === d.id
+                ? <div className="pf-note warn">按下去信就出去了，撤不回来。</div>
+                : d.meta?.to && <div className="pf-note">发出后当场记进左栏往来，这份就不在这儿了。</div>}
+              {/* 退路：要加附件的信走这条 */}
+              <button className="lnk" disabled={busy || !d.body?.trim()}
+                      onClick={() => toGmail(d.id)}
+                      title="要加附件的信走这条：放进草稿箱，去 Gmail 挂上附件再发">
+                {busy === 'gmail' ? '正在放……'
+                  : d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进草稿箱（要加附件时）'}
+              </button>
             </div>
           ))}
         </aside>

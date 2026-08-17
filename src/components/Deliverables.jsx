@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { checkRules, itemProgress } from '../lib/rules.js'
 import { editDeliverable, setFinal, newDeliverable, deleteDeliverable, putInDraftbox } from '../lib/deliverables.js'
+import { sendLetterNow } from '../lib/letters.js'
 
 // 右栏：交付。
 //
@@ -89,37 +90,71 @@ function Checklist({ d, onErr, onChanged, pursuitId }) {
 }
 
 function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(null)
+  // 两段确认的第二段：按第一下只是「上膛」，第二下才真发。
+  const [armed, setArmed] = useState(false)
   const isMail = d.kind === 'email'
-  const inBox = !!d.meta?.gmail_draft_id
+  const to = d.meta?.to || null
 
   // 文字类：定稿 = 搬到左栏。
-  // 邮件类：**定稿不在这一步**。这颗按钮只把信放进 Gmail 草稿箱，状态照旧留在右栏——
-  // 只有你在 Gmail 里真按了发送、下次收信把它当成一封真信收回来，
-  // 它才归到左栏往来，球权也才跟着翻。不这么分的话，系统会替你撒一个
-  // 你察觉不到的谎：那条线显示「等回复」，而信还躺在草稿箱里没人收到。
-  async function go() {
-    setBusy(true)
+  //
+  // 邮件类：**定稿这个动作不存在**，它的终点是「发出去」。发出去之后这份产出
+  // 就从右栏消失了——产出装的是「还没交出去的东西」，交出去了它就成了左栏往来
+  // 里一条真信。这样右栏永远只剩欠着的，一眼知道还欠什么。
+  //
+  // （2026-08-16 之前这儿只有「放进 Gmail 草稿箱」，最后那下发送要你切去
+  // 邮箱按。那条路留着当退路——要加附件的信还得走它。）
+  async function go(what) {
+    setBusy(what)
     try {
-      if (isMail) await putInDraftbox(pursuitId, d.id)
+      if (what === 'send') await sendLetterNow({ pursuitId }, d.id)
+      else if (what === 'draft') await putInDraftbox(pursuitId, d.id)
       else await setFinal(d.id, true)
+      setArmed(false)
       await onChanged?.()
-    } catch (e) { onErr?.(e.message) } finally { setBusy(false) }
+    } catch (e) {
+      setArmed(false)
+      // 授权掉了要说人话，别让你对着一句 HTTP 401 猜
+      onErr?.(e.needsAuth && e.fix ? `${e.message}（${e.fix}）` : e.message)
+    } finally { setBusy(null) }
   }
 
+  if (!isMail) {
+    return (
+      <div className="dv-acts">
+        <button className="b primary" disabled={!allOk || busy} onClick={() => go('final')}
+          title={allOk ? '' : '规则没过，先把上面那几条弄对'}>
+          {busy ? '定稿中……' : '定稿'}
+        </button>
+        {!allOk && <span className="dv-why">规则没过，定不了稿</span>}
+      </div>
+    )
+  }
+
+  const canSend = allOk && !!to && !busy
   return (
     <div className="dv-acts">
-      <button className="b primary" disabled={!allOk || busy} onClick={go}
-        title={allOk ? '' : '规则没过，先把上面那几条弄对'}>
-        {busy ? (isMail ? '正在放……' : '定稿中……')
-          : isMail ? (inBox ? '重放一版进草稿箱' : '放进 Gmail 草稿箱') : '定稿'}
+      {/* 收件人明摆在按钮上，不许藏在折叠里——**发错人是这条路上唯一
+          撤不回来的错**。别的都能补：改错字能再发一封，主题不好看下次注意；
+          发给了不该发的人补不回来。 */}
+      <button className="b primary" disabled={!canSend}
+        onClick={() => (armed ? go('send') : setArmed(true))}
+        onBlur={() => setArmed(false)}
+        title={!allOk ? '规则没过，先把上面那几条弄对' : !to ? '这份产出上没有收件人' : ''}>
+        {busy === 'send' ? '正在发……' : armed ? `确认发给 ${to}` : '发送'}
       </button>
-      {!allOk && <span className="dv-why">规则没过，{isMail ? '放不进去' : '定不了稿'}</span>}
-      {isMail && allOk && !busy && (
-        <span className="dv-why">
-          {inBox ? '在你草稿箱里了 —— 发送要你自己按' : '放进草稿箱不等于发出去，球权不会跟着翻'}
-        </span>
-      )}
+      {armed
+        ? <span className="dv-why warn">按下去信就出去了，撤不回来。</span>
+        : <span className="dv-why">{
+            !allOk ? '规则没过，发不了'
+              : !to ? '没有收件人，发不了'
+              : `发给 ${to} · 发出后当场记进左栏往来`
+          }</span>}
+      {/* 退路：要加附件（作品集 PDF）的信走这条——放进草稿箱，去 Gmail 挂上附件再发。 */}
+      <button className="b" disabled={!allOk || busy} onClick={() => go('draft')}
+        title="要加附件的信走这条：放进草稿箱，去 Gmail 挂上附件再发">
+        {busy === 'draft' ? '正在放……' : d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进草稿箱'}
+      </button>
     </div>
   )
 }
@@ -160,7 +195,7 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
                 : d.kind === 'email' && d.meta?.gmail_draft_id ? 'ready' : 'draft')}>
                 {waiting ? '等前一份定稿'
                   : d.blocked_by ? '挡住了'
-                  : d.kind === 'email' && d.meta?.gmail_draft_id ? '在草稿箱 · 等你按发送'
+                  : d.kind === 'email' && d.meta?.gmail_draft_id ? '在草稿箱 · 那份要你自己按'
                   : prog ? `${prog.hit} / ${prog.total}` : '你在改'}
               </span>
             </div>

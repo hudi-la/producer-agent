@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { saveProfile, useProfile } from '../lib/profile.js'
+import { EditRow } from './EditRow.jsx'
 
 // 「关于你」——档案页最上面那一块。
 //
@@ -13,7 +14,9 @@ import { saveProfile, useProfile } from '../lib/profile.js'
 
 // key 是 profile.data 里的键；list 表示存的是数组，界面上用「、」分隔。
 const FIELDS = [
-  { key: 'email', label: '邮箱', hint: 'Fairwind 往这个账号的草稿箱里放信。填错了草稿会建到别处去。' },
+  // 发信身份不许对不上：**用错身份发出去的信连道歉都没处发**——
+  // 对方看到一个陌生地址，而你在自己的已发送里找不到它。brain 那头会当场拒发。
+  { key: 'email', label: '邮箱', hint: 'Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。' },
   { key: 'visa', label: '身份', hint: '例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。' },
   { key: 'location', label: '常住', list: true, hint: '多个地方用「、」分开。' },
   { key: 'career_stage', label: '阶段', hint: '例：emerging、mid-career。' },
@@ -22,60 +25,7 @@ const FIELDS = [
   { key: 'watch_rule', label: '关注规则', long: true, hint: '够不着但值得盯的，按这条留下来。' },
 ]
 
-const toText = (v, list) => (v == null ? '' : list && Array.isArray(v) ? v.join('、') : String(v))
-const fromText = (s, list) =>
-  list ? s.split(/[、,，]/).map((x) => x.trim()).filter(Boolean) : s.trim()
-
-/** 一行。点一下改，失焦存，Esc 放弃——跟卡上「记一笔」同一套手感。 */
-function Row({ label, value, hint, long, list, onSave }) {
-  const [editing, setEditing] = useState(false)
-  const [text, setText] = useState(() => toText(value, list))
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState(null)
-
-  // 别处改了（另一个标签页、或刚存完重新读），没在编辑就跟着更新
-  useEffect(() => { if (!editing) setText(toText(value, list)) }, [value, list, editing])
-
-  const commit = async () => {
-    setEditing(false)
-    const next = fromText(text, list)
-    if (toText(next, list) === toText(value, list)) return
-    setSaving(true); setErr(null)
-    try { await onSave(next) } catch (e) { setErr(e.message); setText(toText(value, list)) }
-    setSaving(false)
-  }
-
-  const onKey = (e) => {
-    if (e.key === 'Escape') { setText(toText(value, list)); setEditing(false) }
-    if (e.key === 'Enter' && !long && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.blur() }
-  }
-
-  const empty = !toText(value, list)
-
-  return (
-    <div className="idrow">
-      <div className="idk">{label}</div>
-      <div className="idv">
-        {editing ? (
-          long ? (
-            <textarea className="idin" value={text} rows={3} autoFocus
-              onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={onKey} />
-          ) : (
-            <input className="idin" value={text} autoFocus
-              onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={onKey} />
-          )
-        ) : (
-          <button className={'idval' + (empty ? ' empty' : '')} onClick={() => setEditing(true)}>
-            {empty ? '＋ 填一下' : toText(value, list)}
-          </button>
-        )}
-        {hint && <div className="idhint">{hint}</div>}
-        {saving && <div className="idhint">存……</div>}
-        {err && <div className="idhint bad">没存上：{err}</div>}
-      </div>
-    </div>
-  )
-}
+// 那个 Row 搬去了 EditRow.jsx —— 档案页的条目要用同一套手感（见那个文件顶上的说明）。
 
 export default function Identity({ onSaved }) {
   const profile = useProfile()
@@ -88,12 +38,12 @@ export default function Identity({ onSaved }) {
     <section className="kind identity">
       <div className="kind-h">关于你</div>
       <div className="idbox">
-        <Row label="名字" value={profile?.name}
+        <EditRow label="名字" value={profile?.name}
              onSave={(v) => after(() => saveProfile({ name: v }))} />
-        <Row label="作品站" value={profile?.website}
+        <EditRow label="作品站" value={profile?.website}
              onSave={(v) => after(() => saveProfile({ website: v }))} />
         {FIELDS.map((f) => (
-          <Row key={f.key} label={f.label} value={d[f.key]} hint={f.hint} long={f.long} list={f.list}
+          <EditRow key={f.key} label={f.label} value={d[f.key]} hint={f.hint} long={f.long} list={f.list}
                onSave={(v) => after(() => saveProfile({ data: { [f.key]: v } }))} />
         ))}
       </div>

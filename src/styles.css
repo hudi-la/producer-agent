@@ -850,6 +850,12 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .dv-acts .b:not(:disabled):hover { filter: brightness(1.06); }
 .dv-acts .b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dv-why { font-size: 11px; color: var(--ink-3); }
+/* 上了膛的那一下。这句话是这条路上唯一一次「撤不回来」的提醒，
+   所以它得比旁边那些说明显眼一格。 */
+.dv-why.warn, .pf-note.warn { color: var(--accent); font-weight: 600; }
+/* 发送是主动作，比旁边那颗「放进草稿箱」重一格 —— 两颗一样重的话
+   你会分不清哪颗才是真发出去的那颗。 */
+.lnk.send { font-weight: 600; }
 .dv-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .dv-checks li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; }
 .dv-checks .m { font-size: 11px; color: var(--ink-3); }
