@@ -1,29 +1,72 @@
 import React, { useState } from 'react'
-import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL } from '../data/schema.js'
+import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
+import { EditRow, InlineText } from './EditRow.jsx'
 import { useProfile } from '../lib/profile.js'
+import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
 // 59 条事实不该藏在一个划出来又划回去的侧栏里。
+//
+// 但 60 条摊成一条长滚也不对：要找「教育」得滚过 22 条展览。所以现在是左右两栏——
+// 左边一列格名（关于你 / 作品 / 自述 / …），右边一次只开一格。
+//
+// 一次只看得见一格，是拿「一眼看全」换「找得到」。补偿是左栏每一行都带条数：
+// 60 条一条没少，你始终知道它在哪、有几条。
 
 const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
 const BOX_LABELS = { why_now: '为什么是现在', reach_out: '想触达', hidden_links: '隐线', materials: '材料', note: '备注' }
 
 const boxEntries = (box) => Object.entries(box || {}).filter(([, v]) => v != null && v !== '')
 
-function Entry({ e }) {
+/**
+ * 展开后那块「这条的字段」—— 这一类特有的那几条事实（媒介 / 机构 / 年份 / 地点）。
+ *
+ * 标题和描述**不在这儿**：它们就地改（见 Entry 里的 InlineText）。
+ * 上一版把它俩也放进这块，于是看的是上面那行、改的是下面这块，得对着两处看。
+ */
+function EntryFields({ e, ro, save }) {
+  const fields = EDITABLE[e.kind] || []
+  if (!fields.length && !ro) return null
+  return (
+    <div className="efields">
+      <div className="bx-h">这条的字段</div>
+      {ro && (
+        <div className="bx-empty">
+          现在看到的是示范数据（没连上库），改不了。连上 Supabase 之后这些字段就能直接改。
+        </div>
+      )}
+      {fields.map((f) => (
+        <EditRow key={f.key} label={f.label} hint={f.hint} ro={ro}
+                 value={f.col ? e[f.key] : e.meta?.[f.key]}
+                 onSave={(v) => save(patchFor(e.kind, f.key, v))} />
+      ))}
+    </div>
+  )
+}
+
+function Entry({ e, onSaved }) {
   const [open, setOpen] = useState(false)
   const entries = boxEntries(e.box)
   const facts = subInfo(e)
   const imgs = e.images || []
+  const ro = !canEdit(e)
+  const save = async (patch) => { await saveEntry({ id: e.id, ...patch }); await onSaved?.() }
+  const toggle = () => setOpen((o) => !o)
+
   return (
     <div className="work">
-      <button className="work-hd" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
+          输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
+          点空白处仍然展开/收起；键盘走右边那个真按钮。 */}
+      <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
-          <div className="w-t">{e.title}</div>
-          {e.body && <div className="w-d">{e.body}</div>}
+          <InlineText value={e.title} cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
+          <InlineText value={e.body} cls="w-d" long ro={ro}
+                      placeholder={open ? '双击写点描述' : null}
+                      onSave={(v) => save({ body: v })} />
           <div className="w-foot">
             <span className={'boxchip' + (entries.length ? ' filled' : '')}>
               {entries.length ? `盒子 · 已补 ${entries.length} 条` : '盒子 · 空'}
@@ -32,13 +75,16 @@ function Entry({ e }) {
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
           </div>
         </div>
-        <span className={'chev' + (open ? ' open' : '')} aria-hidden="true">›</span>
-      </button>
+        <button className={'chev' + (open ? ' open' : '')} aria-expanded={open}
+                aria-label={open ? '收起' : '展开'}
+                onClick={(ev) => { ev.stopPropagation(); toggle() }}>›</button>
+      </div>
       {open && (
         <div className="box">
           {imgs.length > 1 && (
             <div className="w-imgs">{imgs.map((src, i) => <img src={src} alt="" key={i} loading="lazy" />)}</div>
           )}
+          <EntryFields e={e} ro={ro} save={save} />
           <div className="bx-h">盒子 · 网站装不下的</div>
           {entries.length === 0 && <div className="bx-empty">还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。</div>}
           {entries.map(([k, v]) => (
@@ -71,52 +117,101 @@ function subGroups(items, sub, concerns) {
   return groups
 }
 
-function KindSection({ label, items, sub, concerns }) {
+function KindSection({ label, items, sub, concerns, onSaved }) {
+  // 只有一个子组时不写子标题——「策展」那一格底下再顶一行「策展项目」是重复的。
+  const groups = sub ? subGroups(items, sub, concerns) : null
   return (
     <section className="kind">
       <div className="kind-h">{label} · {items.length}</div>
-      {sub ? (
-        subGroups(items, sub, concerns).map(([subLabel, g]) => (
+      {groups ? (
+        groups.map(([subLabel, g]) => (
           <div className="concern" key={subLabel}>
-            <div className="cn-h">{subLabel}</div>
-            <div className="works">{g.map((e) => <Entry e={e} key={e.id || e.title + e.sort} />)}</div>
+            {groups.length > 1 && <div className="cn-h">{subLabel}</div>}
+            <div className="works">{g.map((e) => <Entry e={e} onSaved={onSaved} key={e.id || e.title + e.sort} />)}</div>
           </div>
         ))
       ) : (
-        <div className="works">{items.map((e) => <Entry e={e} key={e.id || e.title + e.sort} />)}</div>
+        <div className="works">{items.map((e) => <Entry e={e} onSaved={onSaved} key={e.id || e.title + e.sort} />)}</div>
       )}
     </section>
   )
 }
 
-export default function Library({ entries, concerns, onProfileSaved }) {
-  const profile = useProfile()
+/**
+ * 左栏那一列格。第一格永远是「关于你」（它不是条目，是 profile）。
+ *
+ * 兜底有两处，都是为了「不许有条目在页面上没有家」：
+ *   · credit 里类型不在 CREDIT_GROUPS 的 → 归「其他战绩」
+ *   · kind 不在 KINDS 里的（以后新加的 kind）→ 自己占一格，标题就是那个 kind
+ */
+function buildSections(entries) {
   const byKind = new Map()
   for (const e of entries) {
     if (!byKind.has(e.kind)) byKind.set(e.kind, [])
     byKind.get(e.kind).push(e)
   }
-  const ordered = []
+
+  const secs = [{ key: 'about', label: '关于你', about: true }]
   const seen = new Set()
+
   for (const k of KINDS) {
     const items = byKind.get(k.key)
-    if (items && items.length) { ordered.push({ ...k, items }); seen.add(k.key) }
+    seen.add(k.key)
+    if (!items?.length) continue
+    if (k.key !== 'credit') {
+      secs.push({ key: k.key, label: k.label, items, sub: k.sub })
+      continue
+    }
+    const placed = new Set()
+    for (const g of CREDIT_GROUPS) {
+      const items_ = items.filter((e) => g.types.includes(e.meta?.type))
+      items_.forEach((e) => placed.add(e))
+      if (items_.length) secs.push({ key: `credit:${g.key}`, label: g.label, items: items_, sub: 'credit' })
+    }
+    const rest = items.filter((e) => !placed.has(e))
+    if (rest.length) secs.push({ key: 'credit:rest', label: '其他战绩', items: rest, sub: 'credit' })
   }
+
   for (const [kind, items] of byKind) {
-    if (!seen.has(kind)) ordered.push({ key: kind, label: kind, items })
+    if (!seen.has(kind)) secs.push({ key: kind, label: kind, items })
   }
+  return secs
+}
+
+export default function Library({ entries, concerns, onProfileSaved, onEntrySaved }) {
+  const profile = useProfile()
+  const sections = buildSections(entries)
+  const [pick, setPick] = useState('about')
+  // 选中的格可能因为库变了而消失（比如某类被清空）——退回「关于你」，别渲染空白。
+  const cur = sections.find((s) => s.key === pick) || sections[0]
 
   return (
     <div className="page">
-      <div className="page-inner">
+      <div className="page-inner wide">
         <header className="page-head">
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
-        <Identity onSaved={onProfileSaved} />
-        {ordered.map((k) => (
-          <KindSection key={k.key} label={k.label} items={k.items} sub={k.sub} concerns={concerns} />
-        ))}
+        <div className="lib-two">
+          <nav className="lib-rail" aria-label="档案分类">
+            {sections.map((s) => (
+              <button
+                key={s.key}
+                className={'rail-b' + (s.key === cur.key ? ' on' : '')}
+                onClick={() => setPick(s.key)}
+                aria-current={s.key === cur.key ? 'true' : undefined}
+              >
+                <span className="rail-l">{s.label}</span>
+                {s.items && <span className="rail-n">{s.items.length}</span>}
+              </button>
+            ))}
+          </nav>
+          <div className="lib-pane">
+            {cur.about
+              ? <Identity onSaved={onProfileSaved} />
+              : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns} onSaved={onEntrySaved} />}
+          </div>
+        </div>
       </div>
     </div>
   )

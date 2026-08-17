@@ -17,6 +17,19 @@ export const KINDS = [
   { key: 'education', label: '教育 · 背景' },
   { key: 'credit', label: '展览 · 驻地 · 获奖 · 策展', sub: 'credit' },
   { key: 'skill', label: '技能' },
+  // 库里一直有 offer（可提供的工作坊/服务），但这张表里没有它 —— 于是它在档案页上
+  // 顶着一个直接叫 "offer" 的标题（走 Library 里那条「不认识的 kind」兜底）。
+  // 档案页改成左右两栏之后它会变成左栏一行 "offer"，更刺眼，所以补上。
+  { key: 'offer', label: '工作坊 · 可提供' },
+]
+
+// 左栏一行 = 一「格」。格**不等于** kind：credit 那 30 条挤在一格里，右边还是要滚很久，
+// 所以按类型拆成三格。类型落在这三格之外的（以后新加的 type）不会消失——
+// Library 会把它们兜进一格「其他战绩」。
+export const CREDIT_GROUPS = [
+  { key: 'exhibition', label: '展览', types: ['个展', '群展'] },
+  { key: 'residency', label: '驻地 · 资助', types: ['驻地', 'grant'] },
+  { key: 'curatorial', label: '策展', types: ['策展'] },
 ]
 
 // Kind-specific one-line facts shown on the collapsed row (from meta).
@@ -30,9 +43,39 @@ export function subInfo(entry) {
     case 'job': return clean([m.org, period, m.location])
     case 'education': return clean([m.school, m.year, m.location])
     case 'credit': return clean([m.org, m.year, m.location]) // type 已是子分组标题，不重复
-    case 'statement': return clean([{ artist: 'Artist Statement', 'bio-short': '一句话', 'bio-long': '长 Bio' }[m.scope] || m.scope])
+    case 'statement': return clean([{ artist: 'Artist Statement', 'bio-short': '一句话', 'bio-long': '长 Bio', research: '读博方向' }[m.scope] || m.scope])
     default: return []
   }
+}
+
+// 折叠行上那几条事实，哪些能在页面上改 —— 以及它们各自住在库里哪儿。
+//
+// 紧挨着 subInfo 放，因为它俩说的是同一件事的两面：显示什么、就能改什么。
+// 拆到两个文件去的话，以后加一个 kind 必然只改一边 —— 而那种漏法不报错，
+// 只会让某一类条目悄悄变成只读。src/lib/entries.test.js 里有一条测试盯着这个。
+//
+// col: true  = producer.works 表上的一列（medium）
+// 不写       = 住在 meta 那个 jsonb 里（org / school / year / location…）
+// 这个区别没道理可讲，是历史。所以只让它活在这一张表里。
+export const EDITABLE = {
+  work: [{ key: 'medium', label: '媒介', col: true }],
+  job: [
+    { key: 'org', label: '机构' },
+    { key: 'start', label: '开始' },
+    { key: 'end', label: '结束' },
+    { key: 'location', label: '地点' },
+  ],
+  education: [
+    { key: 'school', label: '学校' },
+    { key: 'year', label: '年份' },
+    { key: 'location', label: '地点' },
+  ],
+  credit: [
+    { key: 'org', label: '机构' },
+    { key: 'year', label: '年份' },
+    { key: 'location', label: '地点' },
+  ],
+  statement: [{ key: 'scope', label: '类型', hint: 'artist / bio-short / bio-long / research' }],
 }
 
 // ── 造卡任务的类型说明（producer.tasks.type → 一句人话）────────────────

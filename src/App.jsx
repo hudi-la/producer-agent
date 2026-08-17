@@ -18,6 +18,7 @@ import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
+import { cleanCopy } from './lib/cleanCopy.js'
 import Subbar from './components/Subbar.jsx'
 import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
@@ -151,6 +152,17 @@ export default function App() {
       setTz(p?.data?.tz || 'America/Los_Angeles')
     })
     loadContacts().then(setCt)
+  }, [])
+
+  // 从这儿复制走的东西，不该把这儿的皮肤也带走 —— 粘进 Gmail 不该是一块纸色底。
+  // 挂在 document 上而不是某个组件里：对话、草稿、卷宗，凡是你会拿去粘的地方
+  // 都该一视同仁，一处漏了你就得记住「哪儿能直接粘、哪儿要先清格式」。
+  // 捕获阶段（第三个参数 true）：冒泡阶段挂的话，中间任何一层
+  // stopPropagation 都能让它落空，而那种失败是静默的——底色照样回来，
+  // 看起来像这个修复根本没写过。捕获阶段在所有人之前，谁也拦不住。
+  useEffect(() => {
+    document.addEventListener('copy', cleanCopy, true)
+    return () => document.removeEventListener('copy', cleanCopy, true)
   }, [])
 
   // 人这一层**不进过卡队列**。
@@ -645,7 +657,8 @@ export default function App() {
         )
       ) : area === 'profile' ? (
         <Library entries={lib.entries} concerns={lib.concerns}
-                 onProfileSaved={() => loadProfile().then(setProfile)} />
+                 onProfileSaved={() => loadProfile().then(setProfile)}
+                 onEntrySaved={() => loadLibrary().then(setLib)} />
       ) : paged ? (
         <PursuitFocus
           // key：换一条线就换一个实例。不加的话 React 复用同一个，thinking / text /
