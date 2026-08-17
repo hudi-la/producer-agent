@@ -6,9 +6,25 @@
 // brain 是跑在本机的 Node 进程，它可以自己拿凭证——这一步之后，抓取变成
 // 纯 HTTP，模型只在真需要判断的地方出场。
 //
-// scope 只有 gmail.readonly。**这个系统本来就发不出信**（草稿走的是另一条
-// 路，而且 claude.ai 那套工具里根本没有 send），不给写权限，这条护栏就
-// 不是嘱咐，是结构上做不到。
+// ── scope：readonly + send（2026-08-16 加了 send）────────────────
+//
+// 这儿原来写着「这个系统本来就发不出信……不给写权限，这条护栏就不是嘱咐，
+// 是结构上做不到」。加了 send 之后那句话不成立了，但**护栏没有被拆，
+// 它被挪了位置**：
+//
+//   以前：这个系统发不出信。
+//   现在：**Fairwind 写得出信，但按不了发送键。**
+//
+// 发送是 send.js 里一个纯 HTTP 函数，**不在模型的工具白名单里**
+// （server.js 的 READ_TOOLS / GMAIL_TOOLS 都没有它），只有页面上那颗按钮
+// 能触发它。模型够不到它，跟它够不到别条线的文件是同一种「够不到」——
+// 依然是结构上做不到，不是嘱咐。
+//
+// send 这一格只能发，给不了读的能力；读还是靠 readonly 那一格。
+//
+// ⚠️ 加了 scope 之后**必须重跑一次 `npm run mail:auth`**。旧 token 里没有
+//    这一格，不重授的话按「发送」会报 403 insufficient permissions ——
+//    而那个报错长得一点也不像「你少授权了一格」，很费时间。
 //
 // ── 一个必须踩对的坑 ──────────────────────────────────────────
 // Google 的 OAuth 同意屏幕如果停在 **Testing**，发下来的 refresh token
@@ -25,7 +41,10 @@ import { google } from 'googleapis'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const TOKENS = path.join(HERE, '..', '.mail-tokens.json')
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+]
 
 // 授权回调听在哪个口。默认 8789（brain 自己是 8788，别撞上）。
 //
