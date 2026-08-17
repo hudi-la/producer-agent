@@ -25,6 +25,12 @@ import { foldReply } from './reply.js'
 import { extractLetter } from './letter.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
+// 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
+// 模型够不到它们，跟它够不到别条线的文件是同一种「够不到」。
+import { client as mailClient, whoami } from './mail/auth.js'
+import { gmailFor } from './mail/gmail.js'
+import { sendLetter, assertSameMailbox } from './mail/send.js'
+import { recordSent } from './send-record.js'
 
 // 默认值必须和前端 backends.js 里的 BRAIN 对得上。两边默认值不一致的话，
 // brain/.env 一丢，脑子听一个端口、界面敲另一个，结果是永远误报「脑子没开」。
@@ -581,6 +587,75 @@ ${d.body}
     })
   if (error) throw new Error('记草稿号失败：' + error.message)
   return { ok: true, ...info }
+}
+
+// 真发一封信。
+//
+// ══ 这个口跟上面那个 handleGmailDraft 的分别 ══════════════════
+// 那个是让**模型**去调连接器建草稿——一次模型往返，非确定性，而且只到
+// 草稿箱为止。这个是 brain 自己拿钥匙走 HTTP，一次模型都不过。
+//
+// **它不在模型的工具白名单里**（READ_TOOLS / GMAIL_TOOLS 都没有它），
+// 只有页面上那颗按钮能走到这儿。「Fairwind 写得出信，但按不了发送键」
+// 就是这一条。
+//
+// 顺序也要紧：校验 → 发 → 记账 → 删产出。记账和删产出的先后见
+// send-record.js 顶上那段（反了会两头空）。
+async function handleSendMail(body) {
+  const { deliverable_id } = body
+  const owner = ownerOf(body)
+  if (!owner || !deliverable_id) throw new Error('要有 pursuit_id 或 contact_id，外加 deliverable_id')
+
+  const ctx = await loadOwnerContext(owner)
+  const d = (ctx.raw.deliverables || []).find((x) => x.id === deliverable_id)
+  if (!d) throw new Error(owner.kind === 'contact' ? '这个人名下没有这份产出' : '这条线上没有这份产出')
+  if (d.kind !== 'email') throw new Error('这份产出不是一封信，发不了')
+  if (d.status === 'final') throw new Error('已定稿的不走这条路')
+  if (!d.body?.trim()) throw new Error('正文是空的，没东西可发')
+
+  const to = String(d.meta?.to || '').trim().toLowerCase()
+  if (!to.includes('@')) throw new Error('这份产出上没有收件人——补一个再发')
+
+  // 用错身份发出去的信连道歉都没处发，所以这一条拦在真发之前。
+  const me = await whoami()
+  assertSameMailbox(me.address, mailboxOf(ctx.profile))
+
+  const replyTo = d.meta?.reply_to || null
+  const sent = await sendLetter({
+    gmail: gmailFor(await mailClient()),
+    from: me.address,
+    fromName: artistOf(ctx.profile),
+    to,
+    subject: d.title,
+    body: d.body,
+    replyTo,
+    refs: replyTo ? [replyTo] : null,
+    threadId: d.meta?.thread_id || null,
+  })
+
+  // 信头那一行要挂在哪个账号名下。按地址找，不拿第一行顶——将来多信箱了，
+  // 拿第一行会把这封信记到别的账号名下，而那种错在界面上看不出来。
+  // 查不到不致命：pa_mail_headers_upsert 只在 counterpart / direction / sent_at
+  // 缺了才滤掉行。
+  const { data: accts } = await db.from('v_pa_mail_accounts').select('id,address')
+  const acct = (accts || []).find((a) => String(a.address || '').toLowerCase() === me.address)
+
+  await recordSent(db, {
+    ownerKind: owner.kind === 'contact' ? 'contact' : 'pursuit',
+    ownerId: owner.id,
+    deliverableId: deliverable_id,
+    sent,
+    to,
+    from: me.address,
+    subject: d.title,
+    summary: d.meta?.summary || null,
+    body: d.body,
+    accountId: acct?.id || null,
+    replyTo,
+    refs: replyTo ? [replyTo] : null,
+  })
+
+  return { ok: true, id: sent.id, thread_id: sent.threadId }
 }
 
 // 按线收信：只拉这条线登记过的 thread，永远不遍历信箱。
@@ -1254,6 +1329,28 @@ const server = http.createServer(async (req, res) => {
         console.error('✗', err.message)
         // 授权掉了要认得出来，不能长成「这轮 0 封新信」——那正是这次事故里
         // 最伤人的失败形态。前端拿 needs_auth 弹一句人话。
+        send(res, 500, { error: err.message, needs_auth: err.name === 'MailAuthError', fix: err.fix || null })
+      }
+    })
+    return
+  }
+
+  // ── 发信 ──────────────────────────────────────────────────────
+  //
+  // **这个口不在模型的工具白名单里**，只有页面上那颗按钮能触发它。
+  // 「Fairwind 写得出信，但按不了发送键」那句话就是靠这一条兑现的。
+  if (req.method === 'POST' && req.url === '/mail/send') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(raw || '{}')
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 发信 ${body.contact_id ? `人 ${body.contact_id}` : body.pursuit_id}`)
+        const out = await handleSendMail(body)
+        console.log(`  ↳ 出去了 ${JSON.stringify(out)}`)
+        send(res, 200, out)
+      } catch (err) {
+        console.error('✗', err.message)
         send(res, 500, { error: err.message, needs_auth: err.name === 'MailAuthError', fix: err.fix || null })
       }
     })
