@@ -361,8 +361,17 @@ export default function App() {
   // 为什么不在原地换页：你多半是**边看今天该动的边点开某个人**——
   // 原地换掉的话回来还得重新找位置，而且几个人没法并排比。
   const openInTab = (key, value) => window.open(tabUrl(key, value), '_blank')
-  // 「整页」：新开一个标签页。不带 d=1，所以落地是整页不是抽屉。
-  const expandPursuit = (p) => openInTab('p', p.id)
+  // 抽屉里那个「整页」：**就在这个标签页里**摊开，不另开一张。
+  //
+  // 原来它 window.open 新标签页。可它在抽屉的头上，你按它的时候是「这条线
+  // 我要认真看了，给我地方」——不是「我还要同时看别的」。新开一张的代价是
+  // 你手上那张标签页停在半路（抽屉还开着、看板还在那儿），真正在看的东西
+  // 跑到别处去了：一个动作分给两张标签页，回来还得自己收拾。
+  // 地址栏归那个同步 effect 写（不带 d=1 → 整页），所以整页那一刻地址就是
+  // ?p=<id>：要并排看几条线，复制地址栏 / 复制标签页仍然做得到，只是不再
+  // 由这个按钮替你决定。
+  // （人际那边的名片和机构还是新标签页——openInTab 留着给它们用。）
+  const expandPursuit = (p) => setView({ name: 'pursuit', pursuit: p, mode: 'page' })
   const closePursuit = () => {
     if (view.name === 'pursuit') markSeen(view.pursuit.id)
     setView({ name: 'home' })          // 地址栏归上面那个同步 effect 管

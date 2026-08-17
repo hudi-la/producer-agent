@@ -180,7 +180,8 @@ function emptyText(stage) {
 
 // 两种装法，同一套内容：
 //   drawer —— 从右边划出来盖在看板上，看板还在旁边，可以一张接一张点过去
-//   page   —— 整页（新标签页里 ?p=<id> 打开的就是这个），留给你要长时间写东西的时候
+//   page   —— 整页（?p=<id> 落地的、抽屉上按「整页」换成的都是这个，
+//              看板让位），留给你要长时间写东西的时候
 // 现在两者装的东西一样，只差宽度。等作品链、文档、邮件单独成栏做出来，
 // 整页才会长出抽屉装不下的部分。
 export default function PursuitFocus({
@@ -632,9 +633,11 @@ export default function PursuitFocus({
             <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
           )}
           <h1 className="ft-title" title={p.title}>{p.title}</h1>
+          {/* ↗ 是「去别处」的意思，这个按钮已经不去别处了——就在这一页摊开，
+              所以换成 →。图标撒的谎跟文案撒的谎一样算数。 */}
           {inDrawer && (
-            <button className="expand" onClick={() => onExpand?.(p)} title="在新标签页里整页打开">
-              整页 <span aria-hidden="true">↗</span>
+            <button className="expand" onClick={() => onExpand?.(p)} title="整页摊开（看板让位）">
+              整页 <span aria-hidden="true">→</span>
             </button>
           )}
         </div>
