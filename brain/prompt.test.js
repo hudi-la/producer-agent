@@ -343,3 +343,23 @@ test('明说了「只在真写了一封信时才吐」——这是形式判断�
 test('信封的规矩在静态块里，跟着缓存走', () => {
   assert.ok(buildSystem(pursuitCtx)[0].includes('[[LETTER]]'))
 })
+
+// ── 表单 ───────────────────────────────────────────────────
+
+test('填表的规矩在人格里，且给了标记名和逐格字数闸的写法', () => {
+  const s = systemFor(profile)
+  assert.ok(s.includes('[[FORM]]'), '得给出标记名')
+  assert.ok(s.includes('"fields"') && s.includes('"q"') && s.includes('"a"'))
+  assert.ok(s.includes('"words"') && s.includes('"chars"'), '逐格的字数闸得说清怎么写')
+})
+
+test('明说了字数限制要照抄机构原文，不许自己定一个', () => {
+  const s = systemFor(profile)
+  assert.ok(s.includes('别自己定') || s.includes('照抄') || s.includes('原文'))
+})
+
+test('两个标记互不干扰，都在静态块里', () => {
+  const fixed = buildSystem(pursuitCtx)[0]
+  assert.ok(fixed.includes('[[LETTER]]'))
+  assert.ok(fixed.includes('[[FORM]]'))
+})

@@ -23,6 +23,8 @@ import {
 import { foldReply } from './reply.js'
 // 它写完一封信会在末尾报一声。摘出来存进 meta，正文里不留那行机器读的字。
 import { extractLetter } from './letter.js'
+// 填完一张表也报一声。逐格的字数闸靠它带过来——那是申请表的要害。
+import { extractForm } from './form.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -435,7 +437,14 @@ async function handleChat(body, onEvent = null) {
 
   // 信封摘出来存进 meta，**正文里不留那行机器读的字**——留着的话，你从
   // 气泡里复制走的时候会把它一起粘进 Gmail。界面据 meta.letter 画那张信卡。
-  const { clean: shown, letter } = extractLetter(reply)
+  //
+  // 两种标记都摘：一次回复里不会既是信又是表，但摘的顺序不能让另一个漏网——
+  // 所以是串起来摘，前一个的 clean 交给后一个。
+  const one = extractLetter(reply)
+  const two = extractForm(one.clean)
+  const shown = two.clean
+  const letter = one.letter
+  const form = two.form
 
   // 工作稿存进 meta：不摆在她眼前、不进下一轮 prompt，但一个字都没销毁，
   // 查得回来。recovered 也记一笔——那条回复是拿工作稿顶上的，将来看日志得认得出。
@@ -443,6 +452,7 @@ async function handleChat(body, onEvent = null) {
     ...(notes?.length ? { notes } : {}),
     ...(recovered ? { recovered: true } : {}),
     ...(letter ? { letter } : {}),
+    ...(form ? { form } : {}),
   }
   const theirs = await addMessage(owner, 'producer', shown, 'message',
     Object.keys(extra).length ? extra : null)
