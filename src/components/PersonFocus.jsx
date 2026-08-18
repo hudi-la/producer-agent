@@ -9,6 +9,8 @@ import Pool from './Pool.jsx'
 import { MailList } from './Mail.jsx'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
+// 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
+import FormCard from './FormCard.jsx'
 import { sendLetterNow } from '../lib/letters.js'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
@@ -495,6 +497,12 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                       {m.meta?.letter && (
                         <LetterCard
                           letter={m.meta.letter} body={m.content}
+                          owner={{ contactId: c.id }} onAdopted={reload}
+                        />
+                      )}
+                      {m.meta?.form && (
+                        <FormCard
+                          form={m.meta.form}
                           owner={{ contactId: c.id }} onAdopted={reload}
                         />
                       )}

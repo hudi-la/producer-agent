@@ -810,6 +810,16 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .lcard-sub { margin: 4px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .lcard-err { margin-bottom: 8px; font-size: 12px; color: var(--accent); }
 .lcard-ok { font-size: 12px; color: var(--ink-3); }
+/* 表卡上那份题目清单。字数上限要看得见——听错的上限比没有上限更坏，
+   你会照着那个假的去改。 */
+.fcard-qs { margin: 0 0 8px; padding: 0; list-style: none; }
+.fcard-qs li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 3px 0; font-size: 12px; border-top: 1px solid var(--line); }
+.fcard-qs li:first-child { border-top: 0; }
+.fcard-qs .fq { flex: 1 1 200px; color: var(--ink); }
+.fcard-qs .flim { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.fcard-qs .fempty { color: var(--accent); }
+
 .flash { animation: flash 1.6s ease-out; border-radius: 10px; }
 @keyframes flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
 
@@ -818,6 +828,18 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .dv { border: 1px solid var(--line-2); border-radius: 12px; background: var(--paper);
   margin-bottom: 10px; overflow: hidden; }
 .dv-top { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+
+/* 申请表：一格一个框，闸挂在框底下。挂在框底下是要紧的——挂在卡顶上的话
+   八格的闸堆成一堆，你看得见「有一条没过」却不知道是哪一格。 */
+.dvf { padding: 8px 0; border-top: 1px dashed var(--line); }
+.dvf:first-child { border-top: 0; padding-top: 0; }
+.dvf-q { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 600; color: var(--ink); }
+.dvf-foot { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin-top: 3px; font-size: 11.5px; }
+.dvf-n { font-variant-numeric: tabular-nums; }
+.dvf-n.ok { color: var(--ink-3); }
+.dvf-n.bad { color: var(--accent); }
+.dvf-lim { color: var(--ink-3); }
 .dv-top h4 { margin: 0; font-size: 13px; font-weight: 600; min-width: 0; }
 .pill { font-size: 10.5px; font-weight: 700; letter-spacing: .3px; padding: 2px 7px; border-radius: 999px;
   white-space: nowrap; margin-left: auto; }

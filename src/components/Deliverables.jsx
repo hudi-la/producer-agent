@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { checkRules, itemProgress } from '../lib/rules.js'
+import { checkRules, itemProgress, formProgress } from '../lib/rules.js'
 import { editDeliverable, setFinal, newDeliverable, deleteDeliverable, putInDraftbox } from '../lib/deliverables.js'
 import { sendLetterNow } from '../lib/letters.js'
+import { setAnswer } from '../lib/forms.js'
 
 // 右栏：交付。
 //
@@ -61,6 +62,81 @@ function Editor({ d, onSaved, onErr, onChanged, pursuitId }) {
         </div>
       ))}
       <span className="dv-save">{dirty ? '存中…' : ''}</span>
+      <Acts d={d} allOk={allOk} onErr={onErr} onChanged={onChanged} pursuitId={pursuitId} />
+    </>
+  )
+}
+
+// 申请表：一格一个框，一格一条闸。
+//
+// ══ 为什么不是八份产出 ════════════════════════════════════════
+// 一张申请表是**一件事**。拆成八份就要定稿八次、左栏文件里散成八份，
+// 而且「这张表填完了没有」没有任何一处回答得了。
+//
+// ══ 为什么闸必须逐格 ══════════════════════════════════════════
+// 网页表单是**逐格拒收**的。八格加起来没超，不等于每一格都没超——
+// 合成一条闸的话，你到提交前一刻才发现第三格多了 40 个词。
+//
+// 规则在 rules.fields、答案在 meta.answers（见 0069）。
+
+function Field({ d, f, check, onErr, onChanged }) {
+  const saved = d.meta?.answers?.[f.key] ?? ''
+  const [text, setText] = useState(saved)
+  const [dirty, setDirty] = useState(false)
+  const first = useRef(true)
+
+  // 换一份产出、或者 Fairwind 重写了一版收进来，都要把框里的字换成库里那份。
+  // 不换的话你看到的是上一份的答案，而它跟下面那条闸算的**不是同一段字**。
+  useEffect(() => { setText(saved); setDirty(false); first.current = true }, [d.id, f.key, saved])
+
+  // 自动存，跟正文编辑器同一套节奏。**一格一支 RPC**，不整包写回——
+  // 整包的话你在这一格打字会连别的格子一起写一遍，可能拿旧快照盖掉
+  // 另一次自动存刚写进去的新值。
+  useEffect(() => {
+    if (first.current) { first.current = false; return }
+    setDirty(true)
+    const t = setTimeout(async () => {
+      try {
+        await setAnswer(d.id, f.key, text)
+        setDirty(false)
+        await onChanged?.()
+      } catch (e) { onErr?.(e.message) }
+    }, 700)
+    return () => clearTimeout(t)
+  }, [text])
+
+  return (
+    <div className="dvf">
+      {/* 题目用**原文**摆着——你要照着往网页表单里填，翻译过的对不上号 */}
+      <label className="dvf-q">{f.q}</label>
+      <textarea
+        className="dv-edit"
+        value={text}
+        rows={4}
+        placeholder="还没填。你写，或者回中栏让 Fairwind 起一版。"
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div className="dvf-foot">
+        <span className={'dvf-n ' + (check?.ok ? 'ok' : 'bad')}>
+          {check?.ok ? '✓' : '!'} {check?.label}
+        </span>
+        {check?.detail && <span className="dvf-lim">{check.detail}</span>}
+        <span className="dv-save">{dirty ? '存中…' : ''}</span>
+      </div>
+    </div>
+  )
+}
+
+function FormEditor({ d, onErr, onChanged, pursuitId }) {
+  const fields = d.rules?.fields || []
+  const { checks, allOk } = checkRules(d.rules, null, d.meta)
+  const byKey = Object.fromEntries(checks.filter((c) => c.field).map((c) => [c.key, c]))
+  return (
+    <>
+      {fields.map((f) => (
+        <Field key={f.key} d={d} f={f} check={byKey['field:' + f.key]}
+          onErr={onErr} onChanged={onChanged} />
+      ))}
       <Acts d={d} allOk={allOk} onErr={onErr} onChanged={onChanged} pursuitId={pursuitId} />
     </>
   )
@@ -187,6 +263,7 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
         const dep = d.depends_on ? items.find((x) => x.id === d.depends_on) : null
         const waiting = dep && dep.status !== 'final'
         const prog = itemProgress(d.rules, d.meta)
+        const fprog = formProgress(d.rules, d.meta)
         return (
           <div className="dv" key={d.id}>
             <div className="dv-top">
@@ -195,6 +272,9 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
                 : d.kind === 'email' && d.meta?.gmail_draft_id ? 'ready' : 'draft')}>
                 {waiting ? '等前一份定稿'
                   : d.blocked_by ? '挡住了'
+                  // 一张表填到什么程度，一眼看得见——这是「一份产出装一张表」
+                  // 换来的东西：拆成八份的话这句话没处说。
+                  : fprog ? `${fprog.hit} / ${fprog.total} 格过闸`
                   : d.kind === 'email' && d.meta?.gmail_draft_id ? '在草稿箱 · 那份要你自己按'
                   : prog ? `${prog.hit} / ${prog.total}` : '你在改'}
               </span>
@@ -218,6 +298,8 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
                     <button className="jump" onClick={() => onJump?.(d.blocked_ref)}>← 跳回那段对话</button>
                   )}
                 </div>
+              ) : Array.isArray(d.rules?.fields) ? (
+                <FormEditor d={d} onErr={report} onChanged={onChanged} pursuitId={pursuitId} />
               ) : Array.isArray(d.rules?.items) ? (
                 <Checklist d={d} onErr={report} onChanged={onChanged} pursuitId={pursuitId} />
               ) : (
