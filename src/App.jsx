@@ -24,7 +24,7 @@ import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
-import { loadNotifications, markCue, unmarkAllOff, triage } from './lib/notifications.js'
+import { loadNotifications, markCue, unmarkAllOff, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
@@ -211,14 +211,39 @@ export default function App() {
   // **升级前关掉的那些不许悄悄复活** —— 那是「你以为处理过了，其实系统忘了」。
   useEffect(() => { migrateCueOff().then(pullNotes) }, [])
 
-  // 打开面板时判一批还没判过的信。**懒算：不看就不花钱。**
-  // 判不成不挡路 —— 最坏是这一批当作「要回」，多吵你几条，不丢东西。
+  // 打开面板时判一批。**懒算：不看就不花钱。**
+  //
+  // 两件事：先重判脏了的对象（有新往来、你记了一笔、或者你移过卡），
+  // 再判那些还没判过「要不要回」的信。判不成都不挡路 ——
+  // 水位不推进，下次打开再判，绝不假装判过了。
+  //
+  // 一次只判一批（REJUDGE_BATCH 个对象）。**剩下多少要报出来**，
+  // 不许静默截断 —— 那会让你以为全判完了。
   const openBell = async () => {
     setBellOpen(true)
-    const out = notes || await pullNotes()
-    if (!out?.unjudged?.length) return
+    let out = notes || await pullNotes()
+    if (!out?.stale?.length && !out?.unjudged?.length) return
     setJudging(true)
-    try { await triage(out.unjudged); await pullNotes() } finally { setJudging(false) }
+    try {
+      if (out?.stale?.length) {
+        await rejudge(out.stale.slice(0, REJUDGE_BATCH))
+        out = await pullNotes()
+      }
+      if (out?.unjudged?.length) {
+        await triage(out.unjudged.slice(0, 20))
+        await pullNotes()
+      }
+    } finally { setJudging(false) }
+  }
+
+  // 「还有 N 个没判，接着判」—— 一批一批往下走，进度看得见。
+  const judgeMore = async () => {
+    setJudging(true)
+    try {
+      let out = notes
+      if (out?.stale?.length) { await rejudge(out.stale.slice(0, REJUDGE_BATCH)); out = await pullNotes() }
+      else if (out?.unjudged?.length) { await triage(out.unjudged.slice(0, 20)); await pullNotes() }
+    } finally { setJudging(false) }
   }
 
   const markNote = async (it, mark) => {
@@ -635,7 +660,7 @@ export default function App() {
 
       {bellOpen && (
         <Notifications
-          data={notes} judging={judging}
+          data={notes} judging={judging} onJudgeMore={judgeMore}
           onMark={markNote} onAllBack={allNotesBack}
           onClose={() => setBellOpen(false)}
           onOpen={(it) => {
@@ -685,17 +710,21 @@ export default function App() {
       {/* 人际管理的工具条。跟项目争取那条同一套：**左边镜头，右边动作**。
           这一页还没有镜头（没有筛选），左边就空着——空着可以，假着不行。
           按钮用同一个 .wbtn，不另造一种长相：同一层的东西该长得一样。 */}
+      {/* 抽屉开着时这个按钮不摆：抽屉自己头上那个 × 就是关它的地方，
+          同一个动作摆两处，你还得想一下按哪个。工具条本身留着——
+          它那条底线跟抽屉头的底线是同一条，撤了左边这半页会往上跳一下。 */}
       {area === 'people' && view.name === 'home' && (
         <div className="subbar">
           <span className="sp" />
-          <button
-            type="button"
-            className={'wbtn' + (bookOpen ? ' on' : '')}
-            aria-pressed={bookOpen}
-            onClick={() => setBookOpen((v) => !v)}
-          >
-            通讯录
-          </button>
+          {!bookOpen && (
+            <button
+              type="button"
+              className="wbtn"
+              onClick={() => setBookOpen(true)}
+            >
+              通讯录
+            </button>
+          )}
         </div>
       )}
 

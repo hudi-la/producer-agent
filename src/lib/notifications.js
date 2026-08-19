@@ -51,7 +51,7 @@ export function layer(items, today = new Date()) {
 const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
 
 const empty = (reason, detail) => ({
-  hand: [], old: [], muted: [], unjudged: [], source: 'empty', reason, detail,
+  hand: [], old: [], muted: [], unjudged: [], stale: [], source: 'empty', reason, detail,
 })
 
 /**
@@ -120,7 +120,15 @@ export async function loadNotifications() {
       .filter((f) => 球在你手上(f) && !vOf[f.last_in_id])
       .map((f) => f.last_in_id)
 
-    return { ...layer(items, today), unjudged: [...new Set(unjudged)],
+    // 脏了的：最后一件事（信 / 你记的一笔 / **移卡**）晚于上次重判的水位。
+    // 「脏不脏」是库里算出来的（v_pa_cue_facts.stale），不是这儿存的标记
+    // ——存的会跟事实分叉。
+    const stale = (facts || []).filter((f) => f.stale).map((f) => ({
+      kind: f.subject_kind, id: f.subject_id,
+      last_in_id: f.last_in_id || null, upto: f.last_event_at,
+    }))
+
+    return { ...layer(items, today), unjudged: [...new Set(unjudged)], stale,
              source: 'live', reason: null }
   } catch (e) {
     return empty(FELL_BACK.QUERY_FAILED, e.message)
@@ -143,6 +151,30 @@ export async function unmarkAllOff() {
   if (error) throw new Error(error.message)
   return data || 0
 }
+
+/**
+ * 重判一批对象：这段交流有没有约定下一个时间点、最后那封信要不要回。
+ *
+ * **一次判一批，量按对象数走**（几十个），不按信数（几千封）。
+ * 判不成不抛 —— 水位不推进，下次打开再判，不会假装判过了。
+ */
+export async function rejudge(subjects) {
+  if (!subjects?.length) return { judged: 0, failed: 0, touched: 0 }
+  try {
+    const r = await fetch(`${BRAIN}/subjects/rejudge`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ subjects }),
+    })
+    const out = await r.json().catch(() => null)
+    if (!r.ok || !out || out.error) return { judged: 0, failed: subjects.length, touched: 0 }
+    return out
+  } catch (_) {
+    return { judged: 0, failed: subjects.length, touched: 0 }
+  }
+}
+
+/** 一批判多少个。按对象数，不按信数。 */
+export const REJUDGE_BATCH = 12
 
 /**
  * 判一批信要不要回。

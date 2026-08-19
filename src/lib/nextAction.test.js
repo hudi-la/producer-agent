@@ -66,3 +66,28 @@ test('MD 按本地时区格式化，不留前导零', () => {
   assert.equal(MD('2026-08-06'), '8月6日')
   assert.equal(MD(null), '')
 })
+
+// ── 交出去之后，截止就不再是待办 ────────────────────────────────
+// 真事：Stanford 早就移到「发出&提交」，通知栏还在喊「截止 · 今天」，
+// 「紧急」筛选里也还在。病根是只看日期不看阶段。
+
+test('已经发出&提交 —— 日期照显示，但不算急', () => {
+  const l = deadlineLine({ deadline_at: inDays(1), stage: 'sent' })
+  assert.equal(l.urgent, false)
+  assert.match(l.text, /截止/)              // 事实还在，只是不催了
+})
+
+test('进行中 / 谈成 / 搁置 —— 同样不算急', () => {
+  for (const stage of ['replying', 'won', 'paused']) {
+    assert.equal(deadlineLine({ deadline_at: inDays(1), stage }).urgent, false, stage)
+  }
+})
+
+test('还在写 —— 照旧算急，这时候截止才是真的在催你', () => {
+  assert.equal(deadlineLine({ deadline_at: inDays(1), stage: 'writing' }).urgent, true)
+  assert.equal(deadlineLine({ deadline_at: inDays(1), stage: 'pending' }).urgent, true)
+})
+
+test('已经过了截止但早就交了 —— 也不催', () => {
+  assert.equal(deadlineLine({ deadline_at: inDays(-5), stage: 'sent' }).urgent, false)
+})

@@ -114,9 +114,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    不补的话「谈成」「暂停处理」两列就永远够不着了。 */
 .wrap.drawered .board { padding-right: calc(var(--drawer-w) + 24px); }
 /* 顶栏也得让位，不然抽屉盖住右上角那个 🔔 —— 常驻角标有一半时间点不着，
-   等于没有。让位的写法跟 .board / .subbar 那两条是同一条，不另发明。 */
+   等于没有。让位的写法跟 .board / .subbar 那两条是同一条，不另发明。
+   只有机会线抽屉需要这一条：它顶到最上沿。通讯录抽屉从顶栏下沿才开始
+   （见 .ppl-drawer），🔔 压根不会被它盖住——那就不该让位。
+   🔔 是常驻的，它待在哪儿不该取决于另一个抽屉开没开。 */
 .wrap.drawered .app-top { padding-right: calc(var(--drawer-w) + 24px); }
-.wrap.bookopen .app-top { padding-right: calc(var(--drawer-w) + 24px); }
 
 /* 从右侧贴边落下来的一整条，顶到窗口最上沿（连顶栏一起盖住）。
    宽度就是一句 --drawer-w：33vw，窄窗口不低于 400px。嫌窄改这一个数。 */

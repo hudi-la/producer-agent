@@ -52,10 +52,23 @@ const SOON_DAYS = 14
  * 截止那一行。原文永远显示（"spring 2027" 这种要保留），
  * 只有能算出日期、而且确实近了，才追加倒计时并标红。
  */
+/**
+ * 交出去之后，截止就不再是待办了。
+ *
+ * 真事：Stanford 那条你早就移到「发出&提交」，通知栏还在喊「截止 · 今天」，
+ * 「紧急」筛选里也还在。病根是这个函数从第一行到最后一行只看日期，
+ * 一个字没提阶段——**它把「有截止日期」当成了「还没交」。**
+ *
+ * 「移卡这件事情本身也是包括判断的」：你把卡移过去，就是你说了这件事做完了。
+ */
+const 交出去了 = (p) => ['sent', 'replying', 'won', 'paused'].includes(p.stage)
+
 export function deadlineLine(p) {
   if (!p.deadline && !p.deadline_at) return null
   const text = p.deadline || MD(p.deadline_at)
   const n = daysFromToday(p.deadline_at)
+  // 日期照常显示（那是事实），但不再算「急」——急的意思是「你还得赶」。
+  if (交出去了(p)) return { text: `截止 ${text}`, urgent: false }
   if (n === null || n > SOON_DAYS) return { text: `截止 ${text}`, urgent: false }
   if (n < 0) return { text: `截止 ${text} · 已过`, urgent: true, over: true }
   if (n === 0) return { text: `截止 ${text} · 今天`, urgent: true }

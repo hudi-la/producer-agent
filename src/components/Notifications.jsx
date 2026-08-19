@@ -66,7 +66,7 @@ function Fold({ title, note, items, onMark, onOpen }) {
   )
 }
 
-export default function Notifications({ data, judging, onMark, onAllBack, onOpen, onClose }) {
+export default function Notifications({ data, judging, onJudgeMore, onMark, onAllBack, onOpen, onClose }) {
   // Esc 收起来
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -74,7 +74,8 @@ export default function Notifications({ data, judging, onMark, onAllBack, onOpen
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const { hand = [], old = [], muted = [], source, reason } = data || {}
+  const { hand = [], old = [], muted = [], stale = [], unjudged = [], source, reason } = data || {}
+  const 待判 = stale.length + (stale.length ? 0 : unjudged.length)
 
   return (
     <div className="npanel" role="dialog" aria-label="该动的">
@@ -93,7 +94,17 @@ export default function Notifications({ data, judging, onMark, onAllBack, onOpen
       )}
 
       {judging && (
-        <p className="nnone"><i className="spin" aria-hidden="true" /> 正在判新来的信要不要回…</p>
+        <p className="nnone">
+          <i className="spin" aria-hidden="true" /> 正在读近期往来重判…
+        </p>
+      )}
+
+      {/* 还没判完的**必须报出来**。静默截断 = 你以为全判完了，其实没有。 */}
+      {!judging && 待判 > 0 && (
+        <p className="nnone">
+          还有 {待判} 个没重判过，下面这些可能还是旧结论。
+          <button className="lnk" onClick={onJudgeMore}>接着判</button>
+        </p>
       )}
 
       <section className="nsect">

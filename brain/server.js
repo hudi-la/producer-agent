@@ -27,6 +27,7 @@ import { extractLetter } from './letter.js'
 import { extractForm } from './form.js'
 
 import { parseTriage, triagePrompt } from './triage.js'
+import { parseRejudge, rejudgePrompt } from './rejudge.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -1396,6 +1397,76 @@ const server = http.createServer(async (req, res) => {
           if (data) judged++
         }
         const out = { judged, failed: letters.length - judged }
+        console.log(`  ↳ ${JSON.stringify(out)}`)
+        send(res, 200, out)
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
+  // ── 重判一批对象 ─────────────────────────────────────────────
+  //
+  // 在这之前**没有任何时刻会发生重判**：写 next_touch_at 的 handleRefresh
+  // 是死代码，于是库里那几个日期是历史遗留。结果就是通知栏拿着陈旧的结论
+  // 说话——Sarah 早就回过「plan on 2027」，它还在报老账。
+  //
+  // 懒算，跟判信同一条道理：**不看就不花钱**。前端点名脏了的那些
+  // （stale = 最后一件事晚于上次重判的水位），一批一批判过去。
+  //
+  // 设计稿：docs/specs/2026-08-19-rejudge-design.md
+  if (req.method === 'POST' && req.url === '/subjects/rejudge') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const want = (JSON.parse(raw || '{}').subjects || [])
+          .filter((x) => x && (x.kind === 'contact' || x.kind === 'pursuit') && x.id)
+        if (!want.length) return send(res, 200, { judged: 0, failed: 0 })
+
+        const { data: subjects, error: se } = await db.rpc('pa_subjects_for_rejudge', {
+          p_kinds: want.map((x) => x.kind), p_ids: want.map((x) => x.id),
+        })
+        if (se) throw new Error('取近况失败：' + se.message)
+        if (!subjects?.length) return send(res, 200, { judged: 0, failed: 0 })
+
+        const t = new Date().toLocaleTimeString('zh-CN')
+        console.log(`\n→ ${t} 重判 ${subjects.length} 个对象`)
+        const { text } = await think(rejudgePrompt(subjects), READ_TOOLS, null)
+        const verdicts = parseRejudge(text)
+        const byId = Object.fromEntries(verdicts.map((v) => [v.id, v]))
+
+        let judged = 0, touched = 0
+        for (const w of want) {
+          const key = `${w.kind}:${w.id}`
+          const v = byId[key]
+          // 没判出来的**不推水位** —— 下次打开重判。
+          // 判不出来就当没判，绝不许假装判过了。
+          if (!v) continue
+
+          // 日期和出处成对才写；两个都 null = 把旧的那条作废掉
+          // （它已经过期了，而这段交流没有约定新的）。
+          const { error: te } = await db.rpc('pa_set_next_touch', {
+            p_kind: w.kind, p_id: w.id, p_at: v.touch, p_why: v.why,
+          })
+          if (!te && v.touch) touched++
+
+          // 最后那封来信要不要回，顺手落进 letter_verdicts（跟 triage 同一张表）
+          if (w.last_in_id) {
+            await db.rpc('pa_judge_letter', {
+              p_gmail_message_id: w.last_in_id, p_needs_reply: v.needs_reply,
+              p_not_before: null, p_why: v.reply_why,
+            })
+          }
+
+          const { data } = await db.rpc('pa_mark_judged', {
+            p_kind: w.kind, p_id: w.id, p_upto: w.upto || new Date().toISOString(),
+          })
+          if (data) judged++
+        }
+        const out = { judged, failed: want.length - judged, touched }
         console.log(`  ↳ ${JSON.stringify(out)}`)
         send(res, 200, out)
       } catch (err) {
