@@ -115,14 +115,26 @@ function Letter({ m }) {
   const [open, setOpen] = useState(false)
   const 进来的 = m.role === 'org'
   const who = 进来的 ? (m.meta?.from_name || m.counterpart_email || '对方') : '你发出'
-  const raw = m.body_raw || m.content || ''
-  const head = 砍引用(raw)
-  const 有更多 = head.length > GIST_CAP || raw.trim() !== head
+  // **原文和摘要不是一回事，不许混着显示。**
+  //
+  // 库里有两种信：body_raw 是 Gmail 取回来的原文，content 有时候是人写的
+  // 中文摘要。原来这儿写 `m.body_raw || m.content`，于是没存原文的那些
+  // 直接把摘要摆出来、还没有「展开原文」——同一个框，有的是原文有的是摘要，
+  // 你从外面看不出区别。
+  //
+  // （那 21 封没存原文的已经从 Gmail 补回来了。这道闸是给以后的：
+  //   万一再有，框上得说出来。）
+  const raw = m.body_raw || ''
+  const 只有摘要 = !raw && Boolean(m.content)
+  const body = raw || m.content || ''
+  const head = 砍引用(body)
+  const 有更多 = Boolean(raw) && (head.length > GIST_CAP || raw.trim() !== head)
   return (
     <div id={'msg-' + m.id} className={'arrival' + (进来的 ? ' in' : ' out')}>
       <div className="arr-top">
         <span className="arr-mark" aria-hidden="true">✉</span>
         <b>{进来的 ? `${who} 来信` : who}</b>
+        {只有摘要 && <span className="arr-tag">摘要 · 原文没存下来</span>}
         <span className="arr-when">{md(m.created_at)}</span>
       </div>
       <div className="arr-gist">{head.slice(0, GIST_CAP) || '（这封信没有正文）'}</div>
