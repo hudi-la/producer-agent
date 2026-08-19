@@ -53,3 +53,25 @@ export function saidThisTime(text) {
 
 /** 框里露多少字。再长就该点「展开原文」了。 */
 export const GIST_CAP = 240
+
+/**
+ * 这一条是不是**一封真信**。
+ *
+ * ══ 为什么要有这个函数 ═══════════════════════════════════════
+ *
+ * 因为判据在这个仓库里流通过两个版本，而第二个版本在某一天变成了错的：
+ *
+ *   · `kind === 'email'`            —— 对的
+ *   · `gmail_message_id != null`    —— **gmail_draft 出现之前**是对的
+ *
+ * 草稿也有 gmail_message_id。引入 gmail_draft 那天，后一个判据一下子
+ * 在所有用它的地方同时变错，而没人去扫过一遍 —— 于是左栏卷宗、人卡的
+ * 往来，都在把草稿当信显示（一个人只发过一封，卡上写着五封）。
+ *
+ * **判据只留这一份，组件不许各写各的。**
+ */
+export const isLetter = (m) => m?.kind === 'email'
+
+/** 往来里该显示的：真信 + 你手记的那些。草稿哪儿都不算。 */
+export const isExchange = (m) =>
+  isLetter(m) || m?.role === 'note' || m?.kind === 'meet'

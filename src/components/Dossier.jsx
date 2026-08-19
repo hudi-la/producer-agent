@@ -3,6 +3,7 @@ import Cast from './Cast.jsx'
 import { fetchPursuitMail } from '../lib/pursuitCast.js'
 import Pool from './Pool.jsx'
 import Mail from './Mail.jsx'
+import { isLetter } from '../lib/letter.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
 
 // 左栏：卷宗。
@@ -135,9 +136,12 @@ export default function Dossier({
   // 你在某个人名片上记的一次接触，如果挂在了这条线上，这儿也该看得见。
   // **不是搬过去**——它长在那个人身上，这儿是「也显示」。
   const notes = msgs.filter((m) => m.role === 'note')
-  const own = msgs.filter((m) => m.kind === 'email')
+  const own = msgs.filter(isLetter)
   const seen = new Set(own.map((m) => m.gmail_message_id || m.id))
-  const extra = (derived || []).filter((m) => !seen.has(m.gmail_message_id || m.id))
+  // **derived 也要过 isLetter。** 它来自 v_pa_pursuit_mail，那儿一度不滤草稿，
+  // 于是 Ana 名下只发过一封信，左栏写着五封（四条是草稿的自动保存）。
+  // 读面已经滤了（0089），这儿是第二道 —— 判据只有一份，两边都用它。
+  const extra = (derived || []).filter((m) => isLetter(m) && !seen.has(m.gmail_message_id || m.id))
   const all = [...own.map((m) => ({ ...m, on_this_line: true })), ...extra]
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
   const mails = all.filter((m) => m.on_this_line)

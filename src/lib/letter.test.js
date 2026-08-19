@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { saidThisTime, GIST_CAP } from './letter.js'
+import { saidThisTime, GIST_CAP, isLetter, isExchange } from './letter.js'
 
 test('Gmail 的 > 引用砍掉', () => {
   assert.equal(saidThisTime('Thanks!\n\n> old stuff\n> more old'), 'Thanks!')
@@ -57,4 +57,34 @@ test('取最早的那个标记 —— 别让后面的漏网', () => {
 
 test('露多少字有个上限', () => {
   assert.equal(GIST_CAP, 240)
+})
+
+// ── 这是不是一封真信 ────────────────────────────────────────────
+// 判据流通过两个版本，第二个在 gmail_draft 出现那天变成了错的。
+// 草稿也有 gmail_message_id —— 拿它当判据，草稿就会被当成信显示。
+
+test('kind=email 是信', () => {
+  assert.equal(isLetter({ kind: 'email', gmail_message_id: 'x' }), true)
+})
+
+test('**草稿不是信，哪怕它也有 gmail_message_id**', () => {
+  assert.equal(isLetter({ kind: 'gmail_draft', gmail_message_id: 'x' }), false)
+})
+
+test('跟 Fairwind 的商量不是信', () => {
+  assert.equal(isLetter({ kind: 'message' }), false)
+  assert.equal(isLetter({ kind: 'brief' }), false)
+})
+
+test('空的不炸', () => {
+  assert.equal(isLetter(null), false)
+  assert.equal(isLetter({}), false)
+})
+
+test('往来 = 真信 + 你手记的；草稿不算', () => {
+  assert.equal(isExchange({ kind: 'email' }), true)
+  assert.equal(isExchange({ role: 'note', kind: 'decision' }), true)
+  assert.equal(isExchange({ kind: 'meet' }), true)
+  assert.equal(isExchange({ kind: 'gmail_draft', gmail_message_id: 'x' }), false)
+  assert.equal(isExchange({ kind: 'message' }), false)
 })

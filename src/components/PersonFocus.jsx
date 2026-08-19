@@ -6,6 +6,7 @@ import Md from './Md.jsx'
 import SayBubble from './Resay.jsx'
 import Pool from './Pool.jsx'
 import { MailList } from './Mail.jsx'
+import { isLetter, isExchange } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
@@ -130,11 +131,11 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   // role='artist' 两种情况都有（你发的邮件、你跟 Fairwind 说的话），
   // 所以判据是「有没有 gmail_message_id」而不是 role。
   // 往来 = 跟这个人真实来往过的每一次：邮件是一次，见面/通话/微信也是一次。
-  const mails = (msgs || []).filter((m) => m.gmail_message_id || m.role === 'note')
+  const mails = (msgs || []).filter(isExchange)
   // 往来分两格。**这个区别 Fairwind 也要知道**：
   // 邮件是有凭据的（库里有原文），我记的是你的记忆（只有你那一句）。
   // 它给你写回信的时候，这两种材料的分量不一样。
-  const emails = mails.filter((m) => m.gmail_message_id)
+  const emails = mails.filter(isLetter)
   const notes  = mails.filter((m) => m.role === 'note')
   const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
 
@@ -144,7 +145,7 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   // 所以把产生那个日期的那条记录找出来，把它那句话摆上去。
   // 对不上日子的（你按了「聊过了」但没写内容）就老实说没记内容，
   // 不拿一句「你记的一笔」糊弄过去。
-  const touches = (msgs || []).filter((m) => m.gmail_message_id || m.role === 'note')
+  const touches = (msgs || []).filter(isExchange)
   const lastTouch = touches.length ? touches[touches.length - 1] : null
   const touchShown = lastTouch && c.last_touch_at && day(lastTouch.created_at) === c.last_touch_at
     ? lastTouch : null
