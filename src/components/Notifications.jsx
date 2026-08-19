@@ -99,10 +99,12 @@ export default function Notifications({ data, judging, onJudgeMore, onMark, onAl
         </p>
       )}
 
-      {/* 还没判完的**必须报出来**。静默截断 = 你以为全判完了，其实没有。 */}
+      {/* 还没判完的**必须报出来**。静默截断 = 你以为全判完了，其实没有。
+          只数最近有往来的那些 —— 更老的不主动判（问「约定了什么时间点吗」
+          必然是 null），它们的由头照样从事实现算得出来。 */}
       {!judging && 待判 > 0 && (
         <p className="nnone">
-          还有 {待判} 个没重判过，下面这些可能还是旧结论。
+          还有 {待判} 条最近有往来的没重判，下面这些可能还是旧结论。
           <button className="lnk" onClick={onJudgeMore}>接着判</button>
         </p>
       )}

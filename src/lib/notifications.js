@@ -21,6 +21,15 @@ import { day as dayOf } from './when.js'
 /** 分界线用 BUMP_WAIT[0] —— 项目里已有的节奏常数，不另发明一个数。 */
 export const FRESH_DAYS = BUMP_WAIT[0]
 
+/**
+ * 多久以内的往来才值得花钱重判。
+ *
+ * 30 天：一段还活着的交流，最后一次往来不会比这更久。再往前的，
+ * 「有没有约定下一个时间点」这个问题答案必然是 null ——
+ * 真跑过一批 12 个，11 个是 null。
+ */
+export const REJUDGE_WINDOW_DAYS = 30
+
 const DAY = 86400000
 const daysBetween = (a, b) =>
   Math.round((new Date(dayOf(b) + 'T00:00:00') - new Date(dayOf(a) + 'T00:00:00')) / DAY)
@@ -123,10 +132,22 @@ export async function loadNotifications() {
     // 脏了的：最后一件事（信 / 你记的一笔 / **移卡**）晚于上次重判的水位。
     // 「脏不脏」是库里算出来的（v_pa_cue_facts.stale），不是这儿存的标记
     // ——存的会跟事实分叉。
-    const stale = (facts || []).filter((f) => f.stale).map((f) => ({
+    //
+    // **但脏 ≠ 值得判。** 重判问的是「这段交流约定了下一个时间点吗」，
+    // 而一条两年前发出去没人回的冷邮件，答案必然是 null ——
+    // 上一批 12 个里 11 个是 null。由头本来就从事实现算，模型加不进东西。
+    //
+    // 所以只判**最近真的聊过**的那些。更老的照样算脏（事实摆在那儿），
+    // 只是不主动花钱去问模型；它们的由头一样出得来。
+    const 值得判 = (f) =>
+      f.stale && f.last_event_at &&
+      Date.now() - new Date(f.last_event_at) < REJUDGE_WINDOW_DAYS * 86400000
+    const stale = (facts || []).filter(值得判).map((f) => ({
       kind: f.subject_kind, id: f.subject_id,
       last_in_id: f.last_in_id || null, upto: f.last_event_at,
     }))
+    // 最近的排前面 —— 先判最可能有新约定的那些
+    stale.sort((a, b) => String(b.upto).localeCompare(String(a.upto)))
 
     return { ...layer(items, today), unjudged: [...new Set(unjudged)], stale,
              source: 'live', reason: null }
