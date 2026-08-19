@@ -141,6 +141,70 @@
 
 ---
 
+## 四·五、判据算在哪：库供事实，JS 拼由头
+
+**这一节是写施工计划时补的，它拦下了一次旧事故的重演。**
+
+`loadPursuits.js` 开头记着那次事故：
+
+> 首页**不再拉消息**。原来为了算小红点，这儿每 8 秒把全库消息拉一遍。
+> PostgREST 默认封顶 1000 行——过了这个数它只返回**最老的** 1000 条，
+> 新消息静悄悄不在里面而且不报错。
+
+所以「判据两边共用同一份代码」这句话，如果那份代码是浏览器里的 JS，
+它就得先把全部往来拉进浏览器——**那个事故会原样重演一次**。
+人那边现在能这么干，只是因为「库里十来个人」（`loadContacts.js` 自己写着的），
+机会线不行。
+
+### 但也不能把判据搬进 SQL
+
+那样 `cues.js` 和视图就是两套实现——**第二条病换个地方复发**，
+而且 SQL 那份没有测试（这个仓库的测试只跑 `node --test`）。
+
+### 分工
+
+| | 谁算 | 为什么 |
+|---|---|---|
+| **事实** | 库（一个视图，一行一个对象） | 数量级锁死：对象几十个，不是信几千封 |
+| **由头** | JS（`cues.js`，一份） | 判据要能测；测试只跑得了 JS |
+
+视图 `v_pa_cue_facts`，一行一个对象（人或机会线），只有标量：
+
+```
+subject_kind      'contact' | 'pursuit'
+subject_id        uuid
+name              显示用
+line_title        机会线标题（人挂了线才有；没有就 null）
+last_in_at        最后一封对方来信什么时候
+last_in_id        那封信的 gmail_message_id  ← 第五节靠它去查判定
+last_in_from      谁发的
+last_in_subject   信的主题（通知条上摘一句用）
+last_out_at       最后一封你发出去的信什么时候
+unanswered_n      你连着发出去、中间没人回的最后几封，几封
+unanswered_at     那一串里最后一封的日期
+next_touch_at     说好什么时候再碰
+next_touch_why    那个日子的出处
+deadline_at       截止（机会线才有）
+intro_by_name     介绍人（人才有）
+intro_thanked_at  回谢了没有（人才有）
+org_ever_replied  对方回过你没有（thanks 的前提，人才有）
+last_meet_at      最后一次见面记录（人才有）
+met_followed_up   见面之后发出过信没有（人才有）
+checkin_at        「聊过了」打卡到哪天（人才有，沿用 last_touch_src='checkin'）
+```
+
+`cues.js` 的入口从 `cuesFor(contact, msgs, opts)` 改成
+`cuesFor(facts, opts)`——**它不再需要看见任何一封信**，
+只看这一行标量。现有那些判据一条不改地照搬：
+`unansweredRun(msgs).length` 变成 `facts.unanswered_n`，
+「最后一封是对方的」变成 `facts.last_in_at > facts.last_out_at`，
+其余同理。
+
+**测试全部照旧能跑**，而且比现在好写——不用再造一串假邮件，
+给一行标量就行。
+
+---
+
 ## 五、治「那封信本身就不用回」——三层漏斗
 
 第一、二层**已经建好了**，这一刀只加第三层。
