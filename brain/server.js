@@ -25,6 +25,8 @@ import { foldReply } from './reply.js'
 import { extractLetter } from './letter.js'
 // 填完一张表也报一声。逐格的字数闸靠它带过来——那是申请表的要害。
 import { extractForm } from './form.js'
+
+import { parseTriage, triagePrompt } from './triage.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -1348,6 +1350,57 @@ const server = http.createServer(async (req, res) => {
         // 授权掉了要认得出来，不能长成「这轮 0 封新信」——那正是这次事故里
         // 最伤人的失败形态。前端拿 needs_auth 弹一句人话。
         send(res, 500, { error: err.message, needs_auth: err.name === 'MailAuthError', fix: err.fix || null })
+      }
+    })
+    return
+  }
+
+  // ── 判一批信要不要回 ─────────────────────────────────────────
+  //
+  // 懒算：**不在收信时判**。incremental() 是纯收信，往里加模型调用会让
+  // 全局同步变慢变贵，而且你不看的信也要付钱。改成通知栏打开时判一批。
+  //
+  // 判哪些：由前端点名（它知道哪些是「此刻会成为候选的最后一封来信」），
+  // 量锁在「你有多少个对象」这个数量级上（几十），不是「你收过多少封信」（几千）。
+  //
+  // 设计稿：docs/specs/2026-08-18-notifications-design.md 第五节
+  if (req.method === 'POST' && req.url === '/letters/triage') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const ids = (JSON.parse(raw || '{}').ids || []).filter((x) => typeof x === 'string')
+        if (!ids.length) return send(res, 200, { judged: 0, failed: 0 })
+
+        // 走 RPC 不走 db.from：**producer schema 没进 Exposed schemas**
+        // （第 60 行那条规矩）。直接 from('pursuit_messages') 打的是
+        // public 里那张不存在的表，回空数组还不报错 —— 长成「这批没什么
+        // 可判的」，是最难查的那种失败形态。
+        const { data: letters, error: le } = await db.rpc('pa_letters_for_triage', { p_ids: ids })
+        if (le) throw new Error('取信失败：' + le.message)
+        if (!letters?.length) return send(res, 200, { judged: 0, failed: 0 })
+
+        const t = new Date().toLocaleTimeString('zh-CN')
+        console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
+        const { text } = await think(triagePrompt(letters), READ_TOOLS, null)
+        const verdicts = parseTriage(text)
+
+        // 判不出来的**不写库**，下次打开重判。
+        // 宁可多吵你一条，绝不许因为一次调用失败就把一封真信悄悄咽掉。
+        let judged = 0
+        for (const v of verdicts) {
+          const { data } = await db.rpc('pa_judge_letter', {
+            p_gmail_message_id: v.id, p_needs_reply: v.needs_reply,
+            p_not_before: v.not_before, p_why: v.why,
+          })
+          if (data) judged++
+        }
+        const out = { judged, failed: letters.length - judged }
+        console.log(`  ↳ ${JSON.stringify(out)}`)
+        send(res, 200, out)
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
       }
     })
     return
