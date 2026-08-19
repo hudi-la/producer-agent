@@ -990,6 +990,103 @@ async function handlePersonRefresh(contactId) {
   }
 }
 
+/**
+ * 重判一批对象。**路由和收信循环共用这一份** ——
+ * 手动「接着判」和自动那一轮不该是两套代码。
+ */
+async function rejudgeThese(want) {
+  if (!want?.length) return { judged: 0, failed: 0, touched: 0 }
+
+  const { data: subjects, error: se } = await db.rpc('pa_subjects_for_rejudge', {
+    p_kinds: want.map((x) => x.kind), p_ids: want.map((x) => x.id),
+  })
+  if (se) throw new Error('取近况失败：' + se.message)
+  if (!subjects?.length) return { judged: 0, failed: 0, touched: 0 }
+
+  const t = new Date().toLocaleTimeString('zh-CN')
+  console.log(`\n→ ${t} 重判 ${subjects.length} 个对象`)
+  const { text } = await think(rejudgePrompt(subjects), READ_TOOLS, null)
+  const byId = Object.fromEntries(parseRejudge(text).map((v) => [v.id, v]))
+
+  let judged = 0, touched = 0
+  for (const w of want) {
+    const v = byId[`${w.kind}:${w.id}`]
+    // 没判出来的**不推水位** —— 下次再判。绝不许假装判过了。
+    if (!v) continue
+
+    // 日期和出处成对才写；两个都 null = 把旧的那条作废掉
+    // （它已经过期了，而这段交流没有约定新的）。
+    const { error: te } = await db.rpc('pa_set_next_touch', {
+      p_kind: w.kind, p_id: w.id, p_at: v.touch, p_why: v.why,
+    })
+    if (!te && v.touch) touched++
+
+    // 最后那封来信要不要回，顺手落进 letter_verdicts（跟 triage 同一张表）
+    if (w.last_in_id) {
+      await db.rpc('pa_judge_letter', {
+        p_gmail_message_id: w.last_in_id, p_needs_reply: v.needs_reply,
+        p_not_before: null, p_why: v.reply_why,
+      })
+    }
+
+    // 「上次碰」也是从信推出来的派生值，同样会跟事实分叉。重判到谁就重算谁。
+    await db.rpc('pa_recompute_touch', { p_kind: w.kind, p_id: w.id })
+
+    const { data } = await db.rpc('pa_mark_judged', {
+      p_kind: w.kind, p_id: w.id, p_upto: w.upto || new Date().toISOString(),
+    })
+    if (data) judged++
+  }
+  const out = { judged, failed: want.length - judged, touched }
+  console.log(`  \u21b3 ${JSON.stringify(out)}`)
+  return out
+}
+
+/** 判一批信「要不要回」。跟重判一样，路由和循环共用。 */
+async function triageThese(ids) {
+  if (!ids?.length) return { judged: 0, failed: 0 }
+  const { data: letters, error: le } = await db.rpc('pa_letters_for_triage', { p_ids: ids })
+  if (le) throw new Error('取信失败：' + le.message)
+  if (!letters?.length) return { judged: 0, failed: 0 }
+
+  const t = new Date().toLocaleTimeString('zh-CN')
+  console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
+  const { text } = await think(triagePrompt(letters), READ_TOOLS, null)
+  let judged = 0
+  for (const v of parseTriage(text)) {
+    const { data } = await db.rpc('pa_judge_letter', {
+      p_gmail_message_id: v.id, p_needs_reply: v.needs_reply,
+      p_not_before: v.not_before, p_why: v.why,
+    })
+    if (data) judged++
+  }
+  const out = { judged, failed: letters.length - judged }
+  console.log(`  \u21b3 ${JSON.stringify(out)}`)
+  return out
+}
+
+/**
+ * 变脏就判，不等你打开通知栏。收信循环每轮跑一次。
+ *
+ * 为什么不是懒算：**🔔 上那个数字是在重判之前算的**。一封新信进来，
+ * needs_reply 还没判、缺省当「要回」，数字 +1 —— 那封信要是
+ * 「谢谢，回头见」，这个 +1 是假的，而你正是靠这个数字决定要不要打开。
+ *
+ * 每轮有上限，积压是一轮一轮化开的，不会突然花一大笔。
+ */
+async function judgePass({ subjects = 12, letters = 20 } = {}) {
+  const out = { rejudged: 0, triaged: 0 }
+  try {
+    const { data: stale } = await db.rpc('pa_stale_subjects', { p_days: 30, p_limit: subjects })
+    if (stale?.length) out.rejudged = (await rejudgeThese(stale)).judged
+  } catch (err) { console.error('✗ 重判：', err.message) }
+  try {
+    const { data: ids } = await db.rpc('pa_letters_to_triage', { p_limit: letters })
+    if (ids?.length) out.triaged = (await triageThese(ids)).judged
+  } catch (err) { console.error('✗ 判信：', err.message) }
+  return out
+}
+
 async function handleRefresh(body) {
   const owner = ownerOf(body)
   if (!owner) throw new Error('要有 pursuit_id 或 contact_id')
@@ -1377,28 +1474,7 @@ const server = http.createServer(async (req, res) => {
         // （第 60 行那条规矩）。直接 from('pursuit_messages') 打的是
         // public 里那张不存在的表，回空数组还不报错 —— 长成「这批没什么
         // 可判的」，是最难查的那种失败形态。
-        const { data: letters, error: le } = await db.rpc('pa_letters_for_triage', { p_ids: ids })
-        if (le) throw new Error('取信失败：' + le.message)
-        if (!letters?.length) return send(res, 200, { judged: 0, failed: 0 })
-
-        const t = new Date().toLocaleTimeString('zh-CN')
-        console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
-        const { text } = await think(triagePrompt(letters), READ_TOOLS, null)
-        const verdicts = parseTriage(text)
-
-        // 判不出来的**不写库**，下次打开重判。
-        // 宁可多吵你一条，绝不许因为一次调用失败就把一封真信悄悄咽掉。
-        let judged = 0
-        for (const v of verdicts) {
-          const { data } = await db.rpc('pa_judge_letter', {
-            p_gmail_message_id: v.id, p_needs_reply: v.needs_reply,
-            p_not_before: v.not_before, p_why: v.why,
-          })
-          if (data) judged++
-        }
-        const out = { judged, failed: letters.length - judged }
-        console.log(`  ↳ ${JSON.stringify(out)}`)
-        send(res, 200, out)
+        send(res, 200, await triageThese(ids))
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })
@@ -1424,55 +1500,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const want = (JSON.parse(raw || '{}').subjects || [])
           .filter((x) => x && (x.kind === 'contact' || x.kind === 'pursuit') && x.id)
-        if (!want.length) return send(res, 200, { judged: 0, failed: 0 })
-
-        const { data: subjects, error: se } = await db.rpc('pa_subjects_for_rejudge', {
-          p_kinds: want.map((x) => x.kind), p_ids: want.map((x) => x.id),
-        })
-        if (se) throw new Error('取近况失败：' + se.message)
-        if (!subjects?.length) return send(res, 200, { judged: 0, failed: 0 })
-
-        const t = new Date().toLocaleTimeString('zh-CN')
-        console.log(`\n→ ${t} 重判 ${subjects.length} 个对象`)
-        const { text } = await think(rejudgePrompt(subjects), READ_TOOLS, null)
-        const verdicts = parseRejudge(text)
-        const byId = Object.fromEntries(verdicts.map((v) => [v.id, v]))
-
-        let judged = 0, touched = 0
-        for (const w of want) {
-          const key = `${w.kind}:${w.id}`
-          const v = byId[key]
-          // 没判出来的**不推水位** —— 下次打开重判。
-          // 判不出来就当没判，绝不许假装判过了。
-          if (!v) continue
-
-          // 日期和出处成对才写；两个都 null = 把旧的那条作废掉
-          // （它已经过期了，而这段交流没有约定新的）。
-          const { error: te } = await db.rpc('pa_set_next_touch', {
-            p_kind: w.kind, p_id: w.id, p_at: v.touch, p_why: v.why,
-          })
-          if (!te && v.touch) touched++
-
-          // 最后那封来信要不要回，顺手落进 letter_verdicts（跟 triage 同一张表）
-          if (w.last_in_id) {
-            await db.rpc('pa_judge_letter', {
-              p_gmail_message_id: w.last_in_id, p_needs_reply: v.needs_reply,
-              p_not_before: null, p_why: v.reply_why,
-            })
-          }
-
-          // 「上次碰」也是从信推出来的派生值，同样会跟事实分叉
-          // （草稿写下的日期一直留在名片上）。重判到谁就顺手重算谁。
-          await db.rpc('pa_recompute_touch', { p_kind: w.kind, p_id: w.id })
-
-          const { data } = await db.rpc('pa_mark_judged', {
-            p_kind: w.kind, p_id: w.id, p_upto: w.upto || new Date().toISOString(),
-          })
-          if (data) judged++
-        }
-        const out = { judged, failed: want.length - judged, touched }
-        console.log(`  ↳ ${JSON.stringify(out)}`)
-        send(res, 200, out)
+        send(res, 200, await rejudgeThese(want))
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })
@@ -1525,6 +1553,8 @@ server.listen(PORT, () => {
     try {
       const { sweepMail } = await import('./mail/loop.js')
       await sweepMail()
+      // 收完信顺手把脏了的判掉。**不等你打开通知栏** —— 见 judgePass 上面那段。
+      await judgePass()
     } catch (err) { console.error('  ✗ 邮件循环起不来：' + err.message) }
   }
   setTimeout(mailLoop, 5000)          // 起来 5 秒后先跑一轮，别让你等五分钟

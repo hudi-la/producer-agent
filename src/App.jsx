@@ -211,32 +211,23 @@ export default function App() {
   // **升级前关掉的那些不许悄悄复活** —— 那是「你以为处理过了，其实系统忘了」。
   useEffect(() => { migrateCueOff().then(pullNotes) }, [])
 
-  // 打开面板时判一批。**懒算：不看就不花钱。**
+  // 打开面板只读，**不判**。
   //
-  // 两件事：先重判脏了的对象（有新往来、你记了一笔、或者你移过卡），
-  // 再判那些还没判过「要不要回」的信。判不成都不挡路 ——
-  // 水位不推进，下次打开再判，绝不假装判过了。
+  // 原来是「打开才判一批」，理由写的是不看就不花钱。可那个理由是拿一次性的
+  // 98 个积压算的 —— 稳态一天 1–8 个对象变脏，一天不到两毛钱。
   //
-  // 一次只判一批（REJUDGE_BATCH 个对象）。**剩下多少要报出来**，
-  // 不许静默截断 —— 那会让你以为全判完了。
+  // 而懒算有个结构性的洞：**🔔 上那个数字是在重判之前算的**。一封新信进来，
+  // needs_reply 还没判、缺省当「要回」，数字 +1 —— 那封信要是「谢谢，回头见」，
+  // 这个 +1 是假的，而你正是靠这个数字决定要不要打开。
+  //
+  // 现在收信循环每轮判一批（brain 的 judgePass），打开时该判的多半已经判完了。
   const openBell = async () => {
     setBellOpen(true)
-    let out = notes || await pullNotes()
-    if (!out?.stale?.length && !out?.unjudged?.length) return
-    setJudging(true)
-    try {
-      if (out?.stale?.length) {
-        await rejudge(out.stale.slice(0, REJUDGE_BATCH))
-        out = await pullNotes()
-      }
-      if (out?.unjudged?.length) {
-        await triage(out.unjudged.slice(0, 20))
-        await pullNotes()
-      }
-    } finally { setJudging(false) }
+    if (!notes) await pullNotes()
   }
 
-  // 「还有 N 个没判，接着判」—— 一批一批往下走，进度看得见。
+  // 「接着判」：积压还没化开的时候手动催一把。
+  // 走的是跟收信循环同一条路（brain 的 rejudgeThese / triageThese）。
   const judgeMore = async () => {
     setJudging(true)
     try {
