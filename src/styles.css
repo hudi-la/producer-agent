@@ -1355,3 +1355,28 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
            cursor: pointer; padding: 3px 7px; font-size: 11px; white-space: nowrap; }
 .nnone   { font-size: 12px; opacity: .6; margin: 6px 0; }
 .nback   { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 10px; }
+
+/* ── 信到了的那个框 ────────────────────────────────────────────
+   0030 设计过这条告知，0058 换成 new_mail 之后一直没建。
+   往来是往来、对话是对话 —— 这个框给信在时间线上一个位置。
+   框里全是事实：谁、哪天、正文头一段、展开原文。摘要不叫模型。
+   设计稿：docs/specs/2026-08-19-a-letter-announces-itself.md */
+.arrival   { margin: 10px 0; padding: 8px 11px 9px; border-radius: 7px;
+             border: 1px solid var(--line); background: var(--paper-2);
+             /* 左边一道色条分方向：进来的用强调色，发出去的灰着 */
+             border-left: 3px solid var(--line-2); }
+.arrival.in  { border-left-color: var(--accent); }
+.arr-top   { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+.arr-mark  { opacity: .5; }
+.arr-when  { margin-left: auto; font-size: 11px; color: var(--ink-3);
+             font-variant-numeric: tabular-nums; }
+.arr-gist  { margin-top: 4px; font-size: 12.5px; color: var(--ink-2);
+             white-space: pre-wrap; line-height: 1.5; }
+.arr-more  { margin-top: 5px; background: none; border: 0; padding: 0;
+             cursor: pointer; font-size: 11.5px; color: var(--accent); }
+.arr-raw   { margin: 7px 0 0; padding: 8px 10px; border-radius: 5px;
+             background: var(--paper-3); border: 1px solid var(--line);
+             font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+             white-space: pre-wrap; word-break: break-word;
+             max-height: 340px; overflow-y: auto; }
+.arr-done  { margin-top: 6px; font-size: 12px; color: var(--good); }

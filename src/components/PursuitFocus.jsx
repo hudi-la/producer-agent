@@ -3,6 +3,7 @@ import { fetchMessages, sendMessageStream, stopThinking, rewindChat } from '../l
 import { useLiveReply } from '../lib/useLiveReply.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
+import { md } from '../lib/when.js'
 import SayBubble from './Resay.jsx'
 
 import {
@@ -77,9 +78,71 @@ function Deadline({ p }) {
   )
 }
 
+/**
+ * 一封信在对话流里的样子：谁、哪天、头一段，可以就地展开原文。
+ *
+ * ══ 为什么信要跟对话长得不一样 ═══════════════════════════════
+ *
+ * 信本来就在对话流里（按时间穿插），但它渲染成一个普通气泡，跟 Fairwind
+ * 说的话、你说的话混在一起。你翻这条线的时候，看不出哪一句是**真发生过的
+ * 往来**、哪一句是你俩在商量。
+ *
+ * 而信往往很长（Gmail 把整封旧信引在下面），铺开会把商量的部分挤没。
+ * 所以：**收起来只露头一段，要看原文点一下**。
+ *
+ * ══ 头一段不叫模型摘 ═════════════════════════════════════════
+ *
+ * 按信数花钱违反「量锁在对象数上」那条规矩；更要紧的是模型摘的那句
+ * **会跟原文分叉**，而原文就在一个「展开」的距离。截原文头一段，
+ * 最坏是截得不好看，永远不会是假的。
+ *
+ * ══ 不新造一条「告知」消息 ═══════════════════════════════════
+ *
+ * 0030 当年设计的是「收信顺手落一条 Fairwind 的告知」。第一版真那么干了，
+ * 造了 805 行 —— 结果每封信在对话里出现两次：信一次、告知一次，
+ * 展开原文再一次。**信本来就在流里**，要的只是让它长得不一样。撤了。
+ *
+ * 设计稿：docs/specs/2026-08-19-a-letter-announces-itself.md
+ */
+const 砍引用 = (t) => String(t || '')
+  .replace(/\r/g, '')
+  .split(/\n>|\nOn .{0,100}wrote:|\n-- /)[0]
+  .trim()
+
+const GIST_CAP = 240
+
+function Letter({ m }) {
+  const [open, setOpen] = useState(false)
+  const 进来的 = m.role === 'org'
+  const who = 进来的 ? (m.meta?.from_name || m.counterpart_email || '对方') : '你发出'
+  const raw = m.body_raw || m.content || ''
+  const head = 砍引用(raw)
+  const 有更多 = head.length > GIST_CAP || raw.trim() !== head
+  return (
+    <div id={'msg-' + m.id} className={'arrival' + (进来的 ? ' in' : ' out')}>
+      <div className="arr-top">
+        <span className="arr-mark" aria-hidden="true">✉</span>
+        <b>{进来的 ? `${who} 来信` : who}</b>
+        <span className="arr-when">{md(m.created_at)}</span>
+      </div>
+      <div className="arr-gist">{head.slice(0, GIST_CAP) || '（这封信没有正文）'}</div>
+      {有更多 && (
+        <button className="arr-more" onClick={() => setOpen((x) => !x)}>
+          {open ? '收起原文' : '展开原文'} {open ? '▾' : '▸'}
+        </button>
+      )}
+      {open && <pre className="arr-raw">{raw}</pre>}
+    </div>
+  )
+}
+
 function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay, owner, onAdopted }) {
   // 备注不是谁在说话。role='note' 是这条线上的一笔记录（线下发生的事、一个决定），
   // 原来它也走「其余一律显示 Fairwind」那条路，于是你自己记的事看起来像 Fairwind 说的。
+  // 真信单独一种长相，跟商量分开。见 Letter 上面那段。
+  if (m.kind === 'email') {
+    return <Letter m={m} />
+  }
   if (m.role === 'note') {
     return (
       <div id={'msg-' + m.id} className="notecard">
