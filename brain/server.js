@@ -277,7 +277,7 @@ function filesServer(atts) {
  */
 const asSystem = (s) => (typeof s === 'string' || Array.isArray(s) ? s : systemFor(s))
 
-async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null) {
+async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null, maxTurns = 20) {
   // 按发生顺序收下 text / tool_use 两种块，最后交给 foldReply 挑出「给人看的那段」。
   // 原来这儿是 out.push(b.text) 无差别攒 —— 于是 20 轮的英文工作稿全被拼进落库的回复。
   const blocks = []
@@ -302,7 +302,7 @@ async function think(prompt, tools = READ_TOOLS, system = null, abortController 
       systemPrompt: asSystem(system),
       allowedTools: tools,
       permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
-      maxTurns: 20,
+      maxTurns,
       ...(tell ? { includePartialMessages: true } : {}),
       ...(abortController ? { abortController } : {}),
       ...(mcpServers ? { mcpServers } : {}),
@@ -991,6 +991,22 @@ async function handlePersonRefresh(contactId) {
 }
 
 /**
+ * 判断用的 system —— **跟 Fairwind 那套人格无关**。
+ *
+ * 判「这段交流约定了下一个时间点吗」「这封信要不要回」，不需要知道
+ * 你有哪些作品、履历长什么样、协作弧怎么走、写信有什么规矩。
+ * 带着那些只是白付上下文钱。
+ *
+ * 工具也一个不给：这两件事全在给它的文字里，不需要联网。
+ */
+const JUDGE_SYSTEM = `你在读一段真实的邮件往来，替一位艺术家做一个很小的判断。
+
+规矩：
+- 只回答被问到的那几个问题，不展开、不建议、不客套。
+- 依据只能是给你的这些文字。**看不出来就答 null**，不要推测。
+- 最后一行按要求输出那个标记块，别的什么都不要加。`
+
+/**
  * 重判一批对象。**路由和收信循环共用这一份** ——
  * 手动「接着判」和自动那一轮不该是两套代码。
  */
@@ -1005,7 +1021,7 @@ async function rejudgeThese(want) {
 
   const t = new Date().toLocaleTimeString('zh-CN')
   console.log(`\n→ ${t} 重判 ${subjects.length} 个对象`)
-  const { text } = await think(rejudgePrompt(subjects), READ_TOOLS, null)
+  const { text } = await think(rejudgePrompt(subjects), [], JUDGE_SYSTEM, null, null, null, 1)
   const byId = Object.fromEntries(parseRejudge(text).map((v) => [v.id, v]))
 
   let judged = 0, touched = 0
@@ -1051,7 +1067,7 @@ async function triageThese(ids) {
 
   const t = new Date().toLocaleTimeString('zh-CN')
   console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
-  const { text } = await think(triagePrompt(letters), READ_TOOLS, null)
+  const { text } = await think(triagePrompt(letters), [], JUDGE_SYSTEM, null, null, null, 1)
   let judged = 0
   for (const v of parseTriage(text)) {
     const { data } = await db.rpc('pa_judge_letter', {
@@ -1081,8 +1097,14 @@ async function triageThese(ids) {
 //
 // 20 分钟的上限是拿「你多久看一眼」比出来的：比这更准没意义，
 // 比这更久你就可能看到一个还没判过的数字。
-const BATCH_MIN = 4          // 攒够 4 个就判
-const WAIT_CYCLES = 4        // 或者攒够 4 轮（5 分钟一轮 = 20 分钟）
+// 量过之后调过一次。**每次调用有个 ~$0.19 的底价，跟带多少内容无关**：
+//   判 1 个对象   提示词 773 token     $0.19
+//   判 12 个对象  提示词 14,778 token  $0.235
+// 那 18k 是 agent SDK 自己的底座（试过：不给工具、换最小 system、
+// maxTurns 改 1，都压不动）。所以唯一的杠杆是**少发几次、每次多带点**。
+const BATCH_MIN = 6          // 攒够 6 个就判
+const WAIT_CYCLES = 12       // 或者攒够 12 轮（5 分钟一轮 = 60 分钟）
+const BATCH_CAP = 30         // 一次最多带 30 个 —— 反正跟带 1 个一样贵
 let 攒了几轮 = 0
 
 /**
@@ -1093,7 +1115,7 @@ let 攒了几轮 = 0
  * 那封信要是「谢谢，回头见」，这个 +1 是假的，
  * 而你正是靠这个数字决定要不要打开。
  */
-async function judgePass({ subjects = 12, letters = 20, force = false } = {}) {
+async function judgePass({ subjects = BATCH_CAP, letters = 20, force = false } = {}) {
   const out = { rejudged: 0, triaged: 0 }
   let stale = [], ids = []
   try {
@@ -1105,6 +1127,10 @@ async function judgePass({ subjects = 12, letters = 20, force = false } = {}) {
   if (!有活) { 攒了几轮 = 0; return out }
 
   攒了几轮++
+  // 攒够个数、或者攒够时间，哪个先到都判。
+  // 60 分钟这个上限是拿「🔔 上那个数字能错多久」换的：新信进来
+  // needs_reply 还没判、缺省当「要回」，数字可能虚高 1 —— 一小时内可以忍，
+  // 而每次调用 $0.19，一天判一次和判五次差五倍。
   if (!force && 有活 < BATCH_MIN && 攒了几轮 < WAIT_CYCLES) {
     return { ...out, 攒着: 有活, 等了几轮: 攒了几轮 }
   }
