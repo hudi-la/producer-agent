@@ -92,6 +92,36 @@
 缺原文的用 `pa_letters_missing_body()` 找出来，从 Gmail 补
 （`0085` 补过 21 封，全库现在每封都有原文）。
 
+## 「这是不是一封信」只有一个判据
+
+```
+kind = 'email'          ✅
+gmail_message_id != null ❌  ——草稿也有
+```
+
+`gmail_draft` 出现那天（`0075`），第二个判据**在所有用它的地方同时变错**，
+而没人扫过一遍谁在用它。于是同一件事修了四次，每次只修被指出来的那一处：
+
+| 哪儿看得见 | 修在 |
+|---|---|
+| 抽屉里的对话 | `0086` |
+| 左栏卷宗 / 人卡的往来 | `0089` |
+| 「相关的人」的封数 | `0090` |
+
+**改判据的时候先扫，再改：**
+
+```sql
+select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace
+ where relkind='v' and n.nspname in ('public','producer')
+   and pg_get_viewdef(c.oid) ~* '<旧判据>';
+select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname in ('public','producer') and prokind='f'
+   and pg_get_functiondef(p.oid) ~* '<旧判据>';
+```
+
+前端那一份收在 `src/lib/letter.js` 的 `isLetter` / `isExchange`，带测试。
+**组件不许各写各的**——已经忘了四次。
+
 ## 两个同名的 `classify`（读代码的坑）
 
 `brain/mail/` 下有两个导出叫 `classify`，干的是完全不同的事：
@@ -126,10 +156,11 @@ pa_fill_body(id, body)           → 补原文（空正文不写）
 ## 收工核对
 
 ```sql
-select * from public.pa_selfcheck() where not 通过;
+select * from public.pa_selfcheck()       where not 通过;   -- 17 条
+select * from public.pa_selfcheck_reads() where not 通过;   -- 7 条：每个读面 / 每处计数
 ```
 
-**17 条，全绿才算库是干净的。** 加一条判据的时候这儿也加一条 ——
+**两个都得全绿才算库是干净的。** 加一条判据的时候这儿也加一条 ——
 否则 SQL 那半永远是「我记得是对的」（`0088`）。
 
 自查抓过的真事：删掉一封信**不会**自动重算派生值。
