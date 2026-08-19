@@ -1,7 +1,5 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
-import { cuesFor, cueKey } from '../lib/cues.js'
-import { loadOff, turnOff, turnAllOn } from '../lib/cueoff.js'
 import Strangers from './Strangers.jsx'
 
 // 「人际管理」—— 人这一层。
@@ -12,11 +10,14 @@ import Strangers from './Strangers.jsx'
 // 一人一张卡是对的，但卡是你找到他之后看的东西，不该占满这一页——
 // 四个人的时候网格卡片勉强能看，等扫完老邮箱几千个人进来就废了。搜索框不会。
 //
-// 所以只有三样：一个搜索框、一段「现在该动的」、一份密行通讯录。
+// 所以只有两样：一个搜索框、一份密行通讯录。
 //
-// **这儿没有过卡。** 队列是「你还欠着几件事」，那是项目争取那边的形状；
-// 人这一层推着走的是由头，而由头在这页上就是一行字——看见了就点进去办，
-// 不需要再排成一摞让你一张张翻。
+// 「现在该动的」原来在这儿，现在整块挪去了**顶栏那个 🔔**。
+// 理由是同一件事不该有两个位置：「他回你了」原来在机会线是卡上一句事实、
+// 在这儿是一条由头，两套代码两种措辞。合成一套之后，由头只有一个入口。
+// 见 docs/specs/2026-08-18-notifications-design.md
+//
+// **这儿也没有过卡。** 队列是「你还欠着几件事」，那是项目争取那边的形状。
 
 const SRC = { email: '来自那封信', checkin: '你打的卡', meet: '你记的一笔' }
 const CH  = { email: '邮箱', wechat: '微信', sms: '短信', whatsapp: 'WhatsApp', ig: 'IG', phone: '电话' }
@@ -36,17 +37,6 @@ export default function People({
   bookOpen = false, onCloseBook,
 }) {
   const [q, setQ] = useState('')
-  // 你关掉的那些由头。存 localStorage —— 关掉不是事实，是「先不看它」。
-  const [off, setOff] = useState(loadOff)
-
-  const byId = useMemo(() => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts])
-
-  // 由头挪去顶栏通知了。这儿先空着，删干净在最后一步（人际管理页那一块整个走）。
-  const acting = []
-
-  const shown = acting.filter((x) => !off.has(cueKey(x.c.id, x.cue)))
-  const hidden = acting.length - shown.length
-  const live = shown.filter((x) => !x.cue.stopped).length
 
   // 通讯录装的是**你会写信的对象**，不是只装人。机构和它的共享信箱也在里面。
   const entries = useMemo(() => [
@@ -119,10 +109,19 @@ export default function People({
         <header className="page-head">
           <h1>人际管理</h1>
           <p className="note">
-            这一页只递一件事：<b>现在该动的那几个</b>。推着走的不是阶段和截止，是由头——
-            他回你了 / 该 bump 了 / 到日子了 / 还没回谢介绍人 / 见面 48 小时信。
+            你会写信的对象都在这儿：人、机构、机构的共享信箱。
+            <b>该动哪个</b>不在这一页说了——顶栏那个 🔔 一条一条列着，
+            机会线和人混在一起，因为你要办的事本来就不分家。
           </p>
         </header>
+
+        {/* 通讯录收起来了，这一页就没别的了（「现在该动的」挪去了 🔔）。
+            **不留死白页** —— 说清它去哪了、怎么叫回来。 */}
+        {!bookOpen && contacts.length > 0 && (
+          <p className="pnone">
+            通讯录收起来了。右上角那颗「通讯录」再点一下就回来。
+          </p>
+        )}
 
         {/* 空页可以，骗人不行 —— 说清是「库里真没有」还是「没连上」。 */}
         {!contacts.length && (
@@ -133,35 +132,6 @@ export default function People({
           </p>
         )}
 
-        <section className="psect">
-          <div className="psect-h"><h2>现在该动的</h2><span className="pcount">{live} 件</span></div>
-          {shown.length ? shown.map(({ c, cue }) => (
-            <div key={c.id + cue.via} className={'pcue' + (cue.stopped ? ' stopped' : '')}>
-              <button className="pcue-open" onClick={() => onOpen?.(c)}>
-                <span className="prow-n">{c.name || '未具名联系人'}</span>
-                <span className="pcue-w">{cue.why}</span>
-              </button>
-              {/* 关掉这一条。**不改任何事实**——那封信、那个日期原样都在，
-                  只是这台机器上先不看它。他再回你一封新的，这条会重新出现
-                  （键锚在事实的日期上，见 cues.js 的 cueKey）。 */}
-              <button className="pcue-x" title="先不看这条"
-                      onClick={() => setOff((o) => turnOff(o, cueKey(c.id, cue)))}>✕</button>
-            </div>
-          )) : (
-            <p className="pnone">
-              {acting.length ? '该动的都被你关掉了。' : '现在没有该动的。这是好事，不是漏了什么。'}
-            </p>
-          )}
-
-          {/* 关掉多少条都得说出来，而且永远留一条放回来的路。
-              静默藏起来 = 你以为没有，其实有 —— 那是这个项目最不能忍的那种谎。 */}
-          {hidden > 0 && (
-            <p className="pnone pcue-off">
-              还有 {hidden} 条被你关掉了。
-              <button className="lnk" onClick={() => setOff(turnAllOn())}>都放回来</button>
-            </p>
-          )}
-        </section>
       </div>
 
       {/* ── 通讯录抽屉 ─────────────────────────────────────────

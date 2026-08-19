@@ -1,7 +1,6 @@
 import { md, day } from '../lib/when.js'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchContactMessages, rewindChat } from '../lib/chat.js'
-import { cuesFor } from '../lib/cues.js'
 import { dropFrom } from '../lib/rewind.js'
 import Md from './Md.jsx'
 import SayBubble from './Resay.jsx'
@@ -138,8 +137,6 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const emails = mails.filter((m) => m.gmail_message_id)
   const notes  = mails.filter((m) => m.role === 'note')
   const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
-  // 由头挪去顶栏通知了。这儿先空着，删干净在最后一步。
-  const cues  = []
 
   // 「上次碰」光有日期是没用的。「8/10 · 你记的一笔」等于没说——
   // 你想知道的是**上次到底发生了啥**：哪封信说了什么、那次见面聊了什么。
@@ -398,13 +395,9 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                 placeholder="他关心什么、答应过什么、上回聊了什么"
                 onSave={(v) => save({ notes: v })} />
 
-          {cues.length > 0 && (
-            <div className="pf-cues">
-              {cues.map((q) => (
-                <div key={q.via} className={'pcue-tag' + (q.stopped ? ' stopped' : '')}>{q.why}</div>
-              ))}
-            </div>
-          )}
+          {/* 由头原来贴在这儿。挪去顶栏那个 🔔 了 —— 同一件事不该有两个位置。
+              名片上留的是**这个人是谁**，该动哪个由通知栏一处说。
+              见 docs/specs/2026-08-18-notifications-design.md */}
 
           {/* ── 往来：跟这个人真实来往过的每一次 ──
               分两格是因为两种材料分量不一样：邮件有凭据（库里存着原文），

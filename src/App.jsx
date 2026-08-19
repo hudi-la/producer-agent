@@ -25,6 +25,7 @@ import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
 import { loadNotifications, markCue, unmarkAllOff, triage } from './lib/notifications.js'
+import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
 
@@ -191,7 +192,9 @@ export default function App() {
     setNotes(out)
     return out
   }
-  useEffect(() => { pullNotes() }, [])
+  // 开机先把旧的 localStorage['pa_cue_off'] 迁进库，再拉。
+  // **升级前关掉的那些不许悄悄复活** —— 那是「你以为处理过了，其实系统忘了」。
+  useEffect(() => { migrateCueOff().then(pullNotes) }, [])
 
   // 打开面板时判一批还没判过的信。**懒算：不看就不花钱。**
   // 判不成不挡路 —— 最坏是这一批当作「要回」，多吵你几条，不丢东西。
