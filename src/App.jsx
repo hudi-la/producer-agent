@@ -24,7 +24,9 @@ import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
+import { loadNotifications, markCue, unmarkAllOff, triage } from './lib/notifications.js'
 import QueueRest from './components/QueueRest.jsx'
+import Notifications from './components/Notifications.jsx'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -175,6 +177,40 @@ export default function App() {
   // 但今天没有任何东西往队里塞 contact。
 
   useEffect(() => { saveQueue(queue) }, [queue])
+
+  // ── 顶栏那个 🔔 ────────────────────────────────────────────────
+  //
+  // 条目一条不存，每次现算（见 lib/notifications.js）。你在邮箱里回了一封信，
+  // 下一次拉的时候那条自己就没了 —— 不需要谁去「勾掉」。
+  const [notes, setNotes] = useState(null)
+  const [bellOpen, setBellOpen] = useState(false)
+  const [judging, setJudging] = useState(false)
+
+  const pullNotes = async () => {
+    const out = await loadNotifications()
+    setNotes(out)
+    return out
+  }
+  useEffect(() => { pullNotes() }, [])
+
+  // 打开面板时判一批还没判过的信。**懒算：不看就不花钱。**
+  // 判不成不挡路 —— 最坏是这一批当作「要回」，多吵你几条，不丢东西。
+  const openBell = async () => {
+    setBellOpen(true)
+    const out = notes || await pullNotes()
+    if (!out?.unjudged?.length) return
+    setJudging(true)
+    try { await triage(out.unjudged); await pullNotes() } finally { setJudging(false) }
+  }
+
+  const markNote = async (it, mark) => {
+    try { await markCue(it, mark) } catch (_) {}
+    await pullNotes()
+  }
+  const allNotesBack = async () => {
+    try { await unmarkAllOff() } catch (_) {}
+    await pullNotes()
+  }
 
   // 库换过之后（seed ↔ live，id 完全是两套），localStorage 里可能躺着一批
   // 已经不存在的 id。不清掉的话顶栏会显示一个点了没反应的数字——那是在说谎。
@@ -570,8 +606,32 @@ export default function App() {
         <span className="sp" />
         {/* 过卡入口原来在这儿。挪进工具条了——顶栏常驻角标本身就是一句主张：
             「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
-            就不该站在这儿。谁生的跟谁站。 */}
+            就不该站在这儿。谁生的跟谁站。
+
+            通知**正是**那个东西，所以它站这儿。数字只数「手头」那一层：
+            老账和判为不用回的随时点得开，但不该天天在你眼前报警。 */}
+        <button className="bellbtn" onClick={openBell} aria-label="该动的">
+          🔔{(notes?.hand?.length || 0) > 0 && <span className="belln">{notes.hand.length}</span>}
+        </button>
       </header>
+
+      {bellOpen && (
+        <Notifications
+          data={notes} judging={judging}
+          onMark={markNote} onAllBack={allNotesBack}
+          onClose={() => setBellOpen(false)}
+          onOpen={(it) => {
+            setBellOpen(false)
+            if (it.subject_kind === 'pursuit') {
+              const p = pl.pursuits.find((x) => x.id === it.subject_id)
+              if (p) { setArea('pursue'); closePursuit(); openPursuit(p) }
+            } else {
+              const c = ct?.contacts?.find((x) => x.id === it.subject_id)
+              if (c) { setArea('people'); setView({ name: 'person', person: c }) }
+            }
+          }}
+        />
+      )}
 
       {/* 一切正常时这里什么都不渲染 */}
       <Trouble
