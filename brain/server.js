@@ -1065,25 +1065,55 @@ async function triageThese(ids) {
   return out
 }
 
+// ── 攒够了才判 ──────────────────────────────────────────────
+//
+// **成本是按调用算的，不是按对象算的。** 每次调用要带两万 token 的上下文，
+// 实测：判 1 个对象 $0.19，判 12 个 $0.235 —— 几乎一样贵。
+//
+// 所以「变脏就立刻判」是错的：一天 5 个对象分 5 次判 ≈ $0.95/天，
+// 攒成一批 ≈ $0.2/天，差一个数量级。
+//
+// 但也不能攒太久 —— 攒的这段时间里 🔔 上那个数字是不准的（新信的
+// needs_reply 还没判、缺省当「要回」）。所以两个条件哪个先到就判：
+//
+//   · 攒够 BATCH_MIN 个    —— 忙的时候快
+//   · 攒够 WAIT_CYCLES 轮  —— 闲的时候也不会一直拖着
+//
+// 20 分钟的上限是拿「你多久看一眼」比出来的：比这更准没意义，
+// 比这更久你就可能看到一个还没判过的数字。
+const BATCH_MIN = 4          // 攒够 4 个就判
+const WAIT_CYCLES = 4        // 或者攒够 4 轮（5 分钟一轮 = 20 分钟）
+let 攒了几轮 = 0
+
 /**
- * 变脏就判，不等你打开通知栏。收信循环每轮跑一次。
+ * 判一批脏了的。收信循环每轮调一次，但**不是每轮都真判**。
  *
- * 为什么不是懒算：**🔔 上那个数字是在重判之前算的**。一封新信进来，
- * needs_reply 还没判、缺省当「要回」，数字 +1 —— 那封信要是
- * 「谢谢，回头见」，这个 +1 是假的，而你正是靠这个数字决定要不要打开。
- *
- * 每轮有上限，积压是一轮一轮化开的，不会突然花一大笔。
+ * 为什么不等你打开通知栏：**🔔 上那个数字是在重判之前算的**。
+ * 一封新信进来，needs_reply 还没判、缺省当「要回」，数字 +1 ——
+ * 那封信要是「谢谢，回头见」，这个 +1 是假的，
+ * 而你正是靠这个数字决定要不要打开。
  */
-async function judgePass({ subjects = 12, letters = 20 } = {}) {
+async function judgePass({ subjects = 12, letters = 20, force = false } = {}) {
   const out = { rejudged: 0, triaged: 0 }
+  let stale = [], ids = []
   try {
-    const { data: stale } = await db.rpc('pa_stale_subjects', { p_days: 30, p_limit: subjects })
-    if (stale?.length) out.rejudged = (await rejudgeThese(stale)).judged
-  } catch (err) { console.error('✗ 重判：', err.message) }
-  try {
-    const { data: ids } = await db.rpc('pa_letters_to_triage', { p_limit: letters })
-    if (ids?.length) out.triaged = (await triageThese(ids)).judged
-  } catch (err) { console.error('✗ 判信：', err.message) }
+    ;({ data: stale } = await db.rpc('pa_stale_subjects', { p_days: 30, p_limit: subjects }))
+    ;({ data: ids } = await db.rpc('pa_letters_to_triage', { p_limit: letters }))
+  } catch (err) { console.error('✗ 取待判：', err.message); return out }
+
+  const 有活 = (stale?.length || 0) + (ids?.length || 0)
+  if (!有活) { 攒了几轮 = 0; return out }
+
+  攒了几轮++
+  if (!force && 有活 < BATCH_MIN && 攒了几轮 < WAIT_CYCLES) {
+    return { ...out, 攒着: 有活, 等了几轮: 攒了几轮 }
+  }
+  攒了几轮 = 0
+
+  try { if (stale?.length) out.rejudged = (await rejudgeThese(stale)).judged }
+  catch (err) { console.error('✗ 重判：', err.message) }
+  try { if (ids?.length) out.triaged = (await triageThese(ids)).judged }
+  catch (err) { console.error('✗ 判信：', err.message) }
   return out
 }
 
