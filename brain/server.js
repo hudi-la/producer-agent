@@ -1081,60 +1081,23 @@ async function triageThese(ids) {
   return out
 }
 
-// ── 攒够了才判 ──────────────────────────────────────────────
+// ── 脏了就判 ──────────────────────────────────────────────
 //
-// **成本是按调用算的，不是按对象算的。** 每次调用要带两万 token 的上下文，
-// 实测：判 1 个对象 $0.19，判 12 个 $0.235 —— 几乎一样贵。
+// 一批最多带多少 —— **这不是为了省钱，是为了别让单次调用太大**。
 //
-// 所以「变脏就立刻判」是错的：一天 5 个对象分 5 次判 ≈ $0.95/天，
-// 攒成一批 ≈ $0.2/天，差一个数量级。
-//
-// 但也不能攒太久 —— 攒的这段时间里 🔔 上那个数字是不准的（新信的
-// needs_reply 还没判、缺省当「要回」）。所以两个条件哪个先到就判：
-//
-//   · 攒够 BATCH_MIN 个    —— 忙的时候快
-//   · 攒够 WAIT_CYCLES 轮  —— 闲的时候也不会一直拖着
-//
-// 20 分钟的上限是拿「你多久看一眼」比出来的：比这更准没意义，
-// 比这更久你就可能看到一个还没判过的数字。
-// 量过之后调过一次。**每次调用有个 ~$0.19 的底价，跟带多少内容无关**：
-//   判 1 个对象   提示词 773 token     $0.19
-//   判 12 个对象  提示词 14,778 token  $0.235
-// 那 18k 是 agent SDK 自己的底座（试过：不给工具、换最小 system、
-// maxTurns 改 1，都压不动）。所以唯一的杠杆是**少发几次、每次多带点**。
-const BATCH_MIN = 6          // 攒够 6 个就判
-const WAIT_CYCLES = 12       // 或者攒够 12 轮（5 分钟一轮 = 60 分钟）
-const BATCH_CAP = 30         // 一次最多带 30 个 —— 反正跟带 1 个一样贵
-let 攒了几轮 = 0
+// 这儿一度有一套「攒够 6 个或 60 分钟才判」的逻辑，为的是省订阅额度
+// （每次调用有个跟内容无关的底价）。撤掉了：SDK 这条路本来就是临时的，
+// 而额度现在够用。**省额度是拿「🔔 上那个数字能错多久」换的，
+// 不该拿它换。**
+const BATCH_CAP = 30
 
-/**
- * 判一批脏了的。收信循环每轮调一次，但**不是每轮都真判**。
- *
- * 为什么不等你打开通知栏：**🔔 上那个数字是在重判之前算的**。
- * 一封新信进来，needs_reply 还没判、缺省当「要回」，数字 +1 ——
- * 那封信要是「谢谢，回头见」，这个 +1 是假的，
- * 而你正是靠这个数字决定要不要打开。
- */
-async function judgePass({ subjects = BATCH_CAP, letters = 20, force = false } = {}) {
+async function judgePass({ subjects = BATCH_CAP, letters = 20 } = {}) {
   const out = { rejudged: 0, triaged: 0 }
   let stale = [], ids = []
   try {
     ;({ data: stale } = await db.rpc('pa_stale_subjects', { p_days: 30, p_limit: subjects }))
     ;({ data: ids } = await db.rpc('pa_letters_to_triage', { p_limit: letters }))
   } catch (err) { console.error('✗ 取待判：', err.message); return out }
-
-  const 有活 = (stale?.length || 0) + (ids?.length || 0)
-  if (!有活) { 攒了几轮 = 0; return out }
-
-  攒了几轮++
-  // 攒够个数、或者攒够时间，哪个先到都判。
-  // 60 分钟这个上限是拿「🔔 上那个数字能错多久」换的：新信进来
-  // needs_reply 还没判、缺省当「要回」，数字可能虚高 1 —— 一小时内可以忍，
-  // 而每次调用 $0.19，一天判一次和判五次差五倍。
-  if (!force && 有活 < BATCH_MIN && 攒了几轮 < WAIT_CYCLES) {
-    return { ...out, 攒着: 有活, 等了几轮: 攒了几轮 }
-  }
-  攒了几轮 = 0
 
   try { if (stale?.length) out.rejudged = (await rejudgeThese(stale)).judged }
   catch (err) { console.error('✗ 重判：', err.message) }
