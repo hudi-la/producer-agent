@@ -124,6 +124,23 @@ last_event_at = greatest(收信, 发信, 记一笔, 你在卡上做的动作)
 
 ---
 
+## 三·五、这些判据怎么测的
+
+| 哪一半 | 怎么测 | 多少条 |
+|---|---|---|
+| JS（规则 + agent 的解析） | `npm test`（`node --test`） | 337 |
+| SQL（视图、写口、派生值） | `select * from public.pa_selfcheck()` | 17 |
+
+**两边都得跑。** JS 那半覆盖 `classify` 的四道闸、五种由头、
+`deadlineLine` 的阶段判据、引用块怎么砍、`parseTriage`/`parseRejudge`
+的解析和兜底；SQL 那半覆盖账本真假、`kind` 归类、三处读面的口径是否一致、
+派生值有没有跟事实分叉、写口挡不挡得住坏数据。
+
+加判据的时候**两边都要加一条**。SQL 那半没有测试框架，`pa_selfcheck()`
+就是它的测试。
+
+---
+
 ## 四、新信走哪几步
 
 ```

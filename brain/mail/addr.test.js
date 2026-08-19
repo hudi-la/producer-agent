@@ -96,6 +96,18 @@ test('已归档的来信照收 —— 没有 INBOX 不代表没收到', () => {
   assert.equal(r.direction, 'in')
 })
 
+// 标签要一路带到库里 —— 账本自审靠的就是它
+test('标签跟着行走，一起进库', () => {
+  const r = classify(
+    msg({ From: 'Zoe <zoe@x.org>', To: ME }, { labelIds: ['INBOX', 'IMPORTANT'] }), [ME])
+  assert.deepEqual(r.labels, ['INBOX', 'IMPORTANT'])
+})
+
+test('没有标签就是 null，不编一个空数组冒充「核过了」', () => {
+  const r = classify(msg({ From: 'Zoe <zoe@x.org>', To: ME }), [ME])
+  assert.equal(r.labels, null)
+})
+
 test('没有 labelIds 的照收 —— 老数据和测试桩不该被误伤', () => {
   const r = classify(msg({ From: 'Zoe <zoe@x.org>', To: ME }), [ME])
   assert.equal(r.direction, 'in')

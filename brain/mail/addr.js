@@ -205,6 +205,10 @@ export function classify(msg, mine) {
     counterpart_email: counterpart,
     direction,
     bulk: isBulk(h, from.email),
+    // 标签一起带走：**收信时手里就有，记下来账本就是自审的**。
+    // 不记的话，「这封信 Gmail 说它是什么」只能靠事后再扫一遍全库
+    // ——而那要靠谁记得去扫。见 docs/dev/mail-classification.md
+    labels: labels || null,
     // 认亲用的三个头。没有就是没有——大多数群发根本不带 In-Reply-To。
     message_id: (h['message-id'] || '').trim() || null,
     in_reply_to: (h['in-reply-to'] || '').trim() || null,
