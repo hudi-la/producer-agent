@@ -1,49 +1,45 @@
 import { md, day as dayOf } from './when.js'
 
-// 由头 —— 「现在为什么该动这个人」。
+// 由头 —— 「现在为什么该动这个人 / 这条线」。
 //
-// 设计稿：docs/specs/2026-08-08-people-layer-design.md 第四节
+// 设计稿：docs/specs/2026-08-18-notifications-design.md
 //
-// 核心判断：**「多久没碰」不是引擎，「由头」才是。** 冷却时间只是排序用的，
-// 它决定先找谁，但它不足以让你动笔。在美国，纯问候（just checking in /
-// hope you're well）是公认最没用的邮件类型——有效的 keep-in-touch 一定带一个
-// 由头：我有新作品了 / 我看到个东西想到你 / 恭喜你那个展。
+// ══ 这一份不看信 ═══════════════════════════════════════════════
 //
-// 所以这儿产出的不是「该问候了」（那句话没法写），是四种说得出口的理由。
+// 入口从 cuesFor(contact, msgs, opts) 改成 cuesFor(facts, opts)：
+// 它只看 v_pa_cue_facts 的一行标量。理由是 loadPursuits.js 开头那次事故——
+// 全库消息拉进浏览器，PostgREST 封顶 1000 行，超了只给最老的 1000 条，
+// 静悄悄不报错。**信不进浏览器。**
 //
-// 原则：**能算出来的就算，算不出来的才存。** 这里全是纯函数——给它人 +
-// 那个人名下的消息，回一句**带日期带来源**的人话，或者 null。
-// 存下来的东西会跟事实分叉，算出来的不会。
+// 判据本身一条没改，只是数据来路换了：
+//   unansweredRun(msgs).length  →  facts.unanswered_n
+//   「最后一封是对方的」        →  facts.last_in_at > facts.last_out_at
+//
+// ══ 老规矩，一条都还算数 ═══════════════════════════════════════
+//
+// **「多久没碰」不是引擎，「由头」才是。** 冷却时间只决定先找谁，
+// 它不足以让你动笔。在美国，纯问候（just checking in / hope you're well）
+// 是公认最没用的邮件类型——有效的 keep-in-touch 一定带一个由头：
+// 我有新作品了 / 我看到个东西想到你 / 恭喜你那个展。
+//
+// 所以这儿产出的不是「该问候了」（那句话没法写），是几种说得出口的理由。
+//
+// **能算出来的就算，算不出来的才存。** 存下来的东西会跟事实分叉，
+// 算出来的不会。这里全是纯函数：给它一行事实，回一句**带日期带来源**
+// 的人话，或者 null。
+//
+// 日期一律走 lib/when.js —— **全 app 只有那一份**，按你住的地方（洛杉矶）算。
 
-// 日期一律走 lib/when.js —— **全 app 只有那一份**。
-//
-// 这儿本来自己写了一个按 UTC 取月日的 md()。当时是为了跟库里 last_touch_at
-// （created_at::date，UTC 日）对上，免得同一封信在同一页上两个日期。
-// 对是对了，但对齐到了**错的那一边**：你 8/13 傍晚记的一笔，
-// UTC 那边已经是 8/14，于是卡上写着 8/14——而你明明是十三号写的。
-// 现在两边都按你住的地方（洛杉矶）算，一致而且是真的。
 const DAY = 86400000
-const daysSince = (from, to) => Math.floor((to - new Date(from)) / DAY)
 
 /**
- * 只有邮件才算「跟外面的人的往来」。
- * 没有 gmail_message_id 的是你跟 Fairwind 的商量（role producer|artist），
- * 那不是往来——拿它当往来算，等待期会被你自己的一句嘀咕重置掉。
+ * 差几天。**按当地的日子算，不按毫秒**——你 8/13 傍晚记的一笔，
+ * 拿毫秒减会算成 8/14。两边都先落到 'YYYY-MM-DD' 再减。
  */
-const mailsOf = (msgs) => (msgs || []).filter((m) => m.gmail_message_id)
-
-/**
- * 你连着发出去、中间没人回的最后几封。
- * 第一封不算「碰」，之后每一封才是——所以碰过的次数 = 这一串的长度 - 1。
- */
-export function unansweredRun(msgs) {
-  const mail = mailsOf(msgs)
-  const run = []
-  for (let i = mail.length - 1; i >= 0; i--) {
-    if (mail[i].role !== 'artist') break
-    run.unshift(mail[i])
-  }
-  return run
+const daysSince = (from, to) => {
+  const a = dayOf(from), b = dayOf(to)
+  if (a === null || b === null) return null
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / DAY)
 }
 
 /**
@@ -56,52 +52,64 @@ export const BUMP_WAIT = [7, 21]
 export const MEET_HOURS = 48
 
 /**
- * 他回你了，你还没回。
+ * 邮件类的由头归线，不归人。
  *
- * 这条是**最常发生、也最要紧的一条**，而我一开始定四种由头时把它漏了——
- * 漏得很没道理：机会线那边早就有这个判据（收到来信就进队，见 App.jsx 的
- * needsMe），人这边偏偏没接上。而「Maisa 回了我，我该回他」正是这一整刀
- * 最开始要解决的那件事。
+ * 同一段往来在人和线上各有一行事实，不拦的话会生出两条一模一样的通知
+ * ——那正是「条目非常多」换个地方复发。线有标题、有阶段、有截止，
+ * 上下文比人卡全，所以邮件类的归线。
  *
- * 判据：往来里最后一封邮件是对方发的。就这么简单——你回了，最后一封就是你的了。
- *
- * 怎么算办完了：你回信（下次收信自然就不响了），或者你按「聊过了」打个卡
- * ——有些信本来就不用回（「谢谢，回头见」），那就打卡了事，别让它一直挂着。
+ * 判据锚在「最后那封信在不在某条线上」，**所以没被任何线认走的往来
+ * 依然在人那行报得出来**——一条都不会丢。
  */
-function repliedCue(contact, msgs, today) {
-  const mail = mailsOf(msgs)
-  const last = mail[mail.length - 1]
-  if (!last || last.role !== 'artist' && last.role !== 'org') return null
-  if (last.role !== 'org') return null                    // 最后一封是你发的，轮不到这条
+const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
+
+/**
+ * 他回你了，你还没回。**最常发生、也最要紧的一条。**
+ *
+ * 判据：最后一封进来的比最后一封出去的晚。你回了，出去的就在后面了。
+ *
+ * 怎么算办完了：你回信（下次算自然就不响了），或者你按「聊过了」打个卡
+ * ——有些信本来就不用回（「谢谢，回头见」），那就打卡了事，
+ * 别让它一直挂着。
+ */
+function repliedCue(f, today) {
+  if (归了线(f)) return null
+  if (!f.last_in_at) return null
+  if (f.last_out_at && new Date(f.last_out_at) > new Date(f.last_in_at)) return null
   // 你打过卡说处理过了，而且是在这封信之后 —— 不再吵你
-  if (contact.last_touch_src === 'checkin' && contact.last_touch_at &&
-      new Date(contact.last_touch_at + 'T23:59:59') >= new Date(last.created_at)) return null
-  const d = daysSince(last.created_at, today)
+  if (f.checkin_at && f.checkin_at >= dayOf(f.last_in_at)) return null
+  const d = daysSince(f.last_in_at, today)
   return {
-    via: 'replied', at: dayOf(last.created_at),
-    why: d <= 0 ? `${md(last.created_at)} 他回你了，还没回`
-       : `${md(last.created_at)} 他回你了，${d} 天没回`,
+    via: 'replied', at: dayOf(f.last_in_at),
+    why: d <= 0 ? `${md(f.last_in_at)} 他回你了，还没回`
+       : `${md(f.last_in_at)} 他回你了，${d} 天没回`,
   }
 }
 
-function bumpCue(msgs, today) {
-  const run = unansweredRun(msgs)
-  if (!run.length) return null
-  const last = run[run.length - 1]
-  const bumps = run.length - 1
-  // 碰满了：**不进队列，但也不许消失**。
+/**
+ * 你连着发出去、中间没人回的最后几封。
+ * 第一封不算「碰」，之后每一封才是——所以碰过的次数 = 这一串的长度 - 1。
+ *
+ * **对方一回，这一串在库里就断了**（见 0072 的「没回音的」那段 CTE），
+ * 这条由头自己就没了。「自动勾掉」不是一个功能，它就是这一句。
+ */
+function bumpCue(f, today) {
+  if (归了线(f)) return null
+  if (!f.unanswered_n || !f.unanswered_at) return null
+  const bumps = f.unanswered_n - 1
+  // 碰满了：**不进手头，但也不许消失**。
   // 消失 = 你以为系统还在管，其实它早放弃了 —— 那是「红点撒谎」的同一件事。
   if (bumps >= BUMP_WAIT.length) {
     return {
-      via: 'bump', stopped: true, at: dayOf(last.created_at),
-      why: `已经碰过 ${bumps} 次，停了（最后一次 ${md(last.created_at)}）`,
+      via: 'bump', stopped: true, at: dayOf(f.unanswered_at),
+      why: `已经碰过 ${bumps} 次，停了（最后一次 ${md(f.unanswered_at)}）`,
     }
   }
-  const waited = daysSince(last.created_at, today)
+  const waited = daysSince(f.unanswered_at, today)
   if (waited < BUMP_WAIT[bumps]) return null
   return {
-    via: 'bump', at: dayOf(last.created_at),
-    why: `${md(last.created_at)} 发出去，${waited} 天没回音（第 ${bumps + 1} 次碰）`,
+    via: 'bump', at: dayOf(f.unanswered_at),
+    why: `${md(f.unanswered_at)} 发出去，${waited} 天没回音（第 ${bumps + 1} 次碰）`,
   }
 }
 
@@ -109,16 +117,15 @@ function bumpCue(msgs, today) {
 // 时间点再来一次。婉拒长的是另一个样子（not a fit at this time），而且
 // **不给时间锚点**。0011 那份迁移里记着两条真事：LACHSA 和 Ruth Asawa SOTA
 // 都给了锚点，都因为没人记得再碰而飘掉了。
-function circlebackCue(contact, today) {
-  if (!contact.next_touch_at) return null
-  const at = new Date(contact.next_touch_at + 'T00:00:00')
-  if (Number.isNaN(+at) || at > today) return null
+function circlebackCue(f, today) {
+  if (!f.next_touch_at) return null
+  if (f.next_touch_at > dayOf(today)) return null
   return {
-    via: 'circleback', at: contact.next_touch_at,
+    via: 'circleback', at: f.next_touch_at,
     // 日期永远说得出出处：要么是对方的原话，要么是你自己定的。没有第三种。
-    why: contact.next_touch_why
-      ? `${contact.next_touch_why} → ${md(at)} 到了`
-      : `你定的日子到了（${md(at)}）`,
+    why: f.next_touch_why
+      ? `${f.next_touch_why} → ${md(f.next_touch_at)} 到了`
+      : `你定的日子到了（${md(f.next_touch_at)}）`,
   }
 }
 
@@ -127,14 +134,13 @@ function circlebackCue(contact, today) {
 //
 // 但**得等对方真回过你**：只发出去没人回，谈不上「聊上了」，
 // 这时候去回谢介绍人是尴尬的。
-function thanksCue(contact, msgs, introName) {
-  if (!contact.intro_by || contact.intro_thanked_at) return null
-  if (!mailsOf(msgs).some((m) => m.role === 'org')) return null
+function thanksCue(f) {
+  if (!f.intro_by_name || f.intro_thanked_at) return null
+  if (!f.org_ever_replied) return null
   return {
-    via: 'thanks',
     // 依据是「他回过你了」，锚在他最后那封回信上
-    at: dayOf(mailsOf(msgs).filter((m) => m.role === 'org').at(-1)?.created_at),
-    why: `跟 ${contact.name || '他'} 聊上了，还没回谢 ${introName || '介绍人'}`,
+    via: 'thanks', at: dayOf(f.last_in_at),
+    why: `跟 ${f.name || '他'} 聊上了，还没回谢 ${f.intro_by_name}`,
   }
 }
 
@@ -143,47 +149,41 @@ function thanksCue(contact, msgs, introName) {
 //
 // 48 小时**不是延迟，是过期提示**：过了也不消失，只是改口。
 // 让它消失就等于替你决定放弃了。
-function metCue(msgs, today) {
-  const meets = (msgs || []).filter((m) => m.role === 'note' && m.kind === 'meet')
-  if (!meets.length) return null
-  const last = meets[meets.length - 1]
-  const sentAfter = mailsOf(msgs).some(
-    (m) => m.role === 'artist' && new Date(m.created_at) > new Date(last.created_at))
-  if (sentAfter) return null
-  const hrs = Math.floor((today - new Date(last.created_at)) / 3600000)
+function metCue(f, today) {
+  if (!f.last_meet_at || f.met_followed_up) return null
+  const hrs = Math.floor((new Date(today) - new Date(f.last_meet_at)) / 3600000)
   return {
-    via: 'met', at: dayOf(last.created_at),
+    via: 'met', at: dayOf(f.last_meet_at),
     why: hrs > MEET_HOURS
-      ? `${md(last.created_at)} 见的，已经过 ${MEET_HOURS} 小时了，follow-up 还没发`
-      : `${md(last.created_at)} 见过，48 小时信还没发`,
+      ? `${md(f.last_meet_at)} 见的，已经过 ${MEET_HOURS} 小时了，follow-up 还没发`
+      : `${md(f.last_meet_at)} 见过，48 小时信还没发`,
   }
 }
 
 /**
- * 这个人身上现在有哪些由头。msgs 要按 created_at 升序（loadContacts 就是这么给的）。
+ * 这一行事实上现在有哪些由头。
  *
- * today 和 introName 传得进来是为了测试能写死，也为了列表页算一次日期给所有人用。
+ * today 传得进来是为了测试能写死，也为了列表算一次给所有行用——
+ * 免得渲染到一半跨过午夜，前后两半用两个「今天」。
  */
-export function cuesFor(contact, msgs, { today = new Date(), introName = null } = {}) {
+export function cuesFor(f, { today = new Date() } = {}) {
   return [
     // 「他回你了」排第一：球在你手上的时候，别的都是次要的
-    repliedCue(contact, msgs, today),
-    bumpCue(msgs, today),
-    circlebackCue(contact, today),
-    thanksCue(contact, msgs, introName),
-    metCue(msgs, today),
+    repliedCue(f, today),
+    bumpCue(f, today),
+    circlebackCue(f, today),
+    thanksCue(f),
+    metCue(f, today),
   ].filter(Boolean)
 }
 
 /**
- * 一条由头的**身份**：谁 + 哪一种 + 依据哪天的事实。
+ * 一条由头的**身份**：哪个对象 + 哪一种 + 依据哪天的事实。
  *
- * 关掉一条由头要存下来，就得有个稳定的键。不能拿 why 当键——
+ * 关掉 / 勾掉要存下来，就得有个稳定的键。不能拿 why 当键——
  * 「3 天没回」明天变成「4 天没回」，你今天关掉的明天又冒出来。
  * 拿 at（依据那条事实的日期）当键就对了：**他再回你一封新的，
  * at 就变了，这条由头理应重新出现**——那是新事实，不是你关过的那条。
  */
-export const cueKey = (contactId, cue) => `${contactId}|${cue.via}|${cue.at || ''}`
-
-/** 该进队列的那些 —— 停了的只在卡上显示，不塞进你手头这摊活。 */
-export const actionable = (cues) => (cues || []).filter((c) => !c.stopped)
+export const cueKey = (f, cue) =>
+  `${f.subject_kind}|${f.subject_id}|${cue.via}|${cue.at || ''}`

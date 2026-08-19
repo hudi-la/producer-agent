@@ -41,17 +41,8 @@ export default function People({
 
   const byId = useMemo(() => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts])
 
-  // 一次算出今天，所有人共用 —— 免得列表渲染到一半跨过午夜，前后两半用两个「今天」。
-  const acting = useMemo(() => {
-    const today = new Date()
-    const out = []
-    for (const c of contacts) {
-      for (const cue of cuesFor(c, msgsByContact[c.id] || [],
-        { today, introName: byId[c.intro_by]?.name })) out.push({ c, cue })
-    }
-    // 停了的（碰满三次那种）排后面、灰着：不吵你，但不许消失。
-    return out.sort((a, b) => (a.cue.stopped ? 1 : 0) - (b.cue.stopped ? 1 : 0))
-  }, [contacts, msgsByContact, byId])
+  // 由头挪去顶栏通知了。这儿先空着，删干净在最后一步（人际管理页那一块整个走）。
+  const acting = []
 
   const shown = acting.filter((x) => !off.has(cueKey(x.c.id, x.cue)))
   const hidden = acting.length - shown.length

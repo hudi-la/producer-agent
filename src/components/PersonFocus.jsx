@@ -138,7 +138,8 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
   const emails = mails.filter((m) => m.gmail_message_id)
   const notes  = mails.filter((m) => m.role === 'note')
   const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
-  const cues  = cuesFor(c, msgs || [], { introName: c.intro_by_name })
+  // 由头挪去顶栏通知了。这儿先空着，删干净在最后一步。
+  const cues  = []
 
   // 「上次碰」光有日期是没用的。「8/10 · 你记的一笔」等于没说——
   // 你想知道的是**上次到底发生了啥**：哪封信说了什么、那次见面聊了什么。
