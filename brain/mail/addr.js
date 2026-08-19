@@ -145,7 +145,23 @@ export function classify(msg, mine) {
   //
   // 没写出去的东西不是往来。让它进来，「你发出去 N 天没回音」会把草稿算成
   // 发出，通讯录上「几封」也会跟着虚报。
-  if (Array.isArray(msg?.labelIds) && msg.labelIds.includes('DRAFT')) return null
+  // ── 没发生的事，不进账本 ──
+  //
+  // 全量核过一遍（3519 封逐封问 Gmail 要 labelIds）之后，"我写了但还没发出去"
+  // 有两种，都会被当成"我发出去了"：
+  //
+  //   · **草稿**：改一次存一次，每次一个新 message id。Ana Herruzo 那条线
+  //     十二分钟内四封，把「碰过几次」直接顶到「碰满三次，停了」——
+  //     那等于劝你放弃一条其实还活着的线。
+  //   · **定时发送**：写好排着队，sent_at 是未来的时间。真例：一封 8/25 才发
+  //     的「Zoom meeting」，8/18 就已经在账本里算作"发出去了"。
+  //
+  // 判据是**标签**，不是形态。「没主题就是草稿」那个猜测已经错过一次：
+  // 回信的草稿会继承 `Re:` 主题，那一批一条都没被认出来。
+  //
+  //   我发出去的信一定有 SENT。没有 SENT 又是我发的 → 它还没发出去。
+  const labels = Array.isArray(msg?.labelIds) ? msg.labelIds : null
+  if (labels?.includes('DRAFT')) return null
 
   const my = mineSet(mine)
   const h = headerMap(msg?.payload?.headers)
@@ -170,6 +186,9 @@ export function classify(msg, mine) {
   if (!sent) return null
 
   const direction = my.has(from.email) ? 'out' : 'in'
+  // 我发的，但 Gmail 没给 SENT —— 还没发出去（定时发送在队列里排着）。
+  // 只在拿得到标签时才拦：老数据和测试桩没有 labelIds，不该被误伤。
+  if (direction === 'out' && labels && !labels.includes('SENT')) return null
   const counterpart = direction === 'in'
     ? from.email
     : ([...to, ...cc].map((a) => a.email).find((e) => !my.has(e)) || from.email)

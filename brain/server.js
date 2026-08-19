@@ -1461,6 +1461,10 @@ const server = http.createServer(async (req, res) => {
             })
           }
 
+          // 「上次碰」也是从信推出来的派生值，同样会跟事实分叉
+          // （草稿写下的日期一直留在名片上）。重判到谁就顺手重算谁。
+          await db.rpc('pa_recompute_touch', { p_kind: w.kind, p_id: w.id })
+
           const { data } = await db.rpc('pa_mark_judged', {
             p_kind: w.kind, p_id: w.id, p_upto: w.upto || new Date().toISOString(),
           })

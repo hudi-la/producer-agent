@@ -73,6 +73,29 @@ test('真发出去的照收 —— 别把发件箱一起挡了', () => {
   assert.equal(r.counterpart_email, 'ana@asu.edu')
 })
 
+// 定时发送：写好了排着队，sent_at 是未来的时间。真例：一封 8/25 才发的
+// 「Zoom meeting」，8/18 就已经在账本里算作发出去了。
+// 判据是标签不是时间：**我发出去的信一定有 SENT。**
+
+test('定时发送（我发的但没有 SENT）—— 还没发出去，不入库', () => {
+  const r = classify(
+    msg({ From: `HuDi <${ME}>`, To: 'steven@calarts.edu', Subject: 'Zoom meeting' },
+        { labelIds: ['IMPORTANT'] }), [ME])
+  assert.equal(r, null)
+})
+
+test('对方发来的不要求 SENT —— 那是他的信箱，不是我的', () => {
+  const r = classify(
+    msg({ From: 'Zoe <zoe@x.org>', To: ME }, { labelIds: ['INBOX'] }), [ME])
+  assert.equal(r.direction, 'in')
+})
+
+test('已归档的来信照收 —— 没有 INBOX 不代表没收到', () => {
+  const r = classify(
+    msg({ From: 'Zoe <zoe@x.org>', To: ME }, { labelIds: ['IMPORTANT'] }), [ME])
+  assert.equal(r.direction, 'in')
+})
+
 test('没有 labelIds 的照收 —— 老数据和测试桩不该被误伤', () => {
   const r = classify(msg({ From: 'Zoe <zoe@x.org>', To: ME }), [ME])
   assert.equal(r.direction, 'in')
