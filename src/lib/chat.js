@@ -9,8 +9,17 @@ import { frameSplitter, frameData } from './sse.js'
 /** 拉这条机会线最新的往来。没连库时返回 null（保留调用方手上的种子数据）。 */
 export async function fetchMessages(pursuitId) {
   if (!supa) return null
+  // v_pa_pursuit_thread 而不是 v_pa_pursuit_messages：
+  //
+  // **很多信是靠班底 / 串登记推导挂到线上的**，pursuit_id 是空的
+  // （v_pa_pursuit_mail.on_this_line）。按 pursuit_id 读的话，
+  // ASU 那条线 16 封信一封都读不到 —— 数过，12 条有信的线里只有 1 条读得全，
+  // 一共 49 封在对话里看不见。
+  //
+  // 事实视图（v_pa_cue_facts）和重判（pa_subjects_for_rejudge）都已经走推导，
+  // 这儿是第三处，也是最后一处。见 0086。
   const { data, error } = await supa
-    .from('v_pa_pursuit_messages')
+    .from('v_pa_pursuit_thread')
     .select('*')
     .eq('pursuit_id', pursuitId)
     .order('created_at')

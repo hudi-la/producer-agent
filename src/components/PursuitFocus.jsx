@@ -4,6 +4,7 @@ import { useLiveReply } from '../lib/useLiveReply.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
 import { md } from '../lib/when.js'
+import { saidThisTime, GIST_CAP } from '../lib/letter.js'
 import SayBubble from './Resay.jsx'
 
 import {
@@ -104,13 +105,6 @@ function Deadline({ p }) {
  *
  * 设计稿：docs/specs/2026-08-19-a-letter-announces-itself.md
  */
-const 砍引用 = (t) => String(t || '')
-  .replace(/\r/g, '')
-  .split(/\n>|\nOn .{0,100}wrote:|\n-- /)[0]
-  .trim()
-
-const GIST_CAP = 240
-
 function Letter({ m }) {
   const [open, setOpen] = useState(false)
   const 进来的 = m.role === 'org'
@@ -127,7 +121,7 @@ function Letter({ m }) {
   const raw = m.body_raw || ''
   const 只有摘要 = !raw && Boolean(m.content)
   const body = raw || m.content || ''
-  const head = 砍引用(body)
+  const head = saidThisTime(body)
   const 有更多 = Boolean(raw) && (head.length > GIST_CAP || raw.trim() !== head)
   return (
     <div id={'msg-' + m.id} className={'arrival' + (进来的 ? ' in' : ' out')}>
