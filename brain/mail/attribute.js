@@ -26,15 +26,20 @@ const rpc = async (fn, args) => {
 }
 
 /** 还没落到任何一条线上的近期来信，按地址收拢。 */
+// **方向不限。** 旧的 pa_orphan_inbound 第一个条件是 direction='in' ——
+// 于是「我主动发出去的冷邮件」在被回信之前，归属这一步完全看不见它。
+// 而那恰恰是最该建线的一种：投递、自荐、经人介绍去问一句。
+// 真例：8/19 发给 adavi290@asu.edu 的那封（Biayna 介绍的人），
+// 系统判出「真人 · 正事」之后，就把它扔在账本里了。
 async function orphans(days) {
-  const { data, error } = await db().rpc('pa_orphan_inbound', { p_days: days })
+  const { data, error } = await db().rpc('pa_orphan_mail', { p_days: days })
   if (error) throw new Error('读孤儿来信失败：' + error.message)
   return data || []
 }
 
 export async function attributePass({ days = 30, apply = true, log = console.log } = {}) {
   const rows = await orphans(days)
-  if (!rows.length) return { checked: 0, note: '最近没有无处安放的来信' }
+  if (!rows.length) return { checked: 0, note: '最近没有无处安放的往来' }
 
   const { data: pursuits, error } = await db()
     .from('v_pa_pursuits').select('id, title, org, stage')
@@ -42,19 +47,23 @@ export async function attributePass({ days = 30, apply = true, log = console.log
   if (error) throw new Error(error.message)
   if (!pursuits?.length) return { checked: rows.length, note: '没有在跑的线可挂' }
 
-  log(`${rows.length} 个地址的来信还没落到任何线上，跟 ${pursuits.length} 条线对一遍…`)
+  log(`${rows.length} 个地址的往来还没落到任何线上，跟 ${pursuits.length} 条线对一遍…`)
 
-  const text = await ask(`下面是一些**还没归到任何机会线**的来信，和你现在在跑的机会线。
-判断每一封是不是某条线的事。
+  const text = await ask(`下面是一些**还没归到任何机会线**的往来，和你现在在跑的机会线。
+判断每一个地址是不是某条线的事。
+
+**注意方向**：有的是他发给你的，有的是**你主动发出去、还没等到回信**的
+（下面会标 in / out 的封数）。后一种同样该归线 —— 冷邮件、投递、经人介绍
+去问一句，都是从你发出的那一封开始的。
 
 【在跑的机会线】
 ${pursuits.map((p) => `- [${p.id.slice(0, 8)}] ${p.title}｜机构：${p.org || '（没写）'}`).join('\n')}
 
-【无处安放的来信】
+【无处安放的往来】
 ${rows.map((r) => [
   `- ${r.email}${r.name ? `（${r.name}）` : ''}`,
   r.why ? `  这个人：${r.why}` : '',
-  `  ${r.n} 封，${r.first_at} → ${r.last_at}`,
+  `  ${r.n} 封（他发来 ${r.dirs?.in ?? '?'} · 你发去 ${r.dirs?.out ?? '?'}），${r.first_at} → ${r.last_at}`,
   `  主题：${(r.subjects || []).filter(Boolean).slice(0, 4).map((s) => `「${s}」`).join('　')}`,
 ].filter(Boolean).join('\n')).join('\n\n')}
 
@@ -110,5 +119,7 @@ ${rows.map((r) => [
       } catch (err) { log(`  ✗ ${h.email}：${err.message}`) }
     }
   }
-  return { checked: rows.length, high: high.length, low, attached, applied: apply }
+  // highs 带出名单，不只带个数 —— 只报「高把握 2」的话，查不出是哪两个、
+  // 也看不出它把谁归到了哪条线上。
+  return { checked: rows.length, high: high.length, highs: high, low, attached, applied: apply }
 }

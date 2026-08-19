@@ -35,12 +35,18 @@ const daysBetween = (a, b) =>
   Math.round((new Date(dayOf(b) + 'T00:00:00') - new Date(dayOf(a) + 'T00:00:00')) / DAY)
 
 /**
- * 分三层。**三层都数得出来、都点得开**——静默藏起来 = 你以为没有，其实有，
+ * 分层。**每一层都数得出来、都点得开**——静默藏起来 = 你以为没有，其实有，
  * 那是这个项目最不能忍的那种谎。
+ *
+ * - todo  该动的：有由头的全在这儿，新的在上面。**面板摆的就是它。**
+ * - muted 被判为不用回的（cue 是 null、只有 verdict 的那些）
+ *
+ * hand / old 不再是面板上的两段了（那道分界线看着像两类事，其实只是新旧），
+ * 但这两个数还在：🔔 上那个角标只数 hand —— 七天前那笔老账该在列表里待着，
+ * 不该天天顶着红点冲你喊。
  *
  * - hand  手头：7 天内的事实
  * - old   老账：7 天以前的，加上「碰满三次停了」那种
- * - muted 被判为不用回的（cue 是 null、只有 verdict 的那些）
  */
 export function layer(items, today = new Date()) {
   const hand = [], old = [], muted = []
@@ -50,7 +56,8 @@ export function layer(items, today = new Date()) {
     else hand.push(it)
   }
   const 新的在上面 = (a, b) => String(b.cue?.at || '').localeCompare(a.cue?.at || '')
-  return { hand: hand.sort(新的在上面), old: old.sort(新的在上面), muted }
+  return { hand: hand.sort(新的在上面), old: old.sort(新的在上面), muted,
+           todo: [...hand, ...old].sort(新的在上面) }
 }
 
 /**
@@ -60,7 +67,7 @@ export function layer(items, today = new Date()) {
 const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
 
 const empty = (reason, detail) => ({
-  hand: [], old: [], muted: [], unjudged: [], stale: [], source: 'empty', reason, detail,
+  hand: [], old: [], muted: [], todo: [], unjudged: [], stale: [], source: 'empty', reason, detail,
 })
 
 /**
@@ -93,9 +100,11 @@ export async function loadNotifications() {
       // 它不知道判定是从哪张表来的。**没判过就是 undefined = 当作要回。**
       const merged = v ? { ...f, needs_reply: v.needs_reply, not_before: v.not_before } : f
 
+      const 已经在列表里 = new Set()
       for (const cue of cuesFor(merged, { today })) {
         const key = cueKey(f, cue)
         if (marked.has(key)) continue          // ✓ 或 ✕ 过的，不再出现
+        已经在列表里.add(key)
         items.push({
           key, subject_kind: f.subject_kind, subject_id: f.subject_id,
           name: f.name, line_title: f.line_title, cue, verdict: v || null,
@@ -105,10 +114,22 @@ export async function loadNotifications() {
       // 被判为不用回的：**不消失**，单独一层，看得见理由。
       // 判错了你自己捞得回来 —— 静默筛掉是不许的。
       if (v && v.needs_reply === false && f.last_in_at && !归了线(f)) {
+        // 「放回」按下去到底会不会**多出一条**来 —— 现在就算清楚，
+        // 别让按钮许一个兑现不了的承诺。
+        //
+        // 判定翻成「要回」再问一遍由头，然后减掉两样：已经摆在列表里的
+        // （这条线可能本来就因为「发出去没回音」在上面挂着，那不算放回来），
+        // 和你 ✓/✕ 过的。剩下还有的，按下去才真有东西出现。
+        //
+        // 减不干净的话最常见是这种：信你其实早回过了（last_out_at 晚于
+        // last_in_at，球根本不在你手上），一按，这条从「不用回」里没了，
+        // 上面也不会多出什么——**一条东西被按没了**，比不给这个按钮糟得多。
+        const backable = cuesFor({ ...f, needs_reply: true, not_before: null }, { today })
+          .some((c) => { const k = cueKey(f, c); return !marked.has(k) && !已经在列表里.has(k) })
         items.push({
           key: `${f.subject_kind}|${f.subject_id}|muted|${dayOf(f.last_in_at)}`,
           subject_kind: f.subject_kind, subject_id: f.subject_id,
-          name: f.name, line_title: f.line_title, cue: null, verdict: v,
+          name: f.name, line_title: f.line_title, cue: null, verdict: v, backable,
         })
       }
     }
@@ -161,6 +182,31 @@ export async function markCue(item, mark) {
   const { data, error } = await supa.rpc('pa_mark_cue', {
     p_kind: item.subject_kind, p_id: item.subject_id,
     p_via: item.cue.via, p_at: item.cue.at, p_mark: mark,
+  })
+  if (error) throw new Error(error.message)
+  return Boolean(data)
+}
+
+/**
+ * 把一条「判为不用回的」放回该动的那一列。
+ *
+ * 判错了得捞得回来 —— 这是那一层从一开始就写着的承诺（0073 那张表的注释：
+ * 「判错了你得看得见理由才捞得回来」），只是一直没有那个按钮。
+ *
+ * 走的是判定本身的写口 pa_judge_letter，把 needs_reply 翻成 true。
+ * **不是**再存一张「用户覆盖」表：一封信要不要回只该有一个答案，
+ * 两处存一件事，迟早有一处是假的。
+ *
+ * 原来那句判词接在后面留着 —— 覆盖掉就没人知道当初凭什么判的了。
+ * 这条回到列表里之后，由头照旧从事实现算（「他回你了，N 天没回」）。
+ */
+export async function unmuteLetter(item) {
+  const id = item?.verdict?.gmail_message_id
+  if (!id) return false
+  const was = item.verdict.why || '（没说理由）'
+  const { data, error } = await supa.rpc('pa_judge_letter', {
+    p_gmail_message_id: id, p_needs_reply: true, p_not_before: null,
+    p_why: `你放回来的（原判：${was}）`,
   })
   if (error) throw new Error(error.message)
   return Boolean(data)

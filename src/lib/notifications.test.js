@@ -56,7 +56,21 @@ test('三层加起来 = 进去多少条 —— 一条都不许在路上蒸发', 
   assert.equal(hand.length + old.length + muted.length, items.length)
 })
 
+// 面板摆的是 todo（手头和老账不再分两段）。这条守的是「合并的时候没漏人」——
+// 合并写错一个字，51 条老账就从面板上悄悄没了，而角标只数 3 条，你不会发现。
+test('todo = 手头 + 老账，一条不多一条不少，新的在上面', () => {
+  const items = [item('2026-06-01'), item('2026-08-17'),
+    item('2026-08-16', { key: 'm1', cue: null, verdict: { needs_reply: false, why: 'x' } }),
+    item('2026-08-15', { cue: { via: 'bump', at: '2026-08-15', why: '停了', stopped: true } })]
+  const { hand, old, muted, todo } = layer(items, T('2026-08-18'))
+  assert.equal(todo.length, hand.length + old.length)
+  assert.deepEqual(todo.map((x) => x.cue.at), ['2026-08-17', '2026-08-15', '2026-06-01'])
+  // 被判为不用回的不混进来 —— 它是另一件事，另有一层
+  assert.equal(muted.length, 1)
+  assert.ok(!todo.some((x) => x.key === 'm1'))
+})
+
 test('空的也不炸', () => {
-  const { hand, old, muted } = layer([], T('2026-08-18'))
-  assert.deepEqual([hand, old, muted], [[], [], []])
+  const { hand, old, muted, todo } = layer([], T('2026-08-18'))
+  assert.deepEqual([hand, old, muted, todo], [[], [], [], []])
 })

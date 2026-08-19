@@ -24,7 +24,7 @@ import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
-import { loadNotifications, markCue, unmarkAllOff, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
+import { loadNotifications, markCue, unmuteLetter, unmarkAllOff, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
@@ -239,6 +239,11 @@ export default function App() {
 
   const markNote = async (it, mark) => {
     try { await markCue(it, mark) } catch (_) {}
+    await pullNotes()
+  }
+  // 判错了捞回来：那一封信的判定翻成「要回」，它就回到该动的那一列里。
+  const unmuteNote = async (it) => {
+    try { await unmuteLetter(it) } catch (_) {}
     await pullNotes()
   }
   const allNotesBack = async () => {
@@ -652,7 +657,7 @@ export default function App() {
       {bellOpen && (
         <Notifications
           data={notes} judging={judging} onJudgeMore={judgeMore}
-          onMark={markNote} onAllBack={allNotesBack}
+          onMark={markNote} onUnmute={unmuteNote} onAllBack={allNotesBack}
           onClose={() => setBellOpen(false)}
           onOpen={(it) => {
             setBellOpen(false)
