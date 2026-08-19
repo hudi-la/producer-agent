@@ -139,9 +139,11 @@ test('这段往来已经归了某条线 —— 人那行不再报「他回你了
 })
 
 test('但人类的由头照旧归人 —— 压的只是邮件那两条', () => {
+  // 来信在该碰日**之前** —— 不然 circleback 的前提（那之后没来信）不成立，
+  // 那是另一条规矩在起作用，不是这条测试要验的事。
   const f = facts({ mail_on_line: true, next_touch_at: '2026-08-01',
                     intro_by_name: 'Tom', org_ever_replied: true,
-                    last_in_at: T('2026-08-06').toISOString(),
+                    last_in_at: T('2026-07-20').toISOString(),
                     last_meet_at: T('2026-08-02').toISOString() })
   const cs = cuesFor(f, { today: T('2026-08-09') })
   assert.ok(via(cs, 'circleback'))
@@ -175,4 +177,85 @@ test('他再回一封新的 —— 键变了，这条理应重新出现', () => 
 
 test('BUMP_WAIT 还是那两个数', () => {
   assert.deepEqual(BUMP_WAIT, [7, 21])
+})
+
+// ── ⑦ 判为不用回的，不进由头 ────────────────────────────────────
+
+test('判了不用回 —— replied 不出现', () => {
+  const cs = cuesFor(facts({ last_in_at: T('2026-08-06').toISOString(), needs_reply: false }),
+                     { today: T('2026-08-09') })
+  assert.equal(via(cs, 'replied'), undefined)
+})
+
+test('还没判过 —— 当作要回。漏一封真信比多吵一条坏得多', () => {
+  const cs = cuesFor(facts({ last_in_at: T('2026-08-06').toISOString() }),
+                     { today: T('2026-08-09') })
+  assert.ok(via(cs, 'replied'))
+})
+
+// ── ⑧ 要回，但不是现在 ──────────────────────────────────────────
+
+test('他说了下学期再聊 —— 那天之前不出现', () => {
+  const f = facts({ last_in_at: T('2026-08-06').toISOString(),
+                    needs_reply: true, not_before: '2027-01-15' })
+  assert.equal(via(cuesFor(f, { today: T('2026-08-09') }), 'replied'), undefined)
+})
+
+test('到了那天 —— 出现，而且说得出出处', () => {
+  const f = facts({ last_in_at: T('2026-08-06').toISOString(),
+                    needs_reply: true, not_before: '2027-01-15' })
+  const c = via(cuesFor(f, { today: T('2027-01-15') }), 'replied')
+  assert.ok(c)
+  assert.ok(c.why.includes('1/15'))
+})
+
+// ── ⑨ 说好的日子：中途聊过就不响 ────────────────────────────────
+// 这是这一整刀最开始要解决的那件事：「到那个时间对方没回我，才需要 follow up」。
+
+test('到日子了，但那之后他来过信 —— 不响', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01',
+                                last_in_at: T('2026-08-05').toISOString() }),
+                        { today: T('2026-08-09') }), 'circleback')
+  assert.equal(c, undefined)
+})
+
+test('到日子了，那之后没来信 —— 响', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01',
+                                last_in_at: T('2026-07-20').toISOString(),
+                                needs_reply: false }),
+                        { today: T('2026-08-09') }), 'circleback')
+  assert.ok(c)
+})
+
+test('压根没来过信 —— 照响', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01' }), { today: T('2026-08-09') }),
+                'circleback')
+  assert.ok(c)
+})
+
+// ── ⑩ 截止 ──────────────────────────────────────────────────────
+
+test('14 天内截止 —— 提，带天数', () => {
+  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-08-20' }),
+                        { today: T('2026-08-09') }), 'deadline')
+  assert.ok(c.why.includes('8/20'))
+  assert.ok(c.why.includes('11 天'))
+})
+
+test('就是今天 —— 说「就是今天」，不说「还有 0 天」', () => {
+  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-08-09' }),
+                        { today: T('2026-08-09') }), 'deadline')
+  assert.ok(c.why.includes('就是今天'))
+})
+
+test('已经过了截止 —— 还提，改口', () => {
+  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-08-01' }),
+                        { today: T('2026-08-09') }), 'deadline')
+  assert.ok(c.why.includes('过了'))
+})
+
+test('截止还早 —— 不提', () => {
+  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-12-01' }),
+                        { today: T('2026-08-09') }), 'deadline')
+  assert.equal(c, undefined)
 })

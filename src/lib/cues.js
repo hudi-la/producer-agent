@@ -76,12 +76,21 @@ function repliedCue(f, today) {
   if (归了线(f)) return null
   if (!f.last_in_at) return null
   if (f.last_out_at && new Date(f.last_out_at) > new Date(f.last_in_at)) return null
+  // 判为不用回的：三层漏斗的第三层挡下的（「谢谢，回头见」那种）。
+  // **没判过（undefined）当作要回** —— 漏一封真信比多吵一条坏得多。
+  if (f.needs_reply === false) return null
+  // 要回，但不是现在。日子是从他信里读出来的事实，不是系统编的
+  // （brain/triage.js 明写「不许你编」）。
+  if (f.not_before && f.not_before > dayOf(today)) return null
   // 你打过卡说处理过了，而且是在这封信之后 —— 不再吵你
   if (f.checkin_at && f.checkin_at >= dayOf(f.last_in_at)) return null
   const d = daysSince(f.last_in_at, today)
   return {
     via: 'replied', at: dayOf(f.last_in_at),
-    why: d <= 0 ? `${md(f.last_in_at)} 他回你了，还没回`
+    // 压到今天才冒出来的那种，得说得出为什么是今天
+    why: f.not_before
+      ? `${md(f.last_in_at)} 他回你了，说好 ${md(f.not_before)} 再聊，到了`
+      : d <= 0 ? `${md(f.last_in_at)} 他回你了，还没回`
        : `${md(f.last_in_at)} 他回你了，${d} 天没回`,
   }
 }
@@ -120,6 +129,10 @@ function bumpCue(f, today) {
 function circlebackCue(f, today) {
   if (!f.next_touch_at) return null
   if (f.next_touch_at > dayOf(today)) return null
+  // **到那个日子对方还没回你，才需要 follow up。**
+  // 中间你俩已经聊上了，这条就不该响 —— 这正是断掉的 handleRefresh
+  // 想用「收到新信时让模型判它过期」去解决的那件事。现算不需要作废。
+  if (f.last_in_at && dayOf(f.last_in_at) >= f.next_touch_at) return null
   return {
     via: 'circleback', at: f.next_touch_at,
     // 日期永远说得出出处：要么是对方的原话，要么是你自己定的。没有第三种。
@@ -160,6 +173,24 @@ function metCue(f, today) {
   }
 }
 
+// 截止。8/12 那份稿子把「紧急」筛选开关留着当容器，说「往里放什么，
+// 等卡面这一刀落地之后再定」——放这条。判据沿用它那个：14 天内或已过。
+//
+// 过了也不消失，只是改口。让它消失就等于替你决定放弃了。
+export const DEADLINE_DAYS = 14
+
+function deadlineCue(f, today) {
+  if (!f.deadline_at) return null
+  const d = daysSince(dayOf(today), f.deadline_at)
+  if (d === null || d > DEADLINE_DAYS) return null
+  return {
+    via: 'deadline', at: f.deadline_at,
+    why: d < 0 ? `${md(f.deadline_at)} 截止，已经过了 ${-d} 天`
+       : d === 0 ? `${md(f.deadline_at)} 截止，就是今天`
+       : `${md(f.deadline_at)} 截止，还有 ${d} 天`,
+  }
+}
+
 /**
  * 这一行事实上现在有哪些由头。
  *
@@ -174,6 +205,7 @@ export function cuesFor(f, { today = new Date() } = {}) {
     circlebackCue(f, today),
     thanksCue(f),
     metCue(f, today),
+    deadlineCue(f, today),
   ].filter(Boolean)
 }
 
