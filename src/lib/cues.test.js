@@ -9,7 +9,7 @@ const facts = (o = {}) => ({
   subject_kind: 'contact', subject_id: 'c1', name: 'Maisa',
   line_title: null, last_in_at: null, last_in_id: null, last_in_from: null,
   last_in_subject: null, last_out_at: null, unanswered_n: 0, unanswered_at: null,
-  next_touch_at: null, next_touch_why: null, deadline_at: null,
+  next_touch_at: null, next_touch_why: null, next_action: null, next_action_by: 'you',
   intro_by_name: null, intro_thanked_at: null, checkin_at: null,
   org_ever_replied: false, mail_on_line: false,
   last_meet_at: null, met_followed_up: false,
@@ -90,9 +90,42 @@ test('到日子了 —— 日期说得出出处', () => {
   assert.ok(c.why.includes('8/1'))
 })
 
-test('日子还没到 —— 不提', () => {
-  const c = via(cuesFor(facts({ next_touch_at: '2026-09-01' }), { today: T('2026-08-09') }),
+// ── ⑩ 说不出出处就闭嘴 ─────────────────────────────────────────
+// 原来这儿兜底写「你定的日子到了」。可真查下来 ASU 那条 8/17 是 Fairwind
+// 写的（next_action_by='fairwind'），根本不是他定的。**编一个出处比不报更坏。**
+
+test('只有日期、说不出为什么 —— 不报', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01' }), { today: T('2026-08-09') }),
                 'circleback')
+  assert.equal(c, undefined)
+})
+
+test('没有对方原话，但待办原文写着条件 —— 拿那句话当出处', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-12',
+                                next_action: '8-12 前没回音就向 Sarah 跟进确认收到 proposal' }),
+                        { today: T('2026-08-18') }), 'circleback')
+  assert.ok(c.why.includes('没回音就向 Sarah 跟进'))
+  assert.ok(c.why.includes('8/12'))
+})
+
+test('是它提的就说是它提的 —— 不许算到你头上', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-17', next_action_by: 'fairwind',
+                                next_action: '给 Ana Herruzo 写第一封，CC Weidi' }),
+                        { today: T('2026-08-18') }), 'circleback')
+  assert.ok(c.why.includes('它提的'))
+})
+
+test('对方有原话时，以原话为准，不写「它提的」', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01', next_action_by: 'fairwind',
+                                next_touch_why: '他说下学期再聊', next_action: '随便什么' }),
+                        { today: T('2026-08-09') }), 'circleback')
+  assert.ok(c.why.includes('他说下学期再聊'))
+  assert.equal(c.why.includes('它提的'), false)
+})
+
+test('日子还没到 —— 不提', () => {
+  const c = via(cuesFor(facts({ next_touch_at: '2026-09-01', next_action: '到点催一下' }),
+                        { today: T('2026-08-09') }), 'circleback')
   assert.equal(c, undefined)
 })
 
@@ -141,7 +174,7 @@ test('这段往来已经归了某条线 —— 人那行不再报「他回你了
 test('但人类的由头照旧归人 —— 压的只是邮件那两条', () => {
   // 来信在该碰日**之前** —— 不然 circleback 的前提（那之后没来信）不成立，
   // 那是另一条规矩在起作用，不是这条测试要验的事。
-  const f = facts({ mail_on_line: true, next_touch_at: '2026-08-01',
+  const f = facts({ mail_on_line: true, next_touch_at: '2026-08-01', next_action: '到点催',
                     intro_by_name: 'Tom', org_ever_replied: true,
                     last_in_at: T('2026-07-20').toISOString(),
                     last_meet_at: T('2026-08-02').toISOString() })
@@ -213,14 +246,14 @@ test('到了那天 —— 出现，而且说得出出处', () => {
 // 这是这一整刀最开始要解决的那件事：「到那个时间对方没回我，才需要 follow up」。
 
 test('到日子了，但那之后他来过信 —— 不响', () => {
-  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01',
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01', next_action: '到点催一下',
                                 last_in_at: T('2026-08-05').toISOString() }),
                         { today: T('2026-08-09') }), 'circleback')
   assert.equal(c, undefined)
 })
 
 test('到日子了，那之后没来信 —— 响', () => {
-  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01',
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01', next_action: '到点催一下',
                                 last_in_at: T('2026-07-20').toISOString(),
                                 needs_reply: false }),
                         { today: T('2026-08-09') }), 'circleback')
@@ -228,34 +261,7 @@ test('到日子了，那之后没来信 —— 响', () => {
 })
 
 test('压根没来过信 —— 照响', () => {
-  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01' }), { today: T('2026-08-09') }),
-                'circleback')
+  const c = via(cuesFor(facts({ next_touch_at: '2026-08-01', next_action: '到点催一下' }),
+                        { today: T('2026-08-09') }), 'circleback')
   assert.ok(c)
-})
-
-// ── ⑩ 截止 ──────────────────────────────────────────────────────
-
-test('14 天内截止 —— 提，带天数', () => {
-  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-08-20' }),
-                        { today: T('2026-08-09') }), 'deadline')
-  assert.ok(c.why.includes('8/20'))
-  assert.ok(c.why.includes('11 天'))
-})
-
-test('就是今天 —— 说「就是今天」，不说「还有 0 天」', () => {
-  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-08-09' }),
-                        { today: T('2026-08-09') }), 'deadline')
-  assert.ok(c.why.includes('就是今天'))
-})
-
-test('已经过了截止 —— 还提，改口', () => {
-  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-08-01' }),
-                        { today: T('2026-08-09') }), 'deadline')
-  assert.ok(c.why.includes('过了'))
-})
-
-test('截止还早 —— 不提', () => {
-  const c = via(cuesFor(facts({ subject_kind: 'pursuit', deadline_at: '2026-12-01' }),
-                        { today: T('2026-08-09') }), 'deadline')
-  assert.equal(c, undefined)
 })

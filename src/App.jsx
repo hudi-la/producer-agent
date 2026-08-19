@@ -126,6 +126,21 @@ export default function App() {
   const restoredRef = useRef(false)
   const migratedRef = useRef(false)
 
+  // 顶栏有多高。通讯录抽屉从它的下沿开始（见 .ppl-drawer 的 top），所以得有这个数。
+  //
+  // 不写死一个 55px：.app-top 是 flex-wrap 的，窗口一窄就折成两行——
+  // 写死了要么露出一条缝，要么把折下来的那行压在抽屉底下。量出来的才一直是对的。
+  // 用 state 存节点而不是 useRef：header 在「载入中」那次渲染里还不存在，
+  // useRef + [] 的 effect 只会在 null 上跑一次，数据到了也不会再挂上去。
+  const [topEl, setTopEl] = useState(null)
+  useEffect(() => {
+    if (!topEl) return
+    const wrap = topEl.parentElement
+    const ro = new ResizeObserver(() => wrap?.style.setProperty('--top-h', `${topEl.offsetHeight}px`))
+    ro.observe(topEl)          // observe 自己会先量一次，不用手动补第一下
+    return () => ro.disconnect()
+  }, [topEl])
+
   // 「读到这儿了」写进库（0030 的 pursuit_seen）。跟卡走，不跟浏览器走。
   //
   // 先就地把 unread 关掉再写库：小红点该在你点开的那一瞬间灭，不该等一趟网络。
@@ -593,7 +608,7 @@ export default function App() {
   return (
    <ProfileContext.Provider value={profile}>
     <div className={'wrap' + (drawered ? ' drawered' : '') + (bookOpen && area === 'people' && view.name === 'home' ? ' bookopen' : '')}>
-      <header className="app-top">
+      <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label="主区">
           {AREAS.map(([key, label]) => (

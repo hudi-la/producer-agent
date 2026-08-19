@@ -47,6 +47,37 @@ test('一串里重复的地址只留一个', () => {
   assert.deepEqual(parseAddrList('a@x.com, A@X.com').map((a) => a.email), ['a@x.com'])
 })
 
+// ── 草稿不是信 ──────────────────────────────────────────────────
+//
+// 真事：Ana Herruzo 名下挂了 5 封，可你只发过 1 封。那 4 封是你在 Gmail 里
+// 改草稿，每存一次生成一个新 message id，收信循环每 5 分钟一轮，一轮抓一次。
+// 于是通讯录上写着「5 封」，而「你发出去 N 天没回音」也把草稿算成了发出。
+
+test('草稿不入库 —— 它还没发出去，不是往来', () => {
+  const r = classify(
+    msg({ From: `HuDi <${ME}>`, To: 'ana@asu.edu' }, { labelIds: ['DRAFT'] }), [ME])
+  assert.equal(r, null)
+})
+
+test('草稿旁边还挂着别的标签也认得出来', () => {
+  const r = classify(
+    msg({ From: `HuDi <${ME}>`, To: 'ana@asu.edu' }, { labelIds: ['DRAFT', 'SENT'] }), [ME])
+  assert.equal(r, null)
+})
+
+test('真发出去的照收 —— 别把发件箱一起挡了', () => {
+  const r = classify(
+    msg({ From: `HuDi <${ME}>`, To: 'ana@asu.edu', Subject: 'Introduction' },
+        { labelIds: ['SENT'] }), [ME])
+  assert.equal(r.direction, 'out')
+  assert.equal(r.counterpart_email, 'ana@asu.edu')
+})
+
+test('没有 labelIds 的照收 —— 老数据和测试桩不该被误伤', () => {
+  const r = classify(msg({ From: 'Zoe <zoe@x.org>', To: ME }), [ME])
+  assert.equal(r.direction, 'in')
+})
+
 // ── 谁跟谁 ──────────────────────────────────────────────────────
 
 test('他发来的：对面是 From，方向是 in', () => {

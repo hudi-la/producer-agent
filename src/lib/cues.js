@@ -133,12 +133,21 @@ function circlebackCue(f, today) {
   // 中间你俩已经聊上了，这条就不该响 —— 这正是断掉的 handleRefresh
   // 想用「收到新信时让模型判它过期」去解决的那件事。现算不需要作废。
   if (f.last_in_at && dayOf(f.last_in_at) >= f.next_touch_at) return null
+
+  // 日期永远说得出出处。出处有两个来路：
+  //   · next_touch_why —— 对方的原话（「circle back next semester」）
+  //   · next_action    —— 那条待办的原文，**条件就写在这句话里**
+  //     （真例：「8-12 前没回音就向 Sarah 跟进确认收到 proposal」）
+  //
+  // **两个都没有就不报。** 原来这儿兜底写「你定的日子到了」——
+  // 而真查下来，ASU 那条 8/17 是 Fairwind 写的（next_action_by='fairwind'），
+  // 根本不是你定的。**说不出出处的时候闭嘴，别挑一个说。**
+  const 出处 = f.next_touch_why || f.next_action
+  if (!出处) return null
+  const 谁 = f.next_action_by === 'fairwind' && !f.next_touch_why ? '（它提的）' : ''
   return {
     via: 'circleback', at: f.next_touch_at,
-    // 日期永远说得出出处：要么是对方的原话，要么是你自己定的。没有第三种。
-    why: f.next_touch_why
-      ? `${f.next_touch_why} → ${md(f.next_touch_at)} 到了`
-      : `你定的日子到了（${md(f.next_touch_at)}）`,
+    why: `${出处}${谁} → ${md(f.next_touch_at)} 到了`,
   }
 }
 
@@ -173,24 +182,6 @@ function metCue(f, today) {
   }
 }
 
-// 截止。8/12 那份稿子把「紧急」筛选开关留着当容器，说「往里放什么，
-// 等卡面这一刀落地之后再定」——放这条。判据沿用它那个：14 天内或已过。
-//
-// 过了也不消失，只是改口。让它消失就等于替你决定放弃了。
-export const DEADLINE_DAYS = 14
-
-function deadlineCue(f, today) {
-  if (!f.deadline_at) return null
-  const d = daysSince(dayOf(today), f.deadline_at)
-  if (d === null || d > DEADLINE_DAYS) return null
-  return {
-    via: 'deadline', at: f.deadline_at,
-    why: d < 0 ? `${md(f.deadline_at)} 截止，已经过了 ${-d} 天`
-       : d === 0 ? `${md(f.deadline_at)} 截止，就是今天`
-       : `${md(f.deadline_at)} 截止，还有 ${d} 天`,
-  }
-}
-
 /**
  * 这一行事实上现在有哪些由头。
  *
@@ -205,7 +196,6 @@ export function cuesFor(f, { today = new Date() } = {}) {
     circlebackCue(f, today),
     thanksCue(f),
     metCue(f, today),
-    deadlineCue(f, today),
   ].filter(Boolean)
 }
 

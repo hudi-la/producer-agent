@@ -1196,7 +1196,15 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    它们是同一种东西。 */
 .ppl-inner { max-width: 860px; }
 
-.ppl-drawer { z-index: 25; }
+/* 通讯录抽屉**不**盖顶栏，从顶栏的下沿开始。
+   机会线那个抽屉是顶到最上沿的（见 .drawer），这里跟它不一样是故意的：
+   翻通讯录是「在这一页里查个东西」，羽·Fairwind 那条顶栏和三个主区得一直在，
+   不然抽屉一开就像离开了这个 app。--top-h 由 App.jsx 量出来写在 .wrap 上。 */
+.ppl-drawer { z-index: 25; top: var(--top-h, 55px); }
+/* 抽屉不跟顶栏重叠了，这条只是兜底：别让抽屉那圈阴影糊到顶栏上。
+   只在通讯录开着时生效——机会线抽屉还要盖住顶栏，全局抬会把它自己的
+   标题和「整页」按钮压到顶栏底下。 */
+.wrap.bookopen .app-top { position: relative; z-index: 30; background: var(--paper); }
 .pdrawer { display: flex; flex-direction: column; width: 100%; min-width: 0; }
 .pdrawer-h { display: flex; align-items: baseline; gap: 12px; flex: none;
   padding: 14px 18px; border-bottom: 1px solid var(--line); }

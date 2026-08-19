@@ -126,8 +126,27 @@ export function mineSet(mine) {
  *
  * 认不出发件人、或者时间戳算不出来 → 返回 null，这封不入库。
  * sent_at 在库里是 not null，宁可这一封没进来，也不要一个假日期。
+ *
+ * **草稿也不入库**，理由见下面那段。
  */
 export function classify(msg, mine) {
+  // ── 草稿不是信 ──
+  //
+  // 真事：Ana Herruzo 名下挂了 5 封，可只发过 1 封。那 4 封是在 Gmail 里
+  // 改草稿——每存一次生成一个新 message id，四次的 sent_at 是 05:33、05:37、
+  // 05:46、05:53，收进来的时间是 05:35、05:40、05:50、05:55：**收信循环
+  // 每 5 分钟一轮，一轮抓走一份当时的草稿。**
+  //
+  // 两条路都会抓到它：listIds 的 `-in:chats` 只排掉了聊天，Gmail 搜索默认
+  // 包含草稿；而增量那条路用 historyTypes:['messageAdded']，**草稿每存一次
+  // 就是一个 messageAdded 事件**。
+  //
+  // 堵在这儿是因为 toRows 是那两条路唯一的汇流点——堵一处，两条都堵住。
+  //
+  // 没写出去的东西不是往来。让它进来，「你发出去 N 天没回音」会把草稿算成
+  // 发出，通讯录上「几封」也会跟着虚报。
+  if (Array.isArray(msg?.labelIds) && msg.labelIds.includes('DRAFT')) return null
+
   const my = mineSet(mine)
   const h = headerMap(msg?.payload?.headers)
 
