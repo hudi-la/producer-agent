@@ -138,7 +138,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
           在这之前这封信只能靠你选中、复制、切去 Gmail 粘贴。 */}
       {m.meta?.letter && (
         <LetterCard
-          letter={m.meta.letter} body={m.content}
+          letter={m.meta.letter}
           owner={owner} onAdopted={onAdopted}
         />
       )}

@@ -99,3 +99,34 @@ test('Gmail 没回 threadId 就不认领，但账照记、产出照删', async (
   await recordSent(db, { ...BASE, sent: { ...SENT, threadId: '' } })
   assert.deepEqual(db.seen, ['pa_add_mail', 'pa_mail_headers_upsert', 'pa_delete_deliverable'])
 })
+
+// ── 回给一群人（2026-08-18）──────────────────────────────────
+//
+// 起因：Huntington 那封该回给两个人，而这儿只放得下一个地址、抄送根本不存在。
+
+test('回给多个人：信头里名单是全的，「对面」只挑第一个', async () => {
+  const db = stubDb()
+  await recordSent(db, { ...BASE, to: ['first@x.org', 'second@x.org'], cc: ['boss@y.org'] })
+
+  const [, add] = db.args.find(([fn]) => fn === 'pa_add_mail')
+  assert.equal(add.p_counterpart, 'first@x.org', '对面只能有一个，取 To 里第一个')
+  assert.deepEqual(add.p_meta.to, ['first@x.org', 'second@x.org'])
+  assert.deepEqual(add.p_meta.cc, ['boss@y.org'])
+
+  const [, hdr] = db.args.find(([fn]) => fn === 'pa_mail_headers_upsert')
+  assert.deepEqual(hdr.p_rows[0].to_emails, ['first@x.org', 'second@x.org'])
+  assert.deepEqual(hdr.p_rows[0].cc_emails, ['boss@y.org'])
+  assert.equal(hdr.p_rows[0].counterpart_email, 'first@x.org')
+})
+
+test('老产出那种单个字符串照旧记得下', async () => {
+  const db = stubDb()
+  await recordSent(db, { ...BASE, to: 'solo@x.org' })
+  const [, hdr] = db.args.find(([fn]) => fn === 'pa_mail_headers_upsert')
+  assert.deepEqual(hdr.p_rows[0].to_emails, ['solo@x.org'])
+  assert.deepEqual(hdr.p_rows[0].cc_emails, [])
+})
+
+test('一个收件人都没有时不许记账——记进去也认不出这封信是给谁的', async () => {
+  await assert.rejects(() => recordSent(stubDb(), { ...BASE, to: [] }), /没有收件人/)
+})

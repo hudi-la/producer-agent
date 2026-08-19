@@ -103,3 +103,19 @@ test('收件人里塞换行发不出去——注入拦在 mime 那层，这儿�
   }), /换行/)
   assert.equal(calls.length, 0, '一个字节都不许发出去')
 })
+
+test('抄送要真的发出去——不接住的话它会被静默丢掉', async () => {
+  const calls = []
+  const gmail = { users: { messages: { send: async (a) => {
+    calls.push(a); return { data: { id: 'm', threadId: 't' } }
+  } } } }
+  await sendLetter({
+    gmail, from: 'me@x.com', fromName: 'Hu Di',
+    to: ['a@y.org', 'b@y.org'], cc: ['boss@z.org'],
+    subject: 's', body: 'b',
+  })
+  const mime = Buffer.from(
+    calls[0].requestBody.raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+  assert.match(mime, /^To: a@y\.org, b@y\.org$/m)
+  assert.match(mime, /^Cc: boss@z\.org$/m)
+})

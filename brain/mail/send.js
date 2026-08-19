@@ -44,14 +44,14 @@ export function assertSameMailbox(authed, profileEmail) {
  * 让他自己去已发送里看一眼。
  */
 export async function sendLetter({
-  gmail, from, fromName, to, subject, body,
+  gmail, from, fromName, to, cc = null, subject, body,
   replyTo = null, refs = null, threadId = null,
 }) {
   const messageId = newMessageId(from)
   const { text, html } = renderBody(body)
   // 组信在发之前：注入检查（mime.js 里的 noBreaks）要是抛了，一个字节都还没出去。
   const raw = toRaw(buildMime({
-    from, fromName, to, subject, text, html,
+    from, fromName, to, cc, subject, text, html,
     messageId, inReplyTo: replyTo, refs,
   }))
 

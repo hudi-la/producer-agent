@@ -43,7 +43,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-17a'
+export const BRAIN_BUILD = '2026-08-18a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -623,8 +623,14 @@ async function handleSendMail(body) {
   if (d.status === 'final') throw new Error('已定稿的不走这条路')
   if (!d.body?.trim()) throw new Error('正文是空的，没东西可发')
 
-  const to = String(d.meta?.to || '').trim().toLowerCase()
-  if (!to.includes('@')) throw new Error('这份产出上没有收件人——补一个再发')
+  // 收件人是一份名单（0071）。老产出里存的是单个字符串，两种都认——
+  // 不认的话，改之前收进产出的那几封信一封都发不出去。
+  const listOf = (v) => (Array.isArray(v) ? v : v == null ? [] : [v])
+    .map((x) => String(x ?? '').trim().toLowerCase())
+    .filter((x) => x.includes('@'))
+  const to = listOf(d.meta?.to)
+  const cc = listOf(d.meta?.cc)
+  if (!to.length) throw new Error('这份产出上没有收件人——在页面上勾一个再发')
 
   // 用错身份发出去的信连道歉都没处发，所以这一条拦在真发之前。
   const me = await whoami()
@@ -636,6 +642,7 @@ async function handleSendMail(body) {
     from: me.address,
     fromName: artistOf(ctx.profile),
     to,
+    cc,
     subject: d.title,
     body: d.body,
     replyTo,
@@ -656,6 +663,7 @@ async function handleSendMail(body) {
     deliverableId: deliverable_id,
     sent,
     to,
+    cc,
     from: me.address,
     subject: d.title,
     summary: d.meta?.summary || null,

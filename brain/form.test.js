@@ -27,9 +27,10 @@ test('没有标记就当没有，正文原样交出', () => {
   assert.equal(form, null)
 })
 
+// 不变量是**不许丢**：答案住在标记里，剁掉 = 那几格答案没了
 test('标记坏了不能连累正文', () => {
   const { clean, form } = extractForm('正文在这儿。\n\n[[FORM]] {坏掉的')
-  assert.equal(clean, '正文在这儿。')
+  assert.ok(clean.includes('正文在这儿。'), '正文被咬了')
   assert.equal(form, null)
 })
 

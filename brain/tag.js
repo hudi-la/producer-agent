@@ -18,7 +18,20 @@
 /**
  * 摘走末尾那个 [[NAME]] {...}。
  *
- * 返回 { clean, data }：clean 永远是去掉标记之后的正文，data 解析不出来就是 null。
+ * 返回 { clean, data }：data 解析不出来就是 null。
+ *
+ * ── 解析失败时 clean 退回原文，不剁 ──────────────────────────
+ * 这一条 2026-08-18 改过，起因是一次真事：**信的正文本来就装在标记里面**
+ * （信封里那个 body —— 不这么装的话，收进产出的是「好的，我帮你回一封……」
+ * 那一整段车轱辘话，而不是信）。
+ *
+ * 一旦正文住进了标记，「解析失败就把尾巴剁掉」就从「损失一行元数据」变成
+ * **整封信从屏幕上消失**：他看到的是一句「我起了一版，你看看」，下面什么
+ * 都没有。那比留一行难看的 [[LETTER]] {" 糟得多 —— 难看的东西你看得见，
+ * 消失的东西你连问都不知道该问什么。
+ *
+ * 所以：解析成功才剁（正文已经安全地在 data 里了），失败就原样交出去。
+ * 边想边出字那头有 liveText.stripTag 挡着，屏幕上不会闪。
  */
 export function takeTag(text, name) {
   const src = String(text ?? '')
@@ -28,11 +41,12 @@ export function takeTag(text, name) {
   const at = src.lastIndexOf(tag)
   if (at < 0) return { clean: src.trim(), data: null }
 
-  const clean = src.slice(0, at).trim()
   try {
-    return { clean, data: JSON.parse(src.slice(at + tag.length).trim()) }
+    const data = JSON.parse(src.slice(at + tag.length).trim())
+    return { clean: src.slice(0, at).trim(), data }
   } catch (_) {
-    return { clean, data: null }
+    // 剁不得：尾巴里可能装着整封信
+    return { clean: src.trim(), data: null }
   }
 }
 

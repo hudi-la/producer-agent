@@ -39,21 +39,30 @@ const call = async (db, fn, args, what) => {
 }
 
 export async function recordSent(db, {
-  ownerKind, ownerId, deliverableId, sent, to, from, subject, summary, body, accountId,
+  ownerKind, ownerId, deliverableId, sent, to, cc, from, subject, summary, body, accountId,
   replyTo = null, refs = null, sentAt = null,
 }) {
   const when = sentAt || new Date().toISOString()
+  const toList = Array.isArray(to) ? to : to ? [to] : []
+  const ccList = Array.isArray(cc) ? cc : cc ? [cc] : []
+  if (!toList.length) throw new Error('记账时没有收件人——这封信记进去也认不出是给谁的')
+
+  // 「对面是谁」只能有一个（pa_add_mail 靠它把这封信归到某个人名下，见 0038）。
+  // 一封回给三个人的信，主要那个就是 To 里第一个——那是你回信的对象，
+  // 其余是捎带上的。挑错了的后果是这封信挂到旁人名下，所以宁可写死这条规矩，
+  // 也不让它去猜「谁更重要」。
+  const counterpart = toList[0]
 
   // ① 往来里那一条。人的归属由 pa_add_mail 按地址自己算（0038），
   //    机会线要显式给 pursuit_id。
   await call(db, 'pa_add_mail', {
     p_gmail_message_id: sent.id,
-    p_counterpart: to,
+    p_counterpart: counterpart,
     p_role: 'artist',
     p_content: oneLine(summary, body),
     p_body_raw: body,
     ...(ownerKind === 'pursuit' ? { p_pursuit_id: ownerId } : {}),
-    p_meta: { subject, to, sent_from: 'fairwind' },
+    p_meta: { subject, to: toList, ...(ccList.length ? { cc: ccList } : {}), sent_from: 'fairwind' },
   }, '记账没成')
 
   // ② 信头。**不能等下次同步再补**——0055 靠 message_id / in_reply_to / refs
@@ -64,10 +73,11 @@ export async function recordSent(db, {
       account_id: accountId,
       gmail_thread_id: sent.threadId,
       from_email: from,
-      to_emails: [to],
+      to_emails: toList,
+      cc_emails: ccList,
       subject,
       sent_at: when,
-      counterpart_email: to,
+      counterpart_email: counterpart,
       direction: 'out',
       message_id: sent.messageId,
       in_reply_to: replyTo,

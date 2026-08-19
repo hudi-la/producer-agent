@@ -96,3 +96,33 @@ test('行尾一律 CRLF —— 只有 \\n 的信头有的邮件服务器不认',
   const m = buildMime(BASE)
   assert.doesNotMatch(m.replace(/\r\n/g, ''), /\n/)
 })
+
+// ── 收件人是一份名单（2026-08-18）────────────────────────────
+//
+// 起因：Huntington 那封要回给两个人，而 To 只放得下一个，Cc 根本没有。
+// 「不确定是几个人」就没法安心按发送——那等于这个功能没做。
+
+test('To 收一份名单，逗号分开', () => {
+  const m = buildMime({ ...BASE, to: ['a@x.org', 'b@y.org'] })
+  assert.match(m, /^To: a@x\.org, b@y\.org$/m)
+})
+
+test('单个字符串照旧认——老产出里的 to 就是字符串', () => {
+  assert.match(buildMime({ ...BASE, to: 'a@x.org' }), /^To: a@x\.org$/m)
+})
+
+test('抄送写成 Cc 头；没有就一个字都不出现', () => {
+  assert.match(buildMime({ ...BASE, cc: ['c@z.org'] }), /^Cc: c@z\.org$/m)
+  assert.doesNotMatch(buildMime(BASE), /^Cc:/m)
+  assert.doesNotMatch(buildMime({ ...BASE, cc: [] }), /^Cc:/m)
+})
+
+test('一个收件人都没有就当场拒——空名单的信发出去谁也收不到', () => {
+  assert.throws(() => buildMime({ ...BASE, to: [] }), /收件人/)
+  assert.throws(() => buildMime({ ...BASE, to: '' }), /收件人/)
+})
+
+test('名单里任何一个塞了换行都拒，不是只查第一个', () => {
+  assert.throws(() => buildMime({ ...BASE, to: ['ok@x.org', 'e@y.org\nBcc: evil@z'] }), /换行/)
+  assert.throws(() => buildMime({ ...BASE, cc: ['e@y.org\nBcc: evil@z'] }), /换行/)
+})

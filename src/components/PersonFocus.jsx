@@ -496,7 +496,7 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
                           从来没兑现过，因为模型根本没有建产出的口。 */}
                       {m.meta?.letter && (
                         <LetterCard
-                          letter={m.meta.letter} body={m.content}
+                          letter={m.meta.letter}
                           owner={{ contactId: c.id }} onAdopted={reload}
                         />
                       )}

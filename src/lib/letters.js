@@ -7,6 +7,10 @@
 //    浏览器这头永远拿不到。
 import { supa, BRAIN } from './backends.js'
 
+const need = () => {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+}
+
 /**
  * 把对话里那封信收成一份待发的 email 产出。
  *
@@ -58,4 +62,37 @@ export async function sendLetterNow(owner, deliverableId) {
     throw err
   }
   return out
+}
+
+/**
+ * 回这封信该发给谁 —— **从信头账本算，不问模型**。
+ *
+ * 2026-08-18 加的，起因是一次真用：Huntington 那封实际要回给两个人，
+ * 而界面上只摆着模型挑出来的一个地址、抄送一个字都没有。于是那封信
+ * 没法安心发 ——「我不确定是几个人」。
+ *
+ * 答案本来就在库里（mail_headers 存着原信的 from / to / cc，全带 RFC
+ * Message-ID）。这跟 0060「找信是机械活」是同一条：**收件人猜错了是
+ * 撤不回来的**，更不该交给模型。
+ *
+ * 返回 { found, sender, others, cc }；found=false 时带一句 why——
+ * 交出一份空名单会跟「只回发件人」长得一样，那是在骗人。
+ */
+export async function replyRecipients(replyToMessageId) {
+  need()
+  const { data, error } = await supa.rpc('pa_reply_recipients', {
+    p_message_id: replyToMessageId,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** 存你勾出来的收件人和抄送。to 空了数据库会当场拒（0071）。 */
+export async function setRecipients(deliverableId, to, cc) {
+  need()
+  const { error } = await supa.rpc('pa_set_recipients', {
+    p_id: deliverableId, p_to: to, p_cc: cc,
+  })
+  if (error) throw new Error(error.message)
+  return { ok: true }
 }

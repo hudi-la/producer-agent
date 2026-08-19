@@ -32,12 +32,25 @@ export function extractLetter(text) {
   const to = clean1(j?.to)?.toLowerCase()
   if (!to || !to.includes('@')) return { clean, letter: null }
 
+  // ── 信本身也必须在信封里（2026-08-18 补的）──────────────────
+  //
+  // 起因是一次真用：收进产出的是「好的，我帮你回一封……」那一整段车轱辘话，
+  // 而不是信。因为原来的信封只带 to/subject/summary，**没带信** ——
+  // 于是界面手上唯一能当正文用的就是整条消息。
+  //
+  // 没有 body 就不算信封，宁可不画那张卡。退回去让他自己复制，是**看得见的
+  // 不方便**；画一张卡、点下去收进来一段车轱辘话，是**看不见的错**——
+  // 他要到按发送前才发现，甚至发出去了才发现。
+  const body = clean1(j?.body)
+  if (!body) return { clean, letter: null }
+
   return {
     clean,
     letter: {
       to,
       // 主题给个兜底：null 传到界面上会画出一行空白，而空白让人以为没写
       subject: clean1(j?.subject) || '（无主题）',
+      body,
       summary: clean1(j?.summary),
       reply_to: clean1(j?.reply_to),
       thread_id: clean1(j?.thread_id),

@@ -42,18 +42,38 @@ const noBreaks = (label, v) => {
 const b64 = (s) =>
   Buffer.from(String(s ?? ''), 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n')
 
+/**
+ * 收件人是一份名单。
+ *
+ * 2026-08-18 之前这儿只放得下一个地址，Cc 根本不存在 —— 于是 Huntington
+ * 那封该回给两个人的信没法从这儿发出去。「不确定是几个人」就不敢按发送，
+ * 那等于这个功能没做。
+ *
+ * 单个字符串也认：老产出里的 meta.to 存的就是字符串，不认的话那些信发不出去。
+ */
+const addrs = (v) => (Array.isArray(v) ? v : v == null ? [] : [v])
+  .map((x) => String(x ?? '').trim())
+  .filter(Boolean)
+
 export function buildMime({
-  from, fromName, to, subject, text, html,
+  from, fromName, to, cc, subject, text, html,
   messageId, inReplyTo = null, refs = null,
   date = new Date(), boundary = `b${randomUUID().replace(/-/g, '')}`,
 }) {
-  noBreaks('收件人', to)
+  const toList = addrs(to)
+  const ccList = addrs(cc)
+  // 空名单的信「发出去」了却谁也收不到，而界面会显示已发送 —— 拦在这儿。
+  if (!toList.length) throw new Error('一个收件人都没有，这封信发出去谁也收不到')
+  // **每一个都查**，不是只查第一个：漏查一个就等于给别人留了个加 Bcc 的口子。
+  toList.forEach((a, i) => noBreaks(`收件人第 ${i + 1} 个`, a))
+  ccList.forEach((a, i) => noBreaks(`抄送第 ${i + 1} 个`, a))
   noBreaks('主题', subject)
   noBreaks('发信人', fromName)
 
   const h = [
     `From: ${fromName ? `${encodeHeader(fromName)} <${from}>` : from}`,
-    `To: ${to}`,
+    `To: ${toList.join(', ')}`,
+    ...(ccList.length ? [`Cc: ${ccList.join(', ')}`] : []),
     `Subject: ${encodeHeader(subject)}`,
     `Date: ${date.toUTCString()}`,
     `Message-ID: ${messageId}`,

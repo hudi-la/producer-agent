@@ -3,6 +3,8 @@ import { checkRules, itemProgress, formProgress } from '../lib/rules.js'
 import { editDeliverable, setFinal, newDeliverable, deleteDeliverable, putInDraftbox } from '../lib/deliverables.js'
 import { sendLetterNow } from '../lib/letters.js'
 import { setAnswer } from '../lib/forms.js'
+// 这封信到底发给谁——名单从信头账本算，你自己勾。
+import Recipients from './Recipients.jsx'
 
 // 右栏：交付。
 //
@@ -170,7 +172,14 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
   // 两段确认的第二段：按第一下只是「上膛」，第二下才真发。
   const [armed, setArmed] = useState(false)
   const isMail = d.kind === 'email'
-  const to = d.meta?.to || null
+  // 收件人是一份名单（0071）。老产出里存的是单个字符串，两种都认——
+  // 不认的话，改之前收进产出的那几封信一封都发不出去。
+  const to = Array.isArray(d.meta?.to) ? d.meta.to : d.meta?.to ? [d.meta.to] : []
+  const cc = Array.isArray(d.meta?.cc) ? d.meta.cc : []
+  const n = to.length + cc.length
+  // 按钮上写「2 人」而不是把三个地址挤成一行：地址长起来会把按钮撑爆，
+  // 而**谁**在上面那份名单里逐个看得见，这儿只需要答「几个」。
+  const whoSay = n === 1 ? to[0] : `${n} 人`
 
   // 文字类：定稿 = 搬到左栏。
   //
@@ -207,8 +216,13 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
     )
   }
 
-  const canSend = allOk && !!to && !busy
+  const canSend = allOk && to.length > 0 && !busy
   return (
+    <>
+      {/* 名单摆在按钮上面，逐个可勾。**看不全就不敢发**——2026-08-18 那次
+          Huntington 的信要回给两个人，界面上只有一个地址，于是那封信只能
+          切回 Gmail 手动 reply all。 */}
+      <Recipients d={d} onChanged={onChanged} onErr={onErr} />
     <div className="dv-acts">
       {/* 收件人明摆在按钮上，不许藏在折叠里——**发错人是这条路上唯一
           撤不回来的错**。别的都能补：改错字能再发一封，主题不好看下次注意；
@@ -216,15 +230,15 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
       <button className="b primary" disabled={!canSend}
         onClick={() => (armed ? go('send') : setArmed(true))}
         onBlur={() => setArmed(false)}
-        title={!allOk ? '规则没过，先把上面那几条弄对' : !to ? '这份产出上没有收件人' : ''}>
-        {busy === 'send' ? '正在发……' : armed ? `确认发给 ${to}` : '发送'}
+        title={!allOk ? '规则没过，先把上面那几条弄对' : !to.length ? '这份产出上没有收件人' : ''}>
+        {busy === 'send' ? '正在发……' : armed ? `确认发给 ${whoSay}` : '发送'}
       </button>
       {armed
         ? <span className="dv-why warn">按下去信就出去了，撤不回来。</span>
         : <span className="dv-why">{
             !allOk ? '规则没过，发不了'
-              : !to ? '没有收件人，发不了'
-              : `发给 ${to} · 发出后当场记进左栏往来`
+              : !to.length ? '一个收件人都没勾，发不了'
+              : `发给 ${whoSay}${cc.length ? `（含抄送 ${cc.length}）` : ''} · 发出后当场记进左栏往来`
           }</span>}
       {/* 退路：要加附件（作品集 PDF）的信走这条——放进草稿箱，去 Gmail 挂上附件再发。 */}
       <button className="b" disabled={!allOk || busy} onClick={() => go('draft')}
@@ -232,6 +246,7 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
         {busy === 'draft' ? '正在放……' : d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进草稿箱'}
       </button>
     </div>
+    </>
   )
 }
 
