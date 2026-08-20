@@ -793,9 +793,21 @@ ${known.join(', ')}
 //     它不是人，硬当成人就是 0033 犯过的错
 //   · **只提议，不写库**。写库是前端拿着你的点头去调 RPC。
 //     认错人比不认更麻烦，所以这一步永远留一个人的判断。
+// 认过的先记着：读信要一分钟，他点完常常切走了页面 —— 回来再点不该
+// 重花一次钱重读一遍。缓存在内存里就够：草稿本来就是临时的（一旦认领
+// 就落库了），brain 重启丢掉也只是回到「再读一次」。
+const IDENTIFIED = new Map()   // email → { at, out }
+const IDENTIFY_TTL = 24 * 3600 * 1000
+
 async function handleIdentify(body) {
   const email = String(body?.email || '').trim().toLowerCase()
   if (!email.includes('@')) throw new Error('要一个邮箱地址')
+
+  const hit = IDENTIFIED.get(email)
+  if (hit && Date.now() - hit.at < IDENTIFY_TTL) {
+    console.log('  ↳ 上次认过，直接给（不重读信）')
+    return { ...hit.out, cached: true }
+  }
 
   // 通讯录现状喂给它，好让它认出「这是某人的另一个邮箱」
   const { data: known } = await db.rpc('pa_address_book_digest')
@@ -1577,6 +1589,7 @@ const server = http.createServer(async (req, res) => {
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 认人 ${body.email}`)
         const out = await handleIdentify(body)
         console.log(`  ↳ ${out.kind}${out.name ? ' · ' + out.name : ''}${out.match_name ? ' → 命中 ' + out.match_name : ''}`)
+        if (!out.cached) IDENTIFIED.set(String(body.email || '').trim().toLowerCase(), { at: Date.now(), out })
         send(res, 200, out)
       } catch (err) {
         console.error('✗', err.message)
