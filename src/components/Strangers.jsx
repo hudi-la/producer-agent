@@ -176,7 +176,9 @@ function One({ email, meta, contacts, onDone, onCancel }) {
             他发来 {meta.他发来的} · 你发去 {meta.你发去的} · {md(meta.第一次)}–{md(meta.最近一次)}
           </span>
         </>}
-        {!who && <button className="lnk" onClick={ask} disabled={busy}>
+        {/* 这是整块唯一的操作口，得长得像个按钮 —— 文字链他真的没认出来
+            （2026-08-20：「没有可以操作的地方啊」）。 */}
+        {!who && <button className="nopen" onClick={ask} disabled={busy}>
           {busy ? '读信中…' : '这是谁？'}
         </button>}
       </div>
