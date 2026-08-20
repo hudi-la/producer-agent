@@ -219,6 +219,19 @@ export async function markCue(item, mark) {
   return Boolean(data)
 }
 
+/**
+ * 改一条等待的到点日。默认天数对这个 case 不合适（「等到周四再催」）时
+ * 的落笔口 —— 原来这个结论只能活在对话里，没处落（Arboretum 的教训）。
+ * 只动 wait_days，谁改的、凭什么记进标签的 situation。
+ */
+export async function rescheduleWait(it, due, why = null) {
+  const { error } = await supa.rpc('pa_reschedule_wait', {
+    p_anchor: it.anchor_id, p_due: due, p_why: why,
+  })
+  if (error) throw new Error(error.message)
+  return true
+}
+
 // muteAway / unmuteLetter / unmarkAllOff 于 2026-08-20 退役 ——
 // 「被判为不用回的」那层从面板上删了，✕ 和「放回」没有了立足的行。
 // 记号和判决都还在库里（cue_marks / letter_verdicts），要复活翻 git。

@@ -1387,6 +1387,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .audit-off { position: fixed; right: 18px; bottom: 18px; z-index: 40;
   background: var(--ink); color: var(--paper); border: none; border-radius: 20px;
   padding: 9px 16px; font-size: 12.5px; cursor: pointer; box-shadow: var(--shadow); }
+/* 「改期」：原生 date input 披着链接的皮 —— 点字出日历，不占地方 */
+.nresched { position: relative; font-size: 11.5px; color: var(--ink-3);
+  cursor: pointer; align-self: center; }
+.nresched:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.nresched input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 /* 名字本身是入口：长得像标题，摸上去是链接 */
 .nname { font-weight: 700; font-size: 13px; color: var(--ink); background: none;
   border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }

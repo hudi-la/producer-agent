@@ -24,7 +24,7 @@ import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
-import { loadNotifications, markHandled, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
+import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
@@ -242,6 +242,12 @@ export default function App() {
     try { await markHandled(it) } catch (e) { console.warn('已处理没记上：', e.message) }
     await pullNotes()
   }
+  // 改一条等待的到点日（「说好周四再催」这类结论的落笔口）
+  const rescheduleNote = async (it, due) => {
+    try { await rescheduleWait(it, due) } catch (e) { console.warn('改期没成：', e.message) }
+    await pullNotes()
+  }
+
   // 看板气泡审计视图：开着时每张卡头顶吊着它的状态。
   const [audit, setAudit] = useState(false)
 
@@ -665,6 +671,7 @@ export default function App() {
         <Notifications
           data={notes} judging={judging} onJudgeMore={judgeMore}
           onHandled={handleNote}
+          onReschedule={rescheduleNote}
           auditOn={audit}
           onAudit={() => { setAudit((x) => !x); setBellOpen(false); setArea('pursue') }}
           onGoPeople={() => { setBellOpen(false); setArea('people') }}

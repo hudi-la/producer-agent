@@ -16,7 +16,7 @@ import { stateLine, whyLine } from '../lib/stateText.js'
 //
 // 设计稿：docs/specs/2026-08-19-what-this-line-is-waiting-on-design.md 第七节
 
-function StateRow({ it, onHandled, onOpen }) {
+function StateRow({ it, onHandled, onReschedule, onOpen }) {
   return (
     <div className="nrow">
       <div className="nrow-b">
@@ -34,6 +34,16 @@ function StateRow({ it, onHandled, onOpen }) {
              这一下是**记一笔**（进时间线，留痕迹），不是把提醒抹掉。 */
           <button className="nbtn" title="已处理 —— 记一笔，留痕迹" aria-label="已处理"
                   onClick={() => onHandled(it)}>✓</button>
+        )}
+        {/* 改期：默认等待天数对这个 case 不合适时（「说好周四再催」），
+            直接把到点日改掉 —— 原来这个结论只能活在对话里，没处落。
+            原生 date input 披着链接的皮：点开就是日历。 */}
+        {it.state === 'WAITING_REPLY' && it.anchor_id && (
+          <label className="nresched" title="改到点日">
+            改期
+            <input type="date" value=""
+                   onChange={(e) => e.target.value && onReschedule(it, e.target.value)} />
+          </label>
         )}
         <button className="nopen" onClick={() => onOpen(it)}>打开卡片</button>
       </div>
@@ -65,7 +75,7 @@ function Fold({ title, note, items, render }) {
 // 问题 —— 线在等什么（状态机）才是对的粒度。判决数据都在 letter_verdicts。
 // 错判的发现走「挂到看板上」：没有气泡的活跃卡 = 该起疑的安静线。
 
-export default function Notifications({ data, judging, onJudgeMore, onHandled, onOpen, onGoPeople, onAudit, auditOn, onClose }) {
+export default function Notifications({ data, judging, onJudgeMore, onHandled, onReschedule, onOpen, onGoPeople, onAudit, auditOn, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', onKey)
@@ -112,7 +122,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       {/* 该动的：到点了的，紧的在上 */}
       <section className="nsect">
         {bell.due.length ? bell.due.map((it) => (
-          <StateRow key={it.key} it={it} onHandled={onHandled} onOpen={onOpen} />
+          <StateRow key={it.key} it={it} onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
         )) : source !== 'empty' && (
           <p className="nnone">现在没有到点的。这是好事，不是漏了什么。</p>
         )}
@@ -121,7 +131,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       {/* 等待：没到点的，折叠着，数字露在外面 */}
       <Fold title="等待" items={bell.waiting}
             note="还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。"
-            render={(it) => <StateRow key={it.key} it={it} onHandled={onHandled} onOpen={onOpen} />} />
+            render={(it) => <StateRow key={it.key} it={it} onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />} />
 
       {/* 人的事不在这儿 —— 但不许是隐形的 */}
       {(peopleN > 0 || unclaimed > 0) && (

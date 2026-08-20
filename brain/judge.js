@@ -209,7 +209,10 @@ ${收尾(`${F_GIST},${F_RESOLVE},${F_WAIT}`)}` },
 这笔解决了它吗？（「电话里说定了」「表单已提交」「已处理」这类 = 解决了）
 解决 → resolves=true + resolves_why。这笔里另约了日子 → meet_at；
 解决之后又开始等新的结果（比如交了表单等答复）→ awaiting + wait_days
-（笔里有兜底日期就用它）。否则全 null。
+（笔里有兜底日期就用它）。
+**这笔说的是改等待的节奏**（「说好周四再催」「再等两周」）→
+resolves 别动（事没解决），awaiting=还是原来等的事 + wait_days 到新日子
+—— 新标签锚在这笔上，到点日就顺过去了。否则全 null。
 ${收尾(`${F_GIST},${F_RESOLVE},${F_MEET},${F_WAIT}`)}` },
   },
 
