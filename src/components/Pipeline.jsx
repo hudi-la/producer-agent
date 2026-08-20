@@ -97,8 +97,14 @@ function PCard({ p, st, audit, onOpen, onDragStart, onJot, unseen, picking, chec
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
   const ball = ballOf(p)
-  const ddl = deadlineLine(p)
-  const opn = openLine(p)
+  // 截止日期是「投递窗口」的事实 —— 线走到发出&提交之后它的任务就完成了，
+  // 封面上留着只会跟真正活着的状态行（金色那行「在等什么」）抢注意力。
+  // 真例：Stanford 已交，封面还喊着「截止 8/18」；CultureHub 谈成了，
+  // 还挂着「截止 8/11 · 营销素材」。日期不丢 —— 左栏「事实」里一直有。
+  // 还没投的照旧显示，过了截止还没投的更要红着喊 —— 那才是截止的用处。
+  const 投过了 = 该有动静的.has(p.stage)
+  const ddl = 投过了 ? null : deadlineLine(p)
+  const opn = 投过了 ? null : openLine(p)
 
   // 卡整体是个可点的东西，但里面还嵌了个勾选框——button 套 button 是非法的，
   // 所以外层用 div + role，键盘操作自己接。
@@ -145,7 +151,7 @@ function PCard({ p, st, audit, onOpen, onDragStart, onJot, unseen, picking, chec
 
       {ddl ? (
         <div className={'pc-ddl' + (ddl.urgent ? ' due' : '')}>{ddl.text}</div>
-      ) : (
+      ) : !投过了 && (
         <div className="pc-ddl none">无固定截止</div>
       )}
       {/* 开放日期也是确定的信息，有就显示。不替你判急不急。 */}

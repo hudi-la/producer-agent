@@ -88,15 +88,18 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
   const peopleN = people.due.length + people.waiting.length
 
   return (
-    <div className="npanel" role="dialog" aria-label="该动的">
+    <div className="npanel" role="dialog" aria-label="消息">
       <header className="nhead">
-        <h2>该动的</h2>
+        {/* 「消息」不叫「该动的」：这块板子装的不全是催你动的东西——
+            等待那一层是「在等别人」，人的事那一行是「在别处」。
+            「今天：」那一段才是该动的，标题不该替其中一个区说话。 */}
+        <h2>消息</h2>
         {bell.due.length > 0 && <span className="ncount">{bell.due.length} 件</span>}
         <span className="sp" />
         {/* 挂到看板上：每张卡头顶吊一个状态气泡；发出&提交/进一步/谈成里
             **没有气泡的卡**就是该起疑的 —— 一条线安静了，是真没事还是判漏了，
             看板上一眼能扫出来。这是「判为不用回」那层退役后错判的发现口。 */}
-        <button className="lnk" onClick={onAudit}>{auditOn ? '收起看板气泡' : '挂到看板上'}</button>
+        <button className="lnk" onClick={onAudit}>{auditOn ? '收起看板气泡' : '打开看板气泡'}</button>
         <button className="nclose" onClick={onClose} aria-label="收起">✕</button>
       </header>
 
@@ -119,12 +122,15 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
         </p>
       )}
 
-      {/* 该动的：到点了的，紧的在上 */}
+      {/* 该动的：到点了的，紧的在上。
+          标题改叫「消息」之后，这一段得自己有个名字——不然它跟下面「等待」
+          那一折看着是同一堆东西，而这两堆的分别正是这块板子的全部意思。 */}
       <section className="nsect">
+        <div className="nsect-h"><h3>今天：</h3></div>
         {bell.due.length ? bell.due.map((it) => (
           <StateRow key={it.key} it={it} onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
         )) : source !== 'empty' && (
-          <p className="nnone">现在没有到点的。这是好事，不是漏了什么。</p>
+          <p className="nnone">现在没有到点的。看看新机会吧。</p>
         )}
       </section>
 

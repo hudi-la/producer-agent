@@ -10,6 +10,12 @@
   --shadow:0 1px 2px #241f1b0c,0 12px 34px -20px #241f1b2b;
   /* 机会线抽屉的宽度。看板的右内边距也吃这个值，改一处两边一起动。 */
   --drawer-w:max(400px, 33vw);
+  /* 顶栏下面那条横带的高度：工具条（.subbar）和通讯录抽屉的头（.pdrawer-h）
+     共用一个数，两边的底线才是**同一条线**。51px = 一颗 .wbtn 加上下 9px
+     内边距的自然高度，也就是工具条摆着按钮时本来的样子。
+     写死这个数是为了「工具条空着的时候不许塌」——抽屉一开按钮就藏了，
+     不锁高度这一条带会从 51 缩到 19，左半页整个往上跳一截。 */
+  --bar2:51px;
 }
 @media (prefers-color-scheme: dark){:root{
   --paper:#17141A; --paper-2:#211D25; --paper-3:#100E13; --ink:#EBE3D4; --ink-2:#A99E8B; --ink-3:#6F6556;
@@ -56,7 +62,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .area:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* 二级：某个主区自己的工具条（筛选、造卡任务）。 */
-.subbar { display: flex; align-items: center; gap: 12px; padding: 9px 22px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
+.subbar { display: flex; align-items: center; gap: 12px; padding: 9px 22px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; min-height: var(--bar2); }
 .subbar .sp { flex: 1; }
 
 .tabs { display: flex; gap: 3px; }
@@ -1208,8 +1214,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    标题和「整页」按钮压到顶栏底下。 */
 .wrap.bookopen .app-top { position: relative; z-index: 30; background: var(--paper); }
 .pdrawer { display: flex; flex-direction: column; width: 100%; min-width: 0; }
-.pdrawer-h { display: flex; align-items: baseline; gap: 12px; flex: none;
-  padding: 14px 18px; border-bottom: 1px solid var(--line); }
+/* 高度跟工具条锁成同一个数 —— 抽屉的头和左边的工具条是同一条横带，
+   底线对不齐的话，一开抽屉整个界面就断成上下错位的两截。 */
+.pdrawer-h { display: flex; align-items: center; gap: 12px; flex: none;
+  min-height: var(--bar2); padding: 0 18px; border-bottom: 1px solid var(--line); }
 .pdrawer-h h2 { font-family: var(--serif); font-size: 15px; font-weight: 600; margin: 0; }
 .pdrawer-h .pcount { margin-left: auto; }
 .pdrawer-h .back { font: inherit; font-size: 15px; color: var(--ink-2); background: none;
