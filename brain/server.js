@@ -29,6 +29,7 @@ import { extractForm } from './form.js'
 import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor } from './judge.js'
+import { directive as timerDirective, timerKey } from './timer.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -1145,6 +1146,54 @@ async function tagPass({ limit = 12 } = {}) {
   return { tagged, skipped: skipped.length }
 }
 
+// ── 到点才动笔 ────────────────────────────────────────────
+//
+// 每轮扫「到点了的」（pa_due_actions）。**判断出来不起草，到点才起草**：
+// 等 5 天的那封第 5 天才动笔，中间对方回了，这次调用（带全卡上下文，
+// 全系统最贵的一种）就省了。
+//
+// 去重靠 meta.timer.key（state:subject:since 那天）：同一个等待动一次，
+// 等待换了（新 since_at）才再动。范围闸在 SQL 里：线都自动，
+// 人只对 2026-08-03 之后建的。
+const TIMER_CAP = 4   // 一轮最多起草几封 —— 别让重放完的第一轮憋出十几封
+
+async function timerPass({ cap = TIMER_CAP } = {}) {
+  let rows = []
+  try { ;({ data: rows } = await db.rpc('pa_due_actions')) }
+  catch (err) { console.error('✗ 取到点的：', err.message); return { acted: 0 } }
+
+  const todo = (rows || []).filter((r) => !r.acted && r.allowed)
+  const gated = (rows || []).filter((r) => !r.acted && !r.allowed)
+  if (gated.length) console.log(`  · ${gated.length} 条到点但没开自动起草（开工前的老联系人）：${gated.map((r) => r.subject_name).join('、')}`)
+  if (!todo.length) return { acted: 0 }
+
+  const t = new Date().toLocaleTimeString('zh-CN')
+  console.log(`\n→ ${t} ${todo.length} 条到点了`)
+  let acted = 0
+  for (const r of todo.slice(0, cap)) {
+    const say = timerDirective(r)
+    if (!say) continue                    // 见面当天早上：通知栏的事，不动笔
+    const owner = r.subject_kind === 'pursuit'
+      ? { pursuit_id: r.subject_id } : { contact_id: r.subject_id }
+    try {
+      const ctx = await loadOwnerContext(owner)
+      console.log(`  · ${r.subject_name}：${r.state}（过了 ${r.days_over} 天）`)
+      const { text: reply } = await think(
+        buildUser(ctx, say, null), READ_TOOLS, buildSystem(ctx), null, null, null,
+      )
+      const one = extractLetter(reply)
+      await addMessage(owner, 'producer', one.clean, 'message', {
+        ...(one.letter ? { letter: one.letter } : {}),
+        timer: { key: timerKey(r), state: r.state },
+      })
+      acted++
+    } catch (err) { console.error(`  ✗ ${r.subject_name} 这条没动成：${err.message}`) }
+  }
+  if (todo.length > cap) console.log(`  · 还有 ${todo.length - cap} 条排到下一轮（一轮最多 ${cap} 封）`)
+  console.log(`  ↳ ${JSON.stringify({ acted })}`)
+  return { acted }
+}
+
 // ── 脏了就判 ──────────────────────────────────────────────
 //
 // 一批最多带多少 —— **这不是为了省钱，是为了别让单次调用太大**。
@@ -1640,6 +1689,8 @@ server.listen(PORT, () => {
       await tagPass()
       // ……再把脏了的判掉。**不等你打开通知栏** —— 见 judgePass 上面那段。
       await judgePass()
+      // 最后看谁到点了 —— 起草、发问，都只在这一刻发生
+      await timerPass()
     } catch (err) { console.error('  ✗ 邮件循环起不来：' + err.message) }
   }
   setTimeout(mailLoop, 5000)          // 起来 5 秒后先跑一轮，别让你等五分钟
