@@ -152,9 +152,10 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
         </p>
       )}
 
-      {/* 永远留一条放回来的路。**只放回 ✕ 的**，真办完的不翻出来。 */}
+      {/* 永远留一条反悔的路。撤的是**你按过的 ✕**（不再显示的那些记号），
+          不动 Fairwind 的任何判决、不动任何信 —— 那边的反悔口是每条自己的「放回」。 */}
       <p className="nnone nback">
-        按错了？<button className="lnk" onClick={onAllBack}>把「先不看」的都放回来</button>
+        按错了？<button className="lnk" onClick={onAllBack}>把 ✕ 掉的都放回来</button>
       </p>
     </div>
   )
