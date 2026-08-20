@@ -153,11 +153,26 @@ pa_fill_body(id, body)           → 补原文（空正文不写）
 **必须分页。** PostgREST 默认封顶 1000 行**而且不报错**——
 第一次跑这个审计就中了：3519 封只核了 1000 封，差点报「全核完了」。
 
+## 日历回执不是有信息的信
+
+主题以 `Accepted:` / `Declined:` / `Tentative:` / `Canceled:` / `Cancelled:` /
+`Invitation:` / `Updated invitation:` 开头的是日历回执，正文往往是空的。
+
+**它进账本、进对话（一封不删），但不产生 event** —— 不进判断队列
+（`pa_facts_to_judge`，0095），不会被判「要不要回」。
+
+真例：Valeria 那封 `Accepted: Di Hu's Zoom Meeting` 正文全空，旧 triage
+盯着空正文编了个「可能漏附件，得问一句」——这类错从队列那儿就没了。
+
+**判据只住在 0095 那一个地方**（SQL 正则），JS 里没有第二份。
+群发（`mail_headers.bulk`）同一道闸。
+
 ## 收工核对
 
 ```sql
 select * from public.pa_selfcheck()       where not 通过;   -- 17 条
 select * from public.pa_selfcheck_reads() where not 通过;   -- 7 条：每个读面 / 每处计数
+select * from public.pa_selfcheck_state() where not 通过;   -- 4 条：state 那一半（0094）
 ```
 
 **两个都得全绿才算库是干净的。** 加一条判据的时候这儿也加一条 ——

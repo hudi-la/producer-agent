@@ -135,6 +135,29 @@
 
 ---
 
+## 三·七五、2026-08-19 起：判断按「state × event」分格
+
+「每封信问四件事」的通用判法撤了 —— 问什么取决于**当时的 state 和来的
+event**：等对方回的时候来了信，问「它解决了等的那件事吗」；你发出一封信，
+问「它在等对方做什么、按惯例等几天」。
+
+- 转移表在 `brain/judge.js`（一格一个 prompt），格子的原话抄自
+  [设计稿第四节](../specs/2026-08-19-what-this-line-is-waiting-on-design.md)
+- 每次判断存成**锚在那条事实上的标签**（`message_tags`，0092）：
+  `situation` 记的是哪一格问的，`tagged_by` 记的是谁判的
+  （`fairwind` = 内部 agent；`dev-walkthrough` = 后台开发手写的走查用例）
+- 当前 state **不落表**，由 `v_pa_state`（0094/0097/0098）重放算出来
+- 关 `WAITING_REPLY` 的唯一途径是 `resolves=true` 的标签 ——
+  「存在一封对方回信」这个事实本身不关（「收到，回头看」不许关）
+- 纯规则格不花钱：`NEEDS_REPLY × NOTE`（记一笔就关）、日历回执/群发
+  在队列（0095）就挡掉
+- 到点动作（起草 follow-up、见面提醒、48 小时信）在 `brain/timer.js` +
+  server 的 `timerPass`：**到点才起草**，去重靠 `meta.timer.key`
+
+旧的 rejudge / triage（`letter_verdicts` + `next_touch_at`）还在跑，
+喂的是「被判为不用回的」那一层和 stale 水位；面板的「该动的/等待」
+已经全部改吃 `v_pa_state`。
+
 ## 四、新信走哪几步
 
 ```
