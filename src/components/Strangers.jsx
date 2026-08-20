@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import {
   identifyEmail, claimEmail, markOrgMailbox, upsertContact, claimThread, refreshContact,
+  attachAddressLines,
 } from '../lib/people.js'
 
 // 加人。
@@ -42,6 +43,12 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
     try {
       if (how === 'org') {
         await markOrgMailbox(email, f.org || who.org || '未具名机构', '共享信箱', who.notes || null)
+        // 人跟着信一起归位：这个信箱的信已经在哪条线上，就挂成那条线的
+        // 相关方。真事：adavi290 的信早就在 ASU 线上，认领后却没人挂 —— 他手动的。
+        try {
+          const lines = await attachAddressLines(email, { mailbox: email })
+          if (lines?.length) console.log('顺手挂到了：' + lines.join('、'))
+        } catch (_) {}
       } else {
         let id = matched?.id
         if (how === 'new') {
@@ -56,6 +63,11 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         if (!id) throw new Error('没有可合并的人')
         // 认领地址：这个地址名下所有历史往来当场归位
         await claimEmail(email, id, how === 'merge' ? 'Fairwind 从信里认出这是他的另一个邮箱' : null)
+        // 人跟着信一起归位（同上共享信箱那条注释）
+        try {
+          const lines = await attachAddressLines(email, { contactId: id })
+          if (lines?.length) console.log('顺手挂到了：' + lines.join('、'))
+        } catch (_) {}
         // 顺手认领它读到的那几条 thread，以后按「收信」就跟着走
         for (const t of who.threads || []) {
           try { await claimThread(id, t) } catch (_) {}

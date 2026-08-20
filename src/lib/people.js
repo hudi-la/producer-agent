@@ -137,6 +137,16 @@ const post = async (path, body) => {
  */
 export const identifyEmail = (email) => post('/identify', { email })
 
+/**
+ * 认领之后，人跟着信一起归位：这个地址名下已经躺在某条线上的信，
+ * 人/信箱直接挂成那条线的相关方。纯规则（信就在线上，证据确凿）。
+ * 返回挂上的线的标题，好在界面报一声。
+ */
+export const attachAddressLines = (email, { contactId = null, mailbox = null } = {}) =>
+  rpc('pa_attach_address_lines', {
+    p_email: email, p_contact_id: contactId, p_mailbox: mailbox,
+  })
+
 export const refreshContact = (id) => post('/refresh', { contact_id: id })
 
 /** 跟 Fairwind 说一句（起草回信就是从这儿来的）。 */
