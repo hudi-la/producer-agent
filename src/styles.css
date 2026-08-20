@@ -1443,3 +1443,23 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 摘要不许冒充原文 —— 库里没存原文的那些，框上说出来 */
 .arr-tag { font-size: 10.5px; color: var(--ink-3); border: 1px solid var(--line);
            border-radius: 3px; padding: 0 4px; }
+
+/* ── 流水页 ─────────────────────────────────────────────────
+   办完的事的账本。行首一个小标说事的种类；「关掉一个等待」是他要的
+   那句「它自己发现办到了」，配一行凭什么。 */
+.lg-week { font-size: 13px; color: var(--ink-2); margin: 2px 0 20px; }
+.lg-week b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.lg-day h2 { font-size: 13px; color: var(--ink-2); margin: 22px 0 6px;
+  border-bottom: 1px solid var(--line-2); padding-bottom: 5px; }
+.lg-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0;
+  border-bottom: 1px dashed var(--line-2); }
+.lg-kind { flex: none; width: 92px; font-size: 11px; color: var(--ink-3);
+  text-align: right; }
+.lg-row.wait_close .lg-kind { color: var(--good, #4a7); font-weight: 600; }
+.lg-row.sent .lg-kind, .lg-row.got .lg-kind { color: var(--ink-2); }
+.lg-b { flex: 1; min-width: 0; }
+.lg-what { font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
+.lg-why { font-size: 11.5px; color: var(--good, #4a7); margin-top: 2px; }
+.lg-at { flex: none; font-size: 11px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; }
+.lnk.on { color: var(--ink); font-weight: 700; }

@@ -28,6 +28,7 @@ import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDG
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
+import Ledger from './components/Ledger.jsx'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -36,6 +37,9 @@ const AREAS = [
   ['pursue', '项目争取'],
   ['people', '人际管理'],
   ['profile', '我的档案'],
+  // 办完的事有自己的一页（2026-08-20）：心安做成 pull 不做成 push ——
+  // 「它自己发现办到了」在这儿一行行躺着，不来敲你。
+  ['ledger', '流水'],
 ]
 
 // 日期一律走 lib/when.js —— 全 app 只有那一份，按你住的地方算。
@@ -399,7 +403,7 @@ export default function App() {
     } else if (view.name === 'org') {
       what = view.org.org
     } else {
-      what = area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : 'Producer'
+      what = area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '流水' : 'Producer'
     }
     document.title = 'Fairwind · ' + what
   }, [view, area, pl, ct])
@@ -782,6 +786,15 @@ export default function App() {
         <Library entries={lib.entries} concerns={lib.concerns}
                  onProfileSaved={() => loadProfile().then(setProfile)}
                  onEntrySaved={() => loadLibrary().then(setLib)} />
+      ) : area === 'ledger' ? (
+        <Ledger onOpen={(r) => {
+          if (r.subject_kind === 'pursuit') {
+            const p = pl.pursuits.find((x) => x.id === r.subject_id)
+            if (p) { setArea('pursue'); closePursuit(); openPursuit(p) }
+          } else {
+            setArea('people'); openInTab('c', r.subject_id)
+          }
+        }} />
       ) : paged ? (
         <PursuitFocus
           // key：换一条线就换一个实例。不加的话 React 复用同一个，thinking / text /
