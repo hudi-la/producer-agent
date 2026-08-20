@@ -258,5 +258,102 @@ ${收尾(`${F_GIST},${F_MEET},${F_RESOLVE}`)}` },
   },
 }
 
+TRANSITIONS.DEBRIEF = {
+  // 你在卡里答了「见得怎么样」（handleChat 那边判过「见成了」才会有这条
+  // meet 笔）；或者你自己记了一笔。问一件事：这笔是不是把见面这事收尾了。
+  NOTE: { ask: (fact, state) => `${开头(fact, 'NOTE')}
+
+之前约的见面时间已经过了（${state?.what || ''}）。你记了一笔。
+
+这笔是见面的下文吗？
+· 见成了 / 见完了 → resolves=true + resolves_why（一句话：见了、聊了什么）
+· 没见成，改约了 → meet_at=新时间
+· 取消了、不了了之 → resolves=true + resolves_why
+· 说的是别的事 → 全 null
+${收尾(`${F_GIST},${F_RESOLVE},${F_MEET}`)}` },
+
+  THEIR_LETTER: { ask: (fact, state) => `${开头(fact, 'THEIR_LETTER')}
+
+之前约的见面时间已经过了（${state?.what || ''}）。对方来信。
+
+这封说的是：见完了的跟进（resolves=true + resolves_why）？改约（meet_at）？
+另有事要你回（needs_reply + reply_why）？都不是（全 null）？
+${收尾(`${F_GIST},${F_RESOLVE},${F_MEET},${F_REPLY}`)}` },
+
+  MY_LETTER: { ask: (fact, state) => `${开头(fact, 'MY_LETTER')}
+
+之前约的见面时间已经过了（${state?.what || ''}）。你发出了一封。
+
+这封是见面后的跟进吗（resolves=true + resolves_why）？它自己又在等对方什么
+（awaiting + wait_days）？
+${收尾(`${F_GIST},${F_RESOLVE},${F_WAIT}`)}` },
+
+  // handleChat 专用：你在卡里回答「见得怎么样」。判一件事：见成了没有。
+  // 见成了 → 你的回答本身会被存成一条 kind='meet' 的笔（那才是事实），
+  // 后面的 48 小时信、回谢介绍人都从那条笔自己长出来。
+  YOUR_ANSWER: { ask: (answer, state) => `他刚在卡里回答「见面怎么样」：
+
+「${String(answer).slice(0, 500)}」
+
+（之前约的是：${state?.what || '一次见面'}）
+
+一个问题：**见成了吗？**
+· 见成了 → met=true，gist=一句话记下聊了什么
+· 没见成 / 取消了 → met=false；他说了改约的时间就给 meet_at
+· 他答的是别的事，看不出来 → met=null
+
+**最后一行**单独输出，别的什么都不要加：
+[[TAG]] {"met":true|false|null,"gist":"聊了什么，一句话","meet_at":"YYYY-MM-DDTHH:mm"|null}` },
+}
+
+// 谢介绍人：挂在介绍人身上，等你动手。关法是 contacts.intro_thanked_at
+// （server 判到 resolves 后调 pa_thank_introducer），不是标签。
+TRANSITIONS.OWE_THANKS = {
+  MY_LETTER: { ask: (fact, state) => `${开头(fact, 'MY_LETTER')}
+
+你欠这个人一声谢：**${state?.what || '（介绍了人给你）'}**。你给 ta 发了一封。
+
+两个问题：
+① 这封谢过了吗（哪怕顺带一句也算）→ resolves=true + resolves_why
+② 这封自己在等 ta 做什么吗 → awaiting + wait_days
+${收尾(`${F_GIST},${F_RESOLVE},${F_WAIT}`)}` },
+
+  NOTE: { ask: (fact, state) => `${开头(fact, 'NOTE')}
+
+你欠这个人一声谢：**${state?.what || ''}**。你记了一笔。
+
+这笔说的是谢过了吗（当面说了 / 微信里说了 /「已处理」）？
+是 → resolves=true + resolves_why。不是 → 全 null。
+${收尾(`${F_GIST},${F_RESOLVE}`)}` },
+
+  // 介绍人来信跟「欠谢」无关，按平常的来信判
+  THEIR_LETTER: null,
+}
+TRANSITIONS.OWE_THANKS.THEIR_LETTER = TRANSITIONS.IDLE.THEIR_LETTER
+
+// 见面 48 小时信：关法是 met_followed_up（你发出任何一封就自动关，0079 算的），
+// 所以 MY_LETTER 只需要按平常判「这封自己在等什么」；笔按平常记。
+TRANSITIONS.OWE_MEETING_NOTE = {
+  MY_LETTER: TRANSITIONS.IDLE.MY_LETTER,
+  THEIR_LETTER: TRANSITIONS.IDLE.THEIR_LETTER,
+  NOTE: TRANSITIONS.IDLE.NOTE,
+}
+
+// MEETING_SET 到点自动变 DEBRIEF 是视图算的；到点前后来的事各查各的格。
+
 /** 查表。查不到 = 这格还没想清楚该问什么 —— 调用方必须出声，绝不静默跳过。 */
 export const cellFor = (state, ev) => TRANSITIONS[state]?.[ev] || null
+
+/** DEBRIEF 的回答判「见成了吗」：met / gist / meet_at 三个字段，成对规矩同上。 */
+export function parseMet(text) {
+  const { data } = takeTag(text, 'TAG')
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  const met = data.met === true ? true : data.met === false ? false : null
+  let meet = null
+  if (typeof data.meet_at === 'string' && data.meet_at.trim()) {
+    const s = data.meet_at.trim()
+    if (ISO_DAY.test(s)) meet = `${s}T12:00:00`
+    else if (!Number.isNaN(Date.parse(s))) meet = s
+  }
+  return { met, gist: clean1(data.gist), meet_at: meet }
+}

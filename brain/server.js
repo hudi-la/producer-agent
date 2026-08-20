@@ -28,7 +28,7 @@ import { extractForm } from './form.js'
 
 import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
-import { eventOf, parseTag, cellFor } from './judge.js'
+import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
@@ -407,6 +407,34 @@ async function handleChat(body, onEvent = null) {
   const mine = await addMessage(owner, 'artist', text.trim(), 'message', meta || null)
   // 早点报出去：界面拿它把乐观插入的那条临时消息换成真的（带 id、带时间）。
   onEvent?.({ t: 'mine', row: mine })
+
+  // 见面复盘：正等着你说「见得怎么样」的时候，你说的这句就是答案。
+  // 判「见成了吗」——成了就把你的原话记成一条 kind='meet' 的笔（那才是
+  // 事实），48 小时信、回谢介绍人都从那条笔自己长出来（0097 的两支）。
+  // 改约了就把新时间写回原来那个约的标签上。判不出来就什么都不动。
+  try {
+    const o = asOwner(owner)
+    const { data: st } = await db.from('v_pa_state').select('*')
+      .eq('subject_kind', o.kind).eq('subject_id', o.id).maybeSingle()
+    if (st?.state === 'DEBRIEF') {
+      const cell = cellFor('DEBRIEF', 'YOUR_ANSWER')
+      const { text: verdict } = await think(cell.ask(text.trim(), st), [], JUDGE_SYSTEM, null, null, null, 1)
+      const met = parseMet(verdict)
+      if (met?.met === true) {
+        await db.rpc(o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_pursuit_note',
+          o.kind === 'contact'
+            ? { p_contact_id: o.id, p_role: 'note', p_kind: 'meet', p_content: text.trim() }
+            : { p_pursuit_id: o.id, p_text: text.trim(), p_kind: 'meet' })
+        console.log(`  · 见成了 —— 记成一条 meet 笔（${met.gist || ''}）`)
+      } else if (met?.met === false && met.meet_at && st.anchor_id) {
+        await db.rpc('pa_tag_message', {
+          p_message_id: st.anchor_id, p_situation: 'DEBRIEF x YOUR_ANSWER',
+          p_meet_at: met.meet_at, p_gist: met.gist || '改约了',
+        })
+        console.log(`  · 没见成，改约到 ${met.meet_at}`)
+      }
+    }
+  } catch (err) { console.warn('  ⚠️ 复盘那一步没走成（不挡聊天）：' + err.message) }
 
   const ctx = await loadOwnerContext(owner)
   // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件。
@@ -1140,6 +1168,14 @@ async function tagPass({ limit = 12 } = {}) {
     })
     if (error) { skipped.push(`${f.subject_name}：写标签失败 ${error.message}`); continue }
     tagged++
+
+    // 「谢过了」的落笔处不是标签：owe_thanks 的关法是 contacts.intro_thanked_at
+    // （0097）。判到 resolves 就把这个介绍人名下没谢过的一次性标掉 ——
+    // 一封谢信提几个人，就是一次谢几条。
+    if (stateName === 'OWE_THANKS' && tag.resolves) {
+      const { data: n } = await db.rpc('pa_thank_introducer', { p_introducer: f.subject_id })
+      if (n) console.log(`  · 谢过了：${f.subject_name} 名下 ${n} 条介绍标为已谢`)
+    }
   }
   if (skipped.length) console.log(`  · 跳过 ${skipped.length} 条：${skipped.join('；')}`)
   console.log(`  ↳ ${JSON.stringify({ tagged, skipped: skipped.length })}`)
@@ -1171,8 +1207,17 @@ async function timerPass({ cap = TIMER_CAP } = {}) {
   console.log(`\n→ ${t} ${todo.length} 条到点了`)
   let acted = 0
   for (const r of todo.slice(0, cap)) {
-    const say = timerDirective(r)
+    let say = timerDirective(r)
     if (!say) continue                    // 见面当天早上：通知栏的事，不动笔
+
+    // 合并规则（设计稿第六节）：同一个人跨两张卡都到点了 → 由起草这次调用
+    // 判「等一起发还是先发一封」，别机械地各起各的。
+    if (r.subject_kind === 'contact') {
+      const 同人线 = todo.filter((x) => x !== r && x.contact_ids?.includes(r.subject_id))
+      if (同人线.length) {
+        say += `\n\n注意：这个人同时还挂在到点的机会线上（${同人线.map((x) => `「${x.subject_name}」${x.state}`).join('、')}）。按惯例判断：这封该**并进那边一起说**，还是**单独先发**？该并的话别起草，直接一句话说明并给哪张卡。`
+      }
+    }
     const owner = r.subject_kind === 'pursuit'
       ? { pursuit_id: r.subject_id } : { contact_id: r.subject_id }
     try {

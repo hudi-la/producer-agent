@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { eventOf, parseTag, cellFor, TRANSITIONS, factText } from './judge.js'
+import * as mod from './judge.js'
 
 // ── event 识别 ────────────────────────────────────────────────
 
@@ -137,4 +138,33 @@ test('引用尾巴剥掉：判断只看这次说的话', () => {
 
 test('没有 body_raw 用 content 顶上', () => {
   assert.equal(factText({ content: '梗概' }), '梗概')
+})
+
+// ── Task 6 补的格子：DEBRIEF 和 OWE_* ────────────────────────
+
+test('DEBRIEF 三个 event 的格子都在；OWE_* 借用 IDLE 的格子', () => {
+  for (const e of ['NOTE', 'THEIR_LETTER', 'MY_LETTER', 'YOUR_ANSWER'])
+    assert.ok(cellFor('DEBRIEF', e), `DEBRIEF x ${e} 缺了`)
+  assert.ok(cellFor('OWE_THANKS', 'MY_LETTER'))
+  assert.equal(cellFor('OWE_MEETING_NOTE', 'MY_LETTER'), cellFor('IDLE', 'MY_LETTER'))
+  assert.equal(cellFor('OWE_THANKS', 'THEIR_LETTER'), cellFor('IDLE', 'THEIR_LETTER'))
+})
+
+test('OWE_THANKS x MY_LETTER 问「谢过了吗」，顺带也算一句谢', () => {
+  const p = cellFor('OWE_THANKS', 'MY_LETTER').ask(
+    { kind: 'email', role: 'artist', subject_name: 'Weidi Zhang', who: 'Weidi', content: '谢谢你介绍 Biayna', recent: [] },
+    { what: '见到了你经「Weidi」介绍认识的「Biayna」' })
+  assert.match(p, /谢过了吗/)
+  assert.match(p, /顺带一句也算/)
+})
+
+test('parseMet：见成了 / 没见成改约 / 看不出来', () => {
+  const { parseMet } = mod
+  assert.deepEqual(parseMet('x\n[[TAG]] {"met":true,"gist":"聊了预算"}'),
+    { met: true, gist: '聊了预算', meet_at: null })
+  const re = parseMet('x\n[[TAG]] {"met":false,"meet_at":"2026-09-18"}')
+  assert.equal(re.met, false)
+  assert.equal(re.meet_at, '2026-09-18T12:00:00')
+  assert.equal(parseMet('x\n[[TAG]] {"met":"maybe"}').met, null)
+  assert.equal(parseMet('没标记'), null)
 })
