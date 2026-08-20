@@ -227,6 +227,20 @@ export async function setActionDone(pursuitId, done) {
 }
 
 /** 卡上随手记的几个字。传空字符串 = 清掉。 */
+/**
+ * 「记一笔」：把一句话记成这条线上的一次真实来往（不是跟 Fairwind 商量）。
+ * 电话里说定的、表单交出去的 —— 系统看不见邮箱外的事，靠你这一笔。
+ * kind：note（一般）| meet（见了面）| decision（拍板了）。
+ */
+export async function addPursuitNote(pursuitId, text, kind = 'note') {
+  if (!supa) throw new Error('还没连上库')
+  const { data, error } = await supa.rpc('pa_add_pursuit_note', {
+    p_pursuit_id: pursuitId, p_text: text, p_kind: kind,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
 export async function setJot(pursuitId, jot) {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
   const { error } = await supa.rpc('pa_set_jot', { p_pursuit_id: pursuitId, p_jot: jot ?? '' })

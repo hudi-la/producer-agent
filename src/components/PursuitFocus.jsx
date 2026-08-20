@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMessages, sendMessageStream, stopThinking, rewindChat } from '../lib/chat.js'
+import { fetchMessages, sendMessageStream, stopThinking, rewindChat, addPursuitNote } from '../lib/chat.js'
 import { useLiveReply } from '../lib/useLiveReply.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
@@ -284,6 +284,32 @@ export default function PursuitFocus({
   // 两样都删了：写 next_action 的那个消化环节早就不在了，留着就是一行
   // 永远不会更新的字。要不要重做那套是另一场讨论。
   // 见 docs/specs/2026-08-12-four-signals-design.md
+  // 「记一笔」旁边那层说明：悬停一秒才出来，跟人卡那边同一套（见 PersonFocus）。
+  const [howto, setHowto] = useState(false)
+  const howtoT = useRef(0)
+  const howtoIn = () => {
+    clearTimeout(howtoT.current)
+    if (!howto) howtoT.current = setTimeout(() => setHowto(true), 1000)
+  }
+  const howtoOut = () => {
+    clearTimeout(howtoT.current)
+    howtoT.current = setTimeout(() => setHowto(false), 240)
+  }
+  useEffect(() => () => clearTimeout(howtoT.current), [])
+
+  // 把输入框里那句话记成一次真实来往。商量不算往来，笔算——它进时间线，
+  // 线立刻变「脏」（0079 现算），「这条线在等什么」也靠它才知道你在邮箱外办了事。
+  const jot = async () => {
+    const t = text.trim()
+    if (!t || busy) return
+    try {
+      await addPursuitNote(p.id, t)
+      setText('')
+      const rows = await fetchMessages(p.id)
+      if (rows) setMsgs(rows)
+    } catch (e) { setErr('没记上：' + (e?.message || e)) }
+  }
+
   const endRef = useRef(null)
   const scrollRef = useRef(null)    // 对话那一栏本体，用来判断你是不是贴着底在看
   // 你是不是贴着底。贴着才跟着新内容往下走；你往上翻去看旧的，就别再拽你。
@@ -626,6 +652,9 @@ export default function PursuitFocus({
       </div>
 
       {err && <div className="composer-err">{err}</div>}
+      {/* 跟人卡同一套：输入框和「记一笔」是一组。.composer-dock 是定位锚 ——
+          jot-howto 的绝对定位落在它身上（styles.css 1280 行那段注释）。 */}
+      <div className="composer-dock">
       <div className="composer">
         {/* textarea 而不是 input：一行装不下就自己长高（上限在 CSS 的 max-height，
             到顶了才开始滚）。Enter 发送，Shift+Enter 换行。
@@ -656,6 +685,27 @@ export default function PursuitFocus({
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         )}
+      </div>
+      <div className="jot-row"
+           onMouseEnter={howtoIn} onMouseLeave={howtoOut}
+           onFocusCapture={() => setHowto(true)}>
+        {/* 点完就把说明收掉：点击会让按钮拿到焦点，不收的话你刚记完
+            它反而弹出来解释「记一笔是什么」——你显然已经知道了。 */}
+        <button className="lnk jot-go"
+                onClick={() => { clearTimeout(howtoT.current); setHowto(false); jot() }}
+                disabled={busy || !text.trim()}>记一笔</button>
+        {howto && (
+          <div className="jot-howto" role="tooltip"
+               onMouseEnter={howtoIn} onMouseLeave={howtoOut}>
+            <p>回车 = 跟 <b>Fairwind</b> 商量（商量只是商量，不算往来）。</p>
+            <p>
+              电话里说定了、表单交出去了、线下见了面？写一句按 <b>记一笔</b>——
+              它跟邮件一样是一次真实来往，进时间线，Fairwind 会据此重判这条线。
+              「这条线在等什么」也靠它才知道你在邮箱外把事办了。
+            </p>
+          </div>
+        )}
+      </div>
       </div>
     </>
   )
