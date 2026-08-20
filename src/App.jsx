@@ -795,7 +795,9 @@ export default function App() {
           {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
               「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
               不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
-          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks} onOpen={openPursuit} onMove={moveCard} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
+          <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks}
+            states={new Map([...(notes?.bell?.due || []), ...(notes?.bell?.waiting || [])].map((x) => [x.subject_id, x]))}
+            onOpen={openPursuit} onMove={moveCard} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
           {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (

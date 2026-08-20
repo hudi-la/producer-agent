@@ -40,3 +40,23 @@ export function whyLine(it) {
   if (it.state === 'WAITING_REPLY' && it.what) return `在等：${it.what}`
   return null
 }
+
+/**
+ * 卡封面那行金色字：「这条线现在卡在什么上」。
+ * 一句话 + 到点日 —— 例：「等 Mattie 九月初把 Joo 介绍给你 · 9/1」。
+ */
+export function goldLine(it) {
+  const d = it.due_at ? new Date(it.due_at) : null
+  const 日 = d ? `${d.getMonth() + 1}/${d.getDate()}` : null
+  switch (it.state) {
+    // awaiting 的原文一般自带「等」字（「等 Mattie 九月初介绍 Joo」），
+    // 不再加前缀 —— 加了就是「等：等 Mattie…」。
+    case 'WAITING_REPLY':     return `${it.what}${日 ? ` · ${日}` : ''}`
+    case 'NEEDS_REPLY':       return `欠回信：${it.what}`
+    case 'MEETING_SET':       return `约了见面 · ${日}`
+    case 'DEBRIEF':           return '见面怎么样？等你说一句'
+    case 'OWE_MEETING_NOTE':  return '见完了，欠一封信'
+    case 'OWE_THANKS':        return '欠介绍人一声谢'
+    default:                  return it.what || ''
+  }
+}

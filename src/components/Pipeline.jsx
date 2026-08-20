@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, openLine } from '../lib/nextAction.js'
+import { goldLine } from '../lib/stateText.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
@@ -86,7 +87,7 @@ function statusText(p, held) {
   }
 }
 
-function PCard({ p, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
+function PCard({ p, st, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
   const held = heldLabel(useProfile())
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
@@ -137,6 +138,10 @@ function PCard({ p, onOpen, onDragStart, onJot, unseen, picking, checked, onPick
       )}
       {/* 开放日期也是确定的信息，有就显示。不替你判急不急。 */}
       {opn && <div className="pc-ddl">{opn.text}</div>}
+      {/* 这条线现在卡在什么上 —— 系统从往来算出来的（v_pa_state），
+          跟截止时间一样是金色的。它跟球权并排、不互相覆盖：球权是你随手
+          记的便签，系统不读它。两个不一致，就让你看见不一致。 */}
+      {st && <div className={'pc-wait' + (st.zone === 'due' ? ' due' : '')}>{goldLine(st)}</div>}
       {p.work_title && <div className="pc-p">{p.work_title}</div>}
       <Jot p={p} onSave={onJot} />
       <div className="pc-m" style={p.stage === 'won' ? { color: 'var(--good)' } : undefined}>
@@ -154,7 +159,7 @@ function PCard({ p, onOpen, onDragStart, onJot, unseen, picking, checked, onPick
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
@@ -198,7 +203,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
       </div>
       {open && items.map((p) => (
         <PCard
-          p={p} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
+          p={p} st={states?.get?.(p.id)} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
           unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(p.id)} onPick={onPick}
         />
       ))}
@@ -206,7 +211,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
+export default function Pipeline({ pursuits, tasks = [], states = null, onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -274,6 +279,7 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onJot, 
                   key={row.stack}
                   name={taskName(row.stack)}
                   items={row.items}
+                  states={states}
                   open={openStacks.has(row.stack)}
                   onToggle={() => toggleStack(row.stack)}
                   onOpen={onOpen}
@@ -287,7 +293,7 @@ export default function Pipeline({ pursuits, tasks = [], onOpen, onMove, onJot, 
                 />
               ) : (
                 <PCard
-                  p={row.card} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
+                  p={row.card} st={states?.get?.(row.card.id)} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
                   onJot={onJot} unseen={unseen.has(row.card.id)}
                   picking={picking} checked={picked.has(row.card.id)} onPick={onPick}
                 />
