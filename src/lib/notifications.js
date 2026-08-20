@@ -108,6 +108,10 @@ export async function loadNotifications() {
         items.push({
           key, subject_kind: f.subject_kind, subject_id: f.subject_id,
           name: f.name, line_title: f.line_title, cue, verdict: v || null,
+          // 这条对象的结论更新了没有。脏着 = 要么还没轮到判，要么上一轮判不出来
+          // 被跳过了 —— 两种都意味着**你现在看到的可能是旧结论**，得说出来。
+          // 原来判不出来是完全无声的：跳过只写进 brain 的日志，界面上一个字没有。
+          stale: Boolean(f.stale),
         })
       }
 
