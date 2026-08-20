@@ -16,6 +16,7 @@ import { toUrl, fromUrl, tabUrl } from './lib/route.js'
 import TasksPanel from './components/TasksPanel.jsx'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
+import DrawerGrip, { restoreDrawerWidth } from './components/DrawerGrip.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
 import { cleanCopy } from './lib/cleanCopy.js'
@@ -214,6 +215,8 @@ export default function App() {
   // 开机先把旧的 localStorage['pa_cue_off'] 迁进库，再拉。
   // **升级前关掉的那些不许悄悄复活** —— 那是「你以为处理过了，其实系统忘了」。
   useEffect(() => { migrateCueOff().then(pullNotes) }, [])
+  // 抽屉宽度：上次拉成什么样，开机就摆成什么样
+  useEffect(() => { restoreDrawerWidth() }, [])
 
   // 打开面板只读，**不判**。
   //
@@ -646,34 +649,14 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <span className="sp" />
-        {/* 过卡入口原来在这儿。挪进工具条了——顶栏常驻角标本身就是一句主张：
-            「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
-            就不该站在这儿。谁生的跟谁站。
-
-            通知**正是**那个东西，所以它站这儿。
-            数字**只数该动的**（2026-08-20 他拍的）：等待和没归线的在面板里
-            各自带着数，但不上角标 —— 角标是「现在有几件事等你动」，
-            不是「系统里躺着多少条」。当初「数全部」是为了不藏存档层；
-            存档层已经整个退役了，这个理由跟着走了。 */}
-        <button className="bellbtn" onClick={openBell} aria-label="该动的">
-          {/* Lucide 的 bell，跟读书 app（阅读陪伴）同一套手写内联 SVG 的规格：
-              24 视口、stroke=currentColor、1.75、圆头圆角，不引库。
-              emoji 那颗铃铛他不喜欢 —— 而且 emoji 跟主题色也不搭。 */}
-          <svg className="bellic" viewBox="0 0 24 24" width="17" height="17" fill="none"
-               stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
-               strokeLinejoin="round" aria-hidden="true">
-            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>{(notes?.bell?.due?.length || 0) > 0 && (
-            <span className="belln">{notes.bell.due.length}</span>
-          )}
-        </button>
       </header>
 
+      {/* 批量操作开着时，面板里的条目也是勾选目标 —— 勾的是同一摞 picked：
+          看板按阶段摆，面板按到点没到点摆，同一批卡换个取景框勾。 */}
       {bellOpen && (
         <Notifications
           data={notes} judging={judging} onJudgeMore={judgeMore}
+          picking={picking} picked={picked} onPick={pick}
           onHandled={handleNote}
           onReschedule={rescheduleNote}
           auditOn={audit}
@@ -703,47 +686,68 @@ export default function App() {
         mail={brain?.mail}
       />
 
-      {/* 整页看一条线时不该还看见看板的工具条。抽屉不算——看板还在旁边开着。 */}
-      {area === 'pursue' && !paged && (
+      {/* ── 顶栏下面那条带子 ──
+          **永远在，而且只有这一条**：🔔 常驻在它右端，跟你在哪个区无关，
+          所以带子不能由某个区来决定生不生。里头装什么才按区分。
+          整页看一条线时不摆看板那套镜头和动作（那是看板的事），
+          但带子留着——🔔 还在上面。 */}
+      <div className="subbar">
+        {area === 'pursue' && !paged && (
         <Subbar
-          filters={filters}
-          onToggleFilter={toggleFilter}
-          onSetFilters={setFilters}
-          picking={picking}
-          pickedCount={picked.size}
-          hiddenPickedCount={hiddenPicked}
-          onStartPick={() => setPicking(true)}
-          onCancelPick={cancelPick}
-          onPickAll={pickAll}
-          onOpenTasks={() => setTasksOpen(true)}
-          mail={brain?.mail}
-          onSay={() => setSayOpen(true)}
-          saying={saying}
-          queueCount={queue.items.length}
-          onOpenQueue={() => openQueueCard(queue.at)}
+        filters={filters}
+        onToggleFilter={toggleFilter}
+        onSetFilters={setFilters}
+        picking={picking}
+        pickedCount={picked.size}
+        hiddenPickedCount={hiddenPicked}
+        onStartPick={() => setPicking(true)}
+        onCancelPick={cancelPick}
+        onPickAll={pickAll}
+        onOpenTasks={() => setTasksOpen(true)}
+        mail={brain?.mail}
+        onSay={() => setSayOpen(true)}
+        saying={saying}
+        queueCount={queue.items.length}
+        onOpenQueue={() => openQueueCard(queue.at)}
         />
-      )}
+        )}
 
-      {/* 人际管理的工具条。跟项目争取那条同一套：**左边镜头，右边动作**。
-          这一页还没有镜头（没有筛选），左边就空着——空着可以，假着不行。
-          按钮用同一个 .wbtn，不另造一种长相：同一层的东西该长得一样。 */}
-      {/* 抽屉开着时这个按钮不摆：抽屉自己头上那个 × 就是关它的地方，
-          同一个动作摆两处，你还得想一下按哪个。工具条本身留着——
-          它那条底线跟抽屉头的底线是同一条，撤了左边这半页会往上跳一下。 */}
-      {area === 'people' && view.name === 'home' && (
-        <div className="subbar">
-          <span className="sp" />
-          {!bookOpen && (
-            <button
-              type="button"
-              className="wbtn"
-              onClick={() => setBookOpen(true)}
-            >
-              通讯录
-            </button>
+        {/* 人际管理这一区：还没有镜头（没有筛选），左边就空着——空着可以，假着不行。
+        按钮用同一个 .wbtn，不另造一种长相：同一层的东西该长得一样。
+        抽屉开着时这个按钮不摆：抽屉自己头上那个 × 就是关它的地方，
+        同一个动作摆两处，你还得想一下按哪个。 */}
+        {area === 'people' && view.name === 'home' && !bookOpen && (
+        <button
+        type="button"
+        className="wbtn"
+        onClick={() => setBookOpen(true)}
+        >
+        通讯录
+        </button>
+        )}
+        {/* 过卡入口原来在这儿。挪进工具条了——顶栏常驻角标本身就是一句主张：
+            「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
+            就不该站在这儿。谁生的跟谁站。
+
+            通知**正是**那个东西，所以它站这儿。
+            数字**只数该动的**（2026-08-20 他拍的）：等待和没归线的在面板里
+            各自带着数，但不上角标 —— 角标是「现在有几件事等你动」，
+            不是「系统里躺着多少条」。当初「数全部」是为了不藏存档层；
+            存档层已经整个退役了，这个理由跟着走了。 */}
+        <button className="bellbtn" onClick={openBell} aria-label="该动的">
+          {/* Lucide 的 bell，跟读书 app（阅读陪伴）同一套手写内联 SVG 的规格：
+              24 视口、stroke=currentColor、1.75、圆头圆角，不引库。
+              emoji 那颗铃铛他不喜欢 —— 而且 emoji 跟主题色也不搭。 */}
+          <svg className="bellic" viewBox="0 0 24 24" width="17" height="17" fill="none"
+               stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
+               strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>{(notes?.bell?.due?.length || 0) > 0 && (
+            <span className="belln">{notes.bell.due.length}</span>
           )}
-        </div>
-      )}
+        </button>
+      </div>
 
       {area === 'people' ? (
         view.name === 'person' ? (
@@ -831,6 +835,8 @@ export default function App() {
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (
             <aside className="drawer" aria-label={resting ? '过卡' : view.pursuit.title}>
+              {/* 左沿那条可以拉的边 —— 33vw 是个猜的数，屏幕不一样合适的宽度也不一样 */}
+              <DrawerGrip />
               {resting ? (
                 <QueueRest n={queue.items.length} onClose={closePursuit} />
               ) : (

@@ -16,18 +16,36 @@ import { stateLine, whyLine } from '../lib/stateText.js'
 //
 // 设计稿：docs/specs/2026-08-19-what-this-line-is-waiting-on-design.md 第七节
 
-function StateRow({ it, onHandled, onReschedule, onOpen }) {
+function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpen }) {
+  // 批量操作开着的时候，这一行就是一个勾选目标 —— 跟看板上那张卡一模一样：
+  // 整行可点、行内那几个动作收起来。**勾的是同一个 id**，所以你在这儿勾一条、
+  // 在看板上勾一张，进的是同一摞（「已选 N 张」那个数会一起涨）。
+  //
+  // 这块面板本来就是看板的另一个取景框：看板按阶段摆，它按「到点没到点」摆。
+  // 同一批卡，换个筛法勾 —— 这正是批量操作最想要的那件事。
+  const toggle = () => onPick([it.subject_id], !checked)
   return (
-    <div className="nrow">
+    <div className={'nrow' + (picking ? ' pickable' : '') + (picking && checked ? ' on' : '')}
+         role={picking ? 'checkbox' : undefined}
+         aria-checked={picking ? checked : undefined}
+         tabIndex={picking ? 0 : undefined}
+         onClick={picking ? toggle : undefined}
+         onKeyDown={picking ? ((e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle() } }) : undefined}>
+      {picking && <span className="pc-check" aria-hidden="true" />}
       <div className="nrow-b">
         {/* 名字本身就是入口 —— 跟右边那颗「打开卡片」同一个去处，
             只是目标大、顺手。 */}
         <div className="nrow-h">
-          <button className="nname" onClick={() => onOpen(it)}>{it.name || '（没名字）'}</button>
+          {picking
+            ? <span className="nname as-text">{it.name || '（没名字）'}</span>
+            : <button className="nname" onClick={() => onOpen(it)}>{it.name || '（没名字）'}</button>}
         </div>
         <div className="nrow-w">{stateLine(it)}</div>
         {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}
       </div>
+      {/* 勾选的时候整组动作收起来：这一行现在是个勾选框，
+          里头再摆三颗各干各的按钮，你按哪一下都得先想一想。 */}
+      {!picking && (
       <div className="nrow-a">
         {it.zone === 'due' && (
           /* 表单交了、微信里说了、当面聊了 —— 系统看不见邮箱外的事。
@@ -47,6 +65,7 @@ function StateRow({ it, onHandled, onReschedule, onOpen }) {
         )}
         <button className="nopen" onClick={() => onOpen(it)}>打开卡片</button>
       </div>
+      )}
     </div>
   )
 }
@@ -75,7 +94,8 @@ function Fold({ title, note, items, render }) {
 // 问题 —— 线在等什么（状态机）才是对的粒度。判决数据都在 letter_verdicts。
 // 错判的发现走「挂到看板上」：没有气泡的活跃卡 = 该起疑的安静线。
 
-export default function Notifications({ data, judging, onJudgeMore, onHandled, onReschedule, onOpen, onGoPeople, onAudit, auditOn, onClose }) {
+export default function Notifications({ data, judging, onJudgeMore, onHandled, onReschedule, onOpen, onGoPeople, onAudit, auditOn, onClose,
+                                       picking = false, picked, onPick }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', onKey)
@@ -128,7 +148,8 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       <section className="nsect">
         <div className="nsect-h"><h3>今天：</h3></div>
         {bell.due.length ? bell.due.map((it) => (
-          <StateRow key={it.key} it={it} onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
+          <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(it.subject_id)} onPick={onPick}
+                    onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
         )) : source !== 'empty' && (
           <p className="nnone">现在没有到点的。看看新机会吧。</p>
         )}
@@ -137,7 +158,10 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       {/* 等待：没到点的，折叠着，数字露在外面 */}
       <Fold title="等待" items={bell.waiting}
             note="还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。"
-            render={(it) => <StateRow key={it.key} it={it} onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />} />
+            render={(it) => (
+              <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(it.subject_id)} onPick={onPick}
+                        onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
+            )} />
 
       {/* 人的事不在这儿 —— 但不许是隐形的 */}
       {(peopleN > 0 || unclaimed > 0) && (

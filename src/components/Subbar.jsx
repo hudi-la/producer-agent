@@ -29,8 +29,10 @@ export default function Subbar({
   onSay, saying,
   queueCount, onOpenQueue,
 }) {
+  // 只出内容，不出那条带子本身 —— 带子由 App 一个人渲染，
+  // 因为 🔔 常驻在它右端，跟你在哪个区无关。
   return (
-    <div className="subbar">
+    <>
       {/* 两个开关，可以同时按下去 —— 真正有用的恰恰是交叉。
           「全部」不是第三个开关，是一键清零：开着筛选想回全景，
           得一个个关太啰嗦。都关着的时候它亮着，表示你看的就是全部。 */}
@@ -100,6 +102,6 @@ export default function Subbar({
           <button className="wbtn" onClick={onOpenTasks}>造卡任务</button>
         </>
       )}
-    </div>
+    </>
   )
 }

@@ -119,12 +119,12 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 给看板补一段右内边距，末尾那几列才滑得出抽屉底下——
    不补的话「谈成」「暂停处理」两列就永远够不着了。 */
 .wrap.drawered .board { padding-right: calc(var(--drawer-w) + 24px); }
-/* 顶栏也得让位，不然抽屉盖住右上角那个 🔔 —— 常驻角标有一半时间点不着，
-   等于没有。让位的写法跟 .board / .subbar 那两条是同一条，不另发明。
-   只有机会线抽屉需要这一条：它顶到最上沿。通讯录抽屉从顶栏下沿才开始
-   （见 .ppl-drawer），🔔 压根不会被它盖住——那就不该让位。
-   🔔 是常驻的，它待在哪儿不该取决于另一个抽屉开没开。 */
-.wrap.drawered .app-top { padding-right: calc(var(--drawer-w) + 24px); }
+/* 🔔 现在钉在带子右端（.subbar），所以让位的是带子不是顶栏。
+   机会线抽屉顶到最上沿、整条盖住右边，不让位的话 🔔 就压在它底下——
+   一个常驻入口有一半时间点不着，等于没有。
+   通讯录抽屉不在这儿让位：它是从带子**下沿**才开始的（见 .ppl-drawer），
+   压根碰不到 🔔。🔔 待在哪儿不该取决于那个抽屉开没开。 */
+.wrap.drawered .subbar { padding-right: calc(var(--drawer-w) + 24px); }
 
 /* 从右侧贴边落下来的一整条，顶到窗口最上沿（连顶栏一起盖住）。
    宽度就是一句 --drawer-w：33vw，窄窗口不低于 400px。嫌窄改这一个数。 */
@@ -133,6 +133,25 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
   border-left: 1px solid var(--line-2); box-shadow: -20px 0 50px -30px #241f1b8c;
   animation: drawer-in .22s cubic-bezier(.4,0,.2,1); }
 @keyframes drawer-in { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ── 抽屉左沿那条可以拉的边 ──
+   条子本身 11px 宽（骑在边框上，左右各露一半）—— 2px 的话你得瞄着点，
+   而这是个纯手感的控件，够得着比好看重要。平时完全不显形，
+   鼠标扫过 / 键盘选中 / 正在拉的时候才现出一道强调色。 */
+/* z-index 得压过 20：抽屉里那层 PursuitFocus 的根节点是 <div class="focus drawer">，
+   它身上那个 drawer 是**变体名**，可选择器不分变体不变体——上面 .drawer 那条
+   z-index: 20 照样罩在它头上。不写这一句，条子只有露在抽屉外面的那 4px 点得着。 */
+.drawer-grip { position: absolute; left: 0; top: 0; bottom: 0; width: 11px;
+  margin-left: -5px; z-index: 25; cursor: col-resize; touch-action: none;
+  background: none; border: 0; padding: 0; }
+.drawer-grip::before { content: ''; position: absolute; top: 0; bottom: 0; left: 4px;
+  width: 3px; background: var(--accent); opacity: 0; transition: opacity .14s; }
+.drawer-grip:hover::before, .drawer-grip:focus-visible::before { opacity: .5; }
+.drawer-grip:focus-visible { outline: none; }
+/* 正在拉：整页别选中文字，光标出了条子也还是「左右拉」那个样 */
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing .drawer-grip::before { opacity: .75; }
+@media (prefers-reduced-motion: reduce) { .drawer-grip::before { transition: none; } }
 /* min-width:0 不能省。flex 项的自动最小宽度 = 内容的最小宽度，所以只要某张卡里
    有一段断不开的长东西（待办里的网址、邮箱），这一列就会被它撑宽——
    而卡是折在叠里的，你一展开列宽就跳。写死 0，列永远是 216。 */
@@ -1204,15 +1223,18 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    它们是同一种东西。 */
 .ppl-inner { max-width: 860px; }
 
-/* 通讯录抽屉**不**盖顶栏，从顶栏的下沿开始。
+/* 通讯录抽屉**不**盖顶栏也不盖工具条那条带子，从带子的下沿开始。
+   （2026-08-20 往下挪了一格：🔔 钉在带子右端之后，带子成了常驻的东西，
+   谁都不能盖它——盖住就得让位，一让位 🔔 就跟着通讯录开关左右横跳。）
    机会线那个抽屉是顶到最上沿的（见 .drawer），这里跟它不一样是故意的：
    翻通讯录是「在这一页里查个东西」，羽·Fairwind 那条顶栏和三个主区得一直在，
    不然抽屉一开就像离开了这个 app。--top-h 由 App.jsx 量出来写在 .wrap 上。 */
-.ppl-drawer { z-index: 25; top: var(--top-h, 55px); }
+.ppl-drawer { z-index: 25; top: calc(var(--top-h, 55px) + var(--bar2)); }
 /* 抽屉不跟顶栏重叠了，这条只是兜底：别让抽屉那圈阴影糊到顶栏上。
    只在通讯录开着时生效——机会线抽屉还要盖住顶栏，全局抬会把它自己的
    标题和「整页」按钮压到顶栏底下。 */
-.wrap.bookopen .app-top { position: relative; z-index: 30; background: var(--paper); }
+.wrap.bookopen .app-top,
+.wrap.bookopen .subbar { position: relative; z-index: 30; background: var(--paper); }
 .pdrawer { display: flex; flex-direction: column; width: 100%; min-width: 0; }
 /* 高度跟工具条锁成同一个数 —— 抽屉的头和左边的工具条是同一条横带，
    底线对不齐的话，一开抽屉整个界面就断成上下错位的两截。 */
@@ -1250,8 +1272,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 通讯录抽屉开着时，页面往左让出抽屉那块地。
    不让的话由头那一行的叉叉正好压在抽屉底下——一个点不到的按钮
    比没有这个按钮更糟，你会以为它坏了。 */
-.wrap.bookopen .page,
-.wrap.bookopen .subbar { padding-right: calc(var(--drawer-w) + 20px); }
+.wrap.bookopen .page { padding-right: calc(var(--drawer-w) + 20px); }
 /* 按下去的工具条按钮（通讯录开着的时候）。跟 .tab.on 一个语气：
    是「现在开着」，不是「有个新东西」——所以只描边，不填色。 */
 .wbtn.on { border-color: var(--accent); color: var(--accent); }
@@ -1329,6 +1350,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    一条一条需要你动的事。数字只数「手头」那一层 ——
    老账和判为不用回的随时点得开，但不该天天在眼前报警。
    设计稿：docs/specs/2026-08-18-notifications-design.md */
+/* margin-left:auto 顶到最右：带子里有 .sp（flex:1）的区它吃不到剩余空间，
+   自然就跟在最后一颗按钮后面；没有 .sp 的区（我的档案、整页）靠它顶到右端。
+   两种情况一句话管完，不用每个区各摆一个占位。 */
+.subbar .bellbtn { margin-left: auto; }
 .bellbtn { position: relative; background: none; border: 0; cursor: pointer;
            padding: 3px 6px 1px; line-height: 1; color: var(--ink-2); }
 .bellbtn:hover { color: var(--ink); }
@@ -1343,7 +1368,9 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    深浅一律用 --ink-2 / --ink-3 这两个成色（它们在两套主题里各自调过），
    线一律用 --line-2（--line 是同色块内部的分隔，浮层的边框不够用）。
    opacity 只留给「这条被你按停了」那种状态，那是在说事，不是在调灰度。 */
-.npanel  { position: absolute; top: calc(var(--top-h, 55px) + 6px); right: 10px;
+/* 从 🔔 底下垂下来 —— 🔔 现在钉在带子右端，面板就得从带子的下沿开始，
+   不然它自己会盖住那颗刚被你按下去的铃铛。 */
+.npanel  { position: absolute; top: calc(var(--top-h, 55px) + var(--bar2) + 6px); right: 10px;
            z-index: 40; width: 470px;
            max-width: calc(100vw - 20px); max-height: 74vh; overflow-y: auto;
            padding: 10px 12px 14px; border: 1px solid var(--line-2);
@@ -1410,6 +1437,20 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .ppl-due { margin: 4px 0 18px; }
 .ppl-due .nrow { border-bottom: 1px solid var(--line-2); }
 .nrow-a  { display: flex; gap: 4px; align-items: center; flex: none; }
+
+/* 批量操作开着时，面板里的每一行也是一个勾选目标。
+   长相直接借看板那张卡的 .pc-check（同一件事该长得一样），
+   只把位置挪到行首、按行高对齐。 */
+.nrow.pickable { position: relative; padding-left: 26px; cursor: pointer; }
+.nrow.pickable > .pc-check { left: 0; top: 11px; }
+.nrow.pickable.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.nrow.pickable.on > .pc-check { background: var(--accent); border-color: var(--accent); }
+.nrow.pickable.on > .pc-check::after {
+  content: ''; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.nrow.pickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* 勾选态下名字不是入口了，别再摆出一副能点的样子 */
+.nname.as-text { cursor: inherit; }
 /* ✓ ✕ 和「打开卡片」：比面板底色暗一档的实心块，不再是一圈看不见的描边。
    夜里 --paper 比 --paper-2 暗，白天也暗，两套主题里都是同一个「凹进去」的意思。 */
 .nbtn, .nopen { background: var(--paper); border: 1px solid var(--line-2);
