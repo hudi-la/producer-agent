@@ -28,6 +28,7 @@ import { extractForm } from './form.js'
 
 import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
+import { eventOf, parseTag, cellFor } from './judge.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -1081,6 +1082,69 @@ async function triageThese(ids) {
   return out
 }
 
+// ── 新事实过转移表 ────────────────────────────────────────
+//
+// 一格一个问题：问什么取决于当时的 state 和来的 event（brain/judge.js
+// 顶上那段）。每条事实一次调用 —— 量按新事实数走，平时一轮 0～2 条。
+//
+// **state 每条现读**：上一条的标签会改这一条的 state，所以只能按时间
+// 正序一条条来（pa_facts_to_judge 排好了序）。
+//
+// **跳过要出声**：静默的跳过跟「判过了」长得一样 —— 这次重做的起因
+// 之一就是「判不出来时的跳过完全无声」。
+async function tagPass({ limit = 12 } = {}) {
+  let facts = []
+  try {
+    ;({ data: facts } = await db.rpc('pa_facts_to_judge', { p_limit: limit }))
+  } catch (err) { console.error('✗ 取待判事实：', err.message); return { tagged: 0 } }
+  if (!facts?.length) return { tagged: 0 }
+
+  const t = new Date().toLocaleTimeString('zh-CN')
+  console.log(`\n→ ${t} ${facts.length} 条新事实过转移表`)
+  let tagged = 0
+  const skipped = []
+  for (const f of facts) {
+    const ev = eventOf(f)
+    if (!ev) { skipped.push(`${f.subject_name}：kind=${f.kind} 不是 event`); continue }
+
+    let st = null
+    try {
+      const { data } = await db.from('v_pa_state').select('*')
+        .eq('subject_kind', f.subject_kind).eq('subject_id', f.subject_id).maybeSingle()
+      st = data
+    } catch (_) {}
+    const stateName = st?.state || 'IDLE'
+
+    const cell = cellFor(stateName, ev)
+    if (!cell) { skipped.push(`${f.subject_name}：${stateName} x ${ev} 表里没这格`); continue }
+
+    let tag = null
+    if (cell.rule) {
+      tag = cell.rule(f)          // 纯规则格，不花钱
+    } else {
+      try {
+        const { text } = await think(cell.ask(f, st), [], JUDGE_SYSTEM, null, null, null, 1)
+        tag = parseTag(text)
+      } catch (err) { skipped.push(`${f.subject_name}：${err.message}`); continue }
+    }
+    // 没判成不写标签 —— 标签的存在 = 「判过了」，假装判过比不判坏
+    if (!tag) { skipped.push(`${f.subject_name}：${stateName} x ${ev} 没按格式回话，下轮再来`); continue }
+
+    const { error } = await db.rpc('pa_tag_message', {
+      p_message_id: f.id, p_situation: `${stateName} x ${ev}`,
+      p_resolves: tag.resolves, p_resolves_why: tag.resolves_why,
+      p_needs_reply: tag.needs_reply, p_reply_why: tag.reply_why,
+      p_awaiting: tag.awaiting, p_wait_days: tag.wait_days,
+      p_meet_at: tag.meet_at, p_gist: tag.gist,
+    })
+    if (error) { skipped.push(`${f.subject_name}：写标签失败 ${error.message}`); continue }
+    tagged++
+  }
+  if (skipped.length) console.log(`  · 跳过 ${skipped.length} 条：${skipped.join('；')}`)
+  console.log(`  ↳ ${JSON.stringify({ tagged, skipped: skipped.length })}`)
+  return { tagged, skipped: skipped.length }
+}
+
 // ── 脏了就判 ──────────────────────────────────────────────
 //
 // 一批最多带多少 —— **这不是为了省钱，是为了别让单次调用太大**。
@@ -1572,7 +1636,9 @@ server.listen(PORT, () => {
     try {
       const { sweepMail } = await import('./mail/loop.js')
       await sweepMail()
-      // 收完信顺手把脏了的判掉。**不等你打开通知栏** —— 见 judgePass 上面那段。
+      // 新事实先过转移表（一格一问，state 按事件顺序推进）……
+      await tagPass()
+      // ……再把脏了的判掉。**不等你打开通知栏** —— 见 judgePass 上面那段。
       await judgePass()
     } catch (err) { console.error('  ✗ 邮件循环起不来：' + err.message) }
   }
