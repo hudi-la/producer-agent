@@ -645,7 +645,15 @@ export default function App() {
             判为不用回＋没归到线的）—— 一个把 89 条藏在后面的数字，跟这一刀
             要治的病是同一种。到点没到点看颜色和面板里的分区，不靠藏。 */}
         <button className="bellbtn" onClick={openBell} aria-label="该动的">
-          🔔{(() => {
+          {/* Lucide 的 bell，跟读书 app（阅读陪伴）同一套手写内联 SVG 的规格：
+              24 视口、stroke=currentColor、1.75、圆头圆角，不引库。
+              emoji 那颗铃铛他不喜欢 —— 而且 emoji 跟主题色也不搭。 */}
+          <svg className="bellic" viewBox="0 0 24 24" width="17" height="17" fill="none"
+               stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
+               strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>{(() => {
             const n = (notes?.bell?.due?.length || 0) + (notes?.bell?.waiting?.length || 0)
               + (notes?.unclaimed || 0)
             return n > 0 && <span className={'belln' + ((notes?.bell?.due?.length || 0) ? '' : ' calm')}>{n}</span>

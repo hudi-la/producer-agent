@@ -1322,7 +1322,9 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    老账和判为不用回的随时点得开，但不该天天在眼前报警。
    设计稿：docs/specs/2026-08-18-notifications-design.md */
 .bellbtn { position: relative; background: none; border: 0; cursor: pointer;
-           font-size: 15px; padding: 2px 6px; line-height: 1; }
+           padding: 3px 6px 1px; line-height: 1; color: var(--ink-2); }
+.bellbtn:hover { color: var(--ink); }
+.bellic  { display: block; }
 .belln   { position: absolute; top: -3px; right: -3px; min-width: 15px;
            padding: 0 3px; border-radius: 8px; background: #d33; color: #fff;
            font: 600 10px/15px system-ui; text-align: center; }
