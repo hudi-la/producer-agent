@@ -1150,6 +1150,21 @@ async function tagPass({ limit = 12 } = {}) {
     let tag = null
     if (cell.rule) {
       tag = cell.rule(f)          // 纯规则格，不花钱
+    } else if (ev === 'NOTE') {
+      // 记一笔走**带全卷宗的判断**，不走盲格子。
+      //
+      // 真事（Stanford，2026-08-20）：表单是网页交的，「几周起步、兜底
+      // 10/23」是 Fairwind 提交后查到、说在聊天里的 —— 盲格子看不见聊天，
+      // 只能按惯例猜 14 天，催早了比不催还糟。笔是他亲手写的，少而重
+      // （一天零到几条），值得带上整张卡（讲懂、字段、聊天、往来）判这一次。
+      // 信照旧走盲格子：量大，且信自己的上下文通常够。
+      try {
+        const owner = { kind: f.subject_kind, id: f.subject_id }
+        const ctx = await loadOwnerContext(owner)
+        const { text } = await think(
+          buildUser(ctx, cell.ask(f, st), null), [], buildSystem(ctx), null, null, null, 1)
+        tag = parseTag(text)
+      } catch (err) { skipped.push(`${f.subject_name}：${err.message}`); continue }
     } else {
       try {
         const { text } = await think(cell.ask(f, st), [], JUDGE_SYSTEM, null, null, null, 1)

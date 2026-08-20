@@ -169,8 +169,12 @@ ${收尾(`${F_GIST},${F_WAIT},${F_MEET}`)}` },
 这笔说了什么？
 ① 见了面 / 通了话 → gist 说清跟谁、聊了什么
 ② 约了日子 → meet_at
-③ 办完了某件事 / 只是备注 → 其余 null
-${收尾(`${F_GIST},${F_MEET}`)}` },
+③ **办完了一件事、现在开始等结果**（交了表单/申请、投了提案）→
+   awaiting=等什么 + wait_days 到该问一声的那天。笔里写了兜底日期就用它
+   （「兜底 2026/10/23」→ 到那天的天数）；没写按这类事的惯例。
+   真例：Stanford 的课是网页表单交的，没有邮件，全靠这笔起等待。
+④ 只是备注 → 全 null
+${收尾(`${F_GIST},${F_MEET},${F_WAIT}`)}` },
   },
 
   WAITING_REPLY: {
@@ -203,8 +207,10 @@ ${收尾(`${F_GIST},${F_RESOLVE},${F_WAIT}`)}` },
 我们在等：**${state?.what || '（没写）'}**。你记了一笔。
 
 这笔解决了它吗？（「电话里说定了」「表单已提交」「已处理」这类 = 解决了）
-解决 → resolves=true + resolves_why。这笔里另约了日子 → meet_at。否则全 null。
-${收尾(`${F_GIST},${F_RESOLVE},${F_MEET}`)}` },
+解决 → resolves=true + resolves_why。这笔里另约了日子 → meet_at；
+解决之后又开始等新的结果（比如交了表单等答复）→ awaiting + wait_days
+（笔里有兜底日期就用它）。否则全 null。
+${收尾(`${F_GIST},${F_RESOLVE},${F_MEET},${F_WAIT}`)}` },
   },
 
   NEEDS_REPLY: {
