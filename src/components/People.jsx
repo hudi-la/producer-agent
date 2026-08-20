@@ -41,7 +41,9 @@ function PeopleDue({ notes, onHandled, onOpenState }) {
   const Row = ({ it }) => (
     <div className="nrow">
       <div className="nrow-b">
-        <div className="nrow-h"><b>{it.name || '未具名联系人'}</b></div>
+        <div className="nrow-h">
+          <button className="nname" onClick={() => onOpenState(it)}>{it.name || '未具名联系人'}</button>
+        </div>
         <div className="nrow-w">{stateLine(it)}</div>
         {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}
       </div>

@@ -20,7 +20,11 @@ function StateRow({ it, onHandled, onOpen }) {
   return (
     <div className="nrow">
       <div className="nrow-b">
-        <div className="nrow-h"><b>{it.name || '（没名字）'}</b></div>
+        {/* 名字本身就是入口 —— 跟右边那颗「打开卡片」同一个去处，
+            只是目标大、顺手。 */}
+        <div className="nrow-h">
+          <button className="nname" onClick={() => onOpen(it)}>{it.name || '（没名字）'}</button>
+        </div>
         <div className="nrow-w">{stateLine(it)}</div>
         {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}
       </div>
@@ -56,29 +60,33 @@ function Fold({ title, note, items, render }) {
   )
 }
 
-function MutedRow({ it, onUnmute, onOpen }) {
+function MutedRow({ it, onUnmute, onMuteAway, onOpen }) {
   return (
     <div className="nrow">
       <div className="nrow-b">
         <div className="nrow-h">
-          <b>{it.name || '未具名联系人'}</b>
+          <button className="nname" onClick={() => onOpen(it)}>{it.name || '未具名联系人'}</button>
           {it.line_title && <span className="nrow-l"> · {it.line_title}</span>}
         </div>
         <div className="nrow-w">判为不用回：{it.verdict?.why || '（没说理由）'}</div>
       </div>
       <div className="nrow-a">
-        {it.backable ? (
+        {/* 物业通知、会议提醒这类绝对不用看的：✕ 掉。藏的是这一条提醒，
+            信一个字不动；他再来新信照样出现。「都放回来」也能捞回它。 */}
+        <button className="nbtn" title="不再显示这条" aria-label="不再显示"
+                onClick={() => onMuteAway(it)}>✕</button>
+        {it.backable && (
           <button className="nopen" onClick={() => onUnmute(it)}
                   title="判错了 —— 放回该动的那一列">放回</button>
-        ) : (
-          <button className="nopen" onClick={() => onOpen(it)}>打开卡片</button>
         )}
+        {/* 每一行都进得去卡 —— 原来「放回」那几行把这颗顶掉了，不统一 */}
+        <button className="nopen" onClick={() => onOpen(it)}>打开卡片</button>
       </div>
     </div>
   )
 }
 
-export default function Notifications({ data, judging, onJudgeMore, onHandled, onUnmute, onAllBack, onOpen, onGoPeople, onClose }) {
+export default function Notifications({ data, judging, onJudgeMore, onHandled, onUnmute, onMuteAway, onAllBack, onOpen, onGoPeople, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', onKey)
@@ -134,7 +142,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
 
       <Fold title="被判为不用回的" items={muted}
             note="Fairwind 读过内容，觉得没有等你答的事。判错了按「放回」；没有「放回」的那几条是你早回过了，放回去也算不出由头。"
-            render={(it) => <MutedRow key={it.key} it={it} onUnmute={onUnmute} onOpen={onOpen} />} />
+            render={(it) => <MutedRow key={it.key} it={it} onUnmute={onUnmute} onMuteAway={onMuteAway} onOpen={onOpen} />} />
 
       {/* 人的事不在这儿 —— 但不许是隐形的 */}
       {(peopleN > 0 || unclaimed > 0) && (

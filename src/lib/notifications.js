@@ -168,6 +168,10 @@ export async function loadNotifications() {
       // 被判为不用回的：**不消失**，单独一层，看得见理由。
       // 判错了你自己捞得回来 —— 静默筛掉是不许的。
       if (v && v.needs_reply === false && f.last_in_at && !归了线(f)) {
+        // 你 ✕ 过的不再出现（物业通知、会议提醒这类绝对不用看的）。
+        // 藏的是**这一条提醒**，信一个字没动；他再来一封新信，日期变了，
+        // 键就变了，照样出现 —— 跟 cue 那套 ✕ 同一个锚法。
+        if (marked.has(`${f.subject_kind}|${f.subject_id}|muted|${dayOf(f.last_in_at)}`)) continue
         // 「放回」按下去到底会不会**多出一条**来 —— 现在就算清楚，
         // 别让按钮许一个兑现不了的承诺。
         //
@@ -185,6 +189,7 @@ export async function loadNotifications() {
           key: `${f.subject_kind}|${f.subject_id}|muted|${dayOf(f.last_in_at)}`,
           subject_kind: f.subject_kind, subject_id: f.subject_id,
           name: f.name, line_title: f.line_title, cue: null, verdict: v, backable,
+          at: dayOf(f.last_in_at),
         })
       }
     }
@@ -239,6 +244,21 @@ export async function markCue(item, mark) {
   const { data, error } = await supa.rpc('pa_mark_cue', {
     p_kind: item.subject_kind, p_id: item.subject_id,
     p_via: item.cue.via, p_at: item.cue.at, p_mark: mark,
+  })
+  if (error) throw new Error(error.message)
+  return Boolean(data)
+}
+
+/**
+ * 「不再显示」：物业通知、会议提醒这类绝对不用看的，从「不用回」层里藏掉。
+ * 走 cue_marks（via='muted'，锚在那封信的日期上）—— 只藏这一条提醒，
+ * 信一个字不动；同一个人再来新信是新的日期，照样出现。
+ * 「把先不看的都放回来」也能把它捞回来（它就是一个 off 记号）。
+ */
+export async function muteAway(item) {
+  const { data, error } = await supa.rpc('pa_mark_cue', {
+    p_kind: item.subject_kind, p_id: item.subject_id,
+    p_via: 'muted', p_at: item.at, p_mark: 'off',
   })
   if (error) throw new Error(error.message)
   return Boolean(data)
