@@ -87,7 +87,12 @@ function statusText(p, held) {
   }
 }
 
-function PCard({ p, st, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
+// 发出&提交 / 进一步 / 谈成 —— 这三列的卡**应该**在等着什么。
+// 气泡视图里它们要是什么都没等，就吊一个灰气泡出来：那是「判漏了」
+// 最可能藏身的地方（一封信被错判成不用回，线就这么安静了）。
+const 该有动静的 = new Set(['sent', 'replying', 'won'])
+
+function PCard({ p, st, audit, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
   const held = heldLabel(useProfile())
   const dim = p.stage === 'paused' || !p.eligible
   const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
@@ -117,6 +122,13 @@ function PCard({ p, st, onOpen, onDragStart, onJot, unseen, picking, checked, on
       onClick={open}
       onKeyDown={onKey}
     >
+      {/* 气泡审计视图：状态吊在卡头顶上，一眼扫全板。
+          有状态 → 金（等待）/ 红（到点）；该有动静却没有 → 灰气泡点名。 */}
+      {audit && (st || 该有动静的.has(p.stage)) && (
+        <div className={'pc-bubble' + (!st ? ' quiet' : st.zone === 'due' ? ' due' : '')}>
+          {st ? goldLine(st) : '静了 —— 没在等任何东西'}
+        </div>
+      )}
       {picking && <span className="pc-check" aria-hidden="true" />}
       {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
       {/* 你自己点的标签。系统不动它——点亮了就一直亮着，直到你再点。 */}
@@ -159,7 +171,7 @@ function PCard({ p, st, onOpen, onDragStart, onJot, unseen, picking, checked, on
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states, audit }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
@@ -203,7 +215,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
       </div>
       {open && items.map((p) => (
         <PCard
-          p={p} st={states?.get?.(p.id)} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
+          p={p} st={states?.get?.(p.id)} audit={audit} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
           unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(p.id)} onPick={onPick}
         />
       ))}
@@ -211,7 +223,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], states = null, onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
+export default function Pipeline({ pursuits, tasks = [], states = null, audit = false, onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -280,6 +292,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, onOpen, 
                   name={taskName(row.stack)}
                   items={row.items}
                   states={states}
+                  audit={audit}
                   open={openStacks.has(row.stack)}
                   onToggle={() => toggleStack(row.stack)}
                   onOpen={onOpen}
@@ -293,7 +306,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, onOpen, 
                 />
               ) : (
                 <PCard
-                  p={row.card} st={states?.get?.(row.card.id)} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
+                  p={row.card} st={states?.get?.(row.card.id)} audit={audit} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
                   onJot={onJot} unseen={unseen.has(row.card.id)}
                   picking={picking} checked={picked.has(row.card.id)} onPick={onPick}
                 />

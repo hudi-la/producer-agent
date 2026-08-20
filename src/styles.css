@@ -1367,6 +1367,24 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    到点了换成 --accent —— 跟 .pc-ddl 一家的规矩。 */
 .pc-wait { font-size: 11px; color: var(--wait); font-weight: 600; margin-top: 4px; }
 .pc-wait.due { color: var(--accent); }
+/* 气泡审计视图：状态吊在卡头顶上。金 = 在等；红 = 到点；灰 = 该有动静
+   却安静着（错判嫌疑）。压住上一张卡的下沿没关系 —— 这是临时的检查镜。 */
+.pcard { position: relative; }
+.pc-bubble { position: absolute; left: 8px; right: 8px; top: -10px;
+  transform: translateY(-100%); z-index: 6;
+  background: var(--paper-2); border: 1.5px solid var(--wait); color: var(--wait);
+  border-radius: 10px; padding: 5px 9px; font-size: 11px; font-weight: 600;
+  line-height: 1.35; box-shadow: var(--shadow); pointer-events: none; }
+.pc-bubble::after { content: ''; position: absolute; left: 18px; bottom: -5px;
+  width: 8px; height: 8px; background: inherit;
+  border-right: 1.5px solid var(--wait); border-bottom: 1.5px solid var(--wait);
+  transform: rotate(45deg); border-color: inherit; }
+.pc-bubble.due { border-color: var(--accent); color: var(--accent); }
+.pc-bubble.quiet { border-color: var(--ink-3); color: var(--ink-3); border-style: dashed; }
+/* 悬浮的收起钮：气泡视图从 🔔 进，但收起不该非得再开 🔔 */
+.audit-off { position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  background: var(--ink); color: var(--paper); border: none; border-radius: 20px;
+  padding: 9px 16px; font-size: 12.5px; cursor: pointer; box-shadow: var(--shadow); }
 /* 名字本身是入口：长得像标题，摸上去是链接 */
 .nname { font-weight: 700; font-size: 13px; color: var(--ink); background: none;
   border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }

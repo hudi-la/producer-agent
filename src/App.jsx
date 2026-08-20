@@ -24,7 +24,7 @@ import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
-import { loadNotifications, markHandled, unmuteLetter, muteAway, unmarkAllOff, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
+import { loadNotifications, markHandled, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
@@ -242,20 +242,8 @@ export default function App() {
     try { await markHandled(it) } catch (e) { console.warn('已处理没记上：', e.message) }
     await pullNotes()
   }
-  // 判错了捞回来：那一封信的判定翻成「要回」，它就回到该动的那一列里。
-  const unmuteNote = async (it) => {
-    try { await unmuteLetter(it) } catch (_) {}
-    await pullNotes()
-  }
-  // ✕ 一条「不用回」：不再显示（藏提醒，不动信）
-  const muteAwayNote = async (it) => {
-    try { await muteAway(it) } catch (_) {}
-    await pullNotes()
-  }
-  const allNotesBack = async () => {
-    try { await unmarkAllOff() } catch (_) {}
-    await pullNotes()
-  }
+  // 看板气泡审计视图：开着时每张卡头顶吊着它的状态。
+  const [audit, setAudit] = useState(false)
 
   // 库换过之后（seed ↔ live，id 完全是两套），localStorage 里可能躺着一批
   // 已经不存在的 id。不清掉的话顶栏会显示一个点了没反应的数字——那是在说谎。
@@ -659,7 +647,7 @@ export default function App() {
         <button className="bellbtn" onClick={openBell} aria-label="该动的">
           🔔{(() => {
             const n = (notes?.bell?.due?.length || 0) + (notes?.bell?.waiting?.length || 0)
-              + (notes?.muted?.length || 0) + (notes?.unclaimed || 0)
+              + (notes?.unclaimed || 0)
             return n > 0 && <span className={'belln' + ((notes?.bell?.due?.length || 0) ? '' : ' calm')}>{n}</span>
           })()}
         </button>
@@ -668,7 +656,9 @@ export default function App() {
       {bellOpen && (
         <Notifications
           data={notes} judging={judging} onJudgeMore={judgeMore}
-          onHandled={handleNote} onUnmute={unmuteNote} onMuteAway={muteAwayNote} onAllBack={allNotesBack}
+          onHandled={handleNote}
+          auditOn={audit}
+          onAudit={() => { setAudit((x) => !x); setBellOpen(false); setArea('pursue') }}
           onGoPeople={() => { setBellOpen(false); setArea('people') }}
           onClose={() => setBellOpen(false)}
           onOpen={(it) => {
@@ -802,7 +792,13 @@ export default function App() {
               不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
           <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks}
             states={new Map([...(notes?.bell?.due || []), ...(notes?.bell?.waiting || [])].map((x) => [x.subject_id, x]))}
+            audit={audit}
             onOpen={openPursuit} onMove={moveCard} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
+          {/* 气泡视图开着时，一颗悬浮的关闭钮 —— 你是从 🔔 里进来的，
+              但收起不该非得再打开 🔔 */}
+          {audit && (
+            <button className="audit-off" onClick={() => setAudit(false)}>收起气泡</button>
+          )}
           {/* 不加遮罩：抽屉开着的时候看板必须还能点，你要的就是一张接一张地过。 */}
           {/* aside 而不是 dialog——它不挡着你操作看板，就是旁边多开的一块地方 */}
           {drawered && (

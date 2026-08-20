@@ -60,33 +60,12 @@ function Fold({ title, note, items, render }) {
   )
 }
 
-function MutedRow({ it, onUnmute, onMuteAway, onOpen }) {
-  return (
-    <div className="nrow">
-      <div className="nrow-b">
-        <div className="nrow-h">
-          <button className="nname" onClick={() => onOpen(it)}>{it.name || '未具名联系人'}</button>
-          {it.line_title && <span className="nrow-l"> · {it.line_title}</span>}
-        </div>
-        <div className="nrow-w">判为不用回：{it.verdict?.why || '（没说理由）'}</div>
-      </div>
-      <div className="nrow-a">
-        {/* 物业通知、会议提醒这类绝对不用看的：✕ 掉。藏的是这一条提醒，
-            信一个字不动；他再来新信照样出现。「都放回来」也能捞回它。 */}
-        <button className="nbtn" title="不再显示这条" aria-label="不再显示"
-                onClick={() => onMuteAway(it)}>✕</button>
-        {it.backable && (
-          <button className="nopen" onClick={() => onUnmute(it)}
-                  title="判错了 —— 放回该动的那一列">放回</button>
-        )}
-        {/* 每一行都进得去卡 —— 原来「放回」那几行把这颗顶掉了，不统一 */}
-        <button className="nopen" onClick={() => onOpen(it)}>打开卡片</button>
-      </div>
-    </div>
-  )
-}
+// 「被判为不用回的」那层于 2026-08-20 从面板退役（他拍的）：
+// 它让人「总觉得要对一下，很疲惫」，而且「这封要不要回」是个问错粒度的
+// 问题 —— 线在等什么（状态机）才是对的粒度。判决数据都在 letter_verdicts。
+// 错判的发现走「挂到看板上」：没有气泡的活跃卡 = 该起疑的安静线。
 
-export default function Notifications({ data, judging, onJudgeMore, onHandled, onUnmute, onMuteAway, onAllBack, onOpen, onGoPeople, onClose }) {
+export default function Notifications({ data, judging, onJudgeMore, onHandled, onOpen, onGoPeople, onAudit, auditOn, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', onKey)
@@ -94,7 +73,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
   }, [onClose])
 
   const { bell = { due: [], waiting: [] }, people = { due: [], waiting: [] },
-          muted = [], unclaimed = 0, stale = [], unjudged = [], source, reason } = data || {}
+          unclaimed = 0, stale = [], unjudged = [], source, reason } = data || {}
   const 待判 = stale.length + (stale.length ? 0 : unjudged.length)
   const peopleN = people.due.length + people.waiting.length
 
@@ -104,6 +83,10 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
         <h2>该动的</h2>
         {bell.due.length > 0 && <span className="ncount">{bell.due.length} 件</span>}
         <span className="sp" />
+        {/* 挂到看板上：每张卡头顶吊一个状态气泡；发出&提交/进一步/谈成里
+            **没有气泡的卡**就是该起疑的 —— 一条线安静了，是真没事还是判漏了，
+            看板上一眼能扫出来。这是「判为不用回」那层退役后错判的发现口。 */}
+        <button className="lnk" onClick={onAudit}>{auditOn ? '收起看板气泡' : '挂到看板上'}</button>
         <button className="nclose" onClick={onClose} aria-label="收起">✕</button>
       </header>
 
@@ -140,10 +123,6 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
             note="还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。"
             render={(it) => <StateRow key={it.key} it={it} onHandled={onHandled} onOpen={onOpen} />} />
 
-      <Fold title="被判为不用回的" items={muted}
-            note="Fairwind 读过内容，觉得没有等你答的事。判错了按「放回」；没有「放回」的那几条是你早回过了，放回去也算不出由头。"
-            render={(it) => <MutedRow key={it.key} it={it} onUnmute={onUnmute} onMuteAway={onMuteAway} onOpen={onOpen} />} />
-
       {/* 人的事不在这儿 —— 但不许是隐形的 */}
       {(peopleN > 0 || unclaimed > 0) && (
         <p className="nnone">
@@ -152,11 +131,6 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
         </p>
       )}
 
-      {/* 永远留一条反悔的路。撤的是**你按过的 ✕**（不再显示的那些记号），
-          不动 Fairwind 的任何判决、不动任何信 —— 那边的反悔口是每条自己的「放回」。 */}
-      <p className="nnone nback">
-        按错了？<button className="lnk" onClick={onAllBack}>把 ✕ 掉的都放回来</button>
-      </p>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { supa, DB_CONFIGURED, FELL_BACK, BRAIN } from './backends.js'
-import { cuesFor, cueKey, BUMP_WAIT } from './cues.js'
+import { BUMP_WAIT } from './cues.js'
 import { day as dayOf } from './when.js'
 
 // 顶栏那个 🔔 的读面。
@@ -123,7 +123,7 @@ const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
 
 const empty = (reason, detail) => ({
   bell: { due: [], waiting: [] }, people: { due: [], waiting: [] },
-  muted: [], unclaimed: 0, unjudged: [], stale: [], source: 'empty', reason, detail,
+  unclaimed: 0, unjudged: [], stale: [], source: 'empty', reason, detail,
 })
 
 /**
@@ -139,14 +139,12 @@ export async function loadNotifications() {
     if (fe) return empty(FELL_BACK.QUERY_FAILED, fe.message)
 
     const ids = [...new Set((facts || []).map((f) => f.last_in_id).filter(Boolean))]
-    const [{ data: verdicts }, { data: marks }] = await Promise.all([
-      ids.length ? supa.from('v_pa_letter_verdicts').select('*').in('gmail_message_id', ids)
-                 : Promise.resolve({ data: [] }),
-      supa.from('v_pa_cue_marks').select('*'),
-    ])
+    // 判决只为「还有哪些没判过」服务（triage 的排队口径）；cue_marks 不再读 ——
+    // 面板上已经没有靠记号藏行的地方了。
+    const { data: verdicts } = ids.length
+      ? await supa.from('v_pa_letter_verdicts').select('*').in('gmail_message_id', ids)
+      : { data: [] }
     const vOf = Object.fromEntries((verdicts || []).map((v) => [v.gmail_message_id, v]))
-    const marked = new Set((marks || []).map(
-      (m) => `${m.subject_kind}|${m.subject_id}|${m.via}|${m.fact_at}`))
 
     // state 那一半：该动的 / 等待，全是库里现算的（0094/0098）。
     // 旧的五种由头（cues.js 那套）不再进面板 —— 它们的信息都并进了 state。
@@ -161,39 +159,11 @@ export async function loadNotifications() {
       .from('v_pa_unknown_senders').select('*', { count: 'exact', head: true })
 
     const today = new Date()
-    const items = []
-    for (const f of facts || []) {
-      const v = f.last_in_id ? vOf[f.last_in_id] : null
-
-      // 被判为不用回的：**不消失**，单独一层，看得见理由。
-      // 判错了你自己捞得回来 —— 静默筛掉是不许的。
-      if (v && v.needs_reply === false && f.last_in_at && !归了线(f)) {
-        // 你 ✕ 过的不再出现（物业通知、会议提醒这类绝对不用看的）。
-        // 藏的是**这一条提醒**，信一个字没动；他再来一封新信，日期变了，
-        // 键就变了，照样出现 —— 跟 cue 那套 ✕ 同一个锚法。
-        if (marked.has(`${f.subject_kind}|${f.subject_id}|muted|${dayOf(f.last_in_at)}`)) continue
-        // 「放回」按下去到底会不会**多出一条**来 —— 现在就算清楚，
-        // 别让按钮许一个兑现不了的承诺。
-        //
-        // 判定翻成「要回」再问一遍由头，减掉你 ✓/✕ 过的。剩下还有的，
-        // 按下去才真有东西出现。（原来还要减「已经摆在列表里的」——
-        // cue 行撤了之后，列表里的是 state 行，键不同，减不着也不用减：
-        // 放回之后 brain 重判那封信，state 自己会长出来。）
-        //
-        // 减不干净的话最常见是这种：信你其实早回过了（last_out_at 晚于
-        // last_in_at，球根本不在你手上），一按，这条从「不用回」里没了，
-        // 上面也不会多出什么——**一条东西被按没了**，比不给这个按钮糟得多。
-        const backable = cuesFor({ ...f, needs_reply: true, not_before: null }, { today })
-          .some((c) => !marked.has(cueKey(f, c)))
-        items.push({
-          key: `${f.subject_kind}|${f.subject_id}|muted|${dayOf(f.last_in_at)}`,
-          subject_kind: f.subject_kind, subject_id: f.subject_id,
-          name: f.name, line_title: f.line_title, cue: null, verdict: v, backable,
-          at: dayOf(f.last_in_at),
-        })
-      }
-    }
-
+    // 「被判为不用回的」那层从面板退役了（2026-08-20，他拍的）：
+    // 它让人「总觉得要对一下，很疲惫」，而且问的是错粒度的问题 ——
+    // 「这封要不要回」只答半句，另外半句（线在等什么）在状态机里。
+    // 数据一条没删（letter_verdicts 都在）；错判的发现走看板的「挂出来」
+    // 视图：没有气泡的活跃卡 = 该起疑的安静线。
     // 还没判过的那些 —— 交给 triage() 判一批。
     //
     // **只判球真在你手上的那几封。** 一开始写成「凡是最后一封来信都判」，
@@ -230,7 +200,7 @@ export async function loadNotifications() {
     // 最近的排前面 —— 先判最可能有新约定的那些
     stale.sort((a, b) => String(b.upto).localeCompare(String(a.upto)))
 
-    return { ...splitStates(rows), muted: layer(items, today).muted,
+    return { ...splitStates(rows),
              unclaimed: unclaimed || 0,
              unjudged: [...new Set(unjudged)], stale,
              source: 'live', reason: null }
@@ -249,52 +219,9 @@ export async function markCue(item, mark) {
   return Boolean(data)
 }
 
-/**
- * 「不再显示」：物业通知、会议提醒这类绝对不用看的，从「不用回」层里藏掉。
- * 走 cue_marks（via='muted'，锚在那封信的日期上）—— 只藏这一条提醒，
- * 信一个字不动；同一个人再来新信是新的日期，照样出现。
- * 「把先不看的都放回来」也能把它捞回来（它就是一个 off 记号）。
- */
-export async function muteAway(item) {
-  const { data, error } = await supa.rpc('pa_mark_cue', {
-    p_kind: item.subject_kind, p_id: item.subject_id,
-    p_via: 'muted', p_at: item.at, p_mark: 'off',
-  })
-  if (error) throw new Error(error.message)
-  return Boolean(data)
-}
-
-/**
- * 把一条「判为不用回的」放回该动的那一列。
- *
- * 判错了得捞得回来 —— 这是那一层从一开始就写着的承诺（0073 那张表的注释：
- * 「判错了你得看得见理由才捞得回来」），只是一直没有那个按钮。
- *
- * 走的是判定本身的写口 pa_judge_letter，把 needs_reply 翻成 true。
- * **不是**再存一张「用户覆盖」表：一封信要不要回只该有一个答案，
- * 两处存一件事，迟早有一处是假的。
- *
- * 原来那句判词接在后面留着 —— 覆盖掉就没人知道当初凭什么判的了。
- * 这条回到列表里之后，由头照旧从事实现算（「他回你了，N 天没回」）。
- */
-export async function unmuteLetter(item) {
-  const id = item?.verdict?.gmail_message_id
-  if (!id) return false
-  const was = item.verdict.why || '（没说理由）'
-  const { data, error } = await supa.rpc('pa_judge_letter', {
-    p_gmail_message_id: id, p_needs_reply: true, p_not_before: null,
-    p_why: `你放回来的（原判：${was}）`,
-  })
-  if (error) throw new Error(error.message)
-  return Boolean(data)
-}
-
-/** 都放回来 —— **只放回 ✕ 的**，真办完的不翻出来。 */
-export async function unmarkAllOff() {
-  const { data, error } = await supa.rpc('pa_unmark_all_off')
-  if (error) throw new Error(error.message)
-  return data || 0
-}
+// muteAway / unmuteLetter / unmarkAllOff 于 2026-08-20 退役 ——
+// 「被判为不用回的」那层从面板上删了，✕ 和「放回」没有了立足的行。
+// 记号和判决都还在库里（cue_marks / letter_verdicts），要复活翻 git。
 
 /**
  * 重判一批对象：这段交流有没有约定下一个时间点、最后那封信要不要回。
