@@ -1218,8 +1218,9 @@ async function timerPass({ cap = TIMER_CAP } = {}) {
         say += `\n\n注意：这个人同时还挂在到点的机会线上（${同人线.map((x) => `「${x.subject_name}」${x.state}`).join('、')}）。按惯例判断：这封该**并进那边一起说**，还是**单独先发**？该并的话别起草，直接一句话说明并给哪张卡。`
       }
     }
-    const owner = r.subject_kind === 'pursuit'
-      ? { pursuit_id: r.subject_id } : { contact_id: r.subject_id }
+    // asOwner 认的形状是 {kind, id}（裸 id 会被当成 pursuit）——
+    // 第一轮就栽在这：传了 {pursuit_id} 整个对象被当 uuid 用。
+    const owner = { kind: r.subject_kind, id: r.subject_id }
     try {
       const ctx = await loadOwnerContext(owner)
       console.log(`  · ${r.subject_name}：${r.state}（过了 ${r.days_over} 天）`)
