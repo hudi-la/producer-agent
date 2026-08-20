@@ -651,9 +651,11 @@ export default function App() {
             「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
             就不该站在这儿。谁生的跟谁站。
 
-            通知**正是**那个东西，所以它站这儿。**数字数全部**（该动的＋等待＋
-            判为不用回＋没归到线的）—— 一个把 89 条藏在后面的数字，跟这一刀
-            要治的病是同一种。到点没到点看颜色和面板里的分区，不靠藏。 */}
+            通知**正是**那个东西，所以它站这儿。
+            数字**只数该动的**（2026-08-20 他拍的）：等待和没归线的在面板里
+            各自带着数，但不上角标 —— 角标是「现在有几件事等你动」，
+            不是「系统里躺着多少条」。当初「数全部」是为了不藏存档层；
+            存档层已经整个退役了，这个理由跟着走了。 */}
         <button className="bellbtn" onClick={openBell} aria-label="该动的">
           {/* Lucide 的 bell，跟读书 app（阅读陪伴）同一套手写内联 SVG 的规格：
               24 视口、stroke=currentColor、1.75、圆头圆角，不引库。
@@ -663,11 +665,9 @@ export default function App() {
                strokeLinejoin="round" aria-hidden="true">
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>{(() => {
-            const n = (notes?.bell?.due?.length || 0) + (notes?.bell?.waiting?.length || 0)
-              + (notes?.unclaimed || 0)
-            return n > 0 && <span className={'belln' + ((notes?.bell?.due?.length || 0) ? '' : ' calm')}>{n}</span>
-          })()}
+          </svg>{(notes?.bell?.due?.length || 0) > 0 && (
+            <span className="belln">{notes.bell.due.length}</span>
+          )}
         </button>
       </header>
 

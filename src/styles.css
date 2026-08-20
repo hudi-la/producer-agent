@@ -1398,8 +1398,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .nname:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* 判断的理由那一行（判「要回」凭什么 / 在等什么）——比主句再轻一档 */
 .nrow-y  { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
-/* 没有到点的、只有等待和存档时，角标不用喊 —— 但数字必须在 */
-.belln.calm { background: var(--ink-3); }
 /* 人际管理页「该动的」那两个区，行样式跟通知栏共用（.nrow 一家） */
 .ppl-due { margin: 4px 0 18px; }
 .ppl-due .nrow { border-bottom: 1px solid var(--line-2); }
