@@ -61,7 +61,10 @@ create or replace function public.pa_facts_to_judge(
                    '日', (r.created_at at time zone producer.app_tz())::date,
                    '谁', case when r.kind <> 'email' then '你记的笔'
                               when r.role = 'artist' then '你' else '对方' end,
-                   '说', left(regexp_replace(coalesce(r.content, ''), E'\\s+', ' ', 'g'), 200)
+                   -- 420 不是随手拍的：Biayna 8/17 那封，「meeting anytime between
+                   -- 12-3pm on September 11th」出现在第 300 字上下 —— 截 200 字
+                   -- 正好把日子剁掉，于是 9/11 的见面判丢了一次。
+                   '说', left(regexp_replace(coalesce(r.body_raw, r.content, ''), E'\\s+', ' ', 'g'), 420)
                  ) order by r.created_at), '[]'::jsonb)
             from (select r0.* from producer.pursuit_messages r0
                    left join lateral (
