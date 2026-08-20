@@ -108,7 +108,14 @@ function Deadline({ p }) {
 function Letter({ m }) {
   const [open, setOpen] = useState(false)
   const 进来的 = m.role === 'org'
-  const who = 进来的 ? (m.meta?.from_name || m.counterpart_email || '对方') : '你发出'
+  // 预约发送：你在 Gmail 里点了「安排发送」、还没到点的信。它会出现在
+  // 这儿（信没藏——你得看得见自己排了什么），但**不能长得跟发出去的一样**：
+  // 它还躺在队列里，可以取消，对方还没收到。到点之后自然变回「你发出」。
+  // （Gmail 对这种信不给标签，收信那道「没 SENT 就拦」的闸摸空了——
+  //   所以在这儿用时间说话：sent_at 在未来 = 还没发生。）
+  const 预约中 = !进来的 && new Date(m.created_at) > new Date()
+  const who = 进来的 ? (m.meta?.from_name || m.counterpart_email || '对方')
+    : 预约中 ? '预约发送 · 还没送出' : '你发出'
   // **原文和摘要不是一回事，不许混着显示。**
   //
   // 库里有两种信：body_raw 是 Gmail 取回来的原文，content 有时候是人写的
