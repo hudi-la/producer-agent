@@ -74,3 +74,49 @@ test('空的也不炸', () => {
   const { hand, old, muted, todo } = layer([], T('2026-08-18'))
   assert.deepEqual([hand, old, muted, todo], [[], [], [], []])
 })
+
+// ── state 那一半：分家和分区 ──────────────────────────────────
+
+import { splitStates, goesTo } from './notifications.js'
+import { stateLine, whyLine } from './stateText.js'
+
+const row = (over = {}) => ({
+  key: 'x', subject_kind: 'pursuit', subject_id: 'p1', state: 'WAITING_REPLY',
+  what: '等 Sarah 排 2027 的课', why: null, zone: 'waiting',
+  since_at: '2026-08-14T10:00:00Z', due_at: '2026-09-28T10:00:00Z',
+  name: 'Paperbark Books 工作坊', ...over,
+})
+
+test('线的事进通知栏，人的事进人际管理页 —— 即便是 NEEDS_REPLY', () => {
+  assert.equal(goesTo(row()), 'bell')
+  assert.equal(goesTo(row({ subject_kind: 'contact', state: 'NEEDS_REPLY' })), 'people')
+})
+
+test('Sarah 那条 9/28 之前在等待区，不在该动的', () => {
+  const { bell } = splitStates([row()])
+  assert.equal(bell.due.length, 0)
+  assert.equal(bell.waiting.length, 1)
+})
+
+test('该动的紧的在上：due 早的排前面', () => {
+  const { bell } = splitStates([
+    row({ key: 'a', zone: 'due', due_at: '2026-08-19' }),
+    row({ key: 'b', zone: 'due', due_at: '2026-08-17' }),
+  ])
+  assert.deepEqual(bell.due.map((x) => x.key), ['b', 'a'])
+})
+
+test('等待的措辞带着设定的日子；到点换成「已经起草」', () => {
+  assert.match(stateLine(row()), /设定 follow up 时间为 9 月 28 日/)
+  assert.match(stateLine(row({ zone: 'due' })), /follow up 已经起草/)
+})
+
+test('判「要回」的理由要显示出来 —— 原来完全不显示', () => {
+  const it = row({ state: 'NEEDS_REPLY', what: '她在等你点头', why: '她明说了等你确认九月对接 Joo' })
+  assert.match(whyLine(it), /凭什么：她明说了/)
+})
+
+test('OWE_* 的整句直接用库里拼好的 what', () => {
+  const it = row({ state: 'OWE_THANKS', what: '见到了你经「Weidi」介绍认识的「Biayna」，跟他说一声谢谢。' })
+  assert.equal(stateLine(it), it.what)
+})

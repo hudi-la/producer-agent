@@ -21,6 +21,61 @@ import { day as dayOf } from './when.js'
 /** 分界线用 BUMP_WAIT[0] —— 项目里已有的节奏常数，不另发明一个数。 */
 export const FRESH_DAYS = BUMP_WAIT[0]
 
+// ══ state 那一半（0094/0098 的 v_pa_state）════════════════════
+//
+// 一条线 / 一个人同时只有一个 state；到点没到点（zone）是库里算的。
+// 这儿只做两件事：分家（线的事进通知栏，人的事进人际管理页）和排序。
+
+/**
+ * 机会线的事进通知栏，人的事进人际管理页。
+ * 判据是**这件事挂在哪张卡上**，不是它长什么样：只挂在联系人身上、
+ * 放不进任何线的，即便是 NEEDS_REPLY 也进人际管理页。
+ */
+export const goesTo = (s) => (s.subject_kind === 'pursuit' ? 'bell' : 'people')
+
+/** 分家 + 分区。该动的紧的在上（due 早的先），等待的近的在上。 */
+export function splitStates(rows) {
+  const bell = { due: [], waiting: [] }
+  const people = { due: [], waiting: [] }
+  for (const r of rows || []) {
+    const home = goesTo(r) === 'bell' ? bell : people
+    ;(r.zone === 'due' ? home.due : home.waiting).push(r)
+  }
+  const 早的在上 = (a, b) => String(a.due_at || '').localeCompare(String(b.due_at || ''))
+  bell.due.sort(早的在上); bell.waiting.sort(早的在上)
+  people.due.sort(早的在上); people.waiting.sort(早的在上)
+  return { bell, people }
+}
+
+/**
+ * 【已处理】：表单交了、微信里说了、当面聊了 —— 系统看不见邮箱外的事，
+ * 靠你这一下。**它是一条真的笔**（进时间线，留痕迹），不是把提醒抹掉。
+ *
+ * 立刻生效靠第二步：给这条笔自己打上 resolves 标签（situation 记着
+ * 是按钮按的）。不打的话要等 brain 下一轮判那条笔，提醒会多挂几分钟。
+ * OWE_THANKS 另有一个落笔处（contacts.intro_thanked_at），一并落。
+ */
+export async function markHandled(it, note = '已处理（在通知栏按的）') {
+  const { data: row, error } = await supa.rpc(
+    it.subject_kind === 'pursuit' ? 'pa_add_pursuit_note' : 'pa_add_contact_message',
+    it.subject_kind === 'pursuit'
+      ? { p_pursuit_id: it.subject_id, p_text: note, p_kind: 'note' }
+      : { p_contact_id: it.subject_id, p_role: 'note', p_kind: 'note', p_content: note },
+  )
+  if (error) throw new Error(error.message)
+  const noteId = row?.id
+  if (noteId) {
+    await supa.rpc('pa_tag_message', {
+      p_message_id: noteId, p_situation: '已处理按钮',
+      p_resolves: true, p_resolves_why: '你按了【已处理】', p_gist: note,
+    })
+  }
+  if (it.state === 'OWE_THANKS') {
+    await supa.rpc('pa_thank_introducer', { p_introducer: it.subject_id })
+  }
+  return true
+}
+
 /**
  * 多久以内的往来才值得花钱重判。
  *
@@ -67,7 +122,8 @@ export function layer(items, today = new Date()) {
 const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
 
 const empty = (reason, detail) => ({
-  hand: [], old: [], muted: [], todo: [], unjudged: [], stale: [], source: 'empty', reason, detail,
+  bell: { due: [], waiting: [] }, people: { due: [], waiting: [] },
+  muted: [], unclaimed: 0, unjudged: [], stale: [], source: 'empty', reason, detail,
 })
 
 /**
@@ -92,28 +148,22 @@ export async function loadNotifications() {
     const marked = new Set((marks || []).map(
       (m) => `${m.subject_kind}|${m.subject_id}|${m.via}|${m.fact_at}`))
 
+    // state 那一半：该动的 / 等待，全是库里现算的（0094/0098）。
+    // 旧的五种由头（cues.js 那套）不再进面板 —— 它们的信息都并进了 state。
+    const { data: states } = await supa.from('v_pa_state').select('*')
+    const rows = (states || []).map((r) => ({
+      key: `${r.subject_kind}|${r.subject_id}`, ...r, name: r.subject_name,
+    }))
+
+    // 没归到任何线的往来：不逐条列（那边有自己的处理流程 ——
+    // 人际管理页的「等你点头」），这儿只报个数，别让它是隐形的。
+    const { count: unclaimed } = await supa
+      .from('v_pa_unknown_senders').select('*', { count: 'exact', head: true })
+
     const today = new Date()
     const items = []
     for (const f of facts || []) {
       const v = f.last_in_id ? vOf[f.last_in_id] : null
-      // 判定并进事实行：cues.js 只认 needs_reply / not_before 两个字段，
-      // 它不知道判定是从哪张表来的。**没判过就是 undefined = 当作要回。**
-      const merged = v ? { ...f, needs_reply: v.needs_reply, not_before: v.not_before } : f
-
-      const 已经在列表里 = new Set()
-      for (const cue of cuesFor(merged, { today })) {
-        const key = cueKey(f, cue)
-        if (marked.has(key)) continue          // ✓ 或 ✕ 过的，不再出现
-        已经在列表里.add(key)
-        items.push({
-          key, subject_kind: f.subject_kind, subject_id: f.subject_id,
-          name: f.name, line_title: f.line_title, cue, verdict: v || null,
-          // 这条对象的结论更新了没有。脏着 = 要么还没轮到判，要么上一轮判不出来
-          // 被跳过了 —— 两种都意味着**你现在看到的可能是旧结论**，得说出来。
-          // 原来判不出来是完全无声的：跳过只写进 brain 的日志，界面上一个字没有。
-          stale: Boolean(f.stale),
-        })
-      }
 
       // 被判为不用回的：**不消失**，单独一层，看得见理由。
       // 判错了你自己捞得回来 —— 静默筛掉是不许的。
@@ -121,15 +171,16 @@ export async function loadNotifications() {
         // 「放回」按下去到底会不会**多出一条**来 —— 现在就算清楚，
         // 别让按钮许一个兑现不了的承诺。
         //
-        // 判定翻成「要回」再问一遍由头，然后减掉两样：已经摆在列表里的
-        // （这条线可能本来就因为「发出去没回音」在上面挂着，那不算放回来），
-        // 和你 ✓/✕ 过的。剩下还有的，按下去才真有东西出现。
+        // 判定翻成「要回」再问一遍由头，减掉你 ✓/✕ 过的。剩下还有的，
+        // 按下去才真有东西出现。（原来还要减「已经摆在列表里的」——
+        // cue 行撤了之后，列表里的是 state 行，键不同，减不着也不用减：
+        // 放回之后 brain 重判那封信，state 自己会长出来。）
         //
         // 减不干净的话最常见是这种：信你其实早回过了（last_out_at 晚于
         // last_in_at，球根本不在你手上），一按，这条从「不用回」里没了，
         // 上面也不会多出什么——**一条东西被按没了**，比不给这个按钮糟得多。
         const backable = cuesFor({ ...f, needs_reply: true, not_before: null }, { today })
-          .some((c) => { const k = cueKey(f, c); return !marked.has(k) && !已经在列表里.has(k) })
+          .some((c) => !marked.has(cueKey(f, c)))
         items.push({
           key: `${f.subject_kind}|${f.subject_id}|muted|${dayOf(f.last_in_at)}`,
           subject_kind: f.subject_kind, subject_id: f.subject_id,
@@ -174,7 +225,9 @@ export async function loadNotifications() {
     // 最近的排前面 —— 先判最可能有新约定的那些
     stale.sort((a, b) => String(b.upto).localeCompare(String(a.upto)))
 
-    return { ...layer(items, today), unjudged: [...new Set(unjudged)], stale,
+    return { ...splitStates(rows), muted: layer(items, today).muted,
+             unclaimed: unclaimed || 0,
+             unjudged: [...new Set(unjudged)], stale,
              source: 'live', reason: null }
   } catch (e) {
     return empty(FELL_BACK.QUERY_FAILED, e.message)

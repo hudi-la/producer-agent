@@ -24,7 +24,7 @@ import SayTo from './components/SayTo.jsx'
 import { NO_FILTERS, anyOn, applyFilters } from './lib/filters.js'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, later as queueLater, goto as queueGoto, allSkipped, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { refreshPursuit } from './lib/refresh.js'
-import { loadNotifications, markCue, unmuteLetter, unmarkAllOff, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
+import { loadNotifications, markHandled, unmuteLetter, unmarkAllOff, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
@@ -237,8 +237,9 @@ export default function App() {
     } finally { setJudging(false) }
   }
 
-  const markNote = async (it, mark) => {
-    try { await markCue(it, mark) } catch (_) {}
+  // 【已处理】= 记一笔（进时间线，留痕迹），不是把提醒抹掉。
+  const handleNote = async (it) => {
+    try { await markHandled(it) } catch (e) { console.warn('已处理没记上：', e.message) }
     await pullNotes()
   }
   // 判错了捞回来：那一封信的判定翻成「要回」，它就回到该动的那一列里。
@@ -647,17 +648,23 @@ export default function App() {
             「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
             就不该站在这儿。谁生的跟谁站。
 
-            通知**正是**那个东西，所以它站这儿。数字只数「手头」那一层：
-            老账和判为不用回的随时点得开，但不该天天在你眼前报警。 */}
+            通知**正是**那个东西，所以它站这儿。**数字数全部**（该动的＋等待＋
+            判为不用回＋没归到线的）—— 一个把 89 条藏在后面的数字，跟这一刀
+            要治的病是同一种。到点没到点看颜色和面板里的分区，不靠藏。 */}
         <button className="bellbtn" onClick={openBell} aria-label="该动的">
-          🔔{(notes?.hand?.length || 0) > 0 && <span className="belln">{notes.hand.length}</span>}
+          🔔{(() => {
+            const n = (notes?.bell?.due?.length || 0) + (notes?.bell?.waiting?.length || 0)
+              + (notes?.muted?.length || 0) + (notes?.unclaimed || 0)
+            return n > 0 && <span className={'belln' + ((notes?.bell?.due?.length || 0) ? '' : ' calm')}>{n}</span>
+          })()}
         </button>
       </header>
 
       {bellOpen && (
         <Notifications
           data={notes} judging={judging} onJudgeMore={judgeMore}
-          onMark={markNote} onUnmute={unmuteNote} onAllBack={allNotesBack}
+          onHandled={handleNote} onUnmute={unmuteNote} onAllBack={allNotesBack}
+          onGoPeople={() => { setBellOpen(false); setArea('people') }}
           onClose={() => setBellOpen(false)}
           onOpen={(it) => {
             setBellOpen(false)
@@ -751,6 +758,9 @@ export default function App() {
             strangers={ct?.strangers || []}
             msgsByContact={ct?.msgsByContact || {}}
             fellBack={ct?.reason || null}
+            notes={notes?.people || null}
+            onHandled={handleNote}
+            onOpenState={(it) => openInTab('c', it.subject_id)}
             onOpen={(c) => openInTab('c', c.id)}
             onOpenOrg={(o) => openInTab('o', o.org)}
             onAdded={reloadContacts}
