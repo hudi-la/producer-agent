@@ -160,7 +160,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .col-h .cn { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; font-weight: 600; color: var(--ink-2); }
 .col-h .cc { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .col.now .col-h .cn { color: var(--accent); }
-.pcard { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 13px 14px; margin-bottom: 10px; box-shadow: var(--shadow); cursor: pointer; transition: transform .14s, border-color .14s; text-align: left; width: 100%; font: inherit; color: inherit; display: block; }
+.pcard { border: 1px solid var(--line); border-radius: 12px; background: var(--card-bg, var(--paper-2)); padding: 13px 14px; margin-bottom: 10px; box-shadow: var(--shadow); cursor: pointer; transition: transform .14s, border-color .14s; text-align: left; width: 100%; font: inherit; color: inherit; display: block; }
 .pcard:hover { transform: translateY(-2px); border-color: var(--line-2); }
 .pcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .col.now .pcard { border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
@@ -181,8 +181,34 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .pc-badge { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--g2); box-shadow: 0 0 0 3px var(--paper-2); }
 .stack-head { position: relative; }
 .stack-head .pc-badge { top: 12px; right: 12px; }
-/* open call（投申请的正式机会）：左竖条用标里那支蓝，区别于 workshop 冷外联 */
-.pcard.opencall::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 12px 0 0 12px; background: var(--mark-blue); }
+/* ── 一叠一个色 ──
+   （原来这儿是一条蓝竖条，标「正式申请 vs workshop 冷外联」。撤了：
+   那个区别从标题和机构名就看得出来，不值一条竖条的位置。）
+
+   规矩是**一叠一个色**：一次造卡任务撒出去的一批算一摊（树皮书 / 媒体艺术AI /
+   模特经纪 / 聚合源 scout）。这种批里的卡标题几乎一模一样，摊在板上分不清
+   谁是哪一摊的。不成摊的（你手填的、机构监测抓的正经机会）保持原样。
+   哪一摊用几号色见 lib/batchTint.js。
+
+   **锁明度、只推色相。** 第一版是往纸里混一点色（color-mix 9% 的蓝），
+   出来是「灰一点」不是「蓝一点」——这张纸太暖（r>g>b），9% 的蓝只把 r 和 b
+   的差拉近，翻不过去，反倒把卡压暗了一档，看着像卡失效了。
+   oklch(from …) 是照着现在这张纸取它的明度 l，只换色相和一点点彩度：
+   亮度分毫不动，偏的是颜色本身。两个主题各取各的 l，所以这一句写一遍就够。
+
+   状态那几样一样都不用让路：勾选是边框加外圈（不吃底色），暂停是整卡
+   opacity .58（淡底压在下面照样成立），未读是红点，都在这一层之上。 */
+:root { --kind-c: .013; }                                 /* 彩度：够分得开，又不抢眼 */
+@media (prefers-color-scheme: dark) { :root { --kind-c: .018; } }
+/* 色号设的是 --card-bg 不是 background：折着的那一叠要连身后垫的两层纸一起偏
+   （那两层是 .stack 的伪元素，够不着卡自己的 background）。卡、叠头、垫纸
+   三处都读这一个变量，一摊的色就只有一个出处。 */
+.pcard.k-t0, .stack.k-t0 { --card-bg: oklch(from var(--paper-2) l var(--kind-c) 250); }  /* 偏蓝 */
+.pcard.k-t1, .stack.k-t1 { --card-bg: oklch(from var(--paper-2) l var(--kind-c) 150); }  /* 偏绿 */
+.pcard.k-t2, .stack.k-t2 { --card-bg: oklch(from var(--paper-2) l var(--kind-c) 350); }  /* 偏粉 */
+.pcard.k-t3, .stack.k-t3 { --card-bg: oklch(from var(--paper-2) l var(--kind-c) 300); }  /* 偏紫 */
+.pcard.k-t4, .stack.k-t4 { --card-bg: oklch(from var(--paper-2) l var(--kind-c)  80); }  /* 偏黄 */
+.pcard.k-t5, .stack.k-t5 { --card-bg: oklch(from var(--paper-2) l var(--kind-c)  20); }  /* 偏橘 */
 /* 批量操作开着的时候，整张卡就是个勾选框。角上那个方块只是给你看的。 */
 .pcard.pickable { cursor: pointer; padding-left: 36px; }
 .pcard.pickable:active { cursor: pointer; }
@@ -601,12 +627,12 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .stack:not(.open)::after {
   content: ''; position: absolute; left: 5px; right: 5px; bottom: 5px; height: 10px;
   border: 1px solid var(--line); border-top: none;
-  border-radius: 0 0 11px 11px; background: var(--paper-2);
+  border-radius: 0 0 11px 11px; background: var(--card-bg, var(--paper-2));
 }
 .stack:not(.open)::after { bottom: 1px; left: 10px; right: 10px; opacity: .72; }
 .stack-head {
   position: relative; width: 100%; text-align: left; font: inherit; color: inherit;
-  border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2);
+  border: 1px solid var(--line); border-radius: 12px; background: var(--card-bg, var(--paper-2));
   padding: 13px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px;
   box-shadow: var(--shadow); transition: transform .14s, border-color .14s;
 }

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, openLine } from '../lib/nextAction.js'
 import { goldLine } from '../lib/stateText.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
+import { tintSlots, slotOf, inBatch } from '../lib/batchTint.js'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
 // 然后发出去、等回信；末尾两个收尾去处——成了 = 谈成，停了 = 暂停处理。
@@ -92,10 +93,11 @@ function statusText(p, held) {
 // 最可能藏身的地方（一封信被错判成不用回，线就这么安静了）。
 const 该有动静的 = new Set(['sent', 'replying', 'won'])
 
-function PCard({ p, st, audit, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
+function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
   const held = heldLabel(useProfile())
   const dim = p.stage === 'paused' || !p.eligible
-  const opencall = p.kind && p.kind !== 'workshop' // 投申请的正式机会（区别于 workshop 冷外联）
+  // 这张是哪一摊撒出去的 —— 决定底色偏哪一点。只有冷外联那几摊有，见 lib/batchTint.js
+  const tint = slotOf(p, tints)
   const ball = ballOf(p)
   // 截止日期是「投递窗口」的事实 —— 线走到发出&提交之后它的任务就完成了，
   // 封面上留着只会跟真正活着的状态行（金色那行「在等什么」）抢注意力。
@@ -118,7 +120,7 @@ function PCard({ p, st, audit, onOpen, onDragStart, onJot, unseen, picking, chec
 
   return (
     <div
-      className={'pcard' + (opencall ? ' opencall' : '') + (picking ? ' pickable' : '') + (checked ? ' on' : '')}
+      className={'pcard' + (tint === null ? '' : ' k-t' + tint) + (picking ? ' pickable' : '') + (checked ? ' on' : '')}
       style={dim ? { opacity: 0.58 } : undefined}
       role={picking ? 'checkbox' : 'button'}
       aria-checked={picking ? checked : undefined}
@@ -177,13 +179,16 @@ function PCard({ p, st, audit, onOpen, onDragStart, onJot, unseen, picking, chec
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states, audit }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states, audit, tints }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
   // 「找 workshop 机构 · 15 张」那种场景，冷邮件本来就是一批一批起的——
   // 所以叠头上要能一次勾全叠。不展开也能勾。
   const hit = items.filter((p) => picked?.has(p.id)).length
+  // 叠头也吃这一摊的色 —— 折着的时候你看见的就是这一张，它不带色等于没上色。
+  // 从叠里第一张有色的卡拿号：一叠就是一次造卡任务，摊里各张拿到的号是同一个。
+  const tint = items.map((p) => slotOf(p, tints)).find((x) => x !== null && x !== undefined) ?? null
   const allOn = hit === items.length && hit > 0
   const ids = items.map((p) => p.id)
 
@@ -192,7 +197,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
   }
 
   return (
-    <div className={'stack' + (open ? ' open' : '')}>
+    <div className={'stack' + (open ? ' open' : '') + (tint === null ? '' : ' k-t' + tint)}>
       <div className="stack-head" role="button" tabIndex={0} onClick={onToggle} onKeyDown={onKey}>
         {picking && (
           <button
@@ -221,7 +226,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
       </div>
       {open && items.map((p) => (
         <PCard
-          p={p} st={states?.get?.(p.id)} audit={audit} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
+          p={p} st={states?.get?.(p.id)} audit={audit} tints={tints} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
           unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(p.id)} onPick={onPick}
         />
       ))}
@@ -230,6 +235,8 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
 }
 
 export default function Pipeline({ pursuits, tasks = [], states = null, audit = false, onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
+  // 哪一摊用几号色。整块板算一次 —— 每张卡各算各的会因为看见的卡不同而发出不同的号。
+  const tints = useMemo(() => tintSlots(pursuits), [pursuits])
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
@@ -255,13 +262,17 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
   }
 
   // 一列里：够数的同任务卡折成一叠，其余照旧单张铺开。保持原有顺序。
+  //
+  // 「算不算一摊」问 inBatch —— 跟上色同一个判断（见 lib/batchTint.js）。
+  // 聚合源那批就是靠这一句散着铺开的：它们各是各的机会，不是同一封冷邮件
+  // 撒出去的一批，折起来反而把「这是七个不同的机会」这件事藏了。
   const layout = (items) => {
     const counts = {}
-    for (const p of items) if (p.task_id) counts[p.task_id] = (counts[p.task_id] || 0) + 1
+    for (const p of items) if (inBatch(p)) counts[p.task_id] = (counts[p.task_id] || 0) + 1
     const out = []
     const seen = new Set()
     for (const p of items) {
-      const tid = p.task_id
+      const tid = inBatch(p) ? p.task_id : null
       if (tid && counts[tid] >= STACK_MIN) {
         if (seen.has(tid)) continue
         seen.add(tid)
@@ -299,6 +310,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
                   items={row.items}
                   states={states}
                   audit={audit}
+                  tints={tints}
                   open={openStacks.has(row.stack)}
                   onToggle={() => toggleStack(row.stack)}
                   onOpen={onOpen}
@@ -312,7 +324,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
                 />
               ) : (
                 <PCard
-                  p={row.card} st={states?.get?.(row.card.id)} audit={audit} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
+                  p={row.card} st={states?.get?.(row.card.id)} audit={audit} tints={tints} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
                   onJot={onJot} unseen={unseen.has(row.card.id)}
                   picking={picking} checked={picked.has(row.card.id)} onPick={onPick}
                 />
