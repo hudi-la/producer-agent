@@ -137,6 +137,9 @@ const post = async (path, body) => {
  */
 export const identifyEmail = (email) => post('/identify', { email })
 
+/** 认领共享信箱后立刻搬它名下的信 —— 不等每小时的兜底。 */
+export const carryMailbox = (email) => post('/mailbox/carry', { email })
+
 /**
  * 认领之后，人跟着信一起归位：这个地址名下已经躺在某条线上的信，
  * 人/信箱直接挂成那条线的相关方。纯规则（信就在线上，证据确凿）。

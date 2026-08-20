@@ -1580,6 +1580,25 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // 认领共享信箱那一刻就把它名下的信搬进来 —— 不等每小时的兜底。
+  // 真事（Stanford，2026-08-20）：认领发生在整点兜底之后，那封
+  // 「提案已收到」的确认信要干等一小时才进对话表，线上的归属、
+  // 相关方全跟着晚一小时。认领人有 refreshContact 会搬，信箱原来没有对应物。
+  if (req.method === 'POST' && req.url === '/mailbox/carry') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const { email } = JSON.parse(raw || '{}')
+        if (!email?.includes('@')) throw new Error('要一个邮箱地址')
+        const { promote } = await import('./mail/adopt.js')
+        const out = await promote(String(email).trim().toLowerCase(), { log: (m) => console.log(m) })
+        send(res, 200, out)
+      } catch (err) { send(res, 500, { error: err.message }) }
+    })
+    return
+  }
+
   if (req.method === 'POST' && req.url === '/identify') {
     let raw = ''
     req.on('data', (c) => (raw += c))

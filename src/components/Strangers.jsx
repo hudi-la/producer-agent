@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import {
   identifyEmail, claimEmail, markOrgMailbox, upsertContact, claimThread, refreshContact,
-  attachAddressLines,
+  attachAddressLines, carryMailbox,
 } from '../lib/people.js'
 
 // 加人。
@@ -43,6 +43,9 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
     try {
       if (how === 'org') {
         await markOrgMailbox(email, f.org || who.org || '未具名机构', '共享信箱', who.notes || null)
+        // 立刻搬它名下的信 —— 不等每小时的兜底（Stanford 那封确认信
+        // 干等过一小时）。搬完线上的归属、转移表判断都在下一轮自然跟上。
+        try { await carryMailbox(email) } catch (_) {}
         // 人跟着信一起归位：这个信箱的信已经在哪条线上，就挂成那条线的
         // 相关方。真事：adavi290 的信早就在 ASU 线上，认领后却没人挂 —— 他手动的。
         try {
