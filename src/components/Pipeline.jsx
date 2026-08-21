@@ -15,6 +15,9 @@ const STAGES = [
   ['replying', '进一步'],
   ['won', '谈成'],
   ['paused', '暂停处理'],
+  // 可能以后有用的，放最后。放进来的卡之后再定行为（2026-08-20）——
+  // 现在它不静音（信照归、state 照算），也不算「该有动静的」（不吊灰气泡）。
+  ['watch', '持续关注'],
 ]
 
 // 一次造卡任务造出来的卡，够多就折成一叠——首页恒静，想看才展开。
@@ -84,6 +87,7 @@ function statusText(p, held) {
     case 'won': return '谈成 ✓'
     // 为什么停下来（不投 / 资格暂缓 / 你没兴趣）是卡上的事，列不再分。
     case 'paused': return '暂停处理'
+    case 'watch': return '持续关注'
     default: return ''
   }
 }

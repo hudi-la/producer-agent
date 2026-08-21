@@ -43,7 +43,7 @@ export async function attributePass({ days = 30, apply = true, log = console.log
 
   const { data: pursuits, error } = await db()
     .from('v_pa_pursuits').select('id, title, org, stage')
-    .in('stage', ['sent', 'replying', 'won', 'matching', 'writing', 'paused'])
+    .in('stage', ['sent', 'replying', 'won', 'matching', 'writing', 'paused', 'watch'])
   if (error) throw new Error(error.message)
   if (!pursuits?.length) return { checked: rows.length, note: '没有在跑的线可挂' }
 
