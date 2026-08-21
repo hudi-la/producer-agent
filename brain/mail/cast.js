@@ -25,7 +25,7 @@ const rpc = async (fn, args) => {
 }
 
 // 还没发出去的提案不该有信，别去为难它们；已经放弃的更不用。
-const LIVE = ['sent', 'replying', 'won', 'matching', 'writing', 'paused']
+const LIVE = ['sent', 'replying', 'won', 'matching', 'writing', 'paused', 'watch']
 
 export async function castPass({ apply = true, stages = LIVE, log = console.log } = {}) {
   const { data: pursuits, error: e1 } = await db()

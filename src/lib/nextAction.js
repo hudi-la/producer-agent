@@ -61,6 +61,8 @@ const SOON_DAYS = 14
  *
  * 「移卡这件事情本身也是包括判断的」：你把卡移过去，就是你说了这件事做完了。
  */
+// watch（持续关注）**有意不在**这个名单里：它是「先收着」，不是「办完了」——
+// 截止对它还有意义（可能哪天要投），封面照旧显示。
 const 交出去了 = (p) => ['sent', 'replying', 'won', 'paused'].includes(p.stage)
 
 export function deadlineLine(p) {

@@ -19,3 +19,12 @@ begin
   end if;
 end;
 $function$;
+
+-- ── 0110 补（同一天，他抓的）：加列没扫全 ──────────────────────
+-- 「持续关注」当时只加进了 Pipeline 的 STAGES，卡抽屉顶上那个下拉
+-- （PursuitFocus 的 STAGE_ORDER/STAGE_LABELS）、brain 的 cast.js LIVE
+-- 名单、pa_subjects_for_rejudge 的栏名 CASE 全漏了。教训还是那条：
+-- **改判据先扫再改** —— stage 名单在五处，不是一处。
+-- （pa_subjects_for_rejudge 的修正直接在库上做了，全文见函数本体；
+--   nextAction 的「交出去了」和 Pipeline 的「该有动静的」是**有意**
+--   不含 watch 的，注释写在各自代码里。）

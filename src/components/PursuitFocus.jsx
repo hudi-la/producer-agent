@@ -24,9 +24,9 @@ import Md from './Md.jsx'
 
 const STAGE_LABELS = {
   pending: '新机会', matching: '匹配项目', writing: '一起写', sent: '发出&提交',
-  replying: '进一步', won: '谈成', paused: '暂停处理',
+  replying: '进一步', won: '谈成', paused: '暂停处理', watch: '持续关注',
 }
-const STAGE_ORDER = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused']
+const STAGE_ORDER = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused', 'watch']
 
 const srcLabel = (s) => (s === 'manual' ? '你丢的' : 'scout')
 const PAYOFF = { paid: '给钱', access: '给圈子', both: '钱 + 圈子' }
