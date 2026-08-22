@@ -48,7 +48,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-18a'
+export const BRAIN_BUILD = '2026-08-21a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -1148,12 +1148,21 @@ async function tagPass({ limit = 12 } = {}) {
     const ev = eventOf(f)
     if (!ev) { skipped.push(`${f.subject_name}：kind=${f.kind} 不是 event`); continue }
 
+    // 读不到 state 就不判这条。原来这儿吞错把「没读到」当成 IDLE ——
+    // 网络抖一下、视图超时一下，事实就按 IDLE 走错格子，而日志一个字没有。
+    // 「主体还没有 state 行」（真 IDLE）是 data=null 且无 error；
+    // 「查询失败」是 error —— 两回事，不许长一个样。
+    // 跳过 = 不写标签 = 这条留在 pa_facts_to_judge 的队列里，下轮再来。
     let st = null
     try {
-      const { data } = await db.from('v_pa_state').select('*')
+      const { data, error } = await db.from('v_pa_state').select('*')
         .eq('subject_kind', f.subject_kind).eq('subject_id', f.subject_id).maybeSingle()
+      if (error) throw new Error(error.message)
       st = data
-    } catch (_) {}
+    } catch (err) {
+      skipped.push(`${f.subject_name}：读 state 失败（${err.message}），留在队列下轮再来`)
+      continue
+    }
     const stateName = st?.state || 'IDLE'
 
     const cell = cellFor(stateName, ev)

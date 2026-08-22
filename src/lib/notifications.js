@@ -141,22 +141,29 @@ export async function loadNotifications() {
     const ids = [...new Set((facts || []).map((f) => f.last_in_id).filter(Boolean))]
     // 判决只为「还有哪些没判过」服务（triage 的排队口径）；cue_marks 不再读 ——
     // 面板上已经没有靠记号藏行的地方了。
-    const { data: verdicts } = ids.length
+    // 下面三条原来都没解构 error（2026-08-21 之前）——查询失败时 data 是
+    // undefined，被 `|| []` 兜成空数组，面板显示「没有事要办」，跟真没事
+    // 长得一模一样。限额打爆那天就是这么静默的。失败必须走 QUERY_FAILED，
+    // 让界面说「拉不下来」，别替库编一个「一切安好」。
+    const { data: verdicts, error: ve } = ids.length
       ? await supa.from('v_pa_letter_verdicts').select('*').in('gmail_message_id', ids)
-      : { data: [] }
+      : { data: [], error: null }
+    if (ve) return empty(FELL_BACK.QUERY_FAILED, ve.message)
     const vOf = Object.fromEntries((verdicts || []).map((v) => [v.gmail_message_id, v]))
 
     // state 那一半：该动的 / 等待，全是库里现算的（0094/0098）。
     // 旧的五种由头（cues.js 那套）不再进面板 —— 它们的信息都并进了 state。
-    const { data: states } = await supa.from('v_pa_state').select('*')
+    const { data: states, error: se } = await supa.from('v_pa_state').select('*')
+    if (se) return empty(FELL_BACK.QUERY_FAILED, se.message)
     const rows = (states || []).map((r) => ({
       key: `${r.subject_kind}|${r.subject_id}`, ...r, name: r.subject_name,
     }))
 
     // 没归到任何线的往来：不逐条列（那边有自己的处理流程 ——
     // 人际管理页的「等你点头」），这儿只报个数，别让它是隐形的。
-    const { count: unclaimed } = await supa
+    const { count: unclaimed, error: ue } = await supa
       .from('v_pa_unknown_senders').select('*', { count: 'exact', head: true })
+    if (ue) return empty(FELL_BACK.QUERY_FAILED, ue.message)
 
     const today = new Date()
     // 「被判为不用回的」那层从面板退役了（2026-08-20，他拍的）：
