@@ -18,6 +18,7 @@ import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
+import { onPulse } from '../lib/pulse.js'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
 import Md from './Md.jsx'
@@ -414,8 +415,9 @@ export default function PursuitFocus({
     // 一打开就 ReferenceError 崩掉，整页白。删掉。
     setDeliv([]); setAtts([])
     reloadDeliv()
-    const iv = setInterval(reloadDeliv, 5000)
-    return () => clearInterval(iv)
+    // 原来这儿每 5 秒硬拉一遍（产出带全文 + 附件），一小时一千四百多趟，
+    // 绝大多数趟什么都没变。现在跟脉搏走：库里动了才拉。
+    return onPulse(reloadDeliv)
   }, [p.id, threeCol])
 
   // 取消定稿：左栏那份退回右栏接着改。改的还是同一份，不生第二个版本。
@@ -457,23 +459,24 @@ export default function PursuitFocus({
   const jumpTo = (msgId) => flashTo('msg-' + msgId)
   const jumpMail = (msgId) => flashTo('dmail-' + msgId)
 
-  // 实时兜底：开着这条线时每 3 秒拉一次库。 Fairwind 在后台想完的回复会自动出现——
+  // 实时兜底：开着这条线时跟着脉搏拉库。 Fairwind 在后台想完的回复会自动出现——
   // 你不必守着这个页面。离开再回来也一样，因为回复本就落在库里，不在你的屏幕上。
-  useEffect(() => {
-    const iv = setInterval(async () => {
-      const rows = await fetchMessages(p.id)
-      if (!rows) return
-      setMsgs((cur) => {
-        const tmp = cur.filter((m) =>
-          typeof m.id === 'string' && m.id.startsWith('tmp') &&
-          !rows.some((r) => r.role === m.role && r.content === m.content))
-        const next = [...rows, ...tmp]
-        if (next.length === cur.length && next[next.length - 1]?.id === cur[cur.length - 1]?.id) return cur
-        return next
-      })
-    }, 3000)
-    return () => clearInterval(iv)
-  }, [p.id])
+  //
+  // 原来是每 3 秒硬拉一遍——这条线的**全部往来连邮件原文**，一小时一千二百趟，
+  // 一天几个 GB，是这次流量打爆的最大头。整包的形状没改（原文照样在），
+  // 改的是趟数：脉搏（0111）说库里动了，才来真拉这一趟。
+  useEffect(() => onPulse(async () => {
+    const rows = await fetchMessages(p.id)
+    if (!rows) return
+    setMsgs((cur) => {
+      const tmp = cur.filter((m) =>
+        typeof m.id === 'string' && m.id.startsWith('tmp') &&
+        !rows.some((r) => r.role === m.role && r.content === m.content))
+      const next = [...rows, ...tmp]
+      if (next.length === cur.length && next[next.length - 1]?.id === cur[cur.length - 1]?.id) return cur
+      return next
+    })
+  }), [p.id])
 
   // said 是「重说」交过来的那句改完的话。不传就是输入框里那句。
   // 两条路必须共用这一个函数：乐观插入、换掉临时条、失败时话还不还给你——

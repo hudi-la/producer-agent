@@ -19,6 +19,7 @@ import Trouble from './components/Trouble.jsx'
 import DrawerGrip, { restoreDrawerWidth } from './components/DrawerGrip.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain } from './lib/backends.js'
+import { onPulse } from './lib/pulse.js'
 import { cleanCopy } from './lib/cleanCopy.js'
 import Subbar from './components/Subbar.jsx'
 import SayTo from './components/SayTo.jsx'
@@ -149,14 +150,17 @@ export default function App() {
   // 「读到这儿了」写进库（0030 的 pursuit_seen）。跟卡走，不跟浏览器走。
   //
   // 先就地把 unread 关掉再写库：小红点该在你点开的那一瞬间灭，不该等一趟网络。
-  // 写失败也不回滚——最坏是下一次 8 秒轮询把它带回来，比卡在那儿转圈强。
+  // 写失败也不回滚——最坏是下一次真数据进来时把它带回来，比卡在那儿转圈强。
+  //
+  // **没红点就一个字都不写。** 不只是省一次往返：pursuit_seen 也拨脉搏（0111），
+  // 「正看着的这张随时算已看」那个 effect 又跟着 pl 跑——无条件写的话就成了
+  // 写 → 脉搏 → 重拉 pl → 再写 的自激循环，脉搏跳多快它烧多快。
+  // 红点真亮着才有「已看」这件事可记。
   const markSeen = (id) => {
+    const hit = pl?.pursuits?.find((p) => p.id === id)
+    if (!hit || !hit.unread) return
     setPl((cur) => {
       if (!cur) return cur
-      const hit = cur.pursuits.find((p) => p.id === id)
-      // 没变化就原样返回 —— 下面那个「正看着的这张随时算已看」的 effect 依赖 pl，
-      // 每次都造个新对象的话它会自己触发自己，停不下来。
-      if (!hit || !hit.unread) return cur
       return { ...cur, pursuits: cur.pursuits.map((p) => (p.id === id ? { ...p, unread: false } : p)) }
     })
     markSeenDb(id).catch(() => {})
@@ -322,17 +326,18 @@ export default function App() {
   // 原来只在「关掉详情」时标一次，可抽屉是开着不关、一张接一张过的——
   // 从 A 卡直接点 B 卡，A 从来没被标记过，于是它一不再是「当前这张」，
   // 小红点立刻就回来了：你明明读过了，它还说你没读。
-  // 跟着 pl 走（每 8 秒一刷），所以你读着的时候进来的新回复也算读过了。
+  // 跟着 pl 走（脉搏一动就刷），所以你读着的时候进来的新回复也算读过了。
   useEffect(() => {
     if (view.name === 'pursuit' && view.pursuit?.id) markSeen(view.pursuit.id)
   }, [view.name, view.pursuit?.id, pl])
 
-  // 看板每 8 秒刷一次机会线——Fairwind 在后台想完的回复、别处的改动都会自动进来，
-  // 不用你手动刷新。
-  useEffect(() => {
-    const iv = setInterval(() => { loadPursuits().then((r) => { if (r) setPl(r) }) }, 8000)
-    return () => clearInterval(iv)
-  }, [])
+  // 看板跟着脉搏刷——Fairwind 在后台想完的回复、别处的改动都会自动进来，
+  // 不用你手动刷新。原来是每 8 秒硬拉一遍全表（~110KB），一天下来
+  // 好几个 GB 全花在「重拉没变的东西」上；现在每 4 秒问的是一行两列的
+  // v_pa_pulse，库里真动了才拉这一包。见 docs/specs/2026-08-21-egress-diet.md。
+  useEffect(() => onPulse(() => {
+    loadPursuits().then((r) => { if (r) setPl(r) })
+  }), [])
 
   // ── 地址栏 ⇄ 你在哪 ──────────────────────────────────────
   //
@@ -774,7 +779,6 @@ export default function App() {
             contacts={ct?.contacts || []}
             orgs={ct?.orgs || []}
             strangers={ct?.strangers || []}
-            msgsByContact={ct?.msgsByContact || {}}
             fellBack={ct?.reason || null}
             notes={notes?.people || null}
             onHandled={handleNote}

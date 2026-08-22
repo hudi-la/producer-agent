@@ -75,7 +75,7 @@ function PeopleDue({ notes, onHandled, onOpenState }) {
 }
 
 export default function People({
-  contacts = [], orgs = [], strangers = [], msgsByContact = {},
+  contacts = [], orgs = [], strangers = [],
   fellBack = null, onOpen, onOpenOrg, onAdded,
   // 人的事那两个区（该动的 / 等待）。数据和通知栏同一份 v_pa_state，
   // 分家之后人的那一半落在这儿。

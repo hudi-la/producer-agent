@@ -7,12 +7,15 @@ import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
 // 跟 loadPursuits 一个姿势：连不上 / 库是空的，都退回一个**说得清原因**的空结果，
 // 而不是无声地显示「没有人」——空页可以，骗人不行。
 //
-// 这儿一次把往来全拉回来（不像首页那样只读一个布尔）。理由是人少：
-// 这一刀不做扫老邮箱导通讯录，库里十来个人。等几千个人进来，这儿要改成按需拉——
-// 到时候会疼，但现在为它加复杂度是白加。
+// 这儿**不再拉往来**（2026-08-21）。原来有一条「全库带正文的消息」查询喂
+// msgsByContact——查下来它是个死 prop：People.jsx 解构了但没人读，名片页
+// 打开时 PersonFocus 自己按人现拉。而这条死查询一次 4.2 MB（含全部邮件
+// 原文），是流量打爆的第二大头；并且 1275 行早过了 PostgREST 的 1000 行
+// 上限，返回的还是静默截断的——跟 loadPursuits 开头记的是同一种事故。
+// 界面上没有任何东西靠它，删。
 
 const empty = (reason, detail) => ({
-  contacts: [], orgs: [], msgsByContact: {}, source: 'empty', reason, detail,
+  contacts: [], orgs: [], source: 'empty', reason, detail,
 })
 
 export async function loadContacts() {
@@ -60,15 +63,6 @@ export async function loadContacts() {
     // 现在的机构排前面，离开了的排后面
     const orgsOf = byC(orgs, (a, b) => (a.until ? 1 : 0) - (b.until ? 1 : 0))
 
-    // 邮件 + 你记的笔。升序 —— cues.js 的判据靠这个顺序（最后一封在末尾）。
-    const { data: msgs, error: me } = await supa
-      .from('v_pa_pursuit_messages').select('*')
-      .not('contact_id', 'is', null).order('created_at')
-    if (me) return empty(FELL_BACK.QUERY_FAILED, me.message)
-
-    const msgsByContact = {}
-    for (const m of msgs || []) (msgsByContact[m.contact_id] ||= []).push(m)
-
     // 机构也进通讯录。通讯录装的是**你会写信的对象**，不是只装人——
     // residency@culturehub.org 来回七封，它当然该有一条。
     const { data: orgRows } = await supa
@@ -86,7 +80,6 @@ export async function loadContacts() {
       })),
       orgs: orgRows || [],
       strangers: strangers || [],
-      msgsByContact,
       source: 'live', reason: null, detail: null,
     }
   } catch (e) {
