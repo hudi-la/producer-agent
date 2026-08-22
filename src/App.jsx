@@ -331,11 +331,12 @@ export default function App() {
     if (view.name === 'pursuit' && view.pursuit?.id) markSeen(view.pursuit.id)
   }, [view.name, view.pursuit?.id, pl])
 
-  // 看板跟着脉搏刷——Fairwind 在后台想完的回复、别处的改动都会自动进来，
-  // 不用你手动刷新。原来是每 8 秒硬拉一遍全表（~110KB），一天下来
-  // 好几个 GB 全花在「重拉没变的东西」上；现在每 4 秒问的是一行两列的
-  // v_pa_pulse，库里真动了才拉这一包。见 docs/specs/2026-08-21-egress-diet.md。
-  useEffect(() => onPulse(() => {
+  // 看板跟着计数器刷——Fairwind 在后台想完的回复、别处的改动都会自动进来，
+  // 不用你手动刷新。原来是每 8 秒硬拉一遍全表（161 KB），一天好几个 GB
+  // 全花在「重拉没变的东西」上；现在每 4 秒只问 v_pa_pulse 那几个数，
+  // 而且**只认 board 那一列**——判个邮箱地址、写条邮件标签日志都不会惊动看板。
+  // 见 docs/specs/2026-08-21-egress-diet.md。
+  useEffect(() => onPulse('board', () => {
     loadPursuits().then((r) => { if (r) setPl(r) })
   }), [])
 

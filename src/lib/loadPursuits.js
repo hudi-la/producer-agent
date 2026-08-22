@@ -27,11 +27,16 @@ const seed = (reason, detail) => ({
 //
 // 现在这个判据算在 v_pa_pursuits 里（0030），前端只读 p.unread 一个布尔。
 // 详情页要的往来由 PursuitFocus 自己 fetchMessages 单条拉。
+//
+// 读的是 v_pa_pursuit_cards 而不是 v_pa_pursuits：卡片视图 = 原视图去掉
+// `why`（匹配理由）和 `notes`（关系记忆）两段长文。实测 161,277 → 78,254 字节，
+// 而看板的卡片**一个字都不显示这两列**，只有点开某一张时详情页才要——
+// 那一张由 PursuitFocus 自己 fetchPursuitDetail 单独拉。见 0115。
 export async function loadPursuits() {
   if (!DB_CONFIGURED) return seed(FELL_BACK.NO_CONFIG)
   try {
     const { data: pursuits, error: pe } = await supa
-      .from('v_pa_pursuits').select('*').order('created_at')
+      .from('v_pa_pursuit_cards').select('*').order('created_at')
     if (pe) return seed(FELL_BACK.QUERY_FAILED, pe.message)
     if (!pursuits || !pursuits.length) return seed(FELL_BACK.EMPTY)
 

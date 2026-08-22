@@ -49,6 +49,13 @@ function legacyEntriesBlock(entries) {
     const bits = [e.year, e.medium, e.concern, ...legacyEntryFacts(e)].filter(Boolean).join(' · ')
     const tags = e.tags?.length ? `〔标签：${e.tags.join(' / ')}〕` : ''
     lines.push(`- [${label}] ${e.title}${bits ? ` (${bits})` : ''}${e.body ? ` — ${e.body}` : ''}${tags}`)
+    // 2026-08-21 盒子上膛：这是搬家之后唯一一次**改内容**，尺子跟着长——
+    // 从这天起尺子量的是「chat / brief 两条路 + 三档拼接」仍然逐字一致。
+    const box = Object.entries(e.box || {}).filter(([, v]) => v != null && String(v).trim() !== '')
+    if (box.length) {
+      lines.push('  盒子（私密外联层，是给你的作战情报，不是对外文案——写「为什么是我」、判断怎么开口时用）：')
+      for (const [k, v] of box) lines.push(`  · ${k}：${v}`)
+    }
   }
   lines.push('')
   return lines
@@ -187,6 +194,8 @@ const entries = [
   { kind: 'education', title: 'MFA', meta: { school: 'CalArts', year: '2021', location: 'LA' } },
   { kind: 'job', title: '讲师', meta: { org: 'UCLA', start: '2023', end: '2025', location: 'LA' } },
   { kind: 'statement', title: '创作自述', meta: { scope: '总述' }, body: '正文。' },
+  { kind: 'offer', title: 'Paperbark — Workshop', year: '2026', medium: '工作坊', body: '一段英文描述。', tags: ['workshop'],
+    box: { guardrail: '⚠️ 这个 workshop 还没真教过，对外只能说在谈。', video: 'https://youtu.be/xxxx', 空的: '' } },
 ]
 
 const attachments = [
@@ -275,6 +284,16 @@ test('静态块装的是永不变的那些：人格 + 档案 + 信息库', () =>
   assert.ok(!静态.includes('## 你们之前的往来'))
   assert.ok(!静态.includes('## 这条机会线'))
   assert.ok(!静态.includes('## Ta 刚说'))
+})
+
+test('盒子跟着条目进了信息库——guardrail 这类外联情报 Fairwind 看得见', () => {
+  const [静态] = buildSystem(pursuitCtx)
+  assert.ok(静态.includes('还没真教过'), '盒子里的 guardrail 没进 prompt')
+  assert.ok(静态.includes('https://youtu.be/xxxx'), '盒子里的链接没进 prompt')
+  // 空值的 key 不该渲染出一行空的
+  assert.ok(!静态.includes('空的'))
+  // brief 那条路用同一个 entriesBlock，也得看得见
+  assert.ok(buildBriefSystem(pursuitCtx)[0].includes('还没真教过'))
 })
 
 test('两条不同的线，静态块逐字相同（缓存能不能跨线命中就看这个）', () => {

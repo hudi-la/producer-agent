@@ -161,6 +161,13 @@ export function entriesBlock(entries) {
     const bits = [e.year, e.medium, e.concern, ...entryFacts(e)].filter(Boolean).join(' · ')
     const tags = e.tags?.length ? `〔标签：${e.tags.join(' / ')}〕` : ''
     lines.push(`- [${label}] ${e.title}${bits ? ` (${bits})` : ''}${e.body ? ` — ${e.body}` : ''}${tags}`)
+    // 盒子：网站装不下的私密外联层。RPC 一直把它取回来了，但 2026-08-21 之前这里
+    // 没渲染——guardrail、验证过的开场打法这类弹药等于没上膛。key 不翻译，原样给。
+    const box = Object.entries(e.box || {}).filter(([, v]) => v != null && String(v).trim() !== '')
+    if (box.length) {
+      lines.push('  盒子（私密外联层，是给你的作战情报，不是对外文案——写「为什么是我」、判断怎么开口时用）：')
+      for (const [k, v] of box) lines.push(`  · ${k}：${v}`)
+    }
   }
   lines.push('')
   return lines

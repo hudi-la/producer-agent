@@ -28,6 +28,24 @@ export async function fetchMessages(pursuitId) {
 }
 
 /**
+ * 拉这一张卡的两段长文：why（匹配理由）和 notes（关系记忆）。
+ *
+ * 看板读的是 v_pa_pursuit_cards —— 那儿故意不带这两列（0115）：72 张卡
+ * 每次刷新都搬一遍两段长文，占了看板下载量的一半，而卡片一个字都不显示它们。
+ * 你点开哪一张，才为哪一张拉一次，一次几 KB。
+ *
+ * 拉不到返回 null，调用方退回 p.why / p.notes —— 没连库时那两个字段
+ * 来自种子数据，那条路一个字不能断。
+ */
+export async function fetchPursuitDetail(pursuitId) {
+  if (!supa || !pursuitId) return null
+  const { data, error } = await supa
+    .from('v_pa_pursuits').select('why,notes').eq('id', pursuitId).maybeSingle()
+  if (error) return null
+  return data
+}
+
+/**
  * 拉这个人名下的往来：邮件（有 gmail_message_id）+ 你记的笔（role='note'）。
  * 没连库时返回 null。
  *

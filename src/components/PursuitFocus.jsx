@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMessages, sendMessageStream, stopThinking, rewindChat, addPursuitNote } from '../lib/chat.js'
+import { fetchMessages, sendMessageStream, stopThinking, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
 import { useLiveReply } from '../lib/useLiveReply.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
@@ -288,6 +288,19 @@ export default function PursuitFocus({
   // 不是「你有没有手动改过」——后者不是你要看的东西。
   const [ball, setBallLocal] = useState(ballOf(p))
 
+  // 匹配理由和关系记忆。看板不再搬这两段长文（0115：72 张卡每次都搬，
+  // 占看板下载量一半，而卡片一个字都不显示），改成打开哪一张才拉哪一张。
+  // 拉到之前、以及拉不到时，退回 p 上那份 —— 没连库时它来自种子数据。
+  const [detail, setDetail] = useState(null)
+  useEffect(() => {
+    let alive = true
+    setDetail(null)
+    fetchPursuitDetail(p.id).then((d) => { if (alive && d) setDetail(d) })
+    return () => { alive = false }
+  }, [p.id])
+  const why = detail?.why ?? p.why
+  const notes = detail?.notes ?? p.notes
+
   // 这儿原来还有「现在该干什么」和「Fairwind 提的、你还没认的那句」。
   // 两样都删了：写 next_action 的那个消化环节早就不在了，留着就是一行
   // 永远不会更新的字。要不要重做那套是另一场讨论。
@@ -416,8 +429,8 @@ export default function PursuitFocus({
     setDeliv([]); setAtts([])
     reloadDeliv()
     // 原来这儿每 5 秒硬拉一遍（产出带全文 + 附件），一小时一千四百多趟，
-    // 绝大多数趟什么都没变。现在跟脉搏走：库里动了才拉。
-    return onPulse(reloadDeliv)
+    // 绝大多数趟什么都没变。现在只认 deliv 那一列：产出/附件真变了才拉。
+    return onPulse('deliv', reloadDeliv)
   }, [p.id, threeCol])
 
   // 取消定稿：左栏那份退回右栏接着改。改的还是同一份，不生第二个版本。
@@ -464,8 +477,8 @@ export default function PursuitFocus({
   //
   // 原来是每 3 秒硬拉一遍——这条线的**全部往来连邮件原文**，一小时一千二百趟，
   // 一天几个 GB，是这次流量打爆的最大头。整包的形状没改（原文照样在），
-  // 改的是趟数：脉搏（0111）说库里动了，才来真拉这一趟。
-  useEffect(() => onPulse(async () => {
+  // 改的是趟数：thread 那一列动了，才来真拉这一趟。
+  useEffect(() => onPulse('thread', async () => {
     const rows = await fetchMessages(p.id)
     if (!rows) return
     setMsgs((cur) => {
@@ -604,8 +617,8 @@ export default function PursuitFocus({
                 库里字段没删——以后要不要重做那套是另一场讨论。 */}
             {/* why / notes 库里存的就是 markdown（带加粗、按行分段），
                 原来直接当纯文本塞进 <p>，所以星号露在外面、几行被压成一坨。 */}
-            {p.why && <div className="pf-why md"><Md>{p.why}</Md></div>}
-            {p.notes && <div className="pf-notes md"><Md>{p.notes}</Md></div>}
+            {why && <div className="pf-why md"><Md>{why}</Md></div>}
+            {notes && <div className="pf-notes md"><Md>{notes}</Md></div>}
           </div>
 
           {msgs.length === 0 && !busy ? (
