@@ -262,6 +262,12 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .qnav { display: flex; align-items: center; gap: 8px; padding: 0 0 9px; margin-bottom: 2px;
   border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .qnav .qsp { flex: 1; }
+/* 横在名片头条里的那一份（人也进队之后，2026-08-21）。那身默认样式是给
+   抽屉里竖排用的：下边框和底部留白横过来就是半截多余的线。
+   flex:none 也是必须的 —— .ft-head 里 .ft-title 是 flex:1，不写就被挤成零宽，
+   DOM 里在、屏幕上没有。 */
+.qnav.in-head { border-bottom: none; padding: 0; margin: 0; flex: none; gap: 7px; }
+.qnav.in-head .qsp { display: none; }
 .qarrow { font: inherit; font-size: 16px; line-height: 1; width: 26px; height: 26px; border-radius: 7px;
   border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
 .qarrow:hover:not(:disabled) { border-color: var(--accent); }

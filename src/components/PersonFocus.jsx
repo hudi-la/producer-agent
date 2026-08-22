@@ -5,6 +5,7 @@ import { dropFrom } from '../lib/rewind.js'
 import Md from './Md.jsx'
 import SayBubble from './Resay.jsx'
 import Pool from './Pool.jsx'
+import QueueNav from './QueueNav.jsx'
 import { MailList } from './Mail.jsx'
 import { isLetter, isExchange } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
@@ -68,7 +69,12 @@ function Cell({ label, value, placeholder, onSave, type = 'text', multiline = fa
   )
 }
 
-export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }) {
+export default function PersonFocus({
+  person, onBack, onChanged, onOpenPursuit,
+  // 过卡：人也进队了（2026-08-21）。队列本来就是按「两种东西混在同一队里过」
+  // 设计的（queue.js 顶上那段），人这一半一直没接上，现在接上了。
+  queue = null, onQueuePrev, onQueueNext, onQueueDone,
+}) {
   const c = person
   const [msgs, setMsgs] = useState(null)
   const [threads, setThreads] = useState([])
@@ -293,6 +299,11 @@ export default function PersonFocus({ person, onBack, onChanged, onOpenPursuit }
           </button>
           <h1 className="ft-title" title={c.name}>{c.name || '未具名联系人'}</h1>
         </div>
+        {/* 跟机会线抽屉同一份（QueueNav）——过卡时两种卡长一样，
+            不然你翻到人那张会以为自己掉出队列了。
+            **必须在 .ft-head 外面**：那里头 .ft-title 是 flex:1，会把它挤成零宽——
+            DOM 里在、屏幕上没有，正是最难发现的那种坏法（第一版就这么坏的）。 */}
+        <QueueNav inHead queue={queue} onPrev={onQueuePrev} onNext={onQueueNext} onDone={onQueueDone} />
       </div>
 
       <div className="focus-cols">

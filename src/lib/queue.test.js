@@ -162,3 +162,40 @@ test('不认识的 kind 一律当 pursuit —— 存坏了也不许出现第三�
   assert.equal(q.items[0].kind, 'pursuit')
   assert.equal(q.at, kp('a'))
 })
+
+// ── 一批里混着线和人（2026-08-21 他要的「人也能批量操作」）─────────
+//
+// 勾中的存的是 key 而不是裸 id。这几条锁住的是那个理由：到了群发那步，
+// 要靠 key 分清这句话该发给谁——线走 pursuit_id、人走 contact_id。
+// 光存 id 的话两种混在一摞里就再也分不开了。
+
+import { ownerBody } from './chat.js'
+
+test('勾中的键拆回来能分清是线还是人', () => {
+  const picked = [kp('线1'), kc('人1'), kp('线2')]
+  assert.deepEqual(picked.map(parseKey), [
+    { kind: 'pursuit', id: '线1' },
+    { kind: 'contact', id: '人1' },
+    { kind: 'pursuit', id: '线2' },
+  ])
+})
+
+test('群发时，线发 pursuit_id、人发 contact_id', () => {
+  assert.deepEqual(ownerBody(parseKey(kp('线1'))), { pursuit_id: '线1' })
+  assert.deepEqual(ownerBody(parseKey(kc('人1'))), { contact_id: '人1' })
+})
+
+test('老调用方传裸字符串仍当机会线 —— 不许改坏已有的路', () => {
+  assert.deepEqual(ownerBody('线1'), { pursuit_id: '线1' })
+})
+
+test('线和人混着进队，各自留在自己的身份里', () => {
+  const q = enqueue(EMPTY, [
+    { kind: 'pursuit', id: 'a', via: 'pick' },
+    { kind: 'contact', id: 'b', via: 'pick' },
+  ])
+  assert.deepEqual(q.items.map(keyOf), [kp('a'), kc('b')])
+  // 同一个 id 的线和人是两件事，不该互相顶掉
+  const q2 = enqueue(q, [{ kind: 'contact', id: 'a', via: 'say' }])
+  assert.equal(q2.items.length, 3)
+})

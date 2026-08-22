@@ -70,13 +70,25 @@ export async function fetchContactMessages(contactId) {
  * meta 记的是「你这句是怎么发出来的」（比如群发），只贴在你那条消息上。
  * 不传就完全不带这个键，走 RPC 的默认值 —— 单发的调用方一个字都不用改。
  */
-export async function sendMessage(pursuitId, text, meta, runId) {
+/**
+ * 说话的对象：机会线还是人。
+ *
+ * 传字符串 = 机会线（老调用方一个字不用改）；传 {kind,id} 两种都行。
+ * brain 那边 ownerOf 本来就两种都收（server.js 的 contact_id / pursuit_id），
+ * 只是前端一直只会发前一种 —— 群发要发给人，缺的就是这一层。
+ */
+export const ownerBody = (owner) =>
+  typeof owner === 'string' ? { pursuit_id: owner }
+    : owner?.kind === 'contact' ? { contact_id: owner.id }
+      : { pursuit_id: owner?.id }
+
+export async function sendMessage(owner, text, meta, runId) {
   let res
   try {
     res = await fetch(`${BRAIN}/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pursuit_id: pursuitId, text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) }),
+      body: JSON.stringify({ ...ownerBody(owner), text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) }),
     })
   } catch (_) {
     throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')

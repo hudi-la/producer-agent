@@ -19,6 +19,7 @@ import LetterCard from './LetterCard.jsx'
 import FormCard from './FormCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
+import QueueNav from './QueueNav.jsx'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
 import Md from './Md.jsx'
@@ -742,18 +743,8 @@ export default function PursuitFocus({
             没有任何「已处理」的标记，只有位置。
             两个出口也在这排——原来在抽屉底部，跟输入框叠在一起被盖住了；
             而且「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */}
-        {queue && (
-          <div className="qnav">
-            <button className="qarrow" onClick={onQueuePrev} disabled={queue.i <= 0} aria-label="上一张">‹</button>
-            <span className="qcount">{queue.i + 1} / {queue.n}</span>
-            <button className="qarrow" onClick={onQueueNext} disabled={queue.i >= queue.n - 1} aria-label="下一张">›</button>
-            <span className="qsp" />
-            {/* 「移出」就一个意思：这张从这一摞里拿走，卡里什么都不碰。
-                它不说「这件事我干完了」——干没干完看内容（草稿定没定稿、待办勾没勾、信回没回）。
-                想先放着 = 翻页 ‹ › 走过去、或关掉抽屉——它下次还在原位。 */}
-            <button className="wbtn" onClick={onQueueDone}>移出</button>
-          </div>
-        )}
+        {/* 措辞和行为都在 QueueNav 里 —— 人的卡片用的是同一份 */}
+        <QueueNav queue={queue} onPrev={onQueuePrev} onNext={onQueueNext} onDone={onQueueDone} />
 
         {/* 你为什么在队里。
             一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以

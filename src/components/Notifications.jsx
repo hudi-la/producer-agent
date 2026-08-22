@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { stateLine, whyLine } from '../lib/stateText.js'
+import { key as qKey } from '../lib/queue.js'
 
 // 顶栏那块通知面板。装的是**所有该动和在等的事** —— 机会线的和人的都在这儿。
 //
@@ -28,12 +29,11 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
   // 这块面板本来就是看板的另一个取景框：看板按阶段摆，它按「到点没到点」摆。
   // 同一批卡，换个筛法勾 —— 这正是批量操作最想要的那件事。
   //
-  // **但只有机会线能勾。** 队列按设计只装机会线（App.jsx 的 pickAll 写死
-  // kind:'pursuit'，openQueueCard 也只在 pl.pursuits 里找）。线和人合进这块
-  // 面板之后（2026-08-21），人的行要是也能勾，勾了会静默打不开——
-  // 那种「按了没反应也不报错」正是这套东西最不该有的毛病。
-  const 能勾 = picking && it.subject_kind === 'pursuit'
-  const toggle = () => onPick([it.subject_id], !checked)
+  // **人也能勾**（2026-08-21 接上）。勾的是 key 而不是裸 id：一摞里现在
+  // 既有线又有人，到了群发那步要靠它分清这句话该发给谁（线走 pursuit_id、
+  // 人走 contact_id，brain 两种都收）。队列本来就是按两种东西混着过设计的。
+  const 能勾 = picking
+  const toggle = () => onPick([qKey(it.subject_kind, it.subject_id)], !checked)
   return (
     <div className={'nrow' + (能勾 ? ' pickable' : '') + (能勾 && checked ? ' on' : '')}
          role={能勾 ? 'checkbox' : undefined}
@@ -55,8 +55,7 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
       </div>
       {/* 勾选的时候整组动作收起来：这一行现在是个勾选框，
           里头再摆三颗各干各的按钮，你按哪一下都得先想一想。
-          看的是「这一行能不能勾」而不是「批量开没开」—— 人的行不参与批量，
-          那它在批量模式下就该照常可用，而不是陪着一起变哑。 */}
+          现在线和人都能勾，两者一致。 */}
       {!能勾 && (
       <div className="nrow-a">
         {it.zone === 'due' && (
@@ -159,7 +158,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       <section className="nsect">
         <div className="nsect-h"><h3>今天：</h3></div>
         {due.length ? due.map((it) => (
-          <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(it.subject_id)} onPick={onPick}
+          <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(qKey(it.subject_kind, it.subject_id))} onPick={onPick}
                     onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
         )) : source !== 'empty' && (
           <p className="nnone">现在没有到点的。看看新机会吧。</p>
@@ -170,7 +169,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       <Fold title="等待" items={waiting}
             note="还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。"
             render={(it) => (
-              <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(it.subject_id)} onPick={onPick}
+              <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(qKey(it.subject_kind, it.subject_id))} onPick={onPick}
                         onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
             )} />
 

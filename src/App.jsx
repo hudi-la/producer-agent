@@ -93,26 +93,30 @@ export default function App() {
   // 收信现在在 brain 里每 5 分钟自己跑（mail/loop.js）。取代按钮的不是
   // 「没有反馈」，是顶栏那句一直在的实话：上次收到什么、脑子开没开。
 
-  // 群发：同一句话分别说给每条线，各答各的。
+  // 群发：同一句话分别说给每条线 / 每个人，各答各的。
   //
   // 串行，一条十几秒——跟 runRefresh 一个节奏。答完的当场进队，先到先过。
   // 批次标识用一个时间戳串：同一批的每条消息带同一个 batch，将来要认出
   // 「这几条是一次群发」也认得出来。
+  //
+  // 勾中的是 key（'pursuit:xxx' / 'contact:xxx'）不是裸 id —— 一批里
+  // 现在可能既有线又有人（2026-08-21），光看 id 分不出该发给谁。
   const runSay = async (text) => {
     if (saying) return
-    const ids = [...picked]
-    if (!ids.length) return
+    const keys = [...picked]
+    if (!keys.length) return
     setSayOpen(false)
     cancelPick()
     setSayFailed(0)
     const batch = new Date().toISOString()
-    const meta = { broadcast: { batch, count: ids.length } }
+    const meta = { broadcast: { batch, count: keys.length } }
     let failed = 0
-    for (let i = 0; i < ids.length; i++) {
-      setSaying({ i: i + 1, n: ids.length })
+    for (let i = 0; i < keys.length; i++) {
+      setSaying({ i: i + 1, n: keys.length })
+      const owner = parseKey(keys[i])
       try {
-        await sendMessage(ids[i], text, meta)
-        setQueue((q) => enqueue(q, [{ kind: 'pursuit', id: ids[i], via: 'say' }]))
+        await sendMessage(owner, text, meta)
+        setQueue((q) => enqueue(q, [{ ...owner, via: 'say' }]))
       } catch (_) {
         failed++
       }
@@ -121,6 +125,8 @@ export default function App() {
     setSayFailed(failed)
     const r = await loadPursuits()
     if (r) setPl(r)
+    // 说给人的那些落在他名片的往来里，看板刷不出来 —— 名片那一层也得重读
+    if (keys.some((k) => parseKey(k).kind === 'contact')) reloadContacts()
   }
 
   // 这一行必须待在这儿（状态旁边），不能挪到组件下半截去。
@@ -544,12 +550,19 @@ export default function App() {
     : null
 
   // 勾了但当前镜头看不见的那几张。照实说出来，不假装它们都在眼前。
+  //
+  // 只数机会线：人是在 🔔 里勾的，本来就不在看板这个镜头里，
+  // 把他们算进「看不见的」会变成一句吓人的假话（勾 3 个人 = 「3 张看不见」）。
   const shownIds = new Set(shown.map((p) => p.id))
-  const hiddenPicked = [...picked].filter((id) => !shownIds.has(id)).length
+  const hiddenPicked = [...picked]
+    .map(parseKey)
+    .filter((x) => x.kind === 'pursuit' && !shownIds.has(x.id)).length
 
-  const pick = (ids, on) => setPicked((s) => {
+  // 勾的是 key（'pursuit:xxx' / 'contact:xxx'），不是裸 id —— 看板勾的是线、
+  // 🔔 里可能勾到人，一摞里两种都有，光凭 id 到了群发那步分不出该发给谁。
+  const pick = (keys, on) => setPicked((s) => {
     const next = new Set(s)
-    for (const id of ids) on ? next.add(id) : next.delete(id)
+    for (const k of keys) on ? next.add(k) : next.delete(k)
     return next
   })
 
@@ -560,24 +573,37 @@ export default function App() {
   // 不是裸 id —— 拆开之后各开各的抽屉。
   const openQueueCard = (k) => {
     if (!k) return
-    const { id } = parseKey(k)      // 队里现在只有机会线，见上面那段
+    const { kind, id } = parseKey(k)
+    // 人那半边（2026-08-21 接上）：开的是名片整页，不是抽屉 —— 人本来就没有
+    // 抽屉形态。两边的过卡条是同一份（QueueNav），所以翻到人这张不会
+    // 看着像掉出了队列。
+    if (kind === 'contact') {
+      const c = ct?.contacts?.find((x) => x.id === id)
+      if (c) { setArea('people'); setView({ name: 'person', person: c }) }
+      return
+    }
     const p = pl.pursuits.find((x) => x.id === id)
     if (p) { setArea('pursue'); markSeen(id); setView({ name: 'pursuit', pursuit: p, mode: 'drawer' }) }
   }
 
   // 过一遍：不跑任何东西，直接把勾中的端上工作台。
   const pickAll = () => {
-    const entries = [...picked].map((id) => ({ kind: 'pursuit', id, via: 'pick' }))
+    const entries = [...picked].map((k) => ({ ...parseKey(k), via: 'pick' }))
     if (!entries.length) return
     const q = enqueue(queue, entries)
     setQueue(q)
     cancelPick()
+    // 面板让位：你已经说了「开始过这一摞」，它还盖在卡片上就成了挡路的。
+    // （人也能勾之后这事很明显——人的名片是整页，过卡条正好在面板底下。）
+    setBellOpen(false)
     openQueueCard(q.at)
   }
 
-  // 抽屉正看的这张在不在队里。在 = 显示队头和两个出口。
-  // 队里只有机会线（人这一层不进队，见上面那段）。
-  const viewKey = view.name === 'pursuit' ? qKey('pursuit', view.pursuit.id) : null
+  // 正看的这张在不在队里。在 = 显示队头和出口。
+  // 队里两种都有：机会线走抽屉，人走名片整页。
+  const viewKey = view.name === 'pursuit' ? qKey('pursuit', view.pursuit.id)
+    : view.name === 'person' ? qKey('contact', view.person.id)
+      : null
   const atQueue = Boolean(viewKey) && inQueue(queue, viewKey)
   const qItem = atQueue ? queue.items.find((x) => keyOf(x) === viewKey) : null
   const qInfo = atQueue ? {
@@ -763,6 +789,10 @@ export default function App() {
             onBack={() => setView({ name: 'home' })}
             onChanged={reloadContacts}
             onOpenPursuit={(id) => { setArea('pursue'); openPursuit(pl.pursuits.find((p) => p.id === id)) }}
+            queue={qInfo}
+            onQueuePrev={() => queueGo(-1)}
+            onQueueNext={() => queueGo(1)}
+            onQueueDone={finishCard}
           />
         ) : view.name === 'org' ? (
           <OrgFocus

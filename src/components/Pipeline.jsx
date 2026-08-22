@@ -1,3 +1,4 @@
+import { key as qKey } from '../lib/queue.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, openLine } from '../lib/nextAction.js'
@@ -117,7 +118,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
   //
   // 批量操作开着的时候，整张卡改成「勾/取消勾」——不在卡上另开一个小热区，
   // 那种一按就按歪。角上那个方块只是给你看的，不单独接点击。
-  const open = () => (picking ? onPick([p.id], !checked) : onOpen(p))
+  const open = () => (picking ? onPick([qKey('pursuit', p.id)], !checked) : onOpen(p))
   const onKey = (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() }
   }
@@ -189,12 +190,14 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
   const anyUnseen = items.some((p) => unseen?.has(p.id))
   // 「找 workshop 机构 · 15 张」那种场景，冷邮件本来就是一批一批起的——
   // 所以叠头上要能一次勾全叠。不展开也能勾。
-  const hit = items.filter((p) => picked?.has(p.id)).length
+  const hit = items.filter((p) => picked?.has(qKey('pursuit', p.id))).length
   // 叠头也吃这一摊的色 —— 折着的时候你看见的就是这一张，它不带色等于没上色。
   // 从叠里第一张有色的卡拿号：一叠就是一次造卡任务，摊里各张拿到的号是同一个。
   const tint = items.map((p) => slotOf(p, tints)).find((x) => x !== null && x !== undefined) ?? null
   const allOn = hit === items.length && hit > 0
-  const ids = items.map((p) => p.id)
+  // 勾的是 key 不是裸 id —— 这一摞里可能还有从 🔔 勾进来的人（2026-08-21），
+  // 到群发那步要靠它分清这句话该发给谁。看板这边永远是机会线。
+  const ids = items.map((p) => qKey('pursuit', p.id))
 
   const onKey = (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() }
@@ -231,7 +234,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
       {open && items.map((p) => (
         <PCard
           p={p} st={states?.get?.(p.id)} audit={audit} tints={tints} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
-          unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(p.id)} onPick={onPick}
+          unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(qKey('pursuit', p.id))} onPick={onPick}
         />
       ))}
     </div>
@@ -330,7 +333,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
                 <PCard
                   p={row.card} st={states?.get?.(row.card.id)} audit={audit} tints={tints} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
                   onJot={onJot} unseen={unseen.has(row.card.id)}
-                  picking={picking} checked={picked.has(row.card.id)} onPick={onPick}
+                  picking={picking} checked={picked.has(qKey('pursuit', row.card.id))} onPick={onPick}
                 />
               )
             )}
