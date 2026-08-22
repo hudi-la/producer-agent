@@ -75,9 +75,9 @@ test('空的也不炸', () => {
   assert.deepEqual([hand, old, muted, todo], [[], [], [], []])
 })
 
-// ── state 那一半：分家和分区 ──────────────────────────────────
+// ── state 那一半：分区和排序（线和人不再分家，2026-08-21）──────
 
-import { splitStates, goesTo } from './notifications.js'
+import { splitStates } from './notifications.js'
 import { stateLine, whyLine } from './stateText.js'
 
 const row = (over = {}) => ({
@@ -87,23 +87,39 @@ const row = (over = {}) => ({
   name: 'Paperbark Books 工作坊', ...over,
 })
 
-test('线的事进通知栏，人的事进人际管理页 —— 即便是 NEEDS_REPLY', () => {
-  assert.equal(goesTo(row()), 'bell')
-  assert.equal(goesTo(row({ subject_kind: 'contact', state: 'NEEDS_REPLY' })), 'people')
+// 他撞上的那件事（2026-08-21）：Steven 约了 8/25 通话 —— 全部见面里最近的
+// 一场 —— 却不在 🔔 里，因为他没挂在任何机会线上，被分去了人际管理页。
+// 分家的判据错在维度上：分的是「挂在什么上面」，可他要问的是「什么时候该干嘛」。
+test('人的事跟线的事排在同一摞里 —— 最近的那场见面不许因为「没挂在线上」而消失', () => {
+  const { due, waiting } = splitStates([
+    row({ key: 'huntington', due_at: '2026-09-03T14:00:00Z' }),
+    row({ key: 'steven', subject_kind: 'contact', state: 'MEETING_SET',
+          name: 'Steven Lam', due_at: '2026-08-25T14:00:00Z' }),
+    row({ key: 'asu', due_at: '2026-09-11T19:00:00Z' }),
+  ])
+  assert.equal(due.length, 0)
+  // 三条都在，而且最近的 Steven 排最前
+  assert.deepEqual(waiting.map((x) => x.key), ['steven', 'huntington', 'asu'])
+})
+
+test('一件事只出现一次 —— 合并之后没有第二个位置', () => {
+  const rows = [row({ key: 'a' }), row({ key: 'b', subject_kind: 'contact' })]
+  const { due, waiting } = splitStates(rows)
+  assert.equal(due.length + waiting.length, rows.length)
 })
 
 test('Sarah 那条 9/28 之前在等待区，不在该动的', () => {
-  const { bell } = splitStates([row()])
-  assert.equal(bell.due.length, 0)
-  assert.equal(bell.waiting.length, 1)
+  const { due, waiting } = splitStates([row()])
+  assert.equal(due.length, 0)
+  assert.equal(waiting.length, 1)
 })
 
 test('该动的紧的在上：due 早的排前面', () => {
-  const { bell } = splitStates([
+  const { due } = splitStates([
     row({ key: 'a', zone: 'due', due_at: '2026-08-19' }),
     row({ key: 'b', zone: 'due', due_at: '2026-08-17' }),
   ])
-  assert.deepEqual(bell.due.map((x) => x.key), ['b', 'a'])
+  assert.deepEqual(due.map((x) => x.key), ['b', 'a'])
 })
 
 test('等待的措辞带着设定的日子；到点换成「已经起草」', () => {

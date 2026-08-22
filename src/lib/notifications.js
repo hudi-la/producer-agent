@@ -24,27 +24,29 @@ export const FRESH_DAYS = BUMP_WAIT[0]
 // ══ state 那一半（0094/0098 的 v_pa_state）════════════════════
 //
 // 一条线 / 一个人同时只有一个 state；到点没到点（zone）是库里算的。
-// 这儿只做两件事：分家（线的事进通知栏，人的事进人际管理页）和排序。
+// 这儿只做一件事：分区（到点的 / 还没到点的）和排序。
+//
+// ══ 线和人不再分家（2026-08-21，他拍的）═══════════════════════
+//
+// 原来这儿按「这件事挂在线上还是挂在人身上」分成两处：线的进 🔔，
+// 人的进人际管理页。当初分家是因为**那会儿状态机还没做好**，一大片人
+// 被判成「还需要回复」，全塞进 🔔 会把真正的事淹掉。
+//
+// 那批噪音清干净之后，分家只剩副作用，而且是他撞上的那种：
+// Steven 约了 8/25 通话——**全部见面里最近的一场**——而 🔔 里那一栏
+// 摆着 9/3 和 9/11 两场，唯独最近的这场不在，因为 Steven 没挂在任何线上。
+// 「我这周约了谁」这个问题，本来不该分两个页面回答。
+//
+// 判据错在维度上：分的是「挂在什么上面」，可你要问的是「什么时候、该干嘛」。
+// 现在一份 v_pa_state 只按到点没到点分区，线和人一起排。
 
-/**
- * 机会线的事进通知栏，人的事进人际管理页。
- * 判据是**这件事挂在哪张卡上**，不是它长什么样：只挂在联系人身上、
- * 放不进任何线的，即便是 NEEDS_REPLY 也进人际管理页。
- */
-export const goesTo = (s) => (s.subject_kind === 'pursuit' ? 'bell' : 'people')
-
-/** 分家 + 分区。该动的紧的在上（due 早的先），等待的近的在上。 */
+/** 分区 + 排序。该动的紧的在上（due 早的先），等待的也是近的在上。 */
 export function splitStates(rows) {
-  const bell = { due: [], waiting: [] }
-  const people = { due: [], waiting: [] }
-  for (const r of rows || []) {
-    const home = goesTo(r) === 'bell' ? bell : people
-    ;(r.zone === 'due' ? home.due : home.waiting).push(r)
-  }
+  const due = [], waiting = []
+  for (const r of rows || []) (r.zone === 'due' ? due : waiting).push(r)
   const 早的在上 = (a, b) => String(a.due_at || '').localeCompare(String(b.due_at || ''))
-  bell.due.sort(早的在上); bell.waiting.sort(早的在上)
-  people.due.sort(早的在上); people.waiting.sort(早的在上)
-  return { bell, people }
+  due.sort(早的在上); waiting.sort(早的在上)
+  return { due, waiting }
 }
 
 /**
@@ -122,7 +124,7 @@ export function layer(items, today = new Date()) {
 const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
 
 const empty = (reason, detail) => ({
-  bell: { due: [], waiting: [] }, people: { due: [], waiting: [] },
+  due: [], waiting: [],
   unclaimed: 0, unjudged: [], stale: [], source: 'empty', reason, detail,
 })
 

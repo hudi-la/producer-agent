@@ -1,7 +1,6 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import Strangers from './Strangers.jsx'
-import { stateLine, whyLine } from '../lib/stateText.js'
 
 // 「人际管理」—— 人这一层。
 //
@@ -31,55 +30,9 @@ function channelsOf(c) {
   return c.email ? [{ kind: 'email', value: c.email }] : []
 }
 
-// 人的事那两个区。跟通知栏同一套行组件的形状、同一份措辞（stateText.js）——
-// 装的是**不同的事**（人的事 vs 线的事），不是同一件事的两个位置：
-// 分家的判据在 lib/notifications.js 的 goesTo。
-function PeopleDue({ notes, onHandled, onOpenState }) {
-  const [waitOpen, setWaitOpen] = useState(false)
-  const due = notes?.due || [], waiting = notes?.waiting || []
-  if (!due.length && !waiting.length) return null
-  const Row = ({ it }) => (
-    <div className="nrow">
-      <div className="nrow-b">
-        <div className="nrow-h">
-          <button className="nname" onClick={() => onOpenState(it)}>{it.name || '未具名联系人'}</button>
-        </div>
-        <div className="nrow-w">{stateLine(it)}</div>
-        {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}
-      </div>
-      <div className="nrow-a">
-        {it.zone === 'due' && (
-          <button className="nbtn" title="已处理 —— 记一笔，留痕迹" aria-label="已处理"
-                  onClick={() => onHandled(it)}>✓</button>
-        )}
-        <button className="nopen" onClick={() => onOpenState(it)}>打开卡片</button>
-      </div>
-    </div>
-  )
-  return (
-    <section className="ppl-due">
-      <div className="psect-h"><h2>该动的</h2><span className="pcount">{due.length} 件</span></div>
-      {due.length
-        ? due.map((it) => <Row key={it.key} it={it} />)
-        : <p className="pnone">现在没有到点的。</p>}
-      {waiting.length > 0 && (
-        <>
-          <button className="nfold" onClick={() => setWaitOpen((x) => !x)}>
-            {waitOpen ? '▾' : '▸'} 等待（{waiting.length}）
-          </button>
-          {waitOpen && waiting.map((it) => <Row key={it.key} it={it} />)}
-        </>
-      )}
-    </section>
-  )
-}
-
 export default function People({
   contacts = [], orgs = [], strangers = [],
   fellBack = null, onOpen, onOpenOrg, onAdded,
-  // 人的事那两个区（该动的 / 等待）。数据和通知栏同一份 v_pa_state，
-  // 分家之后人的那一半落在这儿。
-  notes = null, onHandled, onOpenState,
   // 抽屉的开关在顶栏（工具条）上，跟项目争取那边一个位置，所以状态在 App 手里
   bookOpen = false, onCloseBook,
 }) {
@@ -157,14 +110,15 @@ export default function People({
           <h1>人际管理</h1>
           <p className="note">
             你会写信的对象都在这儿：人、机构、机构的共享信箱。
-            <b>人的事</b>（回谢介绍人、见面后的信、只关乎这个人的回信）列在下面的
-            「该动的」里；<b>机会线的事</b>在顶栏那个 🔔 —— 判据是这件事挂在哪张卡上。
+            该动的和在等的事**全部**在顶栏那个 🔔 里 —— 人的和机会线的一起排，
+            不再按「挂在哪张卡上」分成两处。
           </p>
         </header>
 
-        {/* 人的事：该动的 / 等待。8/19 早上删过一次（理由是「同一件事两个位置」），
-            当天又装回来了 —— 这次两栏装的是不同的事，合并规则保证一件事只出现一次。 */}
-        <PeopleDue notes={notes} onHandled={onHandled} onOpenState={onOpenState} />
+        {/* 「该动的 / 等待」那两个区 2026-08-21 撤了，整个并进 🔔。
+            当初分家是为了挡状态机还没做好时那一片假的「还需要回复」；
+            噪音清掉之后，分家只剩副作用——最近的一场见面因为对方没挂在
+            任何线上，就从 🔔 里消失了。理由见 lib/notifications.js。 */}
 
         {/* 通讯录收起来了，这一页就没别的了（「现在该动的」挪去了 🔔）。
             **不留死白页** —— 说清它去哪了、怎么叫回来。 */}

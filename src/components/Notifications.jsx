@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { stateLine, whyLine } from '../lib/stateText.js'
 
-// 顶栏那块通知面板。装的是**机会线的事**（人的事在人际管理页的
-// 「该动的」——分家的规矩见 lib/notifications.js 的 goesTo）。
+// 顶栏那块通知面板。装的是**所有该动和在等的事** —— 机会线的和人的都在这儿。
+//
+// 线和人原来是分家的（人的在人际管理页），2026-08-21 合并了：
+// 当初分家是为了挡状态机还没做好时那一片假的「还需要回复」，噪音清掉之后
+// 分家只剩副作用——最近的一场见面因为对方没挂在任何线上而不在这一栏里。
+// 理由写在 lib/notifications.js 的 splitStates 上面。
 //
 // 两个区，同一份 v_pa_state 的两个切片，不是两个列表：
 //
@@ -23,20 +27,26 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
   //
   // 这块面板本来就是看板的另一个取景框：看板按阶段摆，它按「到点没到点」摆。
   // 同一批卡，换个筛法勾 —— 这正是批量操作最想要的那件事。
+  //
+  // **但只有机会线能勾。** 队列按设计只装机会线（App.jsx 的 pickAll 写死
+  // kind:'pursuit'，openQueueCard 也只在 pl.pursuits 里找）。线和人合进这块
+  // 面板之后（2026-08-21），人的行要是也能勾，勾了会静默打不开——
+  // 那种「按了没反应也不报错」正是这套东西最不该有的毛病。
+  const 能勾 = picking && it.subject_kind === 'pursuit'
   const toggle = () => onPick([it.subject_id], !checked)
   return (
-    <div className={'nrow' + (picking ? ' pickable' : '') + (picking && checked ? ' on' : '')}
-         role={picking ? 'checkbox' : undefined}
-         aria-checked={picking ? checked : undefined}
-         tabIndex={picking ? 0 : undefined}
-         onClick={picking ? toggle : undefined}
-         onKeyDown={picking ? ((e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle() } }) : undefined}>
-      {picking && <span className="pc-check" aria-hidden="true" />}
+    <div className={'nrow' + (能勾 ? ' pickable' : '') + (能勾 && checked ? ' on' : '')}
+         role={能勾 ? 'checkbox' : undefined}
+         aria-checked={能勾 ? checked : undefined}
+         tabIndex={能勾 ? 0 : undefined}
+         onClick={能勾 ? toggle : undefined}
+         onKeyDown={能勾 ? ((e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle() } }) : undefined}>
+      {能勾 && <span className="pc-check" aria-hidden="true" />}
       <div className="nrow-b">
         {/* 名字本身就是入口 —— 跟右边那颗「打开卡片」同一个去处，
             只是目标大、顺手。 */}
         <div className="nrow-h">
-          {picking
+          {能勾
             ? <span className="nname as-text">{it.name || '（没名字）'}</span>
             : <button className="nname" onClick={() => onOpen(it)}>{it.name || '（没名字）'}</button>}
         </div>
@@ -44,8 +54,10 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
         {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}
       </div>
       {/* 勾选的时候整组动作收起来：这一行现在是个勾选框，
-          里头再摆三颗各干各的按钮，你按哪一下都得先想一想。 */}
-      {!picking && (
+          里头再摆三颗各干各的按钮，你按哪一下都得先想一想。
+          看的是「这一行能不能勾」而不是「批量开没开」—— 人的行不参与批量，
+          那它在批量模式下就该照常可用，而不是陪着一起变哑。 */}
+      {!能勾 && (
       <div className="nrow-a">
         {it.zone === 'due' && (
           /* 表单交了、微信里说了、当面聊了 —— 系统看不见邮箱外的事。
@@ -102,19 +114,18 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const { bell = { due: [], waiting: [] }, people = { due: [], waiting: [] },
+  const { due = [], waiting = [],
           unclaimed = 0, stale = [], unjudged = [], source, reason } = data || {}
   const 待判 = stale.length + (stale.length ? 0 : unjudged.length)
-  const peopleN = people.due.length + people.waiting.length
 
   return (
     <div className="npanel" role="dialog" aria-label="消息">
       <header className="nhead">
         {/* 「消息」不叫「该动的」：这块板子装的不全是催你动的东西——
-            等待那一层是「在等别人」，人的事那一行是「在别处」。
+            等待那一层是「在等别人」。
             「今天：」那一段才是该动的，标题不该替其中一个区说话。 */}
         <h2>消息</h2>
-        {bell.due.length > 0 && <span className="ncount">{bell.due.length} 件</span>}
+        {due.length > 0 && <span className="ncount">{due.length} 件</span>}
         <span className="sp" />
         {/* 挂到看板上：每张卡头顶吊一个状态气泡；发出&提交/进一步/谈成里
             **没有气泡的卡**就是该起疑的 —— 一条线安静了，是真没事还是判漏了，
@@ -147,7 +158,7 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
           那一折看着是同一堆东西，而这两堆的分别正是这块板子的全部意思。 */}
       <section className="nsect">
         <div className="nsect-h"><h3>今天：</h3></div>
-        {bell.due.length ? bell.due.map((it) => (
+        {due.length ? due.map((it) => (
           <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(it.subject_id)} onPick={onPick}
                     onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
         )) : source !== 'empty' && (
@@ -156,18 +167,18 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
       </section>
 
       {/* 等待：没到点的，折叠着，数字露在外面 */}
-      <Fold title="等待" items={bell.waiting}
+      <Fold title="等待" items={waiting}
             note="还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。"
             render={(it) => (
               <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(it.subject_id)} onPick={onPick}
                         onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
             )} />
 
-      {/* 人的事不在这儿 —— 但不许是隐形的 */}
-      {(peopleN > 0 || unclaimed > 0) && (
+      {/* 没归到任何线的往来 —— 不逐条列，但不许是隐形的 */}
+      {unclaimed > 0 && (
         <p className="nnone">
-          {peopleN > 0 && <>人的事有 {peopleN} 条，在<button className="lnk" onClick={onGoPeople}>人际管理页</button>。</>}
-          {unclaimed > 0 && <>还有 {unclaimed} 个地址的往来没归到任何线，也在那儿处理。</>}
+          还有 {unclaimed} 个地址的往来没归到任何线，在
+          <button className="lnk" onClick={onGoPeople}>人际管理页</button>处理。
         </p>
       )}
 

@@ -749,8 +749,8 @@ export default function App() {
                strokeLinejoin="round" aria-hidden="true">
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>{(notes?.bell?.due?.length || 0) > 0 && (
-            <span className="belln">{notes.bell.due.length}</span>
+          </svg>{(notes?.due?.length || 0) > 0 && (
+            <span className="belln">{notes.due.length}</span>
           )}
         </button>
       </div>
@@ -781,9 +781,6 @@ export default function App() {
             orgs={ct?.orgs || []}
             strangers={ct?.strangers || []}
             fellBack={ct?.reason || null}
-            notes={notes?.people || null}
-            onHandled={handleNote}
-            onOpenState={(it) => openInTab('c', it.subject_id)}
             onOpen={(c) => openInTab('c', c.id)}
             onOpenOrg={(o) => openInTab('o', o.org)}
             onAdded={reloadContacts}
@@ -828,7 +825,7 @@ export default function App() {
               「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
               不能挂在某个列名上——否则用户一改列，提示就跟着错。 */}
           <Pipeline pursuits={shown} emptyNote={emptyNote} tasks={tk.tasks}
-            states={new Map([...(notes?.bell?.due || []), ...(notes?.bell?.waiting || [])].map((x) => [x.subject_id, x]))}
+            states={new Map([...(notes?.due || []), ...(notes?.waiting || [])].map((x) => [x.subject_id, x]))}
             audit={audit}
             onOpen={openPursuit} onMove={moveCard} onJot={jotCard} unseen={unseen} picking={picking} picked={picked} onPick={pick} />
           {/* 气泡视图开着时，一颗悬浮的关闭钮 —— 你是从 🔔 里进来的，
