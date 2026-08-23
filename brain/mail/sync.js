@@ -12,7 +12,7 @@
 
 import { gmailFor, currentHistoryId, listIds, getMetadata, historySince } from './gmail.js'
 import { classify, mineSet } from './addr.js'
-import { myAccounts, putHeaders, setCursor } from './store.js'
+import { db, myAccounts, putHeaders, setCursor } from './store.js'
 import { client as authClient, whoami } from './auth.js'
 
 const BATCH = 500          // 一次往库里塞多少行
@@ -55,6 +55,30 @@ async function flush(rows, log) {
     log?.(`  写库 ${Math.min(i + BATCH, rows.length)}/${rows.length}（新增 ${written}）`)
   }
   return written
+}
+
+/**
+ * 补核：时间已过、还没核过标签的信（主要是预约发送 —— 入队时触发过
+ * messageAdded，真发出那刻只是标签翻成 SENT，增量听不见）。
+ * 去 Gmail 拿一次标签，putHeaders 顺手写审计（0087）。发出去的信
+ * 重新过 classify 会正常入行；被取消删掉的信 messages.get 回 404，
+ * getMetadata 记成 gone，跳过 —— 它的审计由 0082 的全量核对兜。
+ */
+export async function auditPass({ log = console.log } = {}) {
+  const { data: ids, error } = await db().rpc('pa_unaudited_sent')
+  if (error) throw new Error('读补核队列失败：' + error.message)
+  const list = (ids || []).map((r) => r.gmail_message_id).filter(Boolean)
+  if (!list.length) return { audited: 0 }
+
+  const accounts = await myAccounts()
+  const mine = mineSet(accounts.map((a) => a.address))
+  const gmail = gmailFor(await authClient())
+  let gone = 0
+  const msgs = await getMetadata(gmail, list, { onGone: (n) => { gone = n } })
+  const { rows } = toRows(msgs, accounts[0].id, mine)
+  if (rows.length) await putHeaders(rows)
+  log(`  ↳ 补核标签：${rows.length} 封写了审计${gone ? `，${gone} 封 Gmail 里已没有` : ''}`)
+  return { audited: rows.length, gone }
 }
 
 /**

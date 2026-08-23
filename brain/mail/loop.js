@@ -22,7 +22,7 @@
 // ③ 是补上的：原来只有你**点头认地址**的那一刻搬一次，之后那个人的
 // 每一封新信都停在账本里。认领是一次性的，搬运得每轮做。
 
-import { incremental } from './sync.js'
+import { incremental, auditPass } from './sync.js'
 import { classify } from './classify.js'
 import { carryPass } from './carry.js'
 import { attributePass } from './attribute.js'
@@ -69,6 +69,12 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
     out.added = Number(sync.added || 0)
     if (sync.skipped) { out.note = sync.note }
     if (sync.rebuilt) out.rebuilt = true
+
+    // ①.5 补核：预约发送的信真发出那刻只是标签翻成 SENT（labelAdded），
+    // 增量只听 messageAdded 听不见 —— 每轮把「时间已过、没核过标签」的
+    // 拿一次标签写审计。队列平时是空的，一次 SQL 而已。
+    try { const a = await auditPass({ log: () => {} }); if (a.audited) out.audited = a.audited }
+    catch (err) { console.warn('  ⚠️ 补核标签没走成：' + err.message) }
 
     // ② 判新地址。没有新地址就一次模型都不花——这是常态。
     const left = await rpc('pa_mail_rule_pass')
