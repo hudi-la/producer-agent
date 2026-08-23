@@ -51,10 +51,6 @@ export default function App() {
   const [tk, setTk] = useState(null)
   // 人这一层。名片 + 他名下的往来 —— 人际管理页和过卡队列都靠它。
   const [ct, setCt] = useState(null)
-  // 通讯录抽屉开着没有。放在这儿是因为开关在工具条上——跟项目争取那边一个位置。
-  // **默认开着**：找人是这一页的日常动作，每次都要先点一下才看得到，
-  // 那一下就是白收的过路费。想专心看今天的活再收起来。
-  const [bookOpen, setBookOpen] = useState(true)
   // 关于你自己的事实。卡片、详情页、档案页都要用，所以走 context 而不是一路当 prop 传。
   const [profile, setProfile] = useState(PROFILE_FALLBACK)
   const [view, setView] = useState({ name: 'home' })
@@ -667,7 +663,7 @@ export default function App() {
 
   return (
    <ProfileContext.Provider value={profile}>
-    <div className={'wrap' + (drawered ? ' drawered' : '') + (bookOpen && area === 'people' && view.name === 'home' ? ' bookopen' : '')}>
+    <div className={'wrap' + (drawered ? ' drawered' : '')}>
       <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label="主区">
@@ -687,7 +683,7 @@ export default function App() {
           看板按阶段摆，面板按到点没到点摆，同一批卡换个取景框勾。 */}
       {bellOpen && (
         <Notifications
-          data={notes} judging={judging} onJudgeMore={judgeMore}
+          data={notes} mail={brain?.mail} judging={judging} onJudgeMore={judgeMore}
           picking={picking} picked={picked} onPick={pick}
           onHandled={handleNote}
           onReschedule={rescheduleNote}
@@ -744,19 +740,9 @@ export default function App() {
         />
         )}
 
-        {/* 人际管理这一区：还没有镜头（没有筛选），左边就空着——空着可以，假着不行。
-        按钮用同一个 .wbtn，不另造一种长相：同一层的东西该长得一样。
-        抽屉开着时这个按钮不摆：抽屉自己头上那个 × 就是关它的地方，
-        同一个动作摆两处，你还得想一下按哪个。 */}
-        {area === 'people' && view.name === 'home' && !bookOpen && (
-        <button
-        type="button"
-        className="wbtn"
-        onClick={() => setBookOpen(true)}
-        >
-        通讯录
-        </button>
-        )}
+        {/* 人际管理这一区在带子上没有东西了：通讯录 2026-08-23 摊回页面上，
+            那颗「通讯录」开关也跟着撤了 —— 同一份东西留两个入口，
+            你每次都得先想按哪个。 */}
         {/* 过卡入口原来在这儿。挪进工具条了——顶栏常驻角标本身就是一句主张：
             「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
             就不该站在这儿。谁生的跟谁站。
@@ -814,8 +800,6 @@ export default function App() {
             onOpen={(c) => openInTab('c', c.id)}
             onOpenOrg={(o) => openInTab('o', o.org)}
             onAdded={reloadContacts}
-            bookOpen={bookOpen}
-            onCloseBook={() => setBookOpen(false)}
           />
         )
       ) : area === 'profile' ? (

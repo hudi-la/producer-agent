@@ -105,7 +105,19 @@ function Fold({ title, note, items, render }) {
 // 问题 —— 线在等什么（状态机）才是对的粒度。判决数据都在 letter_verdicts。
 // 错判的发现走「挂到看板上」：没有气泡的活跃卡 = 该起疑的安静线。
 
-export default function Notifications({ data, judging, onJudgeMore, onHandled, onReschedule, onOpen, onGoPeople, onAudit, auditOn, onClose,
+function MailAge({ mail }) {
+  if (!mail?.at) return null
+  const min = Math.round((Date.now() - new Date(mail.at)) / 60000)
+  const ago = min < 1 ? '刚刚' : min < 60 ? `${min} 分钟前` : `${Math.round(min / 60)} 小时前`
+  return (
+    <p className="nnone nfresh">
+      账面截至{ago}收信。<b>你刚发的信要等下一轮</b>（≤5 分钟）才会把
+      对应的条目消掉 —— 那不是没记上，是还没收到。
+    </p>
+  )
+}
+
+export default function Notifications({ data, mail, judging, onJudgeMore, onHandled, onReschedule, onOpen, onGoPeople, onAudit, auditOn, onClose,
                                        picking = false, picked, onPick }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -132,6 +144,8 @@ export default function Notifications({ data, judging, onJudgeMore, onHandled, o
         <button className="lnk" onClick={onAudit}>{auditOn ? '收起看板气泡' : '打开看板气泡'}</button>
         <button className="nclose" onClick={onClose} aria-label="收起">✕</button>
       </header>
+
+      <MailAge mail={mail} />
 
       {/* 空可以，骗人不行 —— 说清是「真没有」还是「没连上」。 */}
       {source === 'empty' && (
