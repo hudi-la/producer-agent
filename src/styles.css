@@ -10,11 +10,10 @@
   --shadow:0 1px 2px #241f1b0c,0 12px 34px -20px #241f1b2b;
   /* 机会线抽屉的宽度。看板的右内边距也吃这个值，改一处两边一起动。 */
   --drawer-w:max(400px, 33vw);
-  /* 顶栏下面那条横带的高度：工具条（.subbar）和通讯录抽屉的头（.pdrawer-h）
-     共用一个数，两边的底线才是**同一条线**。51px = 一颗 .wbtn 加上下 9px
-     内边距的自然高度，也就是工具条摆着按钮时本来的样子。
-     写死这个数是为了「工具条空着的时候不许塌」——抽屉一开按钮就藏了，
-     不锁高度这一条带会从 51 缩到 19，左半页整个往上跳一截。 */
+  /* 顶栏下面那条横带（.subbar）的高度。51px = 一颗 .wbtn 加上下 9px 内边距的
+     自然高度，也就是工具条摆着按钮时本来的样子。写死它是为了「带子空着的时候
+     不许塌」——人际管理那一区带子上只剩 🔔，不锁高度它会缩掉一截，
+     左半页整个往上跳。 */
   --bar2:51px;
 }
 @media (prefers-color-scheme: dark){:root{
@@ -122,8 +121,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 🔔 现在钉在带子右端（.subbar），所以让位的是带子不是顶栏。
    机会线抽屉顶到最上沿、整条盖住右边，不让位的话 🔔 就压在它底下——
    一个常驻入口有一半时间点不着，等于没有。
-   通讯录抽屉不在这儿让位：它是从带子**下沿**才开始的（见 .ppl-drawer），
-   压根碰不到 🔔。🔔 待在哪儿不该取决于那个抽屉开没开。 */
+   通讯录不在这儿让位：它 2026-08-23 摊回页面上了，压根碰不到 🔔。 */
 .wrap.drawered .subbar { padding-right: calc(var(--drawer-w) + 24px); }
 
 /* 从右侧贴边落下来的一整条，顶到窗口最上沿（连顶栏一起盖住）。
@@ -1246,46 +1244,14 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .pf-body.md h1, .pf-body.md h2, .pf-body.md h3 {
   font-family: var(--serif); font-size: 1.05em; margin: .8em 0 .35em; }
 
-/* ── 人际管理：通讯录收进抽屉 ──
-   页面只递一件事：今天该动谁。通讯录是**查阅**不是待办——
-   88 人 23 机构摆在页面上，每天开这一页都得先滚过一遍才看得到今天的活。
-   想找人的时候从右边拉开，看完收起。
-
-   复用机会线那个 .drawer（右侧固定、滑入、Esc 收起）。长得一样是故意的：
-   它们是同一种东西。 */
+/* ── 人际管理：通讯录就摊在页面上 ──
+   原来它收在右边一个抽屉里（.ppl-drawer / .pdrawer*，2026-08-23 整套撤了）。
+   当初收起来的理由是「88 人 23 机构摆出来，每天开这一页都得先滚过一遍
+   才看得到今天的活」。8/21 该动的和在等的整个并进 🔔 之后，这一页再没有
+   别的活会被埋 —— 理由自己作废，剩下的只有「想看名片还得先点一下」。 */
 .ppl-inner { max-width: 860px; }
-
-/* 通讯录抽屉**不**盖顶栏也不盖工具条那条带子，从带子的下沿开始。
-   （2026-08-20 往下挪了一格：🔔 钉在带子右端之后，带子成了常驻的东西，
-   谁都不能盖它——盖住就得让位，一让位 🔔 就跟着通讯录开关左右横跳。）
-   机会线那个抽屉是顶到最上沿的（见 .drawer），这里跟它不一样是故意的：
-   翻通讯录是「在这一页里查个东西」，羽·Fairwind 那条顶栏和三个主区得一直在，
-   不然抽屉一开就像离开了这个 app。--top-h 由 App.jsx 量出来写在 .wrap 上。 */
-.ppl-drawer { z-index: 25; top: calc(var(--top-h, 55px) + var(--bar2)); }
-/* 抽屉不跟顶栏重叠了，这条只是兜底：别让抽屉那圈阴影糊到顶栏上。
-   只在通讯录开着时生效——机会线抽屉还要盖住顶栏，全局抬会把它自己的
-   标题和「整页」按钮压到顶栏底下。 */
-.wrap.bookopen .app-top,
-.wrap.bookopen .subbar { position: relative; z-index: 30; background: var(--paper); }
-.pdrawer { display: flex; flex-direction: column; width: 100%; min-width: 0; }
-/* 高度跟工具条锁成同一个数 —— 抽屉的头和左边的工具条是同一条横带，
-   底线对不齐的话，一开抽屉整个界面就断成上下错位的两截。 */
-.pdrawer-h { display: flex; align-items: center; gap: 12px; flex: none;
-  min-height: var(--bar2); padding: 0 18px; border-bottom: 1px solid var(--line); }
-.pdrawer-h h2 { font-family: var(--serif); font-size: 15px; font-weight: 600; margin: 0; }
-.pdrawer-h .pcount { margin-left: auto; }
-.pdrawer-h .back { font: inherit; font-size: 15px; color: var(--ink-2); background: none;
-  border: 0; cursor: pointer; padding: 0; }
-.pdrawer-h .back:hover { color: var(--ink); }
-.pdrawer-h .back .t { display: none; }
-/* 抽屉里自己滚，页面不动 */
-.pdrawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 60px; }
-.pdrawer-body .pfind { margin-bottom: 18px; }
-.pdrawer-body .pfind input { max-width: none; }
-.pdrawer-body .psect { margin-bottom: 18px; }
-/* 抽屉窄，密行里的机构名和渠道记号得让位给名字 */
-.pdrawer-body .prow-s { flex: 1 1 auto; }
-.pdrawer-body .prow-sp { display: none; }
+/* 找人那一行右端报个总数（原来在抽屉头上） */
+.pfind .pcount { flex: none; }
 
 /* 由头那一条：点名字进卡，点叉叉先不看它。
    叉叉平时淡着，鼠标扫过才明显——它是退路，不是主要动作。 */
@@ -1301,13 +1267,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* 关掉了几条 —— 永远说出来，永远留一条放回来的路 */
 .pcue-off { display: flex; align-items: baseline; gap: 10px; }
 
-/* 通讯录抽屉开着时，页面往左让出抽屉那块地。
-   不让的话由头那一行的叉叉正好压在抽屉底下——一个点不到的按钮
-   比没有这个按钮更糟，你会以为它坏了。 */
-.wrap.bookopen .page { padding-right: calc(var(--drawer-w) + 20px); }
-/* 按下去的工具条按钮（通讯录开着的时候）。跟 .tab.on 一个语气：
-   是「现在开着」，不是「有个新东西」——所以只描边，不填色。 */
-.wbtn.on { border-color: var(--accent); color: var(--accent); }
+
 
 /* 名片中栏：对话和输入框跟机会线那边同一套（.msg / .who / .bubble / .composer）。
    两个地方长得不一样的话，你会以为它们是两种东西——它们不是。 */

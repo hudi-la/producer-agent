@@ -122,9 +122,12 @@ test('该动的紧的在上：due 早的排前面', () => {
   assert.deepEqual(due.map((x) => x.key), ['b', 'a'])
 })
 
-test('等待的措辞带着设定的日子；到点换成「已经起草」', () => {
+test('等待的措辞带着设定的日子；到点说「等够了、该催了」', () => {
   assert.match(stateLine(row()), /设定 follow up 时间为 9 月 28 日/)
-  assert.match(stateLine(row({ zone: 'due' })), /follow up 已经起草/)
+  // 到点的等待 = 该催了。原来写「在等 X」又摆在「该动的」，位置和话
+  // 自相矛盾（「等回信应该在等待里面呀」）。
+  assert.match(stateLine(row({ zone: 'due' })), /等了 \d+ 天没等到 —— 该催了/)
+  assert.match(whyLine(row({ zone: 'due' })), /没等到的是：/)
 })
 
 test('判「要回」的理由要显示出来 —— 原来完全不显示', () => {

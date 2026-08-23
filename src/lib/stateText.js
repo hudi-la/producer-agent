@@ -17,8 +17,10 @@ export function stateLine(it) {
   const n = daysSince(it.since_at)
   switch (it.state) {
     case 'WAITING_REPLY':
+      // 到点的等待 = 「等够了，该催了」。原来写「在等 X」又摆在「该动的」，
+      // 他一眼看出自相矛盾（「等回信应该在等待里面呀」）——位置和话要说同一件事。
       return it.zone === 'due'
-        ? `已经过去 ${n} 天，follow up 已经起草`
+        ? `等了 ${n} 天没等到 —— 该催了，follow up 在卡里`
         : `已经过去 ${n} 天，设定 follow up 时间为 ${月日(it.due_at)}`
     case 'NEEDS_REPLY':
       return `发来邮件，「${it.what || '（没摘出梗概）'}」需要回复`
@@ -37,7 +39,8 @@ export function stateLine(it) {
 /** 副句：判断的理由。判「要回」凭什么 —— 这句原来完全不显示。 */
 export function whyLine(it) {
   if (it.state === 'NEEDS_REPLY' && it.why && it.why !== it.what) return `凭什么：${it.why}`
-  if (it.state === 'WAITING_REPLY' && it.what) return `在等：${it.what}`
+  if (it.state === 'WAITING_REPLY' && it.what)
+    return it.zone === 'due' ? `没等到的是：${it.what}` : `在等：${it.what}`
   return null
 }
 

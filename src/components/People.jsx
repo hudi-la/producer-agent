@@ -33,8 +33,6 @@ function channelsOf(c) {
 export default function People({
   contacts = [], orgs = [], strangers = [],
   fellBack = null, onOpen, onOpenOrg, onAdded,
-  // 抽屉的开关在顶栏（工具条）上，跟项目争取那边一个位置，所以状态在 App 手里
-  bookOpen = false, onCloseBook,
 }) {
   const [q, setQ] = useState('')
 
@@ -44,18 +42,14 @@ export default function People({
     ...orgs.map((o) => ({ kind: 'org', id: o.org, o, at: o.last_touch_at })),
   ].sort((a, b) => String(b.at || '').localeCompare(a.at || '')), [contacts, orgs])
 
-  // Esc 收起抽屉。搜索框里打了字的话，第一下 Esc 先清搜索——
-  // 一下把整个抽屉关掉，你刚打的那几个字就白打了。
+  // Esc 清搜索框。原来它还兼着「收起抽屉」——抽屉撤了（见下面那段），
+  // 只剩这一层：你打了字，一下 Esc 回到全部。
   useEffect(() => {
-    if (!bookOpen) return
-    const onKey = (e) => {
-      if (e.key !== 'Escape') return
-      if (q) setQ('')
-      else onCloseBook?.()
-    }
+    if (!q) return
+    const onKey = (e) => { if (e.key === 'Escape') setQ('') }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [bookOpen, q, onCloseBook])
+  }, [q])
 
   const key = q.trim().toLowerCase()
   const hit = (e) => {
@@ -110,7 +104,7 @@ export default function People({
           <h1>人际管理</h1>
           <p className="note">
             你会写信的对象都在这儿：人、机构、机构的共享信箱。
-            该动的和在等的事**全部**在顶栏那个 🔔 里 —— 人的和机会线的一起排，
+            该动的和在等的事<b>全部</b>在顶栏那个 🔔 里 —— 人的和机会线的一起排，
             不再按「挂在哪张卡上」分成两处。
           </p>
         </header>
@@ -120,12 +114,36 @@ export default function People({
             噪音清掉之后，分家只剩副作用——最近的一场见面因为对方没挂在
             任何线上，就从 🔔 里消失了。理由见 lib/notifications.js。 */}
 
-        {/* 通讯录收起来了，这一页就没别的了（「现在该动的」挪去了 🔔）。
-            **不留死白页** —— 说清它去哪了、怎么叫回来。 */}
-        {!bookOpen && contacts.length > 0 && (
-          <p className="pnone">
-            通讯录收起来了。右上角那颗「通讯录」再点一下就回来。
-          </p>
+        {/* ── 通讯录，就摊在这一页上 ──
+            原来它收在右边一个抽屉里，理由是「88 人 23 机构摆出来，每天开这一页
+            都得先滚过一遍才看得到今天的活」。2026-08-21 该动的和在等的整个并进
+            了 🔔 之后，这一页**再没有别的活**要被埋 —— 那条理由自己作废了，
+            剩下的只有「想看名片还得先点一下」。抽屉和工具条上那颗「通讯录」
+            一起撤了：同一份东西留两个入口，你每次都得先想按哪个。 */}
+        <div className="pfind">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+               stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <circle cx="6" cy="6" r="4.4" /><path d="M9.3 9.3 13 13" />
+          </svg>
+          <input value={q} onChange={(e) => setQ(e.target.value)}
+                 placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
+          <span className="pcount">{contacts.length} 人 · {orgs.length} 机构</span>
+        </div>
+
+        {/* 加人是往通讯录里加，所以它在这儿 */}
+        {!found && <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />}
+
+        {found ? (
+          <>
+            <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
+            <div className="prows">
+              {found.length
+                ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
+                : <p className="pnone">没有叫这个的。清空搜索框，粘他的邮箱加进来。</p>}
+            </div>
+          </>
+        ) : (
+          <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
         )}
 
         {/* 空页可以，骗人不行 —— 说清是「库里真没有」还是「没连上」。 */}
@@ -133,55 +151,11 @@ export default function People({
           <p className="pnone">
             {fellBack === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
              : fellBack === 'query-failed' ? '连上了但查询报错——名片读不出来，不是库里没人。'
-             : '库里一个人都没有。上面工具条拉开通讯录，粘个邮箱，我去信箱里查他是谁。'}
+             : '库里一个人都没有。粘个邮箱到上面那个框，我去信箱里查他是谁。'}
           </p>
         )}
 
       </div>
-
-      {/* ── 通讯录抽屉 ─────────────────────────────────────────
-          跟机会线那个抽屉同一套（.drawer：右侧固定、滑入、Esc 收起）。
-          长得一样是故意的——它们是同一种东西：你临时拉开看一眼，看完收起。 */}
-      {bookOpen && (
-        <aside className="drawer ppl-drawer" aria-label="通讯录">
-          <div className="pdrawer">
-            <div className="pdrawer-h">
-              <button className="back" onClick={() => onCloseBook?.()} aria-label="收起">
-                <span aria-hidden="true">✕</span><span className="t"> 收起</span>
-              </button>
-              <h2>通讯录</h2>
-              <span className="pcount">{contacts.length} 人 · {orgs.length} 机构</span>
-            </div>
-
-            <div className="pdrawer-body">
-              <div className="pfind">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-                     stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                  <circle cx="6" cy="6" r="4.4" /><path d="M9.3 9.3 13 13" />
-                </svg>
-                <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-                       placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
-              </div>
-
-              {/* 加人是往通讯录里加，所以它在这儿 */}
-              {!found && <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />}
-
-              {found ? (
-                <>
-                  <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
-                  <div className="prows">
-                    {found.length
-                      ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
-                      : <p className="pnone">没有叫这个的。清空搜索框，粘他的邮箱加进来。</p>}
-                  </div>
-                </>
-              ) : (
-                <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
-              )}
-            </div>
-          </div>
-        </aside>
-      )}
     </div>
   )
 }
