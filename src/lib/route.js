@@ -13,7 +13,7 @@
 //
 // ══ 约定 ═══════════════════════════════════════════════════════
 //
-//   ?a=people|profile   在哪个主区（pursue 是默认，不写）
+//   ?a=people|profile|ledger   在哪个主区（pursue 是默认，不写）
 //   ?p=<id>             打开着一条机会线
 //   ?c=<id>             打开着一张名片
 //   ?o=<机构名>          打开着一张机构卡
@@ -22,7 +22,9 @@
 // 卡片参数三选一：同时出现只认第一个（p → c → o），不然「落在哪张卡」
 // 就要看谁先被读到，那是种会随实现顺序变的行为。
 
-const AREAS = new Set(['pursue', 'people', 'profile'])
+// ledger 是 2026-08-22 补的：流水页 8/20 建的时候漏进这张白名单，
+// 后果是在流水页刷新一下就被弹回项目争取，地址栏也从来不说你在流水。
+const AREAS = new Set(['pursue', 'people', 'profile', 'ledger'])
 
 /** 当前状态 → 地址栏该长什么样（含 pathname，可以直接喂 replaceState）。 */
 export function toUrl(area, view, pathname = window.location.pathname) {

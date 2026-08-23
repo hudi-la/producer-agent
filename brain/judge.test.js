@@ -102,10 +102,11 @@ test('WAITING_REPLY x THEIR_LETTER 问的是「解决了它吗」，且客套那
   assert.match(p, /只是客套.*等待继续/s)
 })
 
-test('WAITING_REPLY x MY_LETTER 写死了「计时不动」——连发三封不能重置', () => {
+test('WAITING_REPLY x MY_LETTER：计时交给视图滑（从最后一封发出起算），格子只判换事/作废', () => {
   const p = cellFor('WAITING_REPLY', 'MY_LETTER').ask(fact({ role: 'artist' }), state)
-  assert.match(p, /计时不动/)
-  assert.match(p, /连发三封/)
+  assert.match(p, /换掉或作废/)
+  assert.match(p, /计时不用你管/)
+  assert.match(p, /最后一封发出的信起算/)
 })
 
 test('IDLE x MY_LETTER 问「等对方做什么、按惯例等几天」，带惯例数', () => {

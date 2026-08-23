@@ -1526,6 +1526,48 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* ── 流水页 ─────────────────────────────────────────────────
    办完的事的账本。行首一个小标说事的种类；「关掉一个等待」是他要的
    那句「它自己发现办到了」，配一行凭什么。 */
+/* 这一页比别的宽一点：一年 53 列格子要摆得下，压缩格子就分不出深浅了。 */
+.lg-inner { max-width: 880px; }
+
+/* ── 日历方格 ──
+   GitHub 那种排法：一列一周（周一在上），一格一天，深浅是那天的件数。
+   它只递一件事：**形状** —— 哪几周连着动、哪几天断了。具体发生了什么
+   在下面那一段，点哪天看哪天。 */
+.lg-cal { margin: 4px 0 8px; }
+.lg-cal-scroll { overflow-x: auto; padding-bottom: 4px; }
+.lg-grid-wrap { display: flex; gap: 6px; }
+.lg-grid { display: flex; gap: 3px; }
+.lg-col { display: flex; flex-direction: column; gap: 3px; }
+/* 星期标：跟 GitHub 一样隔行标，七行都标太吵。行高必须跟格子严格对齐 */
+.lg-wd { display: flex; flex-direction: column; gap: 3px; flex: none; width: 14px; }
+.lg-wd span { height: 11px; line-height: 11px; font-size: 9px; color: var(--ink-3); }
+/* 月份标顶在对应那一列上：每列一个位（宽 11 + 间隔 3），换月的那列写字 */
+.lg-months { display: flex; gap: 3px; margin: 0 0 4px 20px; height: 13px; }
+.lg-mon { width: 11px; flex: none; font-size: 10px; color: var(--ink-3); white-space: nowrap; }
+
+.lg-cell { width: 11px; height: 11px; border-radius: 2px; flex: none;
+  border: 0; padding: 0; display: block; }
+button.lg-cell { cursor: pointer; }
+.lg-cell.blank { background: none; }
+/* 空的那天也画一格 —— 不画的话「这天没动静」和「这天不在范围里」长得一样。
+   四档深浅，门槛写死（见 lib/heat.js）：缩放的话「最多 3 件」会跟
+   「最多 22 件」染成同一个深度，两周后回头看就读错了自己。 */
+.lg-cell.lv0 { background: color-mix(in srgb, var(--ink) 7%, var(--paper)); }
+.lg-cell.lv1 { background: color-mix(in srgb, var(--accent) 26%, var(--paper)); }
+.lg-cell.lv2 { background: color-mix(in srgb, var(--accent) 50%, var(--paper)); }
+.lg-cell.lv3 { background: color-mix(in srgb, var(--accent) 75%, var(--paper)); }
+.lg-cell.lv4 { background: var(--accent); }
+button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
+.lg-cell.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+.lg-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.lg-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px;
+  font-size: 11px; color: var(--ink-3); }
+.lg-legend .sp { flex: 1; }
+.lg-legend i { display: block; }
+/* 选中那天的件数，跟在日期后面 */
+.lg-n { float: right; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+
 .lg-week { font-size: 13px; color: var(--ink-2); margin: 2px 0 20px; }
 .lg-week b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .lg-day h2 { font-size: 13px; color: var(--ink-2); margin: 22px 0 6px;
