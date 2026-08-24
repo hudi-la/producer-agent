@@ -29,6 +29,7 @@ import { extractForm } from './form.js'
 import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
+import { modelFor, GOOD, CHEAP } from './models.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
@@ -279,7 +280,10 @@ function filesServer(atts) {
  */
 const asSystem = (s) => (typeof s === 'string' || Array.isArray(s) ? s : systemFor(s))
 
-async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null, maxTurns = 20) {
+async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null, maxTurns = 20, tier = GOOD) {
+  // 分档见 models.js:判断和邮件小活走便宜档,带人格和信息库的走好档。
+  // 两档都没配环境变量时 model 是 null、不进 options——跟今天逐字相同。
+  const model = modelFor(tier)
   // 按发生顺序收下 text / tool_use 两种块，最后交给 foldReply 挑出「给人看的那段」。
   // 原来这儿是 out.push(b.text) 无差别攒 —— 于是 20 轮的英文工作稿全被拼进落库的回复。
   const blocks = []
@@ -305,6 +309,7 @@ async function think(prompt, tools = READ_TOOLS, system = null, abortController 
       allowedTools: tools,
       permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
       maxTurns,
+      ...(model ? { model } : {}),
       ...(tell ? { includePartialMessages: true } : {}),
       ...(abortController ? { abortController } : {}),
       ...(mcpServers ? { mcpServers } : {}),
@@ -418,7 +423,7 @@ async function handleChat(body, onEvent = null) {
       .eq('subject_kind', o.kind).eq('subject_id', o.id).maybeSingle()
     if (st?.state === 'DEBRIEF') {
       const cell = cellFor('DEBRIEF', 'YOUR_ANSWER')
-      const { text: verdict } = await think(cell.ask(text.trim(), st), [], JUDGE_SYSTEM, null, null, null, 1)
+      const { text: verdict } = await think(cell.ask(text.trim(), st), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
       const met = parseMet(verdict)
       if (met?.met === true) {
         await db.rpc(o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_pursuit_note',
@@ -604,6 +609,7 @@ ${d.body}
 [[DRAFT]] {"draft_id":"…","thread_id":"…","to":"…"}`,
     GMAIL_TOOLS,
     ctx.profile,
+    null, null, null, 20, CHEAP,
   )
 
   const m = text.match(/\[\[DRAFT\]\]\s*(\{[\s\S]*?\})\s*$/)
@@ -764,6 +770,7 @@ ${known.join(', ')}
 [[THREADS]] {"thread_ids":["…"]}`,
     GMAIL_TOOLS,
     ctx.profile,
+    null, null, null, 20, CHEAP,
   )
   const m = text.match(/\[\[THREADS\]\]\s*(\{[\s\S]*?\})\s*$/)
   let ids = []
@@ -857,6 +864,7 @@ ${(known || []).flatMap((k) => k.mailboxes || []).join(', ') || '（还没有）
 字段没有就用 null。**认不出来就 kind:"unknown"，别硬凑一个人出来。**`,
     GMAIL_TOOLS,
     profile,
+    null, null, null, 20, CHEAP,
   )
 
   const m = text.match(/\[\[WHO\]\]\s*(\{[\s\S]*?\})\s*$/m)
@@ -906,6 +914,7 @@ thread：${threads.join(', ')}
 一封新的都没有就输出 [[MAIL]] {"messages":[]}`,
     GMAIL_TOOLS,
     ctx.profile,
+    null, null, null, 20, CHEAP,
   )
 
   const m = text.match(/\[\[MAIL\]\]\s*(\{[\s\S]*\})\s*$/)
@@ -1072,7 +1081,7 @@ async function rejudgeThese(want) {
 
   const t = new Date().toLocaleTimeString('zh-CN')
   console.log(`\n→ ${t} 重判 ${subjects.length} 个对象`)
-  const { text } = await think(rejudgePrompt(subjects), [], JUDGE_SYSTEM, null, null, null, 1)
+  const { text } = await think(rejudgePrompt(subjects), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
   const byId = Object.fromEntries(parseRejudge(text).map((v) => [v.id, v]))
 
   let judged = 0, touched = 0
@@ -1118,7 +1127,7 @@ async function triageThese(ids) {
 
   const t = new Date().toLocaleTimeString('zh-CN')
   console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
-  const { text } = await think(triagePrompt(letters), [], JUDGE_SYSTEM, null, null, null, 1)
+  const { text } = await think(triagePrompt(letters), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
   let judged = 0
   for (const v of parseTriage(text)) {
     const { data } = await db.rpc('pa_judge_letter', {
@@ -1197,7 +1206,7 @@ async function tagPass({ limit = 12 } = {}) {
       } catch (err) { skipped.push(`${f.subject_name}：${err.message}`); continue }
     } else {
       try {
-        const { text } = await think(cell.ask(f, st), [], JUDGE_SYSTEM, null, null, null, 1)
+        const { text } = await think(cell.ask(f, st), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
         tag = parseTag(text)
       } catch (err) { skipped.push(`${f.subject_name}：${err.message}`); continue }
     }

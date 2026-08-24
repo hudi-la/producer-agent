@@ -9,6 +9,7 @@
 // 的材料。认不出就该说认不出，不该去搜一个看起来合理的答案回来。
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { db } from './store.js'
+import { modelFor, CHEAP } from '../models.js'
 
 let _profile
 /** 画像。判「跟这摊事有关吗」得先知道这摊事是什么。 */
@@ -40,6 +41,8 @@ function systemFor(p) {
 /** 问一次。返回纯文本，解析交给调用方。 */
 export async function ask(prompt, { tools = [], maxTurns = 2 } = {}) {
   const p = await profile()
+  // 邮件小活全走便宜档(models.js);没配环境变量时 model 不进 options,行为照旧。
+  const model = modelFor(CHEAP)
   const out = []
   for await (const m of query({
     prompt,
@@ -48,6 +51,7 @@ export async function ask(prompt, { tools = [], maxTurns = 2 } = {}) {
       allowedTools: tools,          // 默认空数组：一个工具都不给
       permissionMode: 'bypassPermissions',
       maxTurns,
+      ...(model ? { model } : {}),
     },
   })) {
     if (m.type === 'assistant') {
