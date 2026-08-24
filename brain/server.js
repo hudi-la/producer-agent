@@ -18,6 +18,7 @@ import { read, slice, imageBudget, IMG_CAP } from './files.js'
 import {
   artistOf, idOf, mailboxOf, systemFor,
   buildSystem, buildUser, buildBriefSystem, buildBriefUser,
+  JUDGE_RULE,
 } from './prompt.js'
 // 从一次「想」里挑出给人看的那一段：动工具之前说的都是工作稿。
 import { foldReply } from './reply.js'
@@ -81,6 +82,8 @@ async function loadContext(pursuitId) {
     msgs: data.messages || [],
     entries: data.entries || [],
     profile: data.profile || null,
+    // 语气五格（0115 起 RPC 会带；老库没有这个键 = null = 全用默认，一个字不变）
+    voice: data.voice || null,
     // 0027 之后上下文里还有产出和邮件线索。它们不进对话 prompt（那是另一套用法），
     // 但 /gmail-draft 和 /sync 要照着它们干活，所以整包留在这儿。
     raw: data,
@@ -112,6 +115,7 @@ async function loadPersonContext(contactId) {
     msgs: data.messages || [],
     entries: data.entries || [],
     profile: data.profile || null,
+    voice: data.voice || null,
     raw: data,
   }
 }
@@ -1050,21 +1054,10 @@ async function handlePersonRefresh(contactId) {
   }
 }
 
-/**
- * 判断用的 system —— **跟 Fairwind 那套人格无关**。
- *
- * 判「这段交流约定了下一个时间点吗」「这封信要不要回」，不需要知道
- * 你有哪些作品、履历长什么样、协作弧怎么走、写信有什么规矩。
- * 带着那些只是白付上下文钱。
- *
- * 工具也一个不给：这两件事全在给它的文字里，不需要联网。
- */
-const JUDGE_SYSTEM = `你在读一段真实的邮件往来，替一位艺术家做一个很小的判断。
-
-规矩：
-- 只回答被问到的那几个问题，不展开、不建议、不客套。
-- 依据只能是给你的这些文字。**看不出来就答 null**，不要推测。
-- 最后一行按要求输出那个标记块，别的什么都不要加。`
+// 判断用的 system。原文和「为什么跟 Fairwind 人格无关」的道理都搬去了
+// prompt.js（语气是数据那一刀，2026-08-24）——原来这儿和 replay.js 各抄
+// 一份，改一处漏一处。多租户接上后这里改用 judgeSystemFor(voice)。
+const JUDGE_SYSTEM = JUDGE_RULE
 
 /**
  * 重判一批对象。**路由和收信循环共用这一份** ——

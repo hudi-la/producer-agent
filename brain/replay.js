@@ -18,15 +18,10 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { db } from './mail/store.js'
 import { eventOf, parseTag, cellFor } from './judge.js'
-
-// 跟 server.js 的 JUDGE_SYSTEM 同一段话（那份没 export —— server 顶层就
-// listen，import 会占端口）。改一处要改两处，这脚本是一次性的，认了。
-const JUDGE_SYSTEM = `你在读一段真实的邮件往来，替一位艺术家做一个很小的判断。
-
-规矩：
-- 只回答被问到的那几个问题，不展开、不建议、不客套。
-- 依据只能是给你的这些文字。**看不出来就答 null**，不要推测。
-- 最后一行按要求输出那个标记块，别的什么都不要加。`
+// 原来这儿抄着 server.js 那份 JUDGE_SYSTEM（server 没 export——顶层就 listen，
+// import 会占端口）。2026-08-24 语气那刀把它搬进了 prompt.js（纯函数，随便 import），
+// 「改一处要改两处」从此不存在。
+import { JUDGE_RULE as JUDGE_SYSTEM } from './prompt.js'
 
 async function think1(prompt) {
   const out = []

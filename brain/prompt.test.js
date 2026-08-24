@@ -17,6 +17,7 @@ import {
   buildPrompt, buildSystem, buildUser, promptParts,
   buildBriefPrompt, buildBriefSystem, buildBriefUser,
   systemFor, SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
+  judgeSystemFor, JUDGE_RULE,
 } from './prompt.js'
 
 // ── 尺子：老实现的逐字复刻 ──────────────────────────────────
@@ -326,6 +327,80 @@ test('user message 只剩对话——信息库不在里面了（这次改动的�
 test('刚落库的那一句不会在往来里重复出现', () => {
   const u = buildUser(pursuitCtx, '刚说的这句', 'm4')
   assert.equal(u.split('刚说的这句').length - 1, 1)
+})
+
+// ── 语气是数据（2026-08-24）─────────────────────────────────
+// 五个格子：agent_name / persona / letter_rule / form_rule / judge_rule。
+// 安全性质只有一条：**格子空着 = 一个字都不变**。
+// 下面这份「头 + 行为段」是切割前原文的逐字冻结——跟 legacy* 一个道理，
+// 故意不从 prompt.js import：切割时手一抖改了字，这里会红。
+// 见 docs/specs/2026-08-24-the-voice-is-data.md。
+
+const 冻结的头和行为段 = `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。你服务的艺术家是 Hu Di，作品站 https://hudiworks.com/。
+
+你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
+
+怎么做事：
+- 你是**一起想的搭档，不是自动化按钮**。你提议，动手和拍板的是 ta。
+- 协作弧：讲懂 → 一起挑作品 → 一起写。别跳步。
+- **一次只递一件事**。别一口气抛出五个待办；挑最该现在想的那一件，把它说透。
+- 你带着这条线的全部往来，所以别让 ta 重讲已经说过的事。
+- 你握着 ta 的作品网和履历（下面会给），挑作品时用它，别泛泛而谈。
+- 该查就查：机构背景、往届名单、申请要求、截止日期，用联网工具去核实，别猜。
+- 说话像个熟悉这行的人，不是客服。中文对话；给机构的草稿按对方语言写。
+- 拿不准就问 ta，别自己替 ta 决定。
+
+你不能做的：你改不了这条线的阶段、也改不了作品盒子。要动这些，说出来让 ta 点。
+
+`
+
+test('voice 空着 = 切割前逐字相同（头 + 行为段对冻结副本）', () => {
+  for (const 空 of [undefined, null, {}, { persona: '', letter_rule: '   ', agent_name: '' }]) {
+    const s = systemFor(profile, 空)
+    assert.ok(s.startsWith(冻结的头和行为段), '头或行为段被切割改动了')
+    // 两条规矩还挂在后面,顺序没变
+    assert.ok(s.indexOf('[[LETTER]]') < s.indexOf('[[FORM]]'))
+  }
+  // 不传 voice 的老调用方式也一样
+  assert.equal(systemFor(profile), systemFor(profile, {}))
+})
+
+test('填了哪格换哪格,其余照旧', () => {
+  const s = systemFor(profile, { letter_rule: '## 写信\n就一行。' })
+  assert.ok(s.includes('就一行。'))
+  assert.ok(!s.includes('[[LETTER]]'))          // 默认那段整个被换掉
+  assert.ok(s.includes('一次只递一件事'))        // persona 没动
+  assert.ok(s.includes('[[FORM]]'))              // form_rule 没动
+})
+
+test('agent 名字随便起,Fairwind 只是默认', () => {
+  const s = systemFor(profile, { agent_name: '小顺风' })
+  assert.ok(s.startsWith('你是「 小顺风 」，一位艺术家的 producer / 外联搭档。'))
+  assert.ok(!s.includes('Fairwind'))
+})
+
+test('换掉 persona,身份那句还在——它是档案数据,不是语气', () => {
+  const s = systemFor(profile, { persona: '你只做一件事。' })
+  assert.ok(s.includes('Hu Di'))
+  assert.ok(s.includes('https://hudiworks.com/'))
+  assert.ok(s.includes('你只做一件事。'))
+  assert.ok(!s.includes('一次只递一件事'))
+})
+
+test('chat 和讲懂两条路都认 ctx.voice——分叉是最难查的那种坏', () => {
+  const 有声 = { ...pursuitCtx, voice: { agent_name: '小顺风' } }
+  assert.ok(buildSystem(有声)[0].startsWith('你是「 小顺风 」'))
+  assert.ok(buildBriefSystem(有声)[0].startsWith('你是「 小顺风 」'))
+  // 没 voice 的 ctx 照旧
+  assert.ok(buildSystem(pursuitCtx)[0].startsWith('你是「 Fairwind 」'))
+})
+
+test('判断那段小人格能换,而且只有一份默认(原来 server/replay 抄了两份)', () => {
+  assert.equal(judgeSystemFor(), JUDGE_RULE)
+  assert.equal(judgeSystemFor({}), JUDGE_RULE)
+  assert.equal(judgeSystemFor({ judge_rule: '  ' }), JUDGE_RULE)
+  assert.equal(judgeSystemFor({ judge_rule: '只答是或否。' }), '只答是或否。')
+  assert.ok(JUDGE_RULE.includes('很小的判断'))
 })
 
 test('分界标记用的是 SDK 认的那个，不是我们编的', () => {

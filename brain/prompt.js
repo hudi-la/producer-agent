@@ -99,13 +99,18 @@ const FORM_RULE = `## 填申请表的时候
 
 `
 
-export const systemFor = (profile) => {
-  const name = profile?.name
-  const site = profile?.website
-  const who = name ? `你服务的艺术家是 ${name}${site ? `，作品站 ${site}` : ''}。` : ''
-  return `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。${who}
+// ── 语气是数据（2026-08-24）────────────────────────────────
+// 语气和判据本来是这个文件里的常量——最该属于艺术家自己的东西，却只有
+// 懂 JavaScript 才改得动。现在拆成五个格子（voice），每格空着 = 用下面的
+// 默认原文，一个字都不变；填了哪格换哪格。格子的数据从 producer.voice 来
+//（0115），跟着 pa_brain_context 一起进 ctx。设计稿：
+// docs/specs/2026-08-24-the-voice-is-data.md。
+//
+// 「你服务的艺术家是 X」那句**不是格子**——它是档案数据，从 profile 现算。
 
-你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
+export const DEFAULT_AGENT_NAME = 'Fairwind'
+
+export const DEFAULT_PERSONA = `你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
 
 怎么做事：
 - 你是**一起想的搭档，不是自动化按钮**。你提议，动手和拍板的是 ta。
@@ -117,12 +122,38 @@ export const systemFor = (profile) => {
 - 说话像个熟悉这行的人，不是客服。中文对话；给机构的草稿按对方语言写。
 - 拿不准就问 ta，别自己替 ta 决定。
 
-你不能做的：你改不了这条线的阶段、也改不了作品盒子。要动这些，说出来让 ta 点。
+你不能做的：你改不了这条线的阶段、也改不了作品盒子。要动这些，说出来让 ta 点。`
 
-${LETTER_RULE}
-
-${FORM_RULE}`
+// 空串和纯空白都算「没填」——不然界面上清空一格会把那段整个抹掉。
+const pick = (voice, key, fallback) => {
+  const v = voice?.[key]
+  return typeof v === 'string' && v.trim() ? v : fallback
 }
+
+export const systemFor = (profile, voice = null) => {
+  const name = profile?.name
+  const site = profile?.website
+  const who = name ? `你服务的艺术家是 ${name}${site ? `，作品站 ${site}` : ''}。` : ''
+  return `你是「 ${pick(voice, 'agent_name', DEFAULT_AGENT_NAME)} 」，一位艺术家的 producer / 外联搭档。${who}
+
+${pick(voice, 'persona', DEFAULT_PERSONA)}
+
+${pick(voice, 'letter_rule', LETTER_RULE)}
+
+${pick(voice, 'form_rule', FORM_RULE)}`
+}
+
+// 判断那段小人格。跟 Fairwind 的人格无关：判「这封信要不要回」不需要知道
+// 有哪些作品、协作弧怎么走——带着那些只是白付上下文钱，工具也一个不给。
+//（原来 server.js 和 replay.js 各抄了一份，改一处漏一处;现在只有这一份。）
+export const JUDGE_RULE = `你在读一段真实的邮件往来，替一位艺术家做一个很小的判断。
+
+规矩：
+- 只回答被问到的那几个问题，不展开、不建议、不客套。
+- 依据只能是给你的这些文字。**看不出来就答 null**，不要推测。
+- 最后一行按要求输出那个标记块，别的什么都不要加。`
+
+export const judgeSystemFor = (voice = null) => pick(voice, 'judge_rule', JUDGE_RULE)
 
 // 履历那些「一条」的关键事实——学校名、机构、起止年份、地点——存在 meta 这个
 // jsonb 里，不是表上的列。所以这里必须按 kind 摊开：不摊，education / credit / job
@@ -289,7 +320,7 @@ export function buildPrompt(ctx, incoming, exceptId) {
 export function buildSystem(ctx) {
   const { fixed, perLine } = promptParts(ctx, '', null)
   return [
-    [systemFor(ctx.profile), '', ...fixed].join('\n'),
+    [systemFor(ctx.profile, ctx.voice), '', ...fixed].join('\n'),
     SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
     perLine.join('\n'),
   ]
@@ -343,7 +374,7 @@ export function buildBriefPrompt(ctx) {
 export function buildBriefSystem(ctx) {
   const { fixed, perLine } = briefParts(ctx)
   return [
-    [systemFor(ctx.profile), '', ...fixed].join('\n'),
+    [systemFor(ctx.profile, ctx.voice), '', ...fixed].join('\n'),
     SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
     perLine.join('\n'),
   ]
