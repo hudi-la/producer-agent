@@ -1249,9 +1249,40 @@ body.resizing .drawer-grip::before { opacity: .75; }
    当初收起来的理由是「88 人 23 机构摆出来，每天开这一页都得先滚过一遍
    才看得到今天的活」。8/21 该动的和在等的整个并进 🔔 之后，这一页再没有
    别的活会被埋 —— 理由自己作废，剩下的只有「想看名片还得先点一下」。 */
-.ppl-inner { max-width: 860px; }
+.ppl-inner { max-width: 1100px; }
 /* 找人那一行右端报个总数（原来在抽屉头上） */
 .pfind .pcount { flex: none; }
+
+/* ── 名片摆成卡片（2026-08-23）──
+   原来是一行密行：名字 · 机构 · 渠道 · 日期。改成卡片是为了装得下**关系**
+   那一句 —— 库里 95 个人每人都有 notes，写的正是「他是谁、你们之间是什么」，
+   而那句话恰恰是你隔三个月回来时唯一想知道的。密行里没有它的位置。
+   长相直接借看板那张 .pcard：气泡、勾选框、悬停抬一下，三样都是白拿的。 */
+.ppl-cards { display: grid; gap: 12px; align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); }
+/* 气泡吊在卡头顶上（top: -10px），行距不撑开就会压到上一排卡上；
+   头一排没有「上一排」，压的是搜索框，所以整块也得往下让一让 */
+.ppl-cards.audit { row-gap: 30px; margin-top: 24px; }
+.ppl-card { margin-bottom: 0; display: flex; flex-direction: column; }
+.ppl-card .pc-t { display: flex; align-items: baseline; gap: 7px; }
+/* 关系那一句。最多三行 —— 名片是索引不是档案，看全的地方在卡里。 */
+.ppl-rel { font-size: 11.5px; line-height: 1.55; color: var(--ink-2); margin-top: 8px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; white-space: pre-wrap; }
+.ppl-card .pc-m { margin-top: auto; padding-top: 10px; flex-wrap: wrap; row-gap: 4px; }
+.ppl-card .pc-m .sp { flex: 1; }
+/* 批量操作开着、但这张卡不能勾（机构还没进一摞）：淡下去，别装成能点的 */
+.ppl-card.idle { opacity: .45; cursor: default; }
+
+/* 「新联系人」那一段：带子上按一下才出现，收起来的时候一点位置都不占 */
+.ppl-add { border: 1px solid var(--line-2); border-radius: 12px;
+  background: var(--paper-2); padding: 14px 16px 4px; margin-bottom: 20px; }
+.ppl-add .psect-h { margin-bottom: 10px; }
+.ppl-add .psect-h .sp { flex: 1; }
+.ppl-add .psect { margin-bottom: 6px; }
+
+/* 带子最左边那个区名 */
+.barname { font-family: var(--serif); font-size: 13.5px; font-weight: 600; flex: none; }
 
 /* 由头那一条：点名字进卡，点叉叉先不看它。
    叉叉平时淡着，鼠标扫过才明显——它是退路，不是主要动作。 */

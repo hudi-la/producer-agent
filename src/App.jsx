@@ -62,6 +62,10 @@ export default function App() {
   // 那是「看不见 = 丢了」的近亲。
   const [picking, setPicking] = useState(false)
   const [picked, setPicked] = useState(() => new Set())
+  // 人际管理那一区：分类镜头（全部 / 人 / 机构）和「新联系人」那一格。
+  // 状态在 App 手里是因为开关在带子上，跟项目争取那边的筛选同一个道理。
+  const [pplTab, setPplTab] = useState('all')
+  const [addOpen, setAddOpen] = useState(false)
   // 手头这摊活。存 localStorage，不上库（见 lib/queue.js 开头）。
   const [queue, setQueue] = useState(loadQueue)
   const [sayOpen, setSayOpen] = useState(false)
@@ -688,7 +692,11 @@ export default function App() {
           onHandled={handleNote}
           onReschedule={rescheduleNote}
           auditOn={audit}
-          onAudit={() => { setAudit((x) => !x); setBellOpen(false); setArea('pursue') }}
+          /* 气泡现在名片上也挂（2026-08-23），所以人在人际管理页时别把他拽走 ——
+             拽走等于「你要看的那一页刚好不给看」。其余情况仍然带去看板：
+             那句话的意思就是「挂到看板上」。 */
+          onAudit={() => { setAudit((x) => !x); setBellOpen(false)
+                           setArea((a) => (a === 'people' ? a : 'pursue')) }}
           onGoPeople={() => { setBellOpen(false); setArea('people') }}
           onClose={() => setBellOpen(false)}
           onOpen={(it) => {
@@ -740,9 +748,44 @@ export default function App() {
         />
         )}
 
-        {/* 人际管理这一区在带子上没有东西了：通讯录 2026-08-23 摊回页面上，
-            那颗「通讯录」开关也跟着撤了 —— 同一份东西留两个入口，
-            你每次都得先想按哪个。 */}
+        {/* 人际管理这一区。跟项目争取那条同一套：**左边镜头，右边动作**。
+            镜头是「分类」：库里 95 人 27 机构混在一张表里，人和机构是这份
+            数据里唯一一条真实存在、不用另填字段的界。
+            动作是「新联系人」和「批量操作」—— 后者跟看板共用同一摞 picked，
+            所以人和线可以混着勾（见 lib/queue.js 的 qKey）。 */}
+        {area === 'people' && view.name === 'home' && (
+          <>
+            <span className="barname">通讯录</span>
+            <div className="tabs" role="group" aria-label="分类">
+              {[['all', '全部'], ['person', '人'], ['org', '机构']].map(([k, label]) => (
+                <button key={k} type="button"
+                        className={'tab' + (pplTab === k ? ' on' : '')}
+                        aria-pressed={pplTab === k}
+                        onClick={() => setPplTab(k)}>{label}</button>
+              ))}
+            </div>
+            {picking && (
+              <span className="pickinfo">
+                已选 {picked.size} 张
+                {hiddenPicked > 0 && <em>（{hiddenPicked} 张不在当前视图）</em>}
+              </span>
+            )}
+            <span className="sp" />
+            {picking ? (
+              <>
+                <button className="wbtn" disabled={!picked.size || Boolean(saying)}
+                        onClick={() => setSayOpen(true)}>说一句…</button>
+                <button className="wbtn" disabled={!picked.size} onClick={pickAll}>过一遍</button>
+                <button className="btn" onClick={cancelPick}>取消</button>
+              </>
+            ) : (
+              <>
+                <button className="wbtn" onClick={() => setAddOpen(true)}>＋ 新联系人</button>
+                <button className="wbtn" onClick={() => setPicking(true)}>批量操作</button>
+              </>
+            )}
+          </>
+        )}
         {/* 过卡入口原来在这儿。挪进工具条了——顶栏常驻角标本身就是一句主张：
             「你有一摊持续欠着的事」。队列已经不是那个东西（它只说「这批还剩几张」），
             就不该站在这儿。谁生的跟谁站。
@@ -800,6 +843,14 @@ export default function App() {
             onOpen={(c) => openInTab('c', c.id)}
             onOpenOrg={(o) => openInTab('o', o.org)}
             onAdded={reloadContacts}
+            tab={pplTab}
+            addOpen={addOpen}
+            onCloseAdd={() => setAddOpen(false)}
+            picking={picking} picked={picked} onPick={pick}
+            /* 气泡跟看板同一套：这个人现在卡在什么上，吊在名片头顶。
+               states 是同一份 v_pa_state —— 线和人 2026-08-21 就不分家了。 */
+            audit={audit}
+            states={new Map([...(notes?.due || []), ...(notes?.waiting || [])].map((x) => [x.subject_id, x]))}
           />
         )
       ) : area === 'profile' ? (

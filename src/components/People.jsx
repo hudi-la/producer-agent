@@ -1,6 +1,8 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import Strangers from './Strangers.jsx'
+import { goldLine } from '../lib/stateText.js'
+import { key as qKey } from '../lib/queue.js'
 
 // 「人际管理」—— 人这一层。
 //
@@ -31,8 +33,11 @@ function channelsOf(c) {
 }
 
 export default function People({
-  contacts = [], orgs = [], strangers = [],
-  fellBack = null, onOpen, onOpenOrg, onAdded,
+  contacts = [], orgs = [], strangers = [], onOpen, onOpenOrg, onAdded, fellBack = null,
+  // 带子上那几个开关的状态在 App 手里（跟项目争取那边同一个道理）
+  tab = 'all', addOpen = false, onCloseAdd,
+  picking = false, picked, onPick,
+  audit = false, states = null,
 }) {
   const [q, setQ] = useState('')
 
@@ -61,6 +66,9 @@ export default function People({
     return bag.filter(Boolean).some((s) => String(s).toLowerCase().includes(key))
   }
   const found = key ? entries.filter(hit) : null
+  // 分类镜头：全部 / 人 / 机构。**搜索之后再筛** —— 你搜「ASU」的时候
+  // 想看的是跟 ASU 有关的一切，不该被上一次点的那个标签悄悄砍掉一半。
+  const shown = (found || entries).filter((e) => tab === 'all' || e.kind === (tab === 'org' ? 'org' : 'person'))
 
 
   /** 现在挂着的机构（离开了的不在这儿显示，那是名片里的事）。 */
@@ -70,32 +78,73 @@ export default function People({
       : ((c.orgs || []).length ? '（现在没挂机构）' : [c.org, c.role].filter(Boolean).join(' · '))
   }
 
-  const Row = ({ e }) => e.kind === 'org' ? (
-    <button className="prow" onClick={() => onOpenOrg?.(e.o)}>
-      <span className="prow-n">{e.o.org}</span>
-      <span className="pchip org">机构</span>
-      <span className="prow-s">
-        {e.o.mailboxes?.[0]?.email || <span className="pf-empty">没有共享信箱</span>}
-      </span>
-      <span className="prow-sp" />
-      <span className="pchip">
-        {e.o.people_now} 人{e.o.people_past ? ` · 走了 ${e.o.people_past}` : ''}
-      </span>
-      {e.o.mail_count > 0 && <span className="pchip">{e.o.mail_count} 封</span>}
-      <span className="prow-w">{e.o.last_touch_at ? md(e.o.last_touch_at) : '—'}</span>
-    </button>
-  ) : (
-    <button className="prow" onClick={() => onOpen?.(e.c)}>
-      <span className="prow-n">{e.c.name || '未具名联系人'}</span>
-      <span className="prow-s">{nowOrg(e.c)}</span>
-      <span className="prow-sp" />
-      <span className="prow-ch">
-        {channelsOf(e.c).map((x, i) => <span key={i} className="pchip">{CH[x.kind] || x.kind}</span>)}
-      </span>
-      {e.c.pursuits?.length > 0 && <span className="pchip">{e.c.pursuits.length} 条线</span>}
-      <span className="prow-w">{e.c.last_touch_at ? md(e.c.last_touch_at) : '—'}</span>
-    </button>
-  )
+  // ── 一张名片 ──
+  // 原来这儿是一行密行（名字 · 机构 · 渠道 · 日期）。改成卡片是为了装得下
+  // **关系**那一句：库里 95 个人每一个都有 notes，写的正是「他是谁、你们
+  // 之间是什么」（「CalArts Reef 驻地的行政对接，押金和 stipend 都走她这儿」）。
+  // 密行里没有它的位置，而那句话恰恰是你隔三个月回来时唯一想知道的。
+  //
+  // 长相直接借看板那张 .pcard：同一种东西该长得一样，气泡、勾选框、
+  // 悬停抬一下，三样都是白拿的。
+  const Card = ({ e }) => {
+    const isOrg = e.kind === 'org'
+    const id = isOrg ? null : e.c.id
+    const k = id ? qKey('contact', id) : null
+    const checked = k ? Boolean(picked?.has(k)) : false
+    const st = id && states ? states.get(id) : null
+    // 机构还不能进批量（一摞里走的是 contact / pursuit 两种键），
+    // 所以勾选态下它不摆勾选框也不接点击 —— 摆一个按不动的框比不摆更糟。
+    const 能勾 = picking && Boolean(k)
+    const open = () => (能勾 ? onPick([k], !checked) : isOrg ? onOpenOrg?.(e.o) : onOpen?.(e.c))
+
+    return (
+      <div
+        className={'pcard ppl-card' + (能勾 ? ' pickable' : '') + (能勾 && checked ? ' on' : '')
+                   + (picking && !能勾 ? ' idle' : '')}
+        role={能勾 ? 'checkbox' : 'button'}
+        aria-checked={能勾 ? checked : undefined}
+        tabIndex={0}
+        onClick={open}
+        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open() } }}
+      >
+        {/* 气泡：这个人现在卡在什么上。跟看板上那张卡同一套（同一份 v_pa_state）。 */}
+        {audit && st && (
+          <div className={'pc-bubble' + (st.zone === 'due' ? ' due' : '')}>{goldLine(st)}</div>
+        )}
+        {能勾 && <span className="pc-check" aria-hidden="true" />}
+
+        <div className="pc-t">
+          {isOrg ? e.o.org : (e.c.name || '未具名联系人')}
+          {isOrg && <span className="pchip org">机构</span>}
+        </div>
+
+        <div className="pc-p ghost">
+          {isOrg
+            ? (e.o.mailboxes?.[0]?.email || '没有共享信箱')
+            : (nowOrg(e.c) || '（没挂机构）')}
+        </div>
+
+        {/* 关系 —— 这一句才是名片的正文 */}
+        {!isOrg && e.c.notes && <div className="ppl-rel">{e.c.notes}</div>}
+
+        <div className="pc-m">
+          {isOrg ? (
+            <>
+              <span className="pchip">{e.o.people_now} 人{e.o.people_past ? ` · 走了 ${e.o.people_past}` : ''}</span>
+              {e.o.mail_count > 0 && <span className="pchip">{e.o.mail_count} 封</span>}
+            </>
+          ) : (
+            <>
+              {channelsOf(e.c).map((x, i) => <span key={i} className="pchip">{CH[x.kind] || x.kind}</span>)}
+              {e.c.pursuits?.length > 0 && <span className="pchip">{e.c.pursuits.length} 条线</span>}
+            </>
+          )}
+          <span className="sp" />
+          <span className="prow-w">{(isOrg ? e.o.last_touch_at : e.c.last_touch_at) ? md(isOrg ? e.o.last_touch_at : e.c.last_touch_at) : '—'}</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page">
@@ -130,28 +179,40 @@ export default function People({
           <span className="pcount">{contacts.length} 人 · {orgs.length} 机构</span>
         </div>
 
-        {/* 加人是往通讯录里加，所以它在这儿 */}
-        {!found && <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />}
-
-        {found ? (
-          <>
-            <div className="psect-h"><h2>找到的</h2><span className="pcount">{found.length} 个</span></div>
-            <div className="prows">
-              {found.length
-                ? found.map((e) => <Row key={e.kind + e.id} e={e} />)
-                : <p className="pnone">没有叫这个的。清空搜索框，粘他的邮箱加进来。</p>}
+        {/* 加人收进带子上那颗「新联系人」后面。它是**偶尔一次**的动作
+            （粘个邮箱、让它去读信、你点头），而这一页九成时间是在查人；
+            常驻在页面顶上，等于每天替一件偶尔的事付一段版面。 */}
+        {addOpen && (
+          <section className="ppl-add">
+            <div className="psect-h">
+              <h2>新联系人</h2>
+              <span className="sp" />
+              <button className="lnk" onClick={() => onCloseAdd?.()}>收起</button>
             </div>
-          </>
-        ) : (
-          <div className="prows">{entries.map((e) => <Row key={e.kind + e.id} e={e} />)}</div>
+            <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
+          </section>
         )}
+
+        {found && (
+          <div className="psect-h">
+            <h2>找到的</h2><span className="pcount">{shown.length} 个</span>
+          </div>
+        )}
+
+        {shown.length ? (
+          <div className={'ppl-cards' + (audit ? ' audit' : '')}>
+            {shown.map((e) => <Card key={e.kind + e.id} e={e} />)}
+          </div>
+        ) : found ? (
+          <p className="pnone">没有叫这个的。上面「新联系人」里粘他的邮箱加进来。</p>
+        ) : null}
 
         {/* 空页可以，骗人不行 —— 说清是「库里真没有」还是「没连上」。 */}
         {!contacts.length && (
           <p className="pnone">
             {fellBack === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
              : fellBack === 'query-failed' ? '连上了但查询报错——名片读不出来，不是库里没人。'
-             : '库里一个人都没有。粘个邮箱到上面那个框，我去信箱里查他是谁。'}
+             : '库里一个人都没有。右上角「新联系人」，粘个邮箱，我去信箱里查他是谁。'}
           </p>
         )}
 

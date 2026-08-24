@@ -842,8 +842,17 @@ ${(known || []).flatMap((k) => k.mailboxes || []).join(', ') || '（还没有）
 名字（签名）、机构、他管什么、个人网站、**谁介绍的**（主题行和正文第一句常有）。
 认不出的字段就留空，别编。
 
+**notes 里人称只有一条规矩：「他 / 她」永远指 ${email} 这个人，
+永远不指${artistOf(profile) ? ` ${artistOf(profile)}` : '收件人'}本人。**
+- 提到本人，写「你」或者直接写名字${artistOf(profile) ? `（${artistOf(profile)}）` : ''}，两样都行。
+- 唯独不能用「他 / 她」——这句话里「他」已经是对方了，同一个字指两个人，
+  读的人得停下来想一遍这句说的是谁。
+- 例：✓「Hu Di 送过他一件 pigeon 作品，他要回赠新书」
+      ✓「你送过他一件 pigeon 作品，他要回赠新书」
+      ✗「她请他去做 workshop」——两个「他」，一个是对方一个是本人，读不出来
+
 **最后一行**单独输出，别的什么都不要加：
-[[WHO]] {"kind":"person|shared_box|unknown","name":"…","org":"…","role":"…","site":"…","intro_by":"…","notes":"中文，两三句说清这段关系是怎么回事、他最近说了什么、下一步该干嘛","match_name":"命中通讯录里哪位，没有就 null","match_why":"…","threads":["thread id"],"confidence":"high|low"}
+[[WHO]] {"kind":"person|shared_box|unknown","name":"…","org":"…","role":"…","site":"…","intro_by":"…","notes":"中文，两三句说清这段关系是怎么回事、他最近说了什么、下一步该干嘛。**「他/她」只能指对方**","match_name":"命中通讯录里哪位，没有就 null","match_why":"…","threads":["thread id"],"confidence":"high|low"}
 
 字段没有就用 null。**认不出来就 kind:"unknown"，别硬凑一个人出来。**`,
     GMAIL_TOOLS,
