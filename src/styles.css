@@ -1548,6 +1548,11 @@ button.lg-cell { cursor: pointer; }
 .lg-cell.lv2 { background: color-mix(in srgb, var(--accent) 50%, var(--paper)); }
 .lg-cell.lv3 { background: color-mix(in srgb, var(--accent) 75%, var(--paper)); }
 .lg-cell.lv4 { background: var(--accent); }
+/* 还没到的那几天：空心。**染成实心就等于说「这事办了」** ——
+   日历上最不能撒的谎就是把待办画得像已办。 */
+.lg-cell.ahead { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+.lg-cell.ahead.lv0 { color: var(--line-2); }
+.lg-cell.ahead.lv1, .lg-cell.ahead.lv2, .lg-cell.ahead.lv3, .lg-cell.ahead.lv4 { color: var(--accent); }
 button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .lg-cell.on { outline: 2px solid var(--ink); outline-offset: 1px; }
 .lg-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1568,6 +1573,8 @@ button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .lg-kind { flex: none; width: 92px; font-size: 11px; color: var(--ink-3);
   text-align: right; }
 .lg-row.wait_close .lg-kind { color: var(--good, #4a7); font-weight: 600; }
+/* 待办那一行：空心方块是同一个记号，说的是同一件事——还没发生 */
+.lg-row.todo .lg-kind { color: var(--accent); font-weight: 600; }
 .lg-row.sent .lg-kind, .lg-row.got .lg-kind { color: var(--ink-2); }
 .lg-b { flex: 1; min-width: 0; }
 .lg-what { font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }

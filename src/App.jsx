@@ -30,7 +30,7 @@ import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDG
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
-import Ledger from './components/Ledger.jsx'
+import Timeline from './components/Timeline.jsx'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -41,7 +41,10 @@ const AREAS = [
   ['profile', '我的档案'],
   // 办完的事有自己的一页（2026-08-20）：心安做成 pull 不做成 push ——
   // 「它自己发现办到了」在这儿一行行躺着，不来敲你。
-  ['ledger', '流水'],
+  // key 仍叫 ledger：改 key 等于作废地址栏白名单和你存过的链接，
+  // 而这只是换个名字。2026-08-23 从「流水」改叫「时间线」——
+  // 里头分成日历（你动的手）和流水（不是你动的手）两半。
+  ['ledger', '时间线'],
 ]
 
 // 日期一律走 lib/when.js —— 全 app 只有那一份，按你住的地方算。
@@ -66,6 +69,8 @@ export default function App() {
   // 状态在 App 手里是因为开关在带子上，跟项目争取那边的筛选同一个道理。
   const [pplTab, setPplTab] = useState('all')
   const [addOpen, setAddOpen] = useState(false)
+  // 时间线那一区：日历（你动的手）/ 流水（不是你动的手）
+  const [tlTab, setTlTab] = useState('cal')
   // 手头这摊活。存 localStorage，不上库（见 lib/queue.js 开头）。
   const [queue, setQueue] = useState(loadQueue)
   const [sayOpen, setSayOpen] = useState(false)
@@ -418,7 +423,7 @@ export default function App() {
     } else if (view.name === 'org') {
       what = view.org.org
     } else {
-      what = area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '流水' : 'Producer'
+      what = area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '时间线' : 'Producer'
     }
     document.title = 'Fairwind · ' + what
   }, [view, area, pl, ct])
@@ -748,6 +753,22 @@ export default function App() {
         />
         )}
 
+        {/* 时间线这一区：镜头是「看哪一半」。分的不是时间是**谁动的手** ——
+            理由写在 lib/ledger.js 的 MINE / FLOW 上面。 */}
+        {area === 'ledger' && (
+          <>
+            <span className="barname">时间线</span>
+            <div className="tabs" role="group" aria-label="看哪一半">
+              {[['cal', '日历'], ['flow', '流水']].map(([k, label]) => (
+                <button key={k} type="button"
+                        className={'tab' + (tlTab === k ? ' on' : '')}
+                        aria-pressed={tlTab === k}
+                        onClick={() => setTlTab(k)}>{label}</button>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* 人际管理这一区。跟项目争取那条同一套：**左边镜头，右边动作**。
             镜头是「分类」：库里 95 人 27 机构混在一张表里，人和机构是这份
             数据里唯一一条真实存在、不用另填字段的界。
@@ -858,7 +879,11 @@ export default function App() {
                  onProfileSaved={() => loadProfile().then(setProfile)}
                  onEntrySaved={() => loadLibrary().then(setLib)} />
       ) : area === 'ledger' ? (
-        <Ledger onOpen={(r) => {
+        <Timeline
+          tab={tlTab}
+          /* 待办从这儿来：跟 🔔 同一份 v_pa_state，不另查一遍 */
+          states={[...(notes?.due || []), ...(notes?.waiting || [])]}
+          onOpen={(r) => {
           if (r.subject_kind === 'pursuit') {
             const p = pl.pursuits.find((x) => x.id === r.subject_id)
             if (p) { setArea('pursue'); closePursuit(); openPursuit(p) }
