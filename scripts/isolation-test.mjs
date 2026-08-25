@@ -90,6 +90,17 @@ async function seed(u) {
     // pulse 不用手动种:上面这些 insert 本身就会经 t_pulse_i 触发器给这个
     // 用户拨出自己那一行——它出现在 sweep 里,顺带证明 bump 归人了。
     await client.query(`insert into producer.stage_backup_0015 (id, old_stage) values (gen_random_uuid(), $1 || '_stage')`, [M])
+
+    // ── 两个学员认识同一个策展人 ──────────────────────────
+    // email 这类人间的自然键,单人版拿它当全局唯一没问题;多人之后
+    // 唯一性必须按 (谁的, email) 算。A 和 B 都认识 curator@shared.test,
+    // 都注册了 info@shared.test 这个机构信箱——谁都不该撞谁。
+    const { rows: [c2] } = await client.query(
+      `insert into producer.contacts (name, email) values ($1 || '_共同认识的策展人', 'curator@shared.test') returning id`, [M])
+    await client.query(`insert into producer.contact_emails (contact_id, email) values ($1, 'curator2@shared.test')`, [c2.id])
+    await client.query(`insert into producer.org_mailboxes (org, email) values ('SharedOrg', 'info@shared.test')`)
+    await client.query(`insert into producer.mail_accounts (address) values ('team@shared.test')`)
+    await client.query(`insert into producer.address_verdicts (email, verdict, why, decided_by) values ('curator@shared.test', 'person', $1 || '_共判', 'rule')`, [M])
     return { p: p.id, c: c.id, w: w.id, m: m.id }
   })
 }

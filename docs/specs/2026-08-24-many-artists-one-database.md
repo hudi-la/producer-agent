@@ -98,12 +98,24 @@ workshop 要把这套系统交给学员用,而学员里**没有一个人有工�
 0 字节**;各自数据出现在 38 处(非空转证明);函数探针(brain_context /
 person_context / set_stage / set_profile / set_voice)全部挡住;anon 全挡。
 
-### 已知功能缺口(不是安全缺口,下一刀)
+### ~~已知功能缺口~~ → 已修(0120,2026-08-25)
 
-contacts / contact_emails / org_mailboxes / mail_accounts 的唯一索引还是
-全局的 `lower(email)`:两个学员认识同一个策展人,后插的撞索引——**报错,
-不泄密**(读被 RLS 挡着)。修法:索引改 `(owner, lower(email))` + 对应
-upsert 函数的 on conflict 目标同步改,约 6 个函数体。
+他一眼看穿了根因:「联系人先归他是谁的,然后这一个人只取他自己的」——
+email 当全局唯一键是**单人版的化石**(单人时代整个库就是一本通讯录,
+那条公理是对的;多人之后正确的公理是 (owner, email) 唯一)。
+
+0120:五个 email 类唯一索引前面加 owner(全部 `nulls not distinct`,
+无主行之间照旧全局唯一——个人版 service_role 老路的 upsert 语义一个字
+不变);五个拿它们当 on conflict 目标的函数跟着改(pa_claim_email /
+pa_mail_account_upsert / pa_mark_org_mailbox / pa_verdict_upsert /
+pa_mail_rule_pass)。address_verdicts 的主键本来就是 email——整张表
+就是单人假设,拆掉换 (owner, email)。
+
+隔离测试加了「两个学员认识同一个策展人」的种子:A 和 B 都录
+curator@shared.test、都注册 info@shared.test,谁也不撞谁,各看各的。
+
+**给以后的迁移立的规矩**:0118 之后重定义 pa_* 的迁移**不得写
+security definer**——写了就是在那个函数上凿了一个绕过行级权限的洞。
 
 ### ② 的两半也做完了(2026-08-25)
 
