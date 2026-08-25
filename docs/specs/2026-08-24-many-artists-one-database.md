@@ -105,10 +105,23 @@ contacts / contact_emails / org_mailboxes / mail_accounts 的唯一索引还是
 不泄密**(读被 RLS 挡着)。修法:索引改 `(owner, lower(email))` + 对应
 upsert 函数的 on conflict 目标同步改,约 6 个函数体。
 
-### ② 还剩的两半
+### ② 的两半也做完了(2026-08-25)
 
-- brain 换身份(学员会话令牌,不再有 service_role)
-- 前端登录页 + 会话
+- **brain 双模连库**(`brain/dbauth.js`):SERVICE_ROLE 在就走个人版老路;
+  不在就走「anon key + 登录会话」——会话落 `brain/.supabase-session.json`
+  (gitignore),自动续期。学员机器上**不存在能读别人数据的钥匙**。
+  登录:`npm run db:login`。冒烟已验:HTTP 登录 → 自己的线读得到、
+  别人的线 pursuit 为空、视图只有自己的行。
+- **前端大门**(`AuthGate` + `Login`):没配库走演示模式照旧;配了库没登录
+  见登录页;登录页与 app 同纸同墨。故意包在 main.jsx,不碰 App.jsx
+  (他个人分支最活跃的文件,少碰一行合并少疼一次)。
+  已实测:登录后看板只出现自己的卡。
+
+### 给 ③ 的两条 UX 备忘
+
+- 全新账号会看到「数据库是空的——现在显示的是示例假数据」横幅:对学员这
+  不是错误,是常态。③ 要把这句改成新人友好的(「还没有机会线,从……开始」)。
+- 登出入口还没有(登录页有了,登出在 app 里没地方点)。③ 一并做。
 
 ## Gmail 通路统一到自己的 OAuth
 

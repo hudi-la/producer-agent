@@ -8,3 +8,6 @@ dist/
 
 # Gmail 的钥匙：能读你全部邮件，永远不进仓库
 brain/.mail-tokens.json
+
+# 学员的登录会话:等于你的登录态,同样永远不进仓库
+brain/.supabase-session.json

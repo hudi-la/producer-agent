@@ -2,15 +2,13 @@
 //
 // 单独成文件，是为了让 sync.js / classify.js 里**只有逻辑，没有 RPC 名字**。
 // 换句话说：0045 那批端口叫什么、参数长什么样，只活在这儿。
-import { createClient } from '@supabase/supabase-js'
+import { makeDb } from '../dbauth.js'
 
 let _db = null
 export function db() {
   if (_db) return _db
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('brain/.env 里缺 SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY')
-  _db = createClient(url, key, { auth: { persistSession: false } })
+  // 双模见 dbauth.js:个人版走 SERVICE_ROLE,学员走 anon + 登录会话(受行级权限管)
+  _db = makeDb().db
   return _db
 }
 

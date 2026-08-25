@@ -31,6 +31,7 @@ import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
 import { modelFor, GOOD, CHEAP } from './models.js'
+import { makeDb, requireUser } from './dbauth.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
@@ -57,19 +58,20 @@ const PORT = Number(process.env.BRAIN_PORT || 8788)
 const MAIL_MS = Number(process.env.MAIL_SWEEP_MS || 5 * 60 * 1000)
 const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 
-const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('\n✗ 缺配置。把 brain/.env.example 复制成 brain/.env，填上 SUPABASE_URL 和 SUPABASE_SERVICE_ROLE_KEY。\n')
+// 连库双模(dbauth.js):SERVICE_ROLE 在就走个人版老路;不在就走学员路
+// (anon key + 登录会话)——那个身份被行级权限管着,brain 只看得见这个
+// 学员自己的行,机器上不存在能读别人数据的钥匙(0118 起)。
+let db, DB_MODE
+try {
+  ;({ db, mode: DB_MODE } = makeDb())
+  if (DB_MODE === 'user') {
+    const u = await requireUser(db)
+    console.log(`· 以 ${u.email} 的身份连库(行级权限生效)`)
+  }
+} catch (err) {
+  console.error('\n✗ ' + err.message + '\n')
   process.exit(1)
 }
-
-// producer schema 没进 Supabase 的 Exposed schemas（共用项目，不动全局设置），
-// 所以读写都走 public 里那两个 security definer 函数（见 0009_brain_rpc.sql）。
-// 那两个函数只 grant 给 service_role，而且只开了「读上下文 / 写一条消息」两个口——
-// Fairwind 改不了 stage、改不了盒子，是结构上做不到，不是被嘱咐别做。
-const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-})
 
 // ── 上下文：Fairwind 开工前先想起这条线的一切 ──────────────────────────
 
