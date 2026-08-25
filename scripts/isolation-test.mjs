@@ -89,7 +89,7 @@ async function seed(u) {
     await client.query(`insert into producer.attachments (pursuit_id, filename) values ($1, $2 || '_附件.pdf')`, [p.id, M])
     // pulse 不用手动种:上面这些 insert 本身就会经 t_pulse_i 触发器给这个
     // 用户拨出自己那一行——它出现在 sweep 里,顺带证明 bump 归人了。
-    await client.query(`insert into producer.stage_backup_0015 (id, old_stage) values (gen_random_uuid(), $1 || '_stage')`, [M])
+    // (stage_backup_0015 不种:0121 起新库里没有这张个人史备份表。)
 
     // ── 两个学员认识同一个策展人 ──────────────────────────
     // email 这类人间的自然键,单人版拿它当全局唯一没问题;多人之后
@@ -101,6 +101,13 @@ async function seed(u) {
     await client.query(`insert into producer.org_mailboxes (org, email) values ('SharedOrg', 'info@shared.test')`)
     await client.query(`insert into producer.mail_accounts (address) values ('team@shared.test')`)
     await client.query(`insert into producer.address_verdicts (email, verdict, why, decided_by) values ('curator@shared.test', 'person', $1 || '_共判', 'rule')`, [M])
+    // 同一封信的 gmail id 出现在两个人的信箱里(转发、群发、抄送都会造成),
+    // 或者纯粹撞 id——租户内唯一,不是全世界唯一。
+    await client.query(
+      `insert into producer.mail_headers (gmail_message_id, account_id, gmail_thread_id, from_email, sent_at, counterpart_email, direction)
+       values ('shared_gm_dup', $1, 'shared_th_dup', 'curator@shared.test', now(), 'curator@shared.test', 'in')`, [acc.id])
+    await client.query(`insert into producer.letter_verdicts (gmail_message_id, needs_reply, why) values ('shared_gm_dup', false, $1 || '_共同的一封信')`, [M])
+    await client.query(`insert into producer.mail_label_audit (gmail_message_id, labels) values ('shared_gm_dup', array['INBOX'])`)
     return { p: p.id, c: c.id, w: w.id, m: m.id }
   })
 }
