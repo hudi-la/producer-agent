@@ -32,6 +32,7 @@ import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
 import { modelFor, GOOD, CHEAP } from './models.js'
 import { makeDb, requireUser } from './dbauth.js'
+import { buildScoutPrompt, parseCards, SCOUT_SYSTEM } from './scout.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
@@ -90,6 +91,38 @@ async function loadContext(pursuitId) {
     // 但 /gmail-draft 和 /sync 要照着它们干活，所以整包留在这儿。
     raw: data,
   }
+}
+
+// scout 一轮:读血肉 → 模型扫源 → [[CARDS]] → RPC 落卡。
+// 好档(GOOD):要开网页做判断,便宜模型在这儿省的是错卡的钱。
+async function handleScout() {
+  const [{ data: profs }, { data: metas }, { data: tasks }, { data: existing }, { data: works }] =
+    await Promise.all([
+      db.from('v_pa_profile').select('*').limit(1),
+      db.from('v_pa_meta').select('concerns').limit(1),
+      db.from('v_pa_tasks').select('*').eq('type', 'scout_aggregators').limit(1),
+      db.from('v_pa_pursuit_cards').select('title'),
+      db.from('v_pa_entries').select('title, medium, kind').eq('kind', 'work').limit(30),
+    ])
+  const task = tasks?.[0] || null
+  if (task && task.enabled === false) return { ok: false, note: '这条造卡任务是关着的' }
+
+  const prompt = buildScoutPrompt({
+    profile: profs?.[0] || null,
+    concerns: metas?.[0]?.concerns || [],
+    worksDigest: (works || []).map((w) => `『${w.title}』${w.medium ? `(${w.medium})` : ''}`).join('·'),
+    sources: task?.config?.sources || [],
+    existingTitles: (existing || []).map((p) => p.title),
+    cap: 5,
+  })
+  const { text } = await think(prompt, READ_TOOLS, SCOUT_SYSTEM)
+  const cards = parseCards(text)
+  const { data: landed, error } = await db.rpc('pa_scout_cards',
+    { p_task_id: task?.id ?? null, p_cards: cards })
+  if (error) throw new Error('落卡失败:' + error.message)
+  // 汇报给人看;[[CARDS]] 那行是机器读的,摘掉
+  const report = text.replace(/\[\[CARDS\]\][\s\S]*$/, '').trim()
+  return { ok: true, found: cards.length, ...landed, report }
 }
 
 // 一次请求是给谁干活：一条机会线，还是一个人。
@@ -1594,6 +1627,23 @@ const server = http.createServer(async (req, res) => {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 讲懂 ${body.pursuit_id}`)
         send(res, 200, await handleBrief(body))
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
+  // scout:替这个艺术家扫一轮机会源。血肉全部现读(档案/母题/作品/源/已有卡),
+  // 骨架在 brain/scout.js;落库走 pa_scout_cards(RLS 之下只可能落进自己的看板)。
+  if (req.method === 'POST' && req.url === '/scout') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} scout 扫一轮`)
+        send(res, 200, await handleScout())
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })

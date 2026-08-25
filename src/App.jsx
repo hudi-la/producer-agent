@@ -18,7 +18,7 @@ import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
 import DrawerGrip, { restoreDrawerWidth } from './components/DrawerGrip.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
-import { checkBrain } from './lib/backends.js'
+import { checkBrain, BRAIN } from './lib/backends.js'
 import { onPulse } from './lib/pulse.js'
 import { cleanCopy } from './lib/cleanCopy.js'
 import Subbar from './components/Subbar.jsx'
@@ -935,7 +935,14 @@ export default function App() {
       )}
 
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
-      <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)} />
+      <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)}
+        onRunScout={async () => {
+          // 跑一轮 scout(几十秒:要真的开网页看源)。落了卡就把看板和任务捞新
+          const r = await fetch(`${BRAIN}/scout`, { method: 'POST' }).then((x) => x.json())
+          loadPursuits().then((x) => { if (x) setPl(x) })
+          loadTasks().then(setTk)
+          return r
+        }} />
     </div>
    </ProfileContext.Provider>
   )
