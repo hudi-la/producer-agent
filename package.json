@@ -7,6 +7,8 @@
     "dev": "vite",
     "test": "node --test 'src/lib/*.test.js' 'brain/*.test.js' 'brain/mail/*.test.js'",
     "brain": "npm start --prefix brain",
+    "setup": "node scripts/setup.mjs",
+    "fairwind": "node scripts/fairwind.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

@@ -22,14 +22,19 @@ const DANGER = {
     title: '数据库连不上 —— 现在看到的全是示例假数据',
     fix: null,   // 用库返回的原话，比我编的准
   },
-  [FELL_BACK.EMPTY]: {
-    title: '数据库是空的 —— 现在显示的是示例假数据',
-    fix: '库连上了但一行都没有。跑过 supabase/migrations 和 supabase/demo 里的种子了吗？',
-  },
+}
+
+// 空不是出事(2026-08-25 多租户之后):连上了、你也登录了,只是这个账号
+// 还什么都没有——每个新账号的第一眼就是它。数据是真的(真的空),不飘红。
+// 但留一句给「本来有数据却看见空」的人:那种空是事故,别当成正常。
+const FRESH = {
+  title: '这里还是空的',
+  fix: '新账号从「我的档案」把自己填进去开始。要是你确定原来有数据,现在却是空的——那不正常,先核对登录的账号对不对。',
 }
 
 export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed, mail }) {
   const bad = fellBack ? DANGER[fellBack] : null
+  const fresh = fellBack === FELL_BACK.EMPTY ? FRESH : null
   // note 是「这一轮发生了什么」，**包括什么都没发生**。它不是出事，
   // 所以另起一档 quiet：不红不黄，说完一句就等你划掉。
   //
@@ -38,7 +43,7 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
   // 邮件那一轮出了事才说：授权掉了、或者太久没收到了。
   // 正常在跑的时候顶栏那句就够了，这儿闭嘴。
   const mailBad = mail && mail.ok === false ? mail : null
-  if (!bad && !brainDown && !brainStale && !batchFailed && !mailBad) return null
+  if (!bad && !fresh && !brainDown && !brainStale && !batchFailed && !mailBad) return null
 
   return (
     <div className="trouble">
@@ -57,6 +62,15 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
           <span className="tr-txt">
             <b>{bad.title}</b>
             {(detail || bad.fix) && <span className="tr-fix">{detail || bad.fix}</span>}
+          </span>
+        </div>
+      )}
+      {fresh && (
+        <div className="tr-row warn">
+          <span className="tr-dot" aria-hidden="true" />
+          <span className="tr-txt">
+            <b>{fresh.title}</b>
+            <span className="tr-fix">{fresh.fix}</span>
           </span>
         </div>
       )}

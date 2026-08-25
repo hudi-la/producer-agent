@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { saveProfile, useProfile } from '../lib/profile.js'
+import { supa } from '../lib/backends.js'
 import { EditRow } from './EditRow.jsx'
 
 // 「关于你」——档案页最上面那一块。
@@ -50,6 +51,24 @@ export default function Identity({ onSaved }) {
       <div className="idnote">
         改完 Fairwind 下一次开口就用新的——它读的就是这里，没有第二份。
       </div>
+      <AccountRow />
     </section>
+  )
+}
+
+// 账号那一行:登录身份和登出住在「关于你」的最底下——账号的事在账号该住的
+// 地方,不占顶栏。没配库(演示模式)时整行不出现。
+function AccountRow() {
+  const [email, setEmail] = useState(null)
+  useEffect(() => {
+    if (!supa) return
+    supa.auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
+  }, [])
+  if (!supa || !email) return null
+  return (
+    <div className="idnote acct">
+      登录身份:{email}
+      <button type="button" className="acct-out" onClick={() => supa.auth.signOut()}>登出</button>
+    </div>
   )
 }

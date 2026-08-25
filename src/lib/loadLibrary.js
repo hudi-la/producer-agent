@@ -16,7 +16,11 @@ export async function loadLibrary() {
       supa.from('v_pa_meta').select('concerns').limit(1),
     ])
     if (ee) return seed(FELL_BACK.QUERY_FAILED, ee.message)
-    if (!entries || !entries.length) return seed(FELL_BACK.EMPTY)
+    // 连上了但一行没有 = **真的空**,不是假数据的场合。多租户之后这是每个
+    // 新账号的第一眼——给他看别人的种子作品是最坏的欢迎方式。
+    if (!entries || !entries.length) {
+      return { entries: [], concerns: CONCERNS_SEED, source: 'live', reason: FELL_BACK.EMPTY }
+    }
     return {
       entries, concerns: meta?.[0]?.concerns ?? CONCERNS_SEED, source: 'live', reason: null,
     }

@@ -38,7 +38,10 @@ export async function loadPursuits() {
     const { data: pursuits, error: pe } = await supa
       .from('v_pa_pursuit_cards').select('*').order('created_at')
     if (pe) return seed(FELL_BACK.QUERY_FAILED, pe.message)
-    if (!pursuits || !pursuits.length) return seed(FELL_BACK.EMPTY)
+    // 空 = 真的空(新账号的常态),不再拿种子顶
+    if (!pursuits || !pursuits.length) {
+      return { pursuits: [], messagesByPursuit: {}, source: 'live', reason: FELL_BACK.EMPTY }
+    }
 
     return { pursuits: pursuits.map(normalize), messagesByPursuit: {}, source: 'live', reason: null }
   } catch (e) {

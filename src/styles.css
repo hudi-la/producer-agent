@@ -1596,3 +1596,9 @@ button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .login-note { margin: 0; font-size: 12.5px; }
 .login-note.err { color: var(--bad, #a44); }
 .login-note.ok { color: var(--good, #4a7); }
+
+/* 账号那一行(档案页底部):身份 + 登出 */
+.idnote.acct { display: flex; align-items: baseline; gap: 10px; }
+.acct-out { font: inherit; font-size: 12px; background: none; border: none; cursor: pointer;
+  color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+.acct-out:hover { color: var(--ink); }

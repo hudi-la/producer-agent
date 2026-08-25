@@ -88,6 +88,18 @@
 | ④ | 换一个测试学员的档案,产出的机会源来自他的规则,不含作者画像 |
 | ⑤ | voice 全空 = prompt 逐字等于今天(冻结副本当尺子);填哪格换哪格 |
 
+## 开课前 Hu Di 要做的一次性动作(代码替不了的)
+
+1. **建共用 Gmail OAuth 应用**:照 brain/README.md 那五步(Desktop 类型 +
+   Audience 页 PUBLISH 成 In production),把 client id/secret 填进
+   `setup/defaults.mjs`。没填之前 setup 会明说「Gmail 那步先跳过」。
+2. **定生产 workshop 库**:现在 defaults 指 dev(test 组织,免费档,闲置
+   7 天会暂停)。开课用这个也行(装机后天天有人用,不会闲置),想稳就
+   开个付费档项目——换库 = 改 defaults.mjs 一个文件 + db-reset 建一次。
+3. **Supabase 后台关不关邮箱确认**(Authentication → Providers → Email):
+   关了,setup 里注册完直接能用;不关,学员要去邮箱点一下确认信。
+   装机答疑当天建议关。
+
 ## 分支与合并
 
 - 本分支 `workshop-edition`,从 `batch-and-queue` 的 997593d 分出,

@@ -8,7 +8,8 @@ export async function loadTasks() {
   try {
     const { data, error } = await supa.from('v_pa_tasks').select('*').order('sort')
     if (error) return seed(FELL_BACK.QUERY_FAILED, error.message)
-    if (!data || !data.length) return seed(FELL_BACK.EMPTY)
+    // 空 = 真的空(新账号的常态),不再拿种子顶
+    if (!data || !data.length) return { tasks: [], source: 'live', reason: FELL_BACK.EMPTY }
     return { tasks: data, source: 'live', reason: null }
   } catch (e) {
     return seed(FELL_BACK.QUERY_FAILED, e.message)
