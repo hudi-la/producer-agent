@@ -26,7 +26,21 @@ workshop 要把这套系统交给学员用,而学员里**没有一个人有工�
 - brain 在学员本机跑，手里是 `SUPABASE_SERVICE_ROLE_KEY`（绕过一切检查）
 
 唯一的伏笔：`pursuit_seen` 带了 `profile_id`（0030 的注释写着「为了以后真有
-第二个人」）——三十多张表里的一张。
+第二个人」）。
+
+而且 **0001 的最后一行早就写好了这一刀**：
+> `NOTE: RLS is intentionally deferred for the self-use first slice.`
+> `Before this is multi-user, enable RLS on producer.* and scope by an artist_id.`
+
+### 实测清单（2026-08-24 从生产库读的）
+
+`producer` schema 共 **25 张表**，**开了行级权限的：0 张**。带归属列的只有 2 张：
+
+| 已有归属列 | 要加归属列（23 张） |
+|---|---|
+| `cue_marks`、`pursuit_seen`（都是 `profile_id`） | `address_verdicts` `attachments` `contact_emails` `contact_orgs` `contacts` `cue_judged` `deliverables` `letter_verdicts` `mail_accounts` `mail_headers` `mail_label_audit` `message_tags` `org_mailboxes` `profile` `pulse` `pulse_areas` `pursuit_messages` `pursuit_parties` `pursuit_threads` `pursuits` `tasks` `works`（`stage_backup_0015` 是备份表，随 0015 一起清理） |
+
+回填零风险：今天库里只有一个人，所有现存行都归他。
 
 ## brain 往哪放：留在本机，但换身份
 
