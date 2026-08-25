@@ -33,6 +33,7 @@ const 重号集 = new Set(重号真序)
 // 这不是绕过失败,是这类迁移**本来就只对一个特定的库有意义**。
 const 数据修复 = new Set([
   '0067_work_notes_are_not_the_reply.sql',   // 修 8 条落下的工作稿(156 条里的 8 条)
+  '0113_a_second_workshop_to_offer.sql',     // 他个人的 offer 条目(血肉,不是骨架)——学员的新库里不该有他的档案
 ])
 
 /**
@@ -42,11 +43,16 @@ const 数据修复 = new Set([
  */
 export function migrationOrder(dir = 'supabase/migrations', { fresh = false } = {}) {
   const all = readdirSync(dir).filter((f) => f.endsWith('.sql'))
-  // 0110 及以前:文件名字典序就是真序(没有重号)
-  const 前半 = all.filter((f) => !重号集.has(f)).sort()
+  const rest = all.filter((f) => !重号集.has(f)).sort()
+  // 重号块(0111–0116)插在 0110 之后、0117 之前——0117+ 的新迁移按
+  // 字典序会排到重号块前面,而它们依赖重号块建出来的表(pulse_areas 等)。
+  const num = (f) => parseInt(f.slice(0, 4), 10)
+  const 前 = rest.filter((f) => num(f) <= 110)
+  const 后 = rest.filter((f) => num(f) >= 117)
   const 漏网 = 重号真序.filter((f) => !all.includes(f))
   if (漏网.length) throw new Error('ORDER 列表里的文件不存在：' + 漏网.join(', '))
-  const 全部 = [...前半, ...重号真序]
+  const 全部 = [...前, ...重号真序, ...后]
+  if (全部.length !== all.length) throw new Error(`排序丢了文件:${all.length - 全部.length} 支`)
   return fresh ? 全部.filter((f) => !数据修复.has(f)) : 全部
 }
 

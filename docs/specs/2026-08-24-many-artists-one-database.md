@@ -69,13 +69,46 @@ workshop 要把这套系统交给学员用,而学员里**没有一个人有工�
 2. **归属列**：三十多张表加 `owner`。**回填零风险**——今天只有一个人，
    所有现存数据都归他。
 3. **行级权限规则**：每张表都要，不留白。
-4. **九十七个函数**：逐个按「当前登录的是谁」过滤。`security definer` 保留，
-   但函数内部认 `auth.uid()`，不再无条件信任调用者。
+4. ~~九十七个函数逐个过滤~~ → **改成翻身份,见下面「实际刀法」**。
 5. **brain 换身份**：不再用 `SUPABASE_SERVICE_ROLE_KEY`，改用学员的会话令牌。
 6. **前端**：登录页 + 会话。
 7. **`profile` 拆单例**：去掉 `unique(singleton)`，一人一行。
 8. **种子/演示数据的护栏重想**：`demo_guard` 现在查的是「那唯一一行 profile
    的 is_demo」，多人之后这个判据不成立。
+
+## 实际刀法(2026-08-24 施工时定的,比原计划好)
+
+原计划给 89 个 `pa_*` 函数逐个加「当前登录的是谁」的过滤——每改一个都是
+一次留洞的机会,而且洞是静默的。实际走了另一条路(0118):
+
+- 每张表 `owner uuid default auth.uid()` + RLS policy `owner = auth.uid()`
+- **全部函数 definer → invoker**(一个循环),**全部视图开 security_invoker**
+- 于是「什么算你的行」只在一个地方定义,函数和视图以调用者身份跑,
+  自动被同一道门管住。**函数体一个字没改**——所有「取那唯一一行」的
+  `limit 1` / `where singleton`,在 RLS 下自动变成「取你的那一行」。
+- 注册触发器(`handle_new_user`)发每人的 profile + voice 行
+- `pulse` 单独一刀(0119):它原是全库一行,A 动 B 也跳——改成每人一根
+- `owner` 可空:迁移在 postgres 身份下跑,`auth.uid()` 是 null。无主行
+  对任何登录用户不可见(不泄露,只是无主);合并时他认领回填后可补 not null
+- 新表的规矩:自带 owner + policy。忘了的话隔离测试按目录扫,当场红
+
+### 已验证(scripts/isolation-test.mjs,dev 库上全绿)
+
+两个测试用户各种全套数据(标记串),互扫 26 张表 + 30 个视图:**对方标记
+0 字节**;各自数据出现在 38 处(非空转证明);函数探针(brain_context /
+person_context / set_stage / set_profile / set_voice)全部挡住;anon 全挡。
+
+### 已知功能缺口(不是安全缺口,下一刀)
+
+contacts / contact_emails / org_mailboxes / mail_accounts 的唯一索引还是
+全局的 `lower(email)`:两个学员认识同一个策展人,后插的撞索引——**报错,
+不泄密**(读被 RLS 挡着)。修法:索引改 `(owner, lower(email))` + 对应
+upsert 函数的 on conflict 目标同步改,约 6 个函数体。
+
+### ② 还剩的两半
+
+- brain 换身份(学员会话令牌,不再有 service_role)
+- 前端登录页 + 会话
 
 ## Gmail 通路统一到自己的 OAuth
 
