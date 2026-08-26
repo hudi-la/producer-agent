@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   fetchGreetable, searchArchive, archiveTally, overrideVerdict, adopt, markGreeted, mailState,
 } from '../lib/mail.js'
+import Veil from './Veil.jsx'
 
 // 等你点头 + 判掉的档案柜。
 //
@@ -29,11 +30,11 @@ function Row({ r, checked, onCheck, onAdopt, onReject, busy }) {
       )}
       <div className="gr-body">
         <div className="gr-top">
-          <b>{r.name || r.org || r.email}</b>
+          <b><Veil>{r.name || r.org || r.email}</Veil></b>
           <span className={`gr-kind ${org ? 'is-org' : ''}`}>{org ? '机构信箱' : '人'}</span>
           {r.decided_by === 'you' && <span className="gr-kind is-you">你定的</span>}
         </div>
-        <div className="gr-mail">{r.email}</div>
+        <div className="gr-mail"><Veil>{r.email}</Veil></div>
         {r.why && <p className="gr-why">{r.why}</p>}
         <div className="gr-meta">
           你发去 {r.n_out} · 他发来 {r.n_in} · {md(r.first_at)} → {md(r.last_at)}
@@ -225,11 +226,11 @@ export default function Greetable({ onChanged }) {
                 <div className="gr gr-arch" key={a.email}>
                   <div className="gr-body">
                     <div className="gr-top">
-                      <b>{a.name || a.org || a.email}</b>
+                      <b><Veil>{a.name || a.org || a.email}</Veil></b>
                       <span className="gr-kind">{NAMES[a.verdict] || a.verdict}</span>
                       {a.decided_by === 'you' && <span className="gr-kind is-you">你定的</span>}
                     </div>
-                    <div className="gr-mail">{a.email}</div>
+                    <div className="gr-mail"><Veil>{a.email}</Veil></div>
                     {a.why && <p className="gr-why">{a.why}</p>}
                     <div className="gr-meta">
                       共 {a.n} 封（你发去 {a.n_out}）· {md(a.first_at)} → {md(a.last_at)}

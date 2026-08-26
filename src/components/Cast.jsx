@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { fetchParties, attachParty, detachParty, fetchCandidates } from '../lib/pursuitCast.js'
+import Veil from './Veil.jsx'
 
 // 这条线上都有谁。
 //
@@ -72,9 +73,9 @@ export default function Cast({ pursuitId, onOpenPerson, onChanged }) {
               title={r.is_mailbox ? '机构共享信箱，不是某个人，没有名片' : '打开他的名片'}
               onClick={() => !r.is_mailbox && onOpenPerson?.({ id: r.contact_id, name: r.name })}
             >
-              <b>{r.name}</b>
+              <b><Veil>{r.name}</Veil></b>
               {r.is_mailbox && <span className="cast-tag">机构信箱</span>}
-              {r.org && !r.is_mailbox && <span className="cast-org">{r.org}</span>}
+              {r.org && !r.is_mailbox && <span className="cast-org"><Veil>{r.org}</Veil></span>}
             </button>
             <span className="cast-meta">
               {r.mails ? `${r.mails} 封` : '还没往来'}{r.last_at ? ` · ${String(r.last_at).slice(5).replace('-', '/')}` : ''}
@@ -93,12 +94,12 @@ export default function Cast({ pursuitId, onOpenPerson, onChanged }) {
             <div className="cast-list">
               {people.slice(0, 8).map((c) => (
                 <button className="cast-opt" key={c.id} onClick={() => add(c)}>
-                  <b>{c.name}</b>{c.org ? <span className="cast-org">{c.org}</span> : null}
+                  <b><Veil>{c.name}</Veil></b>{c.org ? <span className="cast-org"><Veil>{c.org}</Veil></span> : null}
                 </button>
               ))}
               {boxes.slice(0, 6).map((b) => (
                 <button className="cast-opt" key={b.email} onClick={() => add(b)}>
-                  <b>{b.email}</b><span className="cast-tag">机构信箱</span>
+                  <b><Veil>{b.email}</Veil></b><span className="cast-tag">机构信箱</span>
                 </button>
               ))}
               {!people.length && !boxes.length && (

@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useVeiled } from '../lib/veil.js'
+import { Flower } from './Veil.jsx'
 
 // 页面上「能改的字」——两种长相，一套规矩。
 //
@@ -78,11 +80,27 @@ const asValue = (s, list) =>
 
 /**
  * 带字段名的一行。
- * ro = 只读：值照常显示，但双击不进编辑（连不上库、或这条没有 id 时用）。
+ * ro   = 只读：值照常显示，但双击不进编辑（连不上库、或这条没有 id 时用）。
+ * veil = 私人字段：展示模式开着时值换成小花，双击也不进编辑——
+ *        编辑框里装的是真值，进去了等于当场露出来。
  */
-export function EditRow({ label, value, hint, long, list, ro, onSave }) {
+export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
   const d = useDraft(value, onSave, (v) => asText(v, list), (s) => asValue(s, list))
   const empty = !asText(value, list)
+  const veiled = useVeiled()          // hook 不能放在 && 后面：条件调用会乱掉 hook 顺序
+  const 盖着 = veil && veiled
+
+  if (盖着) {
+    return (
+      <div className="idrow">
+        <div className="idk">{label}</div>
+        <div className="idv">
+          <div className="idval ro"><span className="veil" title="展示模式盖住了"><Flower /></span></div>
+          {hint && <div className="idhint">{hint}</div>}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="idrow">

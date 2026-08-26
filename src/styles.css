@@ -73,6 +73,17 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tab[aria-pressed="true"] { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .app-top .sp { flex: 1; }
+
+/* ── 展示模式（见 lib/veil.js）───────────────────────────────────
+   .veilbtn 右上角你的名字，点一下进入/退出展示模式。
+   .veil    盖在私人信息上的那朵小花。字不在 DOM 里，是换掉不是糊掉。 */
+.veilbtn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 6px 13px; border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--ink-2); cursor: pointer; transition: color .14s, background .14s; }
+.veilbtn:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.veilbtn.on { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); font-weight: 600; }
+.veilbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.veil { display: inline-flex; align-items: center; justify-content: center; min-width: 2.4em; padding: 0 .5em; border-radius: 6px; background: var(--accent-soft); color: var(--accent); vertical-align: -0.15em; line-height: 1.25; }
+/* 花跟着周围的字号走：标题里的花大，脚注里的花小。 */
+.veil svg { width: .95em; height: .95em; }
 .wbtn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
 .wbtn:hover { border-color: var(--accent); }
 .wbtn:disabled { opacity: .4; cursor: default; border-color: var(--line); }

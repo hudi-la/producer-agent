@@ -6,6 +6,7 @@ import { dropFrom } from '../lib/rewind.js'
 import { md } from '../lib/when.js'
 import { saidThisTime, GIST_CAP } from '../lib/letter.js'
 import SayBubble from './Resay.jsx'
+import Veil from './Veil.jsx'
 
 import {
   fetchDeliverables, fetchAttachments, setFinal, syncMail,
@@ -136,7 +137,7 @@ function Letter({ m }) {
     <div id={'msg-' + m.id} className={'arrival' + (进来的 ? ' in' : ' out')}>
       <div className="arr-top">
         <span className="arr-mark" aria-hidden="true">✉</span>
-        <b>{进来的 ? `${who} 来信` : who}</b>
+        <b>{进来的 ? <><Veil>{who}</Veil> 来信</> : who}</b>
         {只有摘要 && <span className="arr-tag">摘要 · 原文没存下来</span>}
         <span className="arr-when">{md(m.created_at)}</span>
       </div>
@@ -199,7 +200,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   const bc = m.meta?.broadcast
   return (
     <div id={'msg-' + m.id} className={'msg' + (mine ? ' you' : external ? ' org' : ' producer')}>
-      <span className="who">{who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
+      <span className="who">{external ? <Veil>{who}</Veil> : who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
         {bc && <span className="viamail"> · 同时发给了 {bc.count} 条线</span>}
       </span>
       {/* 你自己说的那句能改了重说；别人的（它的回复、机构来信）不能——
@@ -234,10 +235,10 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
 function MailAnchor({ m, onJump }) {
   const d = m.created_at ? new Date(m.created_at) : null
   const when = d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
-  const who = m.role === 'artist' ? '你发了一封' : `${m.meta?.from_name || '对方'}来信`
+  const mine = m.role === 'artist'
   return (
     <div id={'msg-' + m.id} className="mailanchor">
-      <b>{when}</b> {who}
+      <b>{when}</b> {mine ? '你发了一封' : <><Veil>{m.meta?.from_name || '对方'}</Veil>来信</>}
       <button className="lnk" onClick={() => onJump?.(m.id)}>看左栏 ↖</button>
     </div>
   )
@@ -756,7 +757,7 @@ export default function PursuitFocus({
         {queue && viaUpdate && lastMail && (
           <div className="qwhat">
             {lastMail && (
-              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}
+              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : <Veil>{lastMail.meta?.from_name || '对方'}</Veil>}
                 <button className="lnk" onClick={() => jumpTo(lastMail.id)}>看最近这封 →</button>
               </span>
             )}

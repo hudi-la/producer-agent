@@ -94,6 +94,19 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
     const link = await rpc('pa_link_replies')
     out.linked = Number(link?.linked || 0)
 
+    // ④.5 同机构的另一个信箱回到你的线里 → 自动登记 + 当场搬信（0115）。
+    // 真事：Descanso 的 programs@ 回了你发给 visitorcenter@ 的提案，
+    // 三封信堵在账本里，通知无声。规则级证据不劳他点头；
+    // 「人」不走这条 —— 名片该谁点头还是谁点头。
+    try {
+      const adopted = await rpc('pa_adopt_replying_mailboxes')
+      if (adopted?.length) {
+        log(`  ↳ 收编同机构信箱：${adopted.map((a) => a.email).join('、')}`)
+        const c2 = await carryPass({ touched: adopted.map((a) => a.email), log: () => {} })
+        out.carried += c2.added || 0
+      }
+    } catch (err) { console.warn('  ⚠️ 收编信箱没走成：' + err.message) }
+
     // ⑤ 归属：只在真有孤儿来信时才问模型
     const attr = await attributePass({ apply: true, log: () => {} })
     out.attached = (attr.attached || []).length

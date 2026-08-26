@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { replyRecipients, setRecipients } from '../lib/letters.js'
+import Veil from './Veil.jsx'
 
 // 这封信到底发给谁 —— 一份摆全了的名单，你自己勾。
 //
@@ -64,7 +65,7 @@ export default function Recipients({ d, onChanged, onErr }) {
               <input type="checkbox" checked readOnly={savedTo.length === 1}
                 disabled={busy || savedTo.length === 1}
                 onChange={() => toggle(a, false)} />
-              <span>{a}</span>
+              <span><Veil>{a}</Veil></span>
             </label>
             {savedTo.length === 1 && <span className="rcp-m">主要收件人</span>}
           </li>
@@ -73,7 +74,7 @@ export default function Recipients({ d, onChanged, onErr }) {
           <li key={a}>
             <label>
               <input type="checkbox" checked disabled={busy} onChange={() => toggle(a, true)} />
-              <span>{a}</span>
+              <span><Veil>{a}</Veil></span>
             </label>
             <span className="rcp-m">抄送</span>
           </li>
@@ -90,7 +91,7 @@ export default function Recipients({ d, onChanged, onErr }) {
                 <label>
                   <input type="checkbox" checked={false} disabled={busy}
                     onChange={() => toggle(a, false)} />
-                  <span>{a}</span>
+                  <span><Veil>{a}</Veil></span>
                 </label>
                 <span className="rcp-m">原信收件人</span>
               </li>
@@ -100,7 +101,7 @@ export default function Recipients({ d, onChanged, onErr }) {
                 <label>
                   <input type="checkbox" checked={false} disabled={busy}
                     onChange={() => toggle(a, true)} />
-                  <span>{a}</span>
+                  <span><Veil>{a}</Veil></span>
                 </label>
                 <span className="rcp-m">原信抄送</span>
               </li>

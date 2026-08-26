@@ -1,6 +1,8 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useState, useCallback } from 'react'
 import { supa } from '../lib/backends.js'
+import Veil from './Veil.jsx'
+import { useVeiled } from '../lib/veil.js'
 
 // 机构卡。
 //
@@ -30,6 +32,8 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
 
   const now  = (org.people || []).filter((p) => !p.until)
   const past = (org.people || []).filter((p) => p.until)
+  // 展示模式下 title 属性也不许挂机构名——悬停一下就露了。
+  const veiled = useVeiled()
 
   return (
     <div className="focus page">
@@ -38,7 +42,7 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
           <button className="back" onClick={onBack}>
             <span aria-hidden="true">←</span><span className="t"> 全部联系人</span>
           </button>
-          <h1 className="ft-title" title={org.org}>{org.org}</h1>
+          <h1 className="ft-title" title={veiled ? undefined : org.org}><Veil>{org.org}</Veil></h1>
           <span className="pchip org">机构</span>
         </div>
       </div>
@@ -49,7 +53,7 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
             <div className="pf-k">共享信箱</div>
             {org.mailboxes?.length ? org.mailboxes.map((b, i) => (
               <div key={i} className="pf-v pf-hist">
-                <span className="pf-mail">{b.email}</span>
+                <span className="pf-mail"><Veil>{b.email}</Veil></span>
                 {b.label && <span className="pf-now-tag">{b.label}</span>}
                 {/* 「它不是一个人」这件事必须写在脸上，否则下一个人又会
                     把它当成某个联系人，然后往来又归错。 */}
@@ -65,7 +69,7 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
             {now.length ? now.map((p) => (
               <button key={p.contact_id} className="pf-v pf-hist pf-link"
                       onClick={() => onOpenPerson?.(p.contact_id)}>
-                {p.name}{p.role ? <span className="pf-note"> · {p.role}</span> : null}
+                <Veil>{p.name}</Veil>{p.role ? <span className="pf-note"> · {p.role}</span> : null}
               </button>
             )) : <div className="pf-empty">库里还没有这里的人</div>}
           </div>
@@ -78,7 +82,7 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
               {past.map((p) => (
                 <button key={p.contact_id} className="pf-v pf-hist past pf-link"
                         onClick={() => onOpenPerson?.(p.contact_id)}>
-                  {p.name}{p.role ? <span className="pf-note"> · {p.role}</span> : null}
+                  <Veil>{p.name}</Veil>{p.role ? <span className="pf-note"> · {p.role}</span> : null}
                   <span className="pf-past-tag">到 {p.until} 为止</span>
                 </button>
               ))}
@@ -107,9 +111,9 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
                  {msgs.map((m) => (
                    <div key={m.id} className="pf-msg">
                      <div className="pf-who">
-                       {m.role === 'artist' ? '你' : org.org}
+                       {m.role === 'artist' ? '你' : <Veil>{org.org}</Veil>}
                        <span className="pf-note"> · {day(m.created_at)}</span>
-                       <span className="pf-tag">{m.counterpart_email}</span>
+                       <span className="pf-tag"><Veil>{m.counterpart_email}</Veil></span>
                      </div>
                      <div className="pf-body sm">{m.content}</div>
                    </div>
@@ -126,7 +130,7 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
           <div className="pf-sect-h"><span>这个机构是什么</span></div>
           <p className="pf-note">
             机构条目答的是人卡答不了的一件事：<b>这里有谁，谁已经走了</b>。
-            {past.length > 0 && <> 比如 {past[0].name} {past[0].until} 离开，
+            {past.length > 0 && <> 比如 <Veil>{past[0].name}</Veil> {past[0].until} 离开，
               所以她在这儿留下的旧地址仍然认得回她本人。</>}
           </p>
         </aside>

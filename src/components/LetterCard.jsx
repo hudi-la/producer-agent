@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { adoptLetter } from '../lib/letters.js'
 import Md from './Md.jsx'
+import Veil from './Veil.jsx'
 
 // 对话里那条回复其实是一封信 —— 就画成一封信的样子。
 //
@@ -42,7 +43,7 @@ export default function LetterCard({ letter, owner, onAdopted }) {
         <span className="lcard-tag">这是一封信</span>
         {/* 收件人一直摆在脸上。发错人是这条路上唯一撤不回来的错，
             所以从这张卡起，那个地址就不许藏起来。 */}
-        <span className="lcard-to">给 {letter.to}</span>
+        <span className="lcard-to">给 <Veil>{letter.to}</Veil></span>
       </div>
       <div className="lcard-sub">{letter.subject}</div>
       {/* 信的全文摆在卡里，不摆在上面那段话里。

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { stateLine, whyLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
+import Veil from './Veil.jsx'
 
 // 顶栏那块通知面板。装的是**所有该动和在等的事** —— 机会线的和人的都在这儿。
 //
@@ -46,9 +47,15 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
         {/* 名字本身就是入口 —— 跟右边那颗「打开卡片」同一个去处，
             只是目标大、顺手。 */}
         <div className="nrow-h">
-          {能勾
-            ? <span className="nname as-text">{it.name || '（没名字）'}</span>
-            : <button className="nname" onClick={() => onOpen(it)}>{it.name || '（没名字）'}</button>}
+          {/* 人名过展示模式；机会线的标题不用——演示的正是这些机会（见 Veil.jsx） */}
+          {(() => {
+            const 名 = it.subject_kind === 'pursuit'
+              ? (it.name || '（没名字）')
+              : <Veil>{it.name || '（没名字）'}</Veil>
+            return 能勾
+              ? <span className="nname as-text">{名}</span>
+              : <button className="nname" onClick={() => onOpen(it)}>{名}</button>
+          })()}
         </div>
         <div className="nrow-w">{stateLine(it)}</div>
         {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}

@@ -5,6 +5,7 @@ import { deadlineLine, openLine } from '../lib/nextAction.js'
 import { goldLine } from '../lib/stateText.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { tintSlots, slotOf, inBatch } from '../lib/batchTint.js'
+import Veil from './Veil.jsx'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
 // 然后发出去、等回信；末尾两个收尾去处——成了 = 谈成，停了 = 暂停处理。
@@ -171,7 +172,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
       <Jot p={p} onSave={onJot} />
       <div className="pc-m" style={p.stage === 'won' ? { color: 'var(--good)' } : undefined}>
         <span className={'src' + (p.source === 'manual' ? '' : ' scout')} aria-hidden="true" />
-        {p.contact_name ? p.contact_name + ' · ' : ''}
+        {p.contact_name ? <><Veil>{p.contact_name}</Veil>{' · '}</> : ''}
         {/* **有外部新来信就说这句，顶掉阶段。**
             卡面上的位置很贵：这条线有信在等你的时候，「新来信」比「沟通中」要紧。
             点开这张卡就灭（跟右上角红点同一个机制），退回显示阶段。 */}

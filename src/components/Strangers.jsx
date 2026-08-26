@@ -3,6 +3,7 @@ import {
   identifyEmail, claimEmail, markOrgMailbox, upsertContact, claimThread, refreshContact,
   attachAddressLines, carryMailbox,
 } from '../lib/people.js'
+import Veil from './Veil.jsx'
 
 // 加人。
 //
@@ -113,7 +114,7 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         {who.kind === 'shared_box' ? (
           <span><b>这是机构的共享信箱</b>，不是某个人</span>
         ) : matched ? (
-          <span>这是 <b>{who.match_name}</b> 的另一个邮箱</span>
+          <span>这是 <b><Veil>{who.match_name}</Veil></b> 的另一个邮箱</span>
         ) : (
           <span>通讯录里没有，这是个新人</span>
         )}
@@ -139,8 +140,8 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         </div>
       )}
 
-      {who.site && <p className="pf-note">个人站 {who.site}</p>}
-      {who.intro_by && <p className="pf-note">谁介绍的：{who.intro_by}</p>}
+      {who.site && <p className="pf-note">个人站 <Veil>{who.site}</Veil></p>}
+      {who.intro_by && <p className="pf-note">谁介绍的：<Veil>{who.intro_by}</Veil></p>}
       {f.notes && how !== 'org' && (
         <label className="prop-notes">关系记忆
           <textarea rows={4} value={f.notes}
@@ -152,12 +153,12 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         <button className="lnk" disabled={busy} onClick={go}>
           {busy ? '弄着…'
             : how === 'org' ? '记成机构共享信箱'
-            : how === 'merge' ? `合到 ${who.match_name} 名下` : '加进通讯录'}
+            : how === 'merge' ? <>合到 <Veil>{who.match_name}</Veil> 名下</> : '加进通讯录'}
         </button>
         {/* 它判断错了你得改得动。合并/新建/共享箱三条路随时切。 */}
         {how !== 'new' && <button className="lnk" onClick={() => setHow('new')}>不对，是个新人</button>}
         {how !== 'merge' && matched &&
-          <button className="lnk" onClick={() => setHow('merge')}>其实是 {who.match_name}</button>}
+          <button className="lnk" onClick={() => setHow('merge')}>其实是 <Veil>{who.match_name}</Veil></button>}
         {how !== 'org' && <button className="lnk" onClick={() => setHow('org')}>其实是共享信箱</button>}
         <button className="lnk" onClick={onCancel}>算了</button>
       </div>
@@ -182,8 +183,8 @@ function One({ email, meta, contacts, onDone, onCancel }) {
   return (
     <div className="stranger">
       <div className="stranger-h">
-        <span className="prow-n">{meta?.信头署名 || email}</span>
-        {meta?.信头署名 && <span className="pf-note">{email}</span>}
+        <span className="prow-n"><Veil>{meta?.信头署名 || email}</Veil></span>
+        {meta?.信头署名 && <span className="pf-note"><Veil>{email}</Veil></span>}
         <span className="prow-sp" />
         {meta && <>
           <span className="pchip">{meta.封数} 封</span>

@@ -19,6 +19,8 @@ import {
   refreshContact, sayToContactStream, draftToGmail,
 } from '../lib/people.js'
 import { useLiveReply } from '../lib/useLiveReply.js'
+import Veil from './Veil.jsx'
+import { useVeiled } from '../lib/veil.js'
 
 // 名片 —— 人这一层的详情页。
 //
@@ -288,6 +290,9 @@ export default function PersonFocus({
   const channels = (Array.isArray(c.channels) && c.channels.length)
     ? c.channels : (c.email ? [{ kind: 'email', value: c.email }] : [])
 
+  // 展示模式下 title 属性也不许挂名字——悬停一下气泡里就露了。
+  const veiled = useVeiled()
+
   return (
     <div className="focus page">
       {/* 必须包在 .focus-top 里：三栏的高度是 .focus 这个 flex 列分下来的，
@@ -297,7 +302,7 @@ export default function PersonFocus({
           <button className="back" onClick={onBack}>
             <span aria-hidden="true">←</span><span className="t"> 全部联系人</span>
           </button>
-          <h1 className="ft-title" title={c.name}>{c.name || '未具名联系人'}</h1>
+          <h1 className="ft-title" title={veiled ? undefined : c.name}><Veil>{c.name || '未具名联系人'}</Veil></h1>
         </div>
         {/* 跟机会线抽屉同一份（QueueNav）——过卡时两种卡长一样，
             不然你翻到人那张会以为自己掉出队列了。
@@ -317,7 +322,7 @@ export default function PersonFocus({
             <div className="pf-k">机构</div>
             {(c.orgs?.length ? c.orgs : [null]).map((o, i) => o ? (
               <div key={i} className={'pf-v pf-hist' + (o.until ? ' past' : '')}>
-                {o.org}{o.role ? <span className="pf-note"> · {o.role}</span> : null}
+                <Veil>{o.org}</Veil>{o.role ? <span className="pf-note"> · {o.role}</span> : null}
                 {o.until && <span className="pf-past-tag">到 {o.until} 为止</span>}
                 {!o.until && o.since && <span className="pf-note"> · {o.since} 起</span>}
               </div>
@@ -330,7 +335,7 @@ export default function PersonFocus({
             <div className="pf-k">邮箱</div>
             {(c.emails?.length ? c.emails : [null]).map((e, i) => e ? (
               <div key={i} className={'pf-v pf-hist' + (e.until ? ' past' : '')}>
-                <span className="pf-mail">{e.email}</span>
+                <span className="pf-mail"><Veil>{e.email}</Veil></span>
                 {e.is_primary && !e.until && <span className="pf-now-tag">在用</span>}
                 {e.until && <span className="pf-past-tag">⛔ {e.until} 起停用</span>}
                 {e.note && <div className="pf-note">{e.note}</div>}
@@ -343,7 +348,7 @@ export default function PersonFocus({
             <div className="pf-chips">
               {channels.length
                 ? channels.map((x, i) => (
-                    <span key={i} className="pchip" title={x.value}>{CH[x.kind] || x.kind}</span>))
+                    <span key={i} className="pchip" title={veiled ? undefined : x.value}>{CH[x.kind] || x.kind}</span>))
                 : <span className="pf-empty">只有邮箱</span>}
             </div>
           </div>
@@ -353,7 +358,7 @@ export default function PersonFocus({
             <div className="pf-cell">
               <div className="pf-k">谁介绍的</div>
               <div className="pf-v">
-                {c.intro_by_name || '（库里那个人）'}
+                <Veil>{c.intro_by_name || '（库里那个人）'}</Veil>
                 {c.intro_thanked_at
                   ? <span className="pf-note"> · {md(c.intro_thanked_at)} 回谢过了</span>
                   : <button className="lnk pf-inline"

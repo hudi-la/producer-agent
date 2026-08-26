@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadLedger, KIND_LABEL, isMine } from '../lib/ledger.js'
 import { md } from '../lib/when.js'
 import { weeksOf, monthMarks, levelOf, dayKey } from '../lib/heat.js'
+import Veil from './Veil.jsx'
 
 // 「时间线」——两半：日历（你动的手）和流水（不是你动的手）。
 //
@@ -20,12 +21,17 @@ import { weeksOf, monthMarks, levelOf, dayKey } from '../lib/heat.js'
 //
 // 每一行都是现算的，永远不会跟事实分叉；点名字进卡对证。
 
+// 人名过展示模式；机会线的标题不用——演示的正是这些机会（见 Veil.jsx）
+const 谁 = (r) => r.subject_kind === 'pursuit'
+  ? (r.subject_name || '（没名字）')
+  : <Veil>{r.subject_name || '（没名字）'}</Veil>
+
 function Row({ r, onOpen }) {
   return (
     <div className={'lg-row ' + r.kind}>
       <span className="lg-kind">{KIND_LABEL[r.kind] || r.kind}</span>
       <div className="lg-b">
-        <button className="nname" onClick={() => onOpen(r)}>{r.subject_name || '（没名字）'}</button>
+        <button className="nname" onClick={() => onOpen(r)}>{谁(r)}</button>
         <div className="lg-what">{r.what}</div>
         {r.why && r.kind === 'wait_close' && <div className="lg-why">凭什么算办到：{r.why}</div>}
       </div>
@@ -195,7 +201,7 @@ export default function Timeline({ tab = 'cal', states = [], onOpen }) {
                   <div className="lg-b">
                     <button className="nname" onClick={() => onOpen({
                       subject_kind: r.subject_kind, subject_id: r.subject_id,
-                    })}>{r.subject_name || '（没名字）'}</button>
+                    })}>{谁(r)}</button>
                     <div className="lg-what">{r.what}</div>
                   </div>
                 </div>

@@ -31,6 +31,8 @@ import { migrateCueOff } from './lib/cueoffMigrate.js'
 import QueueRest from './components/QueueRest.jsx'
 import Notifications from './components/Notifications.jsx'
 import Timeline from './components/Timeline.jsx'
+import { VeilContext, loadVeiled, saveVeiled } from './lib/veil.js'
+import { Flower } from './components/Veil.jsx'
 
 // 顶栏一级 = 三个主区。二级（筛选、造卡任务）沉到各区自己的工具条里。
 // 分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
@@ -76,6 +78,10 @@ export default function App() {
   const [sayOpen, setSayOpen] = useState(false)
   const [saying, setSaying] = useState(null)              // {i, n} | null
   const [sayFailed, setSayFailed] = useState(0)           // 群发挂了几条，也归 Trouble 说
+  // 展示模式：给客户看屏幕时，名字、邮箱这些私人信息盖上小花（见 lib/veil.js）。
+  // 开关就是右上角你的名字——它自己也是私人信息，开着的时候连它一起盖。
+  const [veiled, setVeiled] = useState(loadVeiled)
+  const toggleVeil = () => setVeiled((v) => { saveVeiled(!v); return !v })
 
   // 进队的判据是「现在需要你」，不是「库里多了行数据」。
   // 第一次真跑就吃过亏：提了个 8-12 才要做的事，8-6 就吵人。
@@ -419,14 +425,16 @@ export default function App() {
     if (view.name === 'pursuit' && view.mode !== 'drawer') {
       what = pl?.pursuits.find((x) => x.id === view.pursuit.id)?.title || view.pursuit.title
     } else if (view.name === 'person') {
-      what = ct?.contacts?.find((x) => x.id === view.person.id)?.name || view.person.name || '未具名联系人'
+      // 展示模式下浏览器标签也不许挂人名——页面盖了、标签栏露着等于没盖。
+      what = veiled ? '联系人'
+        : ct?.contacts?.find((x) => x.id === view.person.id)?.name || view.person.name || '未具名联系人'
     } else if (view.name === 'org') {
-      what = view.org.org
+      what = veiled ? '机构' : view.org.org
     } else {
       what = area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '时间线' : 'Producer'
     }
     document.title = 'Fairwind · ' + what
-  }, [view, area, pl, ct])
+  }, [view, area, pl, ct, veiled])
 
   // 「已看」不再走 localStorage —— 它在库里，8 秒一次的轮询自然会把别处的阅读
   // 带过来，而且跨浏览器、跨机器都算数（原来只有同一个浏览器的标签页之间才同步）。
@@ -672,6 +680,7 @@ export default function App() {
 
   return (
    <ProfileContext.Provider value={profile}>
+   <VeilContext.Provider value={veiled}>
     <div className={'wrap' + (drawered ? ' drawered' : '')}>
       <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
@@ -686,6 +695,16 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <span className="sp" />
+        {/* 右上角你的名字 = 展示模式的开关。给客户看屏幕之前点一下，
+            页面上的名字、邮箱全换成小花；再点一下摘掉。
+            开着的时候这颗按钮自己也得盖——你的名字同样是私人信息，
+            而且它正好当场演示了「盖住」长什么样。 */}
+        <button className={'veilbtn' + (veiled ? ' on' : '')} onClick={toggleVeil}
+                title={veiled ? '展示模式开着：私人信息都盖着小花。点一下摘掉。'
+                              : '展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。'}>
+          {veiled ? <><Flower size={14} /><span>展示中</span></> : (profile?.name || '我')}
+        </button>
       </header>
 
       {/* 批量操作开着时，面板里的条目也是勾选目标 —— 勾的是同一摞 picked：
@@ -861,8 +880,16 @@ export default function App() {
             orgs={ct?.orgs || []}
             strangers={ct?.strangers || []}
             fellBack={ct?.reason || null}
-            onOpen={(c) => openInTab('c', c.id)}
-            onOpenOrg={(o) => openInTab('o', o.org)}
+            /* 2026-08-24：平常点**就在这一页展开**，⌘/Ctrl+点才另开一张。
+               原来一律 window.open（4db21b5）。可名片详情页头上摆着「← 全部联系人」——
+               那句话只有在本页翻的时候才说得通；在新标签里它是句废话。
+               更要命的是新标签会被浏览器当弹窗拦掉，按下去什么都不发生，
+               看着就是「点不进去」。并排开三四张那个用途没丢，交给
+               ⌘/Ctrl+点——那是浏览器本来的规矩，不用我们另发明。 */
+            onOpen={(c, e) => (e?.metaKey || e?.ctrlKey
+              ? openInTab('c', c.id) : setView({ name: 'person', person: c }))}
+            onOpenOrg={(o, e) => (e?.metaKey || e?.ctrlKey
+              ? openInTab('o', o.org) : setView({ name: 'org', org: o }))}
             onAdded={reloadContacts}
             tab={pplTab}
             addOpen={addOpen}
@@ -962,6 +989,7 @@ export default function App() {
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
       <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)} />
     </div>
+   </VeilContext.Provider>
    </ProfileContext.Provider>
   )
 }
