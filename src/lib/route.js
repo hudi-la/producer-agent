@@ -13,31 +13,34 @@
 //
 // ══ 约定 ═══════════════════════════════════════════════════════
 //
-//   ?a=people|profile|ledger   在哪个主区（pursue 是默认，不写）
+//   ?a=desk|people|profile|ledger   在哪个主区（pursue 是默认，不写）
 //   ?p=<id>             打开着一条机会线
 //   ?c=<id>             打开着一张名片
 //   ?o=<机构名>          打开着一张机构卡
-//   &d=1                那条机会线是抽屉不是整页（看板还在旁边）
+//   &d=1                那张卡是某个区旁边的抽屉（看板 / 通讯录还在旁边）
+//
+// 2026-09-02 起只有一条规矩：**带 d=1 是抽屉，不带就是桌上那张**。
+// 整页只在工作区里有，所以不带 d 的卡不管 ?a= 写什么，主区一律是 desk。
 //
 // 卡片参数三选一：同时出现只认第一个（p → c → o），不然「落在哪张卡」
 // 就要看谁先被读到，那是种会随实现顺序变的行为。
 
 // ledger 是 2026-08-22 补的：流水页 8/20 建的时候漏进这张白名单，
 // 后果是在流水页刷新一下就被弹回项目争取，地址栏也从来不说你在流水。
-const AREAS = new Set(['pursue', 'people', 'profile', 'ledger'])
+const AREAS = new Set(['desk', 'pursue', 'people', 'profile', 'ledger'])
 
 /** 当前状态 → 地址栏该长什么样（含 pathname，可以直接喂 replaceState）。 */
 export function toUrl(area, view, pathname = window.location.pathname) {
   const q = new URLSearchParams()
-  // pursue 是默认，不写进 URL —— 干净的地址就是「首页」
-  if (area && area !== 'pursue') q.set('a', area)
-  if (view?.name === 'pursuit' && view.pursuit?.id) {
-    q.set('p', view.pursuit.id)
+  const onCard = ['pursuit', 'person', 'org'].includes(view?.name)
+  // pursue 是默认，不写进 URL —— 干净的地址就是「首页」。
+  // 桌上那张也不写 a=desk：不带 d 的卡本身就说明在桌上，写了是废话。
+  if (area && area !== 'pursue' && !(area === 'desk' && onCard)) q.set('a', area)
+  if (view?.name === 'pursuit' && view.pursuit?.id) q.set('p', view.pursuit.id)
+  else if (view?.name === 'person' && view.person?.id) q.set('c', view.person.id)
+  else if (view?.name === 'org' && view.org?.org) q.set('o', view.org.org)
+  if (q.has('p') || q.has('c') || q.has('o')) {
     if (view.mode === 'drawer') q.set('d', '1')
-  } else if (view?.name === 'person' && view.person?.id) {
-    q.set('c', view.person.id)
-  } else if (view?.name === 'org' && view.org?.org) {
-    q.set('o', view.org.org)
   }
   const s = q.toString()
   return pathname + (s ? `?${s}` : '')
@@ -52,25 +55,13 @@ export function fromUrl(search = window.location.search) {
   const p = q.get('p')
   const c = q.get('c')
   const o = q.get('o')
+  const drawer = q.get('d') === '1'
   // 三选一，顺序写死。同时出现时不去猜哪个更「对」。
-  const card = p ? { kind: 'pursuit', id: p, drawer: q.get('d') === '1' }
-    : c ? { kind: 'contact', id: c }
-    : o ? { kind: 'org', id: o }
+  const card = p ? { kind: 'pursuit', id: p, drawer }
+    : c ? { kind: 'contact', id: c, drawer }
+    : o ? { kind: 'org', id: o, drawer }
     : null
 
-  return { area, card }
-}
-
-/**
- * 「在新标签页里开这一个」该跳到哪。
- *
- * 关键是**先把地址清干净**再设参数，别拿当前地址复制一份就用。
- * 踩过一次：抽屉打开一条线时地址是 ?p=xxx&d=1，「整页」按钮复制它再设 p，
- * 于是 d=1 跟着过去了——新标签页打开的还是抽屉，看着就是「按了没反应」。
- * 同理点第二个人时会带着上一个的 ?c= 一起走。
- */
-export function tabUrl(key, value, pathname = window.location.pathname) {
-  const q = new URLSearchParams()
-  q.set(key, value)
-  return `${pathname}?${q.toString()}`
+  // 不带 d 的卡在桌上，主区就是 desk —— ?a= 写了别的也不算数
+  return { area: card && !drawer ? 'desk' : area, card }
 }
