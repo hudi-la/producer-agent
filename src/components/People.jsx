@@ -35,9 +35,11 @@ function channelsOf(c) {
 
 export default function People({
   contacts = [], orgs = [], strangers = [], onOpen, onOpenOrg, onAdded, fellBack = null,
-  // 带子上那几个开关的状态在 App 手里（跟项目争取那边同一个道理）
-  tab = 'all', addOpen = false, onCloseAdd,
+  // 「新联系人」那一格开没开，在 App 手里（按钮在这一页头一行，跟看板同一个道理）
+  addOpen = false, onCloseAdd,
   picking = false, picked, onPick,
+  // 桌上有哪些（key 的集合）：名片角上挂「在工作区」
+  desk = new Set(),
   audit = false, states = null,
 }) {
   const [q, setQ] = useState('')
@@ -67,9 +69,8 @@ export default function People({
     return bag.filter(Boolean).some((s) => String(s).toLowerCase().includes(key))
   }
   const found = key ? entries.filter(hit) : null
-  // 分类镜头：全部 / 人 / 机构。**搜索之后再筛** —— 你搜「ASU」的时候
-  // 想看的是跟 ASU 有关的一切，不该被上一次点的那个标签悄悄砍掉一半。
-  const shown = (found || entries).filter((e) => tab === 'all' || e.kind === (tab === 'org' ? 'org' : 'person'))
+  // 「全部 / 人 / 机构」那组镜头 2026-09-02 撤了——不用。搜什么就看什么。
+  const shown = found || entries
 
 
   /** 现在挂着的机构（离开了的不在这儿显示，那是名片里的事）。 */
@@ -119,6 +120,8 @@ export default function People({
         <div className="pc-t">
           <Veil>{isOrg ? e.o.org : (e.c.name || '未具名联系人')}</Veil>
           {isOrg && <span className="pchip org">机构</span>}
+          {/* 名片角上的记号：这张今天挑了。跟看板上那张卡同一套。 */}
+          {desk.has(isOrg ? qKey('org', e.o.org) : k) && <span className="pc-desk" aria-label="在工作区">在工作区</span>}
         </div>
 
         <div className="pc-p ghost">

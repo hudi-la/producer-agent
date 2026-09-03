@@ -42,7 +42,10 @@ function Row({ r, onOpen }) {
 
 const WEEKDAY = ['一', '', '三', '', '五', '', '']   // 跟 GitHub 一样隔行标，七行都标太吵
 
-export default function Timeline({ tab = 'cal', states = [], onOpen }) {
+export default function Timeline({ states = [], onOpen }) {
+  // 日历 / 流水：看哪一半。切换从导航带子搬进页里（2026-09-02）——它不是「去哪儿」，
+  // 是「看哪一半」；两半都得看得见，撤掉切换让日历不可见就是丢信息。
+  const [tab, setTab] = useState('cal')
   const [data, setData] = useState(null)
   const [span, setSpan] = useState(365)
   const [pickedDay, setPickedDay] = useState(null)
@@ -121,6 +124,12 @@ export default function Timeline({ tab = 'cal', states = [], onOpen }) {
       <div className="page-inner lg-inner">
         <header className="page-head">
           <h1>时间线</h1>
+          <div className="tabs" role="group" aria-label="看哪一半">
+            {[['cal', '日历'], ['flow', '流水']].map(([k, label]) => (
+              <button key={k} type="button" className={'tab' + (tab === k ? ' on' : '')}
+                      aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>
+            ))}
+          </div>
           <p className="note">
             {tab === 'cal'
               ? <>你动的手：发出去的信、你记的一笔、办到了的那些（<b>已办</b>），

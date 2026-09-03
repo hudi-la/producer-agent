@@ -101,7 +101,7 @@ function statusText(p, held) {
 // 最可能藏身的地方（一封信被错判成不用回，线就这么安静了）。
 const 该有动静的 = new Set(['sent', 'replying', 'won'])
 
-function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, picking, checked, onPick }) {
+function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, picking, checked, onPick, onDesk = false }) {
   const held = heldLabel(useProfile())
   const dim = p.stage === 'paused' || !p.eligible
   // 这张是哪一摊撒出去的 —— 决定底色偏哪一点。只有冷外联那几摊有，见 lib/batchTint.js
@@ -147,6 +147,9 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
       )}
       {picking && <span className="pc-check" aria-hidden="true" />}
       {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
+      {/* 卡角上的记号：这张今天挑了。跟顶栏数字、抽屉那颗开关一起翻面——
+          关了抽屉回到看板，一眼看得出挑了哪几张、还没挑哪几张。 */}
+      {onDesk && <span className="pc-desk" aria-label="在工作区">在工作区</span>}
       {/* 你自己点的标签。系统不动它——点亮了就一直亮着，直到你再点。 */}
       {ball && (
         <div className={'pc-ball ' + ball}>
@@ -189,7 +192,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
 }
 
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
-function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states, audit, tints }) {
+function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states, audit, tints, desk }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
   const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
@@ -241,13 +244,14 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
         <PCard
           p={p} st={states?.get?.(p.id)} audit={audit} tints={tints} key={p.id} onOpen={onOpen} onDragStart={onDragStart} onJot={onJot}
           unseen={unseen?.has(p.id)} picking={picking} checked={picked?.has(qKey('pursuit', p.id))} onPick={onPick}
+          onDesk={desk?.has(qKey('pursuit', p.id))}
         />
       ))}
     </div>
   )
 }
 
-export default function Pipeline({ pursuits, tasks = [], states = null, audit = false, onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick }) {
+export default function Pipeline({ pursuits, tasks = [], states = null, audit = false, onOpen, onMove, onJot, unseen = new Set(), emptyNote = null, picking = false, picked = new Set(), onPick, desk = new Set() }) {
   // 哪一摊用几号色。整块板算一次 —— 每张卡各算各的会因为看见的卡不同而发出不同的号。
   const tints = useMemo(() => tintSlots(pursuits), [pursuits])
   const [over, setOver] = useState(null)
@@ -334,12 +338,14 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
                   picking={picking}
                   picked={picked}
                   onPick={onPick}
+                  desk={desk}
                 />
               ) : (
                 <PCard
                   p={row.card} st={states?.get?.(row.card.id)} audit={audit} tints={tints} key={row.card.id} onOpen={onOpen} onDragStart={onDragStart}
                   onJot={onJot} unseen={unseen.has(row.card.id)}
                   picking={picking} checked={picked.has(qKey('pursuit', row.card.id))} onPick={onPick}
+                  onDesk={desk.has(qKey('pursuit', row.card.id))}
                 />
               )
             )}

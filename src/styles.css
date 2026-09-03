@@ -73,6 +73,32 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tab[aria-pressed="true"] { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .app-top .sp { flex: 1; }
+.app-top .mailst { flex: none; }
+.area-n { font-weight: 500; color: var(--ink-3); }
+.area.on .area-n { color: var(--accent); }
+
+/* 各区自己的头一行：动作跟着它作用的东西走，不再站在导航带子上 */
+.areabar { display: flex; align-items: center; gap: 12px; padding: 9px 22px; border-bottom: 1px solid var(--line); flex: none; }
+.areabar .sp { flex: 1; }
+
+/* 桌上那排窗口（工作区底下那一排）。横向滚，格子不缩——看不见题目等于没开。 */
+.desk-tabs { flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding: 7px 18px; }
+.dtab { display: inline-flex; align-items: center; flex: none; border: 1px solid transparent; border-radius: 9px; }
+.dtab.on { background: var(--paper-2); border-color: var(--line-2); }
+.dtab-t { font: inherit; font-size: 12.5px; color: var(--ink-3); background: none; border: 0; padding: 6px 4px 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtab-t:hover { color: var(--ink-2); }
+.dtab.on .dtab-t { color: var(--ink); font-weight: 600; }
+.dtab-t em { font-style: normal; color: var(--ink-3); }
+.dtab-k { width: 7px; height: 7px; border-radius: 2px; background: var(--line-2); flex: none; }
+.dtab-k.pursuit { background: var(--accent); }
+.dtab-k.contact { border-radius: 50%; background: var(--g2); }
+.dtab-x { font: inherit; font-size: 15px; line-height: 1; color: var(--ink-3); background: none; border: 0; padding: 4px 8px 4px 2px; cursor: pointer; border-radius: 6px; }
+.dtab-x:hover { color: var(--ink); }
+.dtab-x:focus-visible, .dtab-t:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.desk-empty { padding: 60px 26px; color: var(--ink-3); font-family: var(--serif); font-size: 14px; }
+
+/* 卡角上的记号：这张今天挑了。跟顶栏数字、抽屉那颗开关一起翻面。 */
+.pc-desk { display: inline-block; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 6px; margin-left: 6px; border-radius: 5px; color: var(--accent); background: var(--accent-soft); vertical-align: 2px; }
 
 /* ── 展示模式（见 lib/veil.js）───────────────────────────────────
    .veilbtn 右上角你的名字，点一下进入/退出展示模式。
@@ -100,13 +126,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 工具条上的过卡入口。像一叠东西，不像一个通知。
    字号和内边距跟 .wbtn 一模一样——它现在跟一排 .wbtn 站一起，
    长得不一样会让人以为它是另一种东西（它只是多了个「一叠」的记号）。 */
-.qbtn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 12.5px; font-weight: 600;
-  padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2);
-  color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
-.qbtn:hover { border-color: var(--accent); }
-.qbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.qpile { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); flex: none;
-  box-shadow: 2px -2px 0 -1px var(--paper-2), 3px -3px 0 0 var(--accent); }
 /* ── 出事了才说话 ──
    正常状态不渲染任何东西。两档：danger = 你看到的是假数据；warn = 数据真，
    但渡不干活。危险那档用醒目的暖色铺底——它必须刺眼，看漏了会让你在假数据上做决定。 */
@@ -129,11 +148,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 给看板补一段右内边距，末尾那几列才滑得出抽屉底下——
    不补的话「谈成」「暂停处理」两列就永远够不着了。 */
 .wrap.drawered .board { padding-right: calc(var(--drawer-w) + 24px); }
-/* 🔔 现在钉在带子右端（.subbar），所以让位的是带子不是顶栏。
-   机会线抽屉顶到最上沿、整条盖住右边，不让位的话 🔔 就压在它底下——
-   一个常驻入口有一半时间点不着，等于没有。
-   通讯录不在这儿让位：它 2026-08-23 摊回页面上了，压根碰不到 🔔。 */
-.wrap.drawered .subbar { padding-right: calc(var(--drawer-w) + 24px); }
+/* 🔔 和收信状态在顶栏右端（2026-09-02 搬上去的）。抽屉顶到窗口最上沿、
+   整条盖住右边，不让位的话 🔔 就压在它底下——一个常驻入口有一半时间点不着，
+   等于没有。看板 / 通讯录自己的头一行（.areabar）同理。 */
+.wrap.drawered .app-top { padding-right: calc(var(--drawer-w) + 24px); }
+.wrap.drawered .areabar { padding-right: calc(var(--drawer-w) + 24px); }
 
 /* 从右侧贴边落下来的一整条，顶到窗口最上沿（连顶栏一起盖住）。
    宽度就是一句 --drawer-w：33vw，窄窗口不低于 400px。嫌窄改这一个数。 */
@@ -288,10 +307,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* 这儿原来有条 .qwhy（「到日子了 · 为什么」）。「行动时间到了」那套判据撤了，它也就没人用了。 */
 
 /* 剩下的全放过了。不无限转圈。 */
-.qrest { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
-  gap: 9px; padding: 0 26px; }
-.qrest-t { font-family: var(--serif); font-size: 15px; font-weight: 600; margin: 0; }
-.qrest-s { font-size: 12.5px; color: var(--ink-3); margin: 0 0 6px; }
 /* 「整页 ↗」：抽屉里唯一一个把你送出去的出口，所以给它边框、跟旁边的开关区分开 */
 .focus-top .back { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .focus-top .back:hover { color: var(--ink); }
@@ -1314,7 +1329,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .ppl-add .psect { margin-bottom: 6px; }
 
 /* 带子最左边那个区名 */
-.barname { font-family: var(--serif); font-size: 13.5px; font-weight: 600; flex: none; }
 
 /* 由头那一条：点名字进卡，点叉叉先不看它。
    叉叉平时淡着，鼠标扫过才明显——它是退路，不是主要动作。 */
@@ -1408,7 +1422,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* margin-left:auto 顶到最右：带子里有 .sp（flex:1）的区它吃不到剩余空间，
    自然就跟在最后一颗按钮后面；没有 .sp 的区（我的档案、整页）靠它顶到右端。
    两种情况一句话管完，不用每个区各摆一个占位。 */
-.subbar .bellbtn { margin-left: auto; }
 .bellbtn { position: relative; background: none; border: 0; cursor: pointer;
            padding: 3px 6px 1px; line-height: 1; color: var(--ink-2); }
 .bellbtn:hover { color: var(--ink); }
