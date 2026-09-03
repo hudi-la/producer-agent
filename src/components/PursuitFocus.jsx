@@ -20,7 +20,7 @@ import LetterCard from './LetterCard.jsx'
 import FormCard from './FormCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
-import QueueNav from './QueueNav.jsx'
+import DeskToggle from './DeskToggle.jsx'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
 import Md from './Md.jsx'
@@ -266,14 +266,17 @@ function emptyText(stage) {
 
 // 两种装法，同一套内容：
 //   drawer —— 从右边划出来盖在看板上，看板还在旁边，可以一张接一张点过去
-//   page   —— 整页（?p=<id> 落地的、抽屉上按「整页」换成的都是这个，
-//              看板让位），留给你要长时间写东西的时候
+//   page   —— 整页。只在工作区里出现：桌上那格（?p=<id> 不带 d=1 落地的
+//              就是它），留给你要长时间写东西的时候
 // 现在两者装的东西一样，只差宽度。等作品链、文档、邮件单独成栏做出来，
 // 整页才会长出抽屉装不下的部分。
 export default function PursuitFocus({
   onOpenPerson,
-  pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall,
-  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater,
+  pursuit: p, messages, variant = 'page', onBack, onMove, onSetBall,
+  // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
+  onDesk = false, onToggleDesk,
+  // 这张是怎么上桌的（queue.js 的 via）。只有 'update'（收信收出来的）要交代。
+  via = null,
 }) {
   const inDrawer = variant === 'drawer'
   const [msgs, setMsgs] = useState(messages || [])
@@ -597,7 +600,7 @@ export default function PursuitFocus({
   // 「这次发生了什么」：更新最新信息把这张卡送进队，先交代它动了什么再让你过。
   // 内容全部从库里读（最新的信、作废行、它提的那句）——队列只存 id 和 via，
   // 不背内容：背了的那份不会跟着库变，迟早说谎。
-  const viaUpdate = queue?.via === 'update'
+  const viaUpdate = via === 'update'
   const lastMail = viaUpdate ? [...msgs].reverse().find((m) => m.kind === 'email') : null
   const proposal = null
   const mailWhen = (m) => {
@@ -740,12 +743,6 @@ export default function PursuitFocus({
       {/* 标题在顶条里，跟着一起钉住——你往下读对话时，「这是哪条线」不该滚走。
           整页一行放得下就一行，放不下截断；抽屉窄，最多两行。 */}
       <div className="focus-top">
-        {/* 队头。翻页什么都不改——翻回来那张原样在那儿，所以 ‹ › 旁边
-            没有任何「已处理」的标记，只有位置。
-            两个出口也在这排——原来在抽屉底部，跟输入框叠在一起被盖住了；
-            而且「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */}
-        {/* 措辞和行为都在 QueueNav 里 —— 人的卡片用的是同一份 */}
-        <QueueNav queue={queue} onPrev={onQueuePrev} onNext={onQueueNext} onDone={onQueueDone} />
 
         {/* 你为什么在队里。
             一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
@@ -754,7 +751,7 @@ export default function PursuitFocus({
             **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
             effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
             跟两个出口挪上来是同一个理由。 */}
-        {queue && viaUpdate && lastMail && (
+        {viaUpdate && lastMail && (
           <div className="qwhat">
             {lastMail && (
               <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : <Veil>{lastMail.meta?.from_name || '对方'}</Veil>}
@@ -771,16 +768,11 @@ export default function PursuitFocus({
           {inDrawer ? (
             <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
           ) : (
-            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 看板</button>
           )}
           <h1 className="ft-title" title={p.title}>{p.title}</h1>
-          {/* ↗ 是「去别处」的意思，这个按钮已经不去别处了——就在这一页摊开，
-              所以换成 →。图标撒的谎跟文案撒的谎一样算数。 */}
-          {inDrawer && (
-            <button className="expand" onClick={() => onExpand?.(p)} title="整页摊开（看板让位）">
-              整页 <span aria-hidden="true">→</span>
-            </button>
-          )}
+          {/* 「整页 →」退役了。整页只在工作区里有，去工作区的路是这颗开关 + 顶栏那个字。 */}
+          {inDrawer && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
         <div className="ft-ctl">
         {/* 截止跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关 */}

@@ -2,6 +2,7 @@ import { md, day } from '../lib/when.js'
 import React, { useEffect, useState, useCallback } from 'react'
 import { supa } from '../lib/backends.js'
 import Veil from './Veil.jsx'
+import DeskToggle from './DeskToggle.jsx'
 import { useVeiled } from '../lib/veil.js'
 
 // 机构卡。
@@ -17,7 +18,9 @@ import { useVeiled } from '../lib/veil.js'
 // 你跟里面的人商量），改成往来本身。
 
 
-export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
+// variant / onDesk / onToggleDesk 跟名片同一套：drawer 是通讯录旁边划出来的抽屉，
+// 头上一颗「放到工作区」；page 是桌上那格。
+export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit, variant = 'page', onDesk = false, onToggleDesk }) {
   const [msgs, setMsgs] = useState(null)
 
   const load = useCallback(async () => {
@@ -36,14 +39,17 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit }) {
   const veiled = useVeiled()
 
   return (
-    <div className="focus page">
+    <div className={'focus ' + variant}>
       <div className="focus-top">
         <div className="ft-head">
-          <button className="back" onClick={onBack}>
-            <span aria-hidden="true">←</span><span className="t"> 全部联系人</span>
-          </button>
+          {variant === 'drawer' ? (
+            <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+          ) : (
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span><span className="t"> 通讯录</span></button>
+          )}
           <h1 className="ft-title" title={veiled ? undefined : org.org}><Veil>{org.org}</Veil></h1>
           <span className="pchip org">机构</span>
+          {variant === 'drawer' && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
       </div>
 

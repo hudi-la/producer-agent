@@ -5,7 +5,7 @@ import { dropFrom } from '../lib/rewind.js'
 import Md from './Md.jsx'
 import SayBubble from './Resay.jsx'
 import Pool from './Pool.jsx'
-import QueueNav from './QueueNav.jsx'
+import DeskToggle from './DeskToggle.jsx'
 import { MailList } from './Mail.jsx'
 import { isLetter, isExchange } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
@@ -73,9 +73,11 @@ function Cell({ label, value, placeholder, onSave, type = 'text', multiline = fa
 
 export default function PersonFocus({
   person, onBack, onChanged, onOpenPursuit,
-  // 过卡：人也进队了（2026-08-21）。队列本来就是按「两种东西混在同一队里过」
-  // 设计的（queue.js 顶上那段），人这一半一直没接上，现在接上了。
-  queue = null, onQueuePrev, onQueueNext, onQueueDone,
+  // 两种装法：page 是桌上那格（整页三栏），drawer 是通讯录旁边划出来的抽屉
+  // （三栏叠成一栏）。跟机会线同一套规矩——线和人两套规矩就得教。
+  variant = 'page',
+  // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
+  onDesk = false, onToggleDesk,
 }) {
   const c = person
   const [msgs, setMsgs] = useState(null)
@@ -294,21 +296,19 @@ export default function PersonFocus({
   const veiled = useVeiled()
 
   return (
-    <div className="focus page">
+    <div className={'focus ' + variant}>
       {/* 必须包在 .focus-top 里：三栏的高度是 .focus 这个 flex 列分下来的，
           头部漏了这层，.focus-cols 就拿不到 flex:1，整个版面塌成一坨。 */}
       <div className="focus-top">
         <div className="ft-head">
-          <button className="back" onClick={onBack}>
-            <span aria-hidden="true">←</span><span className="t"> 全部联系人</span>
-          </button>
+          {variant === 'drawer' ? (
+            <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+          ) : (
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span><span className="t"> 通讯录</span></button>
+          )}
           <h1 className="ft-title" title={veiled ? undefined : c.name}><Veil>{c.name || '未具名联系人'}</Veil></h1>
+          {variant === 'drawer' && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
-        {/* 跟机会线抽屉同一份（QueueNav）——过卡时两种卡长一样，
-            不然你翻到人那张会以为自己掉出队列了。
-            **必须在 .ft-head 外面**：那里头 .ft-title 是 flex:1，会把它挤成零宽——
-            DOM 里在、屏幕上没有，正是最难发现的那种坏法（第一版就这么坏的）。 */}
-        <QueueNav inHead queue={queue} onPrev={onQueuePrev} onNext={onQueueNext} onDone={onQueueDone} />
       </div>
 
       <div className="focus-cols">
