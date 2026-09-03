@@ -7,13 +7,14 @@ import React from 'react'
 // 按下去这颗变、顶栏数字变、看板上那张卡变，三处一起，你看得见东西去了哪。
 // 翻面换色不换位——位置一动你就找不到它了。
 // 图标：Lucide 的 layout-grid / check，内联 SVG，不引库。
+// onToggle 收到按钮本身（事件目标）：飞入动画要从它的位置起飞。
 export default function DeskToggle({ on, onToggle }) {
   return (
     <button
       type="button"
       className={'desktg' + (on ? ' on' : '')}
       aria-pressed={on}
-      onClick={onToggle}
+      onClick={(e) => onToggle?.(e.currentTarget)}
       title={on ? '已经在「展开的卡片」里了。再按一下收回来。' : '展开——今天要弄它。你留在这儿接着挑，挑完点顶栏「展开的卡片」过去。'}
     >
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
@@ -23,7 +24,7 @@ export default function DeskToggle({ on, onToggle }) {
           : <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
              <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>}
       </svg>
-      {on ? '已展开' : '展开'}
+      {on ? '在展开的卡片区' : '展开'}
     </button>
   )
 }

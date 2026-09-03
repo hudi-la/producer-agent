@@ -24,6 +24,7 @@ import { cleanCopy } from './lib/cleanCopy.js'
 import SayTo from './components/SayTo.jsx'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, select as queueSelect, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { deskTabs, deskView } from './lib/desk.js'
+import { flyTo } from './lib/fly.js'
 import { refreshPursuit } from './lib/refresh.js'
 import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
@@ -149,6 +150,10 @@ export default function App() {
   // null = 还没测出来（先别报警，免得刚打开页面就闪一下红）
   const [brain, setBrain] = useState(null)
   const restoredRef = useRef(false)
+  // 顶栏那颗「展开的卡片」——飞入动画的落点（lib/fly.js）。
+  // 必须待在这儿（状态旁边）：下半截在「载入中」的早退 return 下面，
+  // hook 写在那儿会让两次渲染的 hook 数量对不上，整页白。
+  const deskBtnRef = useRef(null)
   const migratedRef = useRef(false)
 
   // 顶栏有多高。通讯录抽屉从它的下沿开始（见 .ppl-drawer 的 top），所以得有这个数。
@@ -546,9 +551,13 @@ export default function App() {
   const onDeskKey = (k) => Boolean(k) && inQueue(queue, k)
   // 抽屉头上那颗开关。**留在原地**——它是「记下今天要弄它」，不是「带我去」。
   // 按下去三处当场翻面（这颗、顶栏数字、卡角上的记号），你看得见东西去了哪。
-  const toggleDesk = (kind, id) => {
+  // 放上去的那一下再多一件事：一个带卡名的小标签从按钮飞到顶栏那个字上（lib/fly.js）——
+  // 跟购物车一样，你看得见它去了哪。拿回来不飞：收回去没有「去了哪」可讲。
+  const toggleDesk = (kind, id, fromEl, label) => {
     const k = qKey(kind, id)
-    setQueue((q) => (inQueue(q, k) ? queueDone(q, k) : enqueue(q, [{ kind, id, via: 'pick' }])))
+    if (inQueue(queue, k)) { setQueue((q) => queueDone(q, k)); return }
+    setQueue((q) => enqueue(q, [{ kind, id, via: 'pick' }]))
+    flyTo(fromEl, deskBtnRef.current, label)
   }
   // 从桌上某一页点相关的人 / 线：直接开成旁边一格，切过去。
   const openOnDesk = (kind, id) => {
@@ -595,6 +604,7 @@ export default function App() {
           {AREAS.map(([key, label]) => (
             <button
               key={key}
+              ref={key === 'desk' ? deskBtnRef : undefined}
               className={'area' + (area === key ? ' on' : '')}
               onClick={() => { setArea(key); if (view.name !== 'home') closeDrawer() }}
             >
@@ -799,18 +809,18 @@ export default function App() {
               messages={pl.messagesByPursuit[view.pursuit.id]}
               onOpenPerson={(c) => { setArea('people'); openPerson(c) }}
               onBack={closeDrawer} onMove={moveCard} onSetBall={markBall}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={() => toggleDesk('pursuit', view.pursuit.id)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => toggleDesk('pursuit', view.pursuit.id, el, openedPursuit.title)} />
           ) : view.name === 'person' ? (
             <PersonFocus key={view.person.id} variant="drawer" person={openedPerson}
               onBack={closeDrawer} onChanged={reloadContacts}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={() => toggleDesk('contact', view.person.id)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => toggleDesk('contact', view.person.id, el, veiled ? '联系人' : openedPerson.name)} />
           ) : (
             <OrgFocus key={view.org.org} variant="drawer" org={ct?.orgs?.find((o) => o.org === view.org.org) || view.org}
               onBack={closeDrawer}
               onOpenPerson={(id) => { const c = ct?.contacts?.find((x) => x.id === id); if (c) openPerson(c) }}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={() => toggleDesk('org', view.org.org)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => toggleDesk('org', view.org.org, el, veiled ? '机构' : view.org.org)} />
           )}
         </aside>
       )}
