@@ -576,7 +576,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .box .add { font-size: 11.5px; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 8px; padding: 7px 10px; text-align: center; margin-top: 2px; }
 
 /* ── 造卡任务 modal ── */
-.taskmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(520px,92vw); max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 24px 24px 26px; }
+.taskmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(560px,92vw); max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 24px 24px 26px; }
 .taskmodal.open { transform: translate(-50%,-50%) scale(1); opacity: 1; pointer-events: auto; }
 .tm-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .tm-head h3 { font-family: var(--serif); font-size: 19px; margin: 0; font-weight: 600; }
@@ -606,6 +606,16 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .tk-result { font: inherit; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--ink-2); }
 .tk-warn { font-size: 12.5px; line-height: 1.5; padding: 9px 12px; border-radius: 10px; margin: 0 0 12px; background: color-mix(in srgb, var(--wait) 11%, var(--paper)); color: var(--ink); }
 .tk-warn code { font-size: 12px; }
+/* 面板分组：只有第一组是真会跑的，后面几组连开关都没有 */
+.tm-sec { font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 20px 0 4px; }
+.tm-sec:first-of-type { margin-top: 4px; }
+.tm-intro.sub { margin-bottom: 12px; font-size: 12px; }
+.task.past { background: transparent; border-style: dashed; }
+.task.past .task-t { font-weight: 600; }
+.task-when { font-size: 11px; color: var(--ink-3); flex: none; }
+.tk-result.past { margin-top: 8px; font-size: 11.5px; color: var(--ink-3); max-height: 130px; overflow-y: auto; }
+.tm-line { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin-top: 14px; padding-left: 2px; }
+.tm-line b { color: var(--ink-2); font-weight: 600; }
 .toggle:is(button) { border: 0; padding: 0; cursor: pointer; }
 .toggle:is(button):disabled { opacity: .5; cursor: default; }
 .task.off { opacity: .62; border-style: dashed; background: transparent; }
@@ -620,8 +630,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .toggle.on { background: var(--accent); }
 .toggle .knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s; }
 .toggle.on .knob { transform: translateX(14px); }
-.tm-add { margin-top: 14px; font-size: 12.5px; color: var(--ink-3); text-align: center; padding: 10px; border: 1px dashed var(--line-2); border-radius: 10px; cursor: pointer; }
-.tm-add:hover { border-color: var(--accent); color: var(--ink-2); }
 
 /* ── card ddl ── */
 .pc-stars { font-size: 11px; color: var(--accent); letter-spacing: 1.5px; margin-top: 5px; }
@@ -1637,3 +1645,51 @@ button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .lg-at { flex: none; font-size: 11px; color: var(--ink-3);
   font-variant-numeric: tabular-nums; }
 .lnk.on { color: var(--ink); font-weight: 700; }
+
+/* ── 机会池：那张 Excel ──────────────────────────────────────
+   是表不是卡。宽、能滚、行紧凑——82 行要一眼扫得完，
+   而不是 82 个需要点开的东西。 */
+.opmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(1180px,95vw); max-height: 88vh; display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 22px 22px 18px; }
+.opmodal.open { transform: translate(-50%,-50%) scale(1); opacity: 1; pointer-events: auto; }
+.op-round { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; margin: 2px 0 14px; font-family: var(--serif); }
+.op-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.op-q { font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); min-width: 190px; }
+.op-q:focus { outline: none; border-color: var(--accent); }
+.op-wrap { overflow: auto; flex: 1; min-height: 120px; border-top: 1px solid var(--line); }
+.op-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.op-table th { position: sticky; top: 0; z-index: 1; background: var(--paper); text-align: left; font-weight: 600; font-size: 11px; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.op-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.op-row:hover td { background: var(--paper-2); }
+/* 已经捡过的、划掉的沉底并且淡下去——**但不消失**：消失了他会以为丢了 */
+.op-row.lane-onboard td, .op-row.lane-dropped td { opacity: .5; }
+.op-c-st { white-space: nowrap; color: var(--ink-2); }
+.op-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--line-2); vertical-align: 1px; }
+.op-dot.s-open { background: var(--good); }
+.op-dot.s-closed { background: var(--line-2); }
+.op-dot.s-unknown { background: var(--wait); }
+.op-c-t { min-width: 240px; max-width: 420px; }
+.op-title { font-family: var(--serif); font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: none; }
+a.op-title:hover { color: var(--accent); text-decoration: underline; }
+.op-org { font-size: 11.5px; color: var(--ink-3); margin-left: 7px; }
+.op-hold { font-size: 10.5px; color: var(--wait); border: 1px solid var(--wait); border-radius: 5px; padding: 1px 5px; margin-left: 7px; white-space: nowrap; }
+.op-why { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.op-c-k, .op-c-w, .op-c-ck { white-space: nowrap; color: var(--ink-2); font-size: 11.5px; }
+.op-c-f { white-space: nowrap; }
+.op-stars { color: var(--accent); letter-spacing: .5px; }
+.op-dim { color: var(--ink-3); }
+.op-c-r { white-space: nowrap; }
+/* 四档要分得开。「没查到」不是「不行」——它是灰的，不是红的。 */
+.op-reach { font-size: 11.5px; border-radius: 5px; padding: 1px 6px; border: 1px solid transparent; }
+.op-reach.r-realistic { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.op-reach.r-stretch { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 40%, transparent); }
+.op-reach.r-longshot { color: var(--ink-3); border-color: var(--line-2); }
+.op-reach.r-unknown { color: var(--ink-3); border-style: dashed; border-color: var(--line-2); }
+.op-ev { font-style: normal; margin-left: 3px; opacity: .7; }   /* 有凭证：停上去看得到 */
+.op-c-a { white-space: nowrap; text-align: right; }
+.op-btn { font: inherit; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; margin-left: 5px; }
+.op-btn:hover { border-color: var(--accent); }
+.op-btn.ghost { background: transparent; color: var(--ink-3); font-weight: 500; }
+.op-btn:disabled { opacity: .4; cursor: default; }
+.op-empty { padding: 34px 10px; text-align: center; font-size: 12.5px; color: var(--ink-3); font-family: var(--serif); }
+@media (prefers-reduced-motion: reduce) { .opmodal { transition: none; } }
+.op-c-w.past { color: var(--wait); }   /* 截止日已经过了：那个日子不该看着像还有效 */

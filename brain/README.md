@@ -46,21 +46,47 @@ npm run brain          # 在项目根目录；等同于 cd brain && npm start
 ⚠️ **白名单不能省。** 2026-08-05 实测发现 Agent SDK 会继承你整台机器的工具配置——
 不写 `allowedTools` 的话，Fairwind 拿得到 Bash、Write、Supabase MCP。那两个常量是护栏本身。
 
-## 定时造卡（2026-09-02）
+## 每周找机会（2026-09-03）
 
-「每周找聚合源」「每周找 Open Call」原来挂在 claude.ai 的定时任务里，结果写 Excel，
-再由人肉搬进 Fairwind 造卡。现在它们是 `producer.tasks` 里两行带提示词的任务：
+他的持续关注列表原来是盘上那张 Excel（`Desktop/applicaitons/opportunity/HuDi_Opportunities.xlsx`，
+82 行），每周由 claude.ai 的定时任务扫一遍，再由人肉搬进 Fairwind 造卡。现在整张表进了
+`producer.opportunities`（**机会池**），每周那一轮在脑子里跑，一轮三步：
 
+| | 干什么 | 花多少 |
+|---|---|---|
+| ① 复查池子 | 挑一批去官网看开了没有。**不是全表每周查一遍** —— 优先级在 `pa_opp_to_check` 里：该开门的 > 该关门的 > 从没查过的 > 最久没查的 | `config.check_per_round`，默认 20 行，6 行一批 |
+| ② 出去找新的 | 聚合源 + 搜索。找到的**进池子**，不直接造卡，所以不设条数上限 | 一次调用 |
+| ③ 挑 | 本轮开着的行判「以他这个阶段够不够得着」（要真去翻往届名单），够格的造卡 | `config.reach_per_round`，默认 8 个 |
+
+**够得着（reach）是这套东西里唯一需要真做调研的判断**：方向合不合、身份能不能申，读一遍官网就知道；
+「够不够得着」得去翻 past fellows / alumni，拿真人的履历跟他的比。所以它单独一步、
+只对本轮开着的行做、判完存在行上（**一个机会判一次就够**，300 天后才重判）。
+判据和四档在 `brain/reach.js`。
+
+⚠️ **查不到往届名单就存 `unknown`，绝不许编一份出来** —— 编出来的参照比没有参照坏得多，
+他会照着它决定投不投。没有 `reach_evidence` 的结论一律降级成 `unknown`（`parseReach` 里那一刀）。
+
+造卡是**门槛不是名额**：`fit ★★★ 且 reach ≠ longshot`，或 `fit ★★ 且 reach = realistic`，
+够格的全造。`config.card_cap`（默认 12）只是安全阀，触发了会在战报里说「还有 N 个够格但这轮没造」。
+
+其余的：
 - 提示词、每周几点、开不开，都在界面「造卡任务」面板里改（双击提示词进编辑，确定才存）。
-- 脑子每 30 秒问一句谁到点了（`pa_tasks_due`），到点就跑：读提示词 → 联网找 →
-  Fairwind 用 `[[CARDS]]` 信封**报**机会 → 脑子解析、去重、经 `pa_create_pursuit` 落成卡
-  → 卡进「新机会」→ 后台「讲懂」照旧接手。
-- 「现在跑一次」= 把任务拨成 `run_now`，脑子下一轮就接手。关着的任务也能这样跑一次。
-- **脑子没开，到点不会跑。** 开了会立刻补跑（到点时刻已过就算到点），下一次仍按排期算，不漂。
-- 战报写进 `tasks.last_result`：新增了谁、库里已有跳过了谁、查了没建卡的和原因。
+- 「现在跑一次」= 把任务拨成 `run_now`，脑子下一轮（30 秒内）就接手。关着的任务也能这样跑一次。
+- **脑子没开，到点不会跑。** 开了会立刻补跑，下一次仍按排期算，不漂。
+- 战报写进 `tasks.last_result`：三步各一行，包括「还有多少行没轮到」和「查了没收的和原因」。
 
-护栏没动：模型拿到的还是 `READ_TOOLS`，它建不了卡；建卡是脑子拿 service_role 走
-`pa_create_pursuit` 这一个口。设计稿：`docs/specs/2026-09-02-scheduled-scout-design.md`。
+### 那张 Excel 怎么进来的（一次性）
+
+```sh
+npm run import:xlsx            # 加 --dry 只看不写；--file 换路径
+```
+
+只读，原文件一个字节都不写。跑完会把池子里的行跟看板上已有的卡对上（`pa_link_pool_to_cards`），
+对上的显示「已在看板上」，不会被复查也不会再造一张重的。
+
+护栏没动：模型拿到的还是 `READ_TOOLS`，它只**报**（`[[CARDS]]` / `[[CHECKS]]` / `[[REACH]]`
+三种信封），解析和落库是脑子的事，建卡只走 `pa_create_pursuit` 一个口。
+设计稿：`docs/specs/2026-09-03-opportunity-pool-design.md`。
 
 ## 边界
 

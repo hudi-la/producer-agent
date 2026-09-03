@@ -14,6 +14,8 @@ import { loadContacts } from './lib/loadContacts.js'
 import { setTz } from './lib/when.js'
 import { toUrl, fromUrl } from './lib/route.js'
 import TasksPanel from './components/TasksPanel.jsx'
+import Opportunities from './components/Opportunities.jsx'
+import { loadPool } from './lib/opportunities.js'
 import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
 import DrawerGrip, { restoreDrawerWidth } from './components/DrawerGrip.jsx'
@@ -68,6 +70,9 @@ export default function App() {
   const [view, setView] = useState({ name: 'home' })
   const [area, setArea] = useState('pursue')
   const [tasksOpen, setTasksOpen] = useState(false)
+  // 机会池 = 他那张 Excel。开着才拉 —— 82 行带 notes，不该跟着看板每次刷。
+  const [poolOpen, setPoolOpen] = useState(false)
+  const [pool, setPool] = useState(null)
   // 批量操作：你勾出来的那一批。换区不清空 —— 换一下就无声无息没了，
   // 那是「看不见 = 丢了」的近亲。
   const [picking, setPicking] = useState(false)
@@ -200,6 +205,7 @@ export default function App() {
     loadLibrary().then(setLib)
     loadPursuits().then(setPl)
     loadTasks().then(setTk)
+    loadPool().then(setPool)
     loadProfile().then((p) => {
       setProfile(p)
       // 日期按**你住的地方**算，不按服务器（UTC）也不按浏览器。
@@ -461,6 +467,7 @@ export default function App() {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
       if (picking) cancelPick()
+      else if (poolOpen) setPoolOpen(false)
       else if (tasksOpen) setTasksOpen(false)
       // Esc 是关抽屉最顺手的动作，所以它得跟点「收起」做一样的事——
       // 也标已看、也把 ?p= 从地址栏抹掉。原来它只换了 view，小红点会赖着不走。
@@ -468,7 +475,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [tasksOpen, view, picking])
+  }, [tasksOpen, poolOpen, view, picking])
 
   if (!lib || !pl || !tk) return <div className="wrap"><div className="loading">载入中……</div></div>
 
@@ -778,6 +785,9 @@ export default function App() {
           <PickBar picking={picking} pickedCount={picked.size} saying={saying}
                    onStart={() => setPicking(true)} onCancel={cancelPick}
                    onSay={() => setSayOpen(true)} onPickAll={pickAll}>
+            <button className="wbtn" onClick={() => setPoolOpen(true)}>
+              机会池{pool?.rows?.length ? ` · ${pool.rows.length}` : ''}
+            </button>
             <button className="wbtn" onClick={() => setTasksOpen(true)}>造卡任务</button>
           </PickBar>
           {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
@@ -833,6 +843,13 @@ export default function App() {
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
       <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)}
         brain={brain} tz={profile?.data?.tz} onChanged={() => loadTasks().then(setTk)} />
+
+      {/* 机会池：那张 Excel。它是表不是卡 —— 见 components/Opportunities.jsx 顶上那段。
+          lastRun 只取战报第一行；全文在造卡任务面板里，不在这儿重复一遍。 */}
+      <Opportunities
+        open={poolOpen} onClose={() => setPoolOpen(false)} pool={pool}
+        onChanged={() => loadPool().then(setPool)}
+        lastRun={tk.tasks.find((t) => t.prompt)?.last_result?.split('\n')[1] || null} />
     </div>
    </VeilContext.Provider>
    </ProfileContext.Provider>

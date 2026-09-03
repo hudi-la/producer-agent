@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { scheduleText, runState, fmtLocal, isFresh } from './tasks.js'
+import { scheduleText, runState, fmtLocal, isFresh, groupTasks } from './tasks.js'
 
 test('排期说成人话；老任务只有 schedule 那列也照旧', () => {
   assert.equal(scheduleText({ run_every: 'week', run_weekday: 1, run_hour: 8 }), '每周一 08:00')
@@ -32,4 +32,19 @@ test('「新」= seen_at 明确是 null；种子没这个键不算', () => {
   assert.equal(isFresh({ seen_at: null }), true)
   assert.equal(isFresh({ seen_at: '2026-08-08T00:00:00Z' }), false)
   assert.equal(isFresh({}), false)
+})
+
+test('分四组：只有带提示词的那一条是真的定时任务', () => {
+  const { timed, ran, origins, notYet } = groupTasks([
+    { name: '每周找机会', prompt: '…', run_every: 'week' },
+    { name: '树皮书', type: 'institution_monitor', last_run_at: '2026-08-03T00:00:00Z', last_result: '核实 22 家' },
+    { name: '模特经纪', type: 'agency_scout', last_result: '核实 7 家' },
+    { name: '你自己丢的', type: 'manual' },
+    { name: '盯梢机构', type: 'institution_monitor', last_result: '未接' },
+    { name: '邮箱进来的机会', type: 'email_watch', last_result: '未接' },
+  ])
+  assert.deepEqual(timed.map((t) => t.name), ['每周找机会'])
+  assert.deepEqual(ran.map((t) => t.name), ['树皮书', '模特经纪'])
+  assert.deepEqual(origins.map((t) => t.name), ['你自己丢的'])
+  assert.deepEqual(notYet.map((t) => t.name), ['盯梢机构', '邮箱进来的机会'])
 })

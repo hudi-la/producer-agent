@@ -30,8 +30,13 @@ import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
 import { directive as timerDirective, timerKey } from './timer.js'
-// 定时造卡：拼提示词、解析 [[CARDS]] 信封、去重、写战报。纯函数，scout.test.js 按着。
-import { fullPrompt, parseCards, pick, report, capOf } from './scout.js'
+// 定时造卡那一轮的纯函数：拼提示词、解析信封、去重、判门槛、写战报。scout.test.js 按着。
+import {
+  fullPrompt, parseCards, pick, pickable, report3,
+  checkPrompt, parseChecks, checkCapOf, reachCapOf, cardCapOf, CHECK_BATCH,
+} from './scout.js'
+// 「以他这个阶段够不够得着」—— 唯一一个要真去翻往届名单的判断。reach.test.js 按着。
+import { reachPrompt, reachSystem, parseReach, needsReach, REACH_LABEL } from './reach.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -50,7 +55,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-09-02a'
+export const BRAIN_BUILD = '2026-09-03a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -1438,65 +1443,186 @@ async function sweepBriefs() {
   }
 }
 
-// ── 定时造卡 ──────────────────────────────────────────────────
+// ── 每周找机会 ────────────────────────────────────────────────
 //
-// 「每周找机会」原来挂在 claude.ai 的定时任务里，结果写 Excel，再由人肉搬进这儿造卡。
-// 现在提示词在 producer.tasks.prompt（你在面板里改），排期在库里（同上），
+// 原来挂在 claude.ai 的定时任务里，结果写 Excel，再由人肉搬进这儿造卡。
+// 现在提示词在 producer.tasks.prompt（他在面板里改），排期在库里（同上），
 // 这儿每 30 秒问一句「谁到点了」，到点就跑。
 //
-// 护栏没动：Fairwind 拿到的还是 READ_TOOLS，它只**报**机会（[[CARDS]] 信封），
-// 解析、去重、落库是这儿的事，落库只走 pa_create_pursuit 一个口。
+// ══ 一轮三步（2026-09-03）═══════════════════════════════════
+//
+//   ① 复查池子   他那张 Excel 的 82 行进了 producer.opportunities。
+//                挑一批去官网看开了没有。不是全表每周查一遍 —— 表会长到几百行。
+//   ② 出去找新的  聚合源 + 搜索。找到的**进池子**，不直接造卡，所以不设条数上限。
+//   ③ 挑         本轮开着的里面，判「以他这个阶段够不够得着」（要翻往届名单），
+//                够格的造卡。**门槛不是名额**：合适的多就多造几张。
+//
+// 护栏没动：Fairwind 拿到的还是 READ_TOOLS，它只**报**（[[CARDS]] / [[CHECKS]] /
+// [[REACH]] 三种信封），解析和落库是这儿的事，建卡只走 pa_create_pursuit 一个口。
 // 卡落进「新机会」之后 sweepBriefs 会照旧读它——「查一查这个机会」那一步早就有了。
 //
-// 设计稿：docs/specs/2026-09-02-scheduled-scout-design.md
+// 设计稿：docs/specs/2026-09-03-opportunity-pool-design.md
 const SCOUT_MS = Number(process.env.SCOUT_SWEEP_MS || 30_000)
-const SCOUT_TURNS = 80           // 要开六七个站、搜几轮，20 轮不够
 let scouting = false
 let lastScout = { at: null, ok: null, note: '还没跑过', task: null }
 const scoutState = () => ({ ...lastScout, running: scouting })
 
+// 一轮 = 三步。每一步都可能没活干，没活干也要在战报里说一句 ——
+// 静默的「什么都没发生」跟「跑挂了」长得一模一样。
 async function runScoutTask(t) {
   const { data: prof } = await db.from('v_pa_profile').select('*').limit(1)
   const profile = prof?.[0] || null
   const tz = profile?.data?.tz || 'America/Los_Angeles'
   const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })   // YYYY-MM-DD，按当地
 
-  const { data: existing, error: ee } = await db.rpc('pa_pursuit_titles')
-  if (ee) throw new Error('读已有机会失败：' + ee.message)
-  const have = existing || []
+  const R = { today, cardCap: cardCapOf(t) }
 
-  const { text, usage } = await think(
-    fullPrompt(t, { today, tz, existing: have }), READ_TOOLS, systemFor(profile), null, null, null, SCOUT_TURNS)
-  console.log(`  ↳ 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
+  // ══ 第一步 · 复查池子 ═══════════════════════════════════════
+  //
+  // 不是全表每周查一遍：表会长到几百行。优先级在 SQL 里（pa_opp_to_check）——
+  // 该开门的 > 该关门的 > 从没查过的 > 最久没查的。
+  const checkCap = checkCapOf(t)
+  const { data: toCheck, error: ce } = await db.rpc('pa_opp_to_check', { p_limit: checkCap })
+  if (ce) throw new Error('取该复查的行失败：' + ce.message)
+  const rows = toCheck || []
 
-  const parsed = parseCards(text)
-  if (!parsed) {
-    // 「没按格式报」和「真没找到」长得一样，但一个是它的错一个不是——分开记
-    console.warn(`  ⚠️ 「${t.name}」没按格式报。它说的是：\n${text.slice(0, 1500)}`)
-    await db.rpc('pa_task_finish', { p_id: t.id, p_ok: false,
-      p_result: `${today} 这轮没跑成：Fairwind 没按格式报机会（原话在脑子日志里）。` })
-    return { ok: false }
+  // 「还有多少行没轮到」是实话的一部分：他得知道这轮只看了表的一角。
+  const { count: live } = await db
+    .from('v_pa_opportunities')
+    .select('id', { count: 'exact', head: true })
+    .is('pursuit_id', null).is('dropped_at', null)
+  R.leftToCheck = Math.max(0, (live || 0) - rows.length)
+
+  R.checked = []; R.opened = []; R.closedNow = []
+  for (let i = 0; i < rows.length; i += CHECK_BATCH) {
+    const batch = rows.slice(i, i + CHECK_BATCH)
+    let checks = null
+    try {
+      const { text } = await think(checkPrompt(batch, { today, tz }), READ_TOOLS,
+        systemFor(profile), null, null, null, 40)
+      checks = parseChecks(text)
+    } catch (err) {
+      console.warn(`  ⚠️ 复查第 ${i / CHECK_BATCH + 1} 批没成：${err.message}`)
+      continue                       // 这一批留着下轮再查，不写库
+    }
+    if (!checks) { console.warn(`  ⚠️ 复查第 ${i / CHECK_BATCH + 1} 批没按格式报，跳过不写库`); continue }
+
+    const byId = Object.fromEntries(checks.map((c) => [c.id, c]))
+    for (const r of batch) {
+      const c = byId[r.id]
+      // 没报到的那几行**不写库** —— 写一个 unknown 进去会把 checked_at 推到今天，
+      // 于是它接下来几周都排不到队。漏掉的下轮还得排在前面。
+      if (!c) { console.warn(`  ⚠️ 「${r.title}」这轮没报回来，留着下轮`); continue }
+      const { error } = await db.rpc('pa_opp_checked', {
+        p_id: r.id, p_status: c.status, p_deadline: c.deadline,
+        p_deadline_at: c.deadline_at, p_opens_at: c.opens_at, p_note: c.note,
+      })
+      if (error) { console.warn(`  ⚠️ 「${r.title}」写不进去：${error.message}`); continue }
+      R.checked.push(r)
+      if (c.status === 'open' && r.status !== 'open') R.opened.push(r)
+      if (c.status === 'closed' && r.status === 'open') R.closedNow.push(r)
+      console.log(`  · 复查 ${r.title} → ${c.status}${c.note ? `（${c.note}）` : ''}`)
+    }
   }
-  if (parsed.said) console.log(`  ↳ 它说：${parsed.said.slice(0, 400).replace(/\n+/g, ' ')}`)
 
-  const cap = capOf(t)
-  const { take, over, dup } = pick(parsed.cards, have, cap)
-  const made = [], dupDb = [], failed = []
-  for (const c of take) {
-    const { data, error } = await db.rpc('pa_create_pursuit', {
-      p_title: c.title, p_kind: c.kind, p_org: c.org, p_location: c.location, p_funding: c.funding,
-      p_deadline: c.deadline, p_deadline_at: c.deadline_at, p_opens_at: c.opens_at, p_url: c.url,
-      p_match_stars: c.match_stars, p_why: c.why, p_notes: c.notes, p_eligible: c.eligible,
-      p_source: t.type, p_task_id: t.id,
-    })
-    if (error) { failed.push({ title: c.title, why: '建卡失败：' + error.message }); continue }
-    if (data?.created) { made.push(c); console.log(`  ✓ 建卡：${c.title}`) }
-    else dupDb.push(c)
+  // ══ 第二步 · 出去找新的 ═════════════════════════════════════
+  //
+  // 落点是池子，不是卡。池子里多几行不花钱，所以这一步不设条数上限。
+  const { data: poolTitles } = await db
+    .from('v_pa_opportunities').select('title, org, url').is('dropped_at', null)
+  const { data: cardTitles } = await db.rpc('pa_pursuit_titles')
+  const existing = [...(poolTitles || []), ...(cardTitles || [])]
+
+  R.found = []; R.dupFound = []; R.skipped = []
+  try {
+    const { text, usage } = await think(
+      fullPrompt(t, { today, tz, existing }), READ_TOOLS, systemFor(profile), null, null, null, 80)
+    console.log(`  ↳ 找新的：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
+    const parsed = parseCards(text)
+    if (!parsed) {
+      console.warn(`  ⚠️ 找新的这一步没按格式报。它说的是：\n${text.slice(0, 1200)}`)
+      R.skipped.push({ title: '（找新的这一步）', why: '没按格式报，这轮没收到任何新行' })
+    } else {
+      if (parsed.said) console.log(`  ↳ 它说：${parsed.said.slice(0, 300).replace(/\n+/g, ' ')}`)
+      const { take, dup } = pick(parsed.cards, existing)
+      R.dupFound = dup
+      R.skipped = parsed.skipped
+      for (const c of take) {
+        const { data, error } = await db.rpc('pa_upsert_opportunity', {
+          p_title: c.title, p_org: c.org, p_kind: c.kind, p_location: c.location,
+          p_funding: c.funding, p_url: c.url, p_deadline: c.deadline,
+          p_deadline_at: c.deadline_at, p_opens_at: c.opens_at, p_status: c.status,
+          p_fit_stars: c.match_stars, p_eligible: c.eligible, p_why: c.why, p_notes: c.notes,
+          p_source: t.type, p_task_id: t.id,
+        })
+        if (error) { R.skipped.push({ title: c.title, why: '进表失败：' + error.message }); continue }
+        if (data?.created) { R.found.push(c); console.log(`  ✓ 进表：${c.title}`) }
+        else R.dupFound.push(c)
+      }
+    }
+  } catch (err) {
+    // 找新的挂了不该把复查的成果一起丢掉 —— 那一步已经写库了
+    console.error(`  ✗ 找新的这一步没成：${err.message}`)
+    R.skipped.push({ title: '（找新的这一步）', why: err.message })
   }
-  const result = report({ today, made, dup: [...dup, ...dupDb], skipped: [...parsed.skipped, ...failed], over, cap })
+
+  // ══ 第三步 · 挑 ═════════════════════════════════════════════
+  //
+  // 只对**本轮开着的**行判「够不够得着」—— 成本跟着「本周真开着的」走，
+  // 不跟表的大小走。判完存在行上，一个机会判一次就够。
+  const openRows = async () => {
+    const { data, error } = await db.rpc('pa_opp_open_unpicked')
+    if (error) throw new Error('取开着的行失败：' + error.message)
+    return data || []
+  }
+  let open = await openRows()
+
+  R.judged = []
+  const need = open.filter((o) => needsReach(o)).slice(0, reachCapOf(t))
+  if (need.length) {
+    // 履历要进判断：「往届名单里的人跟他比」没有履历就是空话。
+    const { data: entries } = await db.from('v_pa_entries').select('*').order('sort')
+    const sys = reachSystem(profile, entries || [])
+    console.log(`\n→ 判 ${need.length} 个够不够得着（要翻往届名单）`)
+    for (const o of need) {
+      try {
+        const { text } = await think(reachPrompt(o), READ_TOOLS, sys, null, null, null, 40)
+        const v = parseReach(text)
+        if (!v) { console.warn(`  ⚠️ 「${o.title}」没按格式报，下轮再判`); continue }
+        if (v.downgraded) console.warn(`  ⚠️ 「${o.title}」给了结论但没凭证，按「没查到」记`)
+        const { error } = await db.rpc('pa_opp_reach', {
+          p_id: o.id, p_reach: v.reach, p_why: v.why, p_evidence: v.evidence, p_url: v.url,
+        })
+        if (error) { console.warn(`  ⚠️ 「${o.title}」写不进去：${error.message}`); continue }
+        R.judged.push({ title: o.title, label: REACH_LABEL[v.reach], why: v.why })
+        console.log(`  · ${o.title} → ${REACH_LABEL[v.reach]}${v.why ? `（${v.why}）` : ''}`)
+      } catch (err) {
+        console.warn(`  ⚠️ 「${o.title}」判不成：${err.message}`)
+      }
+    }
+    open = await openRows()          // 拿刚写进去的 reach 重排
+  }
+
+  // 门槛不是名额：够格的全造。cap 只是安全阀，触发了在战报里说出来。
+  const { take, over, hold } = pickable(open, R.cardCap)
+  R.made = []; R.overCap = over; R.held = hold
+  for (const o of take) {
+    const { data, error } = await db.rpc('pa_pick_opportunity', { p_id: o.id })
+    if (error) { R.skipped.push({ title: o.title, why: '造卡失败：' + error.message }); continue }
+    if (data?.already) continue
+    R.made.push(o)
+    console.log(`  ✓ 造卡：${o.title}`)
+  }
+
+  // 「这一轮开着的」全部打上戳 —— 界面上「本周还找到这些」就是这个筛选。
+  if (open.length) {
+    await db.rpc('pa_opp_note_round', { p_ids: open.map((o) => o.id), p_round: today })
+  }
+
+  const result = report3(R)
   await db.rpc('pa_task_finish', { p_id: t.id, p_result: result, p_ok: true })
-  console.log(`  ↳ ${result.replace(/\n/g, ' ')}`)
-  return { ok: true, made: made.length }
+  console.log(`  ↳ 战报：\n${result}`)
+  return { ok: true, made: R.made.length, found: R.found.length, checked: R.checked.length }
 }
 
 async function scoutPass() {
@@ -1521,7 +1647,9 @@ async function scoutPass() {
       try {
         const out = await runScoutTask(t)
         lastScout = { at, ok: out.ok, task: t.name,
-          note: out.ok ? `「${t.name}」跑完，新增 ${out.made} 张` : `「${t.name}」没按格式报` }
+          note: out.ok
+            ? `「${t.name}」跑完：复查 ${out.checked} 行 · 进表 ${out.found} 个 · 造卡 ${out.made} 张`
+            : `「${t.name}」没跑成` }
       } catch (err) {
         console.error(`  ✗ 「${t.name}」没跑成：${err.message}`)
         lastScout = { at, ok: false, task: t.name, note: `「${t.name}」没跑成：${err.message}` }
