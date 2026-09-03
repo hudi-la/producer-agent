@@ -2,14 +2,16 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   EMPTY, normalize, loadQueue, saveQueue,
-  enqueue, done, later, goto, indexOf, allSkipped, inQueue,
+  enqueue, done, goto, indexOf, inQueue, select,
   key, keyOf, parseKey,
 } from './queue.js'
 
 const P = (id) => ({ kind: 'pursuit', id })
 const C = (id) => ({ kind: 'contact', id })
+const O = (id) => ({ kind: 'org', id })
 const kp = (id) => key('pursuit', id)
 const kc = (id) => key('contact', id)
+const ko = (id) => key('org', id)
 
 const q3 = () => enqueue(EMPTY, [P('a'), P('b'), P('c')])
 const ids = (q) => q.items.map(keyOf)
@@ -27,11 +29,6 @@ test('不重复塞 —— 同一张塞两次还是一张，位置不动，via �
   assert.equal(q.items[0].via, 'mail')
 })
 
-test('再塞一张放过的，「先放着」清零 —— 它变了，值得你再看一眼', () => {
-  const q = enqueue(later(q3(), kp('a')), [{ ...P('a'), via: 'mail' }])
-  assert.equal(q.items.find((x) => keyOf(x) === kp('a')).skipped, false)
-  assert.equal(q.items.find((x) => keyOf(x) === kp('a')).skippedAt, null)
-})
 
 test('做完了：拿走，光标落到原位置上的下一张', () => {
   const q = done(q3(), kp('a'))
@@ -52,25 +49,8 @@ test('做完唯一一张 —— 队空了', () => {
   assert.deepEqual(q, EMPTY)
 })
 
-test('再等一等：留着，挪队尾，数字不降', () => {
-  const q = later(q3(), kp('a'), '2026-08-06')
-  assert.deepEqual(ids(q), [kp('b'), kp('c'), kp('a')])
-  assert.equal(q.items.length, 3)
-  assert.equal(q.items[2].skipped, true)
-  assert.equal(q.items[2].skippedAt, '2026-08-06')
-  assert.equal(q.at, kp('b'))
-})
 
-test('全放过了 —— 抽屉该停手，不无限转圈', () => {
-  let q = q3()
-  q = later(q, kp('a')); q = later(q, kp('b')); q = later(q, kp('c'))
-  assert.equal(allSkipped(q), true)
-  assert.equal(q.items.length, 3)
-})
 
-test('空队不算「全放过了」—— 没有"剩下的"', () => {
-  assert.equal(allSkipped(EMPTY), false)
-})
 
 test('翻页什么都不改，只移动光标；到头就停住', () => {
   const q = q3()
@@ -86,14 +66,35 @@ test('inQueue', () => {
   assert.equal(inQueue(q3(), kp('zz')), false)
 })
 
-test('normalize 挡住存坏了的东西：非法项、重复 id、指不到人的光标', () => {
+test('存坏了也读得回来 —— 非法项丢掉、重复的合并、旧存档里的 skipped 字段扔掉', () => {
   const got = normalize({
-    items: [P('a'), null, P('a'), { nope: 1 }, { ...P('b'), skipped: 1 }],
-    at: 'ghost',
+    items: [P('a'), null, P('a'), { nope: 1 }, { ...P('b'), skipped: 1, skippedAt: '2026-08-06' }],
+    at: 'zzz',
   })
   assert.deepEqual(ids(got), [kp('a'), kp('b')])
-  assert.equal(got.items[1].skipped, true)
+  assert.deepEqual(Object.keys(got.items[1]).sort(), ['id', 'kind', 'via'])
   assert.equal(got.at, kp('a'))
+})
+
+test('机构也能上桌 —— kind=org 认得出、拆得回', () => {
+  const q = enqueue(EMPTY, [O('ZKM')])
+  assert.equal(q.items[0].kind, 'org')
+  assert.equal(keyOf(q.items[0]), 'org:ZKM')
+  assert.deepEqual(parseKey('org:ZKM'), { kind: 'org', id: 'ZKM' })
+  assert.equal(ko('ZKM'), 'org:ZKM')
+})
+
+test('select：把光标放到那一格上；不在桌上就不动', () => {
+  const q = q3()
+  assert.equal(select(q, kp('c')).at, kp('c'))
+  assert.equal(select(q, kp('zzz')).at, kp('a'))
+})
+
+test('关掉当前那张 → 光标落到旁边一张；关掉最后一张 → 空桌', () => {
+  let q = select(q3(), kp('b'))
+  q = done(q, kp('b'));  assert.equal(q.at, kp('c'))
+  q = done(q, kp('c'));  assert.equal(q.at, kp('a'))
+  q = done(q, kp('a'));  assert.deepEqual(q, EMPTY)
 })
 
 test('normalize 收到垃圾就还一个空队', () => {
@@ -107,7 +108,7 @@ test('存进去读回来是同一份', () => {
     getItem(k) { return k in this._d ? this._d[k] : null },
     setItem(k, v) { this._d[k] = String(v) },
   }
-  const q = later(q3(), kp('a'), '2026-08-06')
+  const q = select(q3(), kp('b'))
   saveQueue(q)
   assert.deepEqual(loadQueue(), q)
 })
