@@ -173,12 +173,16 @@ export default function App() {
   // 「正看着的这张随时算已看」那个 effect 又跟着 pl 跑——无条件写的话就成了
   // 写 → 脉搏 → 重拉 pl → 再写 的自激循环，脉搏跳多快它烧多快。
   // 红点真亮着才有「已看」这件事可记。
+  //
+  // 从来没点开过的卡（seen_at 是 null，封面挂着「新」）也写一次：写完 seen_at
+  // 就不是 null 了，同一张不会再触发，自激那条路还是断的。
   const markSeen = (id) => {
     const hit = pl?.pursuits?.find((p) => p.id === id)
-    if (!hit || !hit.unread) return
+    if (!hit || !(hit.unread || hit.seen_at === null)) return
+    const at = new Date().toISOString()
     setPl((cur) => {
       if (!cur) return cur
-      return { ...cur, pursuits: cur.pursuits.map((p) => (p.id === id ? { ...p, unread: false } : p)) }
+      return { ...cur, pursuits: cur.pursuits.map((p) => (p.id === id ? { ...p, unread: false, seen_at: p.seen_at ?? at } : p)) }
     })
     markSeenDb(id).catch(() => {})
   }
@@ -987,7 +991,8 @@ export default function App() {
       )}
 
       {/* 造卡任务只列属于项目争取的那些——「关系降温提醒」归人际管理 */}
-      <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)} />
+      <TasksPanel tasks={tk.tasks.filter(isPursuitTask)} open={tasksOpen} onClose={() => setTasksOpen(false)}
+        brain={brain} tz={profile?.data?.tz} onChanged={() => loadTasks().then(setTk)} />
     </div>
    </VeilContext.Provider>
    </ProfileContext.Provider>

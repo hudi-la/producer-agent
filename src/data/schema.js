@@ -83,6 +83,7 @@ export const EDITABLE = {
 // 清单（哪几条开着、上次跑出什么）是内容，在 src/demo/tasks.js。
 export const TASK_DESC = {
   scout_aggregators: '扫 Creative Capital / Colossal / TransArtists…按你的画像筛、查资格、去重',
+  scout_search: '按提示词里那几组关键词联网搜新冒出来的 open call / 驻地 / grant，按画像筛、去重',
   agency_scout: '扫模特/演艺经纪的 commercial / lifestyle / beauty 板，逐家核实投递入口再造卡',
   manual: '朋友转的、你刷到的——贴链接 / 截图 / 一句话，我写成卡',
   institution_monitor: '专盯某机构，它开下一轮 open call 就造张卡',

@@ -30,6 +30,8 @@ import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
 import { directive as timerDirective, timerKey } from './timer.js'
+// 定时造卡：拼提示词、解析 [[CARDS]] 信封、去重、写战报。纯函数，scout.test.js 按着。
+import { fullPrompt, parseCards, pick, report, capOf } from './scout.js'
 // 人的「收信」走机械管线：账本 → 拉正文 → 入库。找信不花模型。
 import { promote } from './mail/adopt.js'
 // 发信：纯 HTTP，一次模型都不过。**这几个不进工具白名单**——
@@ -48,7 +50,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-08-21a'
+export const BRAIN_BUILD = '2026-09-02a'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -1436,6 +1438,105 @@ async function sweepBriefs() {
   }
 }
 
+// ── 定时造卡 ──────────────────────────────────────────────────
+//
+// 「每周找机会」原来挂在 claude.ai 的定时任务里，结果写 Excel，再由人肉搬进这儿造卡。
+// 现在提示词在 producer.tasks.prompt（你在面板里改），排期在库里（同上），
+// 这儿每 30 秒问一句「谁到点了」，到点就跑。
+//
+// 护栏没动：Fairwind 拿到的还是 READ_TOOLS，它只**报**机会（[[CARDS]] 信封），
+// 解析、去重、落库是这儿的事，落库只走 pa_create_pursuit 一个口。
+// 卡落进「新机会」之后 sweepBriefs 会照旧读它——「查一查这个机会」那一步早就有了。
+//
+// 设计稿：docs/specs/2026-09-02-scheduled-scout-design.md
+const SCOUT_MS = Number(process.env.SCOUT_SWEEP_MS || 30_000)
+const SCOUT_TURNS = 80           // 要开六七个站、搜几轮，20 轮不够
+let scouting = false
+let lastScout = { at: null, ok: null, note: '还没跑过', task: null }
+const scoutState = () => ({ ...lastScout, running: scouting })
+
+async function runScoutTask(t) {
+  const { data: prof } = await db.from('v_pa_profile').select('*').limit(1)
+  const profile = prof?.[0] || null
+  const tz = profile?.data?.tz || 'America/Los_Angeles'
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })   // YYYY-MM-DD，按当地
+
+  const { data: existing, error: ee } = await db.rpc('pa_pursuit_titles')
+  if (ee) throw new Error('读已有机会失败：' + ee.message)
+  const have = existing || []
+
+  const { text, usage } = await think(
+    fullPrompt(t, { today, tz, existing: have }), READ_TOOLS, systemFor(profile), null, null, null, SCOUT_TURNS)
+  console.log(`  ↳ 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
+
+  const parsed = parseCards(text)
+  if (!parsed) {
+    // 「没按格式报」和「真没找到」长得一样，但一个是它的错一个不是——分开记
+    console.warn(`  ⚠️ 「${t.name}」没按格式报。它说的是：\n${text.slice(0, 1500)}`)
+    await db.rpc('pa_task_finish', { p_id: t.id, p_ok: false,
+      p_result: `${today} 这轮没跑成：Fairwind 没按格式报机会（原话在脑子日志里）。` })
+    return { ok: false }
+  }
+  if (parsed.said) console.log(`  ↳ 它说：${parsed.said.slice(0, 400).replace(/\n+/g, ' ')}`)
+
+  const cap = capOf(t)
+  const { take, over, dup } = pick(parsed.cards, have, cap)
+  const made = [], dupDb = [], failed = []
+  for (const c of take) {
+    const { data, error } = await db.rpc('pa_create_pursuit', {
+      p_title: c.title, p_kind: c.kind, p_org: c.org, p_location: c.location, p_funding: c.funding,
+      p_deadline: c.deadline, p_deadline_at: c.deadline_at, p_opens_at: c.opens_at, p_url: c.url,
+      p_match_stars: c.match_stars, p_why: c.why, p_notes: c.notes, p_eligible: c.eligible,
+      p_source: t.type, p_task_id: t.id,
+    })
+    if (error) { failed.push({ title: c.title, why: '建卡失败：' + error.message }); continue }
+    if (data?.created) { made.push(c); console.log(`  ✓ 建卡：${c.title}`) }
+    else dupDb.push(c)
+  }
+  const result = report({ today, made, dup: [...dup, ...dupDb], skipped: [...parsed.skipped, ...failed], over, cap })
+  await db.rpc('pa_task_finish', { p_id: t.id, p_result: result, p_ok: true })
+  console.log(`  ↳ ${result.replace(/\n/g, ' ')}`)
+  return { ok: true, made: made.length }
+}
+
+async function scoutPass() {
+  if (scouting) return
+  let due
+  try {
+    const { data, error } = await db.rpc('pa_tasks_due')
+    if (error) throw new Error(error.message)
+    due = data
+  } catch (err) { console.error('✗ 问谁到点了：', err.message); return }
+  if (!due?.length) return
+
+  scouting = true
+  try {
+    for (const t of due) {
+      // 认领。两轮撞上、或者两个脑子，只有一个拿得到
+      const { data: got } = await db.rpc('pa_task_start', { p_id: t.id })
+      if (!got) continue
+      const at = new Date().toISOString()
+      console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 造卡任务「${t.name}」开跑`)
+      lastScout = { at, ok: null, note: `正在跑「${t.name}」`, task: t.name }
+      try {
+        const out = await runScoutTask(t)
+        lastScout = { at, ok: out.ok, task: t.name,
+          note: out.ok ? `「${t.name}」跑完，新增 ${out.made} 张` : `「${t.name}」没按格式报` }
+      } catch (err) {
+        console.error(`  ✗ 「${t.name}」没跑成：${err.message}`)
+        lastScout = { at, ok: false, task: t.name, note: `「${t.name}」没跑成：${err.message}` }
+        // 没跑成也要收工——不然 running_since 挂两小时才松，而且 last_result 不说实话
+        try {
+          await db.rpc('pa_task_finish', { p_id: t.id, p_ok: false,
+            p_result: `${at.slice(0, 10)} 这轮没跑成：${err.message}` })
+        } catch (e2) { console.error('  ✗ 连收工都没记上：' + e2.message) }
+      }
+    }
+  } finally {
+    scouting = false
+  }
+}
+
 const send = (res, code, obj) => {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' })
   res.end(JSON.stringify(obj))
@@ -1461,7 +1562,8 @@ const server = http.createServer(async (req, res) => {
     // 邮件那一轮的状态跟着 /health 走：界面每 8 秒本来就在问它，
     // 不用再多开一个口，也不会出现「界面以为在收、其实早停了」。
     const { lastSweep } = await import('./mail/loop.js')
-    return send(res, 200, { ok: true, build: BRAIN_BUILD, mail: lastSweep() })
+    // scout = 定时造卡那一轮。面板靠它说「脑子没开 · 到点不会跑」。
+    return send(res, 200, { ok: true, build: BRAIN_BUILD, mail: lastSweep(), scout: scoutState() })
   }
 
   if (req.method === 'POST' && req.url === '/chat') {
@@ -1806,5 +1908,11 @@ server.listen(PORT, () => {
   }
   setTimeout(mailLoop, 5000)          // 起来 5 秒后先跑一轮，别让你等五分钟
   setInterval(mailLoop, MAIL_MS)
+
+  // 定时造卡。到点的任务（或你按了「现在跑一次」的）每 30 秒查一次。
+  // 脑子没开的那段时间到点的，开了立刻补跑——next_run_at 已过就算到点。
+  setTimeout(scoutPass, 8000)
+  setInterval(scoutPass, SCOUT_MS)
+  console.log(`   造卡任务：每 ${Math.round(SCOUT_MS / 1000)} 秒看一眼谁到点了`)
   console.log(`   邮件：每 ${Math.round(MAIL_MS / 60000)} 分钟收一次新信（这是唯一会去 Gmail 拿信的地方）`)
 })

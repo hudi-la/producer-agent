@@ -36,7 +36,7 @@ export const ERR_EVERY = 15   // 失败时每 15 跳（≈一分钟）才叫一�
 // 前端能订阅的区。**必须跟库里 producer.pulse_areas 对得上。**
 // 写错一个字就抛错（见下面 onPulse）——漏配要在你第一次打开那个页面时
 // 就炸出来，不能变成几周后才发现的「这一栏怎么不更新」。
-export const AREAS = ['board', 'thread', 'deliv']
+export const AREAS = ['board', 'thread', 'deliv', 'tasks']
 
 /** 拆出来是为了测试：read 和「看得见吗」都可注入。 */
 export function makePulse(read, { visible = () => true } = {}) {

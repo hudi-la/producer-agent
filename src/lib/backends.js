@@ -35,7 +35,7 @@ export const FELL_BACK = {
 // 而界面完全看不出来——这已经害过一次：把「讲懂」改成后台扫之后，前端触发器删了、
 // 后台扫描没跑起来，整整一天没有一张新卡被读过，谁也没发现。
 // 所以两边各存一个日期，对不上就提示重启。改 brain/server.js 的行为时两处一起改。
-export const BRAIN_BUILD = '2026-08-21a'
+export const BRAIN_BUILD = '2026-09-02a'
 
 export async function checkBrain() {
   try {
