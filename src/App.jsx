@@ -41,7 +41,7 @@ import { Flower } from './components/Veil.jsx'
 // 架子的分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
 // 无 proposal 压力的关系进人际管理；关于你自己的事实进我的档案。
 const AREAS = [
-  ['desk', '工作区'],
+  ['desk', '展开的卡片'],   // 稿子里叫「工作区」，界面上他要这四个字（2026-09-03）
   ['pursue', '项目争取'],
   ['people', '人际管理'],
   ['profile', '我的档案'],
@@ -435,7 +435,7 @@ export default function App() {
     } else if (cur.name === 'org') {
       what = veiled ? '机构' : cur.org.org
     } else {
-      what = area === 'desk' ? '工作区' : area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '时间线' : 'Producer'
+      what = area === 'desk' ? '展开的卡片' : area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '时间线' : 'Producer'
     }
     document.title = 'Fairwind · ' + what
   }, [area, queue, pl, ct, veiled])
@@ -686,7 +686,7 @@ export default function App() {
       {area === 'desk' ? (
         (() => {
           const cur = deskView(queue, deskData)
-          if (!queue.items.length) return <div className="desk-empty">桌上没东西。去看板或通讯录挑，抽屉头上按「放到工作区」。</div>
+          if (!queue.items.length) return <div className="desk-empty">没有展开的卡片。去看板或通讯录挑，抽屉头上按「展开」。</div>
           if (cur.name === 'home') return <div className="desk-empty">这一格对应的东西找不到了——库里没有它。关掉它就行。</div>
           if (cur.name === 'pursuit') return (
             <PursuitFocus
@@ -789,7 +789,7 @@ export default function App() {
       {/* ── 抽屉：看板旁、通讯录旁共用一份 ──
           不加遮罩：抽屉开着的时候底下必须还能点，你要的就是一张接一张地看。
           aside 而不是 dialog——它不挡着你操作，就是旁边多开的一块地方。
-          头上那颗「放到工作区」是开关：按了人留在原地，三处翻面。 */}
+          头上那颗「展开」是开关：按了人留在原地，三处翻面。 */}
       {drawered && (
         <aside className="drawer" aria-label={view.name === 'pursuit' ? view.pursuit.title : view.name === 'person' ? '名片' : view.org.org}>
           {/* 左沿那条可以拉的边 —— 33vw 是个猜的数，屏幕不一样合适的宽度也不一样 */}

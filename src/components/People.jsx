@@ -121,7 +121,7 @@ export default function People({
           <Veil>{isOrg ? e.o.org : (e.c.name || '未具名联系人')}</Veil>
           {isOrg && <span className="pchip org">机构</span>}
           {/* 名片角上的记号：这张今天挑了。跟看板上那张卡同一套。 */}
-          {desk.has(isOrg ? qKey('org', e.o.org) : k) && <span className="pc-desk" aria-label="在工作区">在工作区</span>}
+          {desk.has(isOrg ? qKey('org', e.o.org) : k) && <span className="pc-desk" aria-label="已展开">已展开</span>}
         </div>
 
         <div className="pc-p ghost">

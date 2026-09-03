@@ -149,7 +149,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
       {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
       {/* 卡角上的记号：这张今天挑了。跟顶栏数字、抽屉那颗开关一起翻面——
           关了抽屉回到看板，一眼看得出挑了哪几张、还没挑哪几张。 */}
-      {onDesk && <span className="pc-desk" aria-label="在工作区">在工作区</span>}
+      {onDesk && <span className="pc-desk" aria-label="已展开">已展开</span>}
       {/* 你自己点的标签。系统不动它——点亮了就一直亮着，直到你再点。 */}
       {ball && (
         <div className={'pc-ball ' + ball}>

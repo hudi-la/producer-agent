@@ -73,7 +73,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tab[aria-pressed="true"] { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .app-top .sp { flex: 1; }
-.app-top .mailst { flex: none; }
+/* 收信状态是顶栏里唯一能缩的：抽屉开着时顶栏让出 33vw，别的都是字不能缩，
+   这一段长句先缩、超出省略——不然整条顶栏折成两行，「我」掉到底下去。 */
+.app-top .mailst { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-top .brand, .app-top .areas, .app-top .bellbtn, .app-top .veilbtn { flex: none; }
+.wrap.drawered .app-top { flex-wrap: nowrap; }
 .area-n { font-weight: 500; color: var(--ink-3); }
 .area.on .area-n { color: var(--accent); }
 
