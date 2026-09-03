@@ -676,8 +676,8 @@ export default function App() {
       {/* ── 工作区底下那一排：桌上开着的窗口 ──
           **只在工作区亮着时有**。别的区底下没有第二排：放在「项目争取」底下的一排，
           任何人都会当成它的分栏，可它混着人。位置在说一件事、内容在说另一件事，
-          就是要教才会用的界面。 */}
-      {area === 'desk' && (
+          就是要教才会用的界面。空桌连带子都不画——一条空带子是占位，占位就是骗人。 */}
+      {area === 'desk' && queue.items.length > 0 && (
         <DeskTabs tabs={deskTabs(queue, deskData)} at={queue.at}
                   onPick={(k) => setQueue((q) => queueSelect(q, k))}
                   onClose={(k) => setQueue((q) => queueDone(q, k))} />
