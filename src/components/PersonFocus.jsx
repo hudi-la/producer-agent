@@ -12,6 +12,7 @@ import { isLetter, isExchange } from '../lib/letter.js'
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
+import StateMoveCard from './StateMoveCard.jsx'
 import { sendLetterNow } from '../lib/letters.js'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
@@ -516,6 +517,9 @@ export default function PersonFocus({
                           form={m.meta.form}
                           owner={{ contactId: c.id }} onAdopted={reload}
                         />
+                      )}
+                      {m.meta?.state_move?.applied && (
+                        <StateMoveCard msgId={m.id} move={m.meta.state_move} onUndone={reload} />
                       )}
                     </div>
                   )

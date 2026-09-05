@@ -25,6 +25,7 @@ import { foldReply } from './reply.js'
 import { extractLetter } from './letter.js'
 // 填完一张表也报一声。逐格的字数闸靠它带过来——那是申请表的要害。
 import { extractForm } from './form.js'
+import { extractStateMove, moveLine, localToday } from './stateMove.js'
 
 import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
@@ -87,6 +88,7 @@ async function loadContext(pursuitId) {
     msgs: data.messages || [],
     entries: data.entries || [],
     profile: data.profile || null,
+    state: data.state || null,     // 提醒栏那一行（0123），没有就是 IDLE
     // 0027 之后上下文里还有产出和邮件线索。它们不进对话 prompt（那是另一套用法），
     // 但 /gmail-draft 和 /sync 要照着它们干活，所以整包留在这儿。
     raw: data,
@@ -118,6 +120,7 @@ async function loadPersonContext(contactId) {
     msgs: data.messages || [],
     entries: data.entries || [],
     profile: data.profile || null,
+    state: data.state || null,     // 提醒栏那一行（0123），没有就是 IDLE
     raw: data,
   }
 }
@@ -141,6 +144,26 @@ async function addMessage(owner, role, content, kind = 'message', meta = null) {
     },
   )
   if (error) throw new Error(`存${role === 'artist' ? '你的话' : 'Fairwind 的回复'}失败：` + error.message)
+  return data
+}
+
+// 聊天里定的事，当场落地（0123，他定的：聊天为准，默认落地，按了能撤回）。
+//
+// 一个口：pa_apply_state_move 记一条 decision 笔 + 标签，并把 applied / note_id
+// 回写进气泡的 meta —— 界面只在 applied 时画那张带【撤回】的小卡。
+// 失败只出声不挡聊天：回复已经存了，小卡不画，日志里有原因。
+async function applyStateMove(owner, mv, bubble) {
+  const o = asOwner(owner)
+  const { data, error } = await db.rpc('pa_apply_state_move', {
+    p_kind: o.kind, p_subject: o.id, p_move: mv.move, p_why: mv.why, p_line: moveLine(mv),
+    p_awaiting: mv.awaiting || null, p_due: mv.due || null, p_meet_at: mv.meet_at || null,
+    p_needs_reply: mv.needs_reply ?? null, p_reply_why: mv.reply_why || null,
+    p_src_msg: bubble?.id || null,
+  })
+  if (error) { console.warn(`  ⚠️ 拨提醒没落上（${mv.move}）：${error.message}`); return null }
+  console.log(`  · 拨提醒：${moveLine(mv)}（凭什么：${mv.why}）`)
+  // 界面拿的是这一份（SSE 的 done 事件），不重读库 —— 就地补上落地的结果
+  if (bubble?.meta?.state_move) Object.assign(bubble.meta.state_move, { applied: true, note_id: data })
   return data
 }
 
@@ -482,9 +505,12 @@ async function handleChat(body, onEvent = null) {
   // 所以是串起来摘，前一个的 clean 交给后一个。
   const one = extractLetter(reply)
   const two = extractForm(one.clean)
-  const shown = two.clean
+  // 第三种信封：它在改提醒（0123）。串在后面摘，前一个的 clean 交给后一个。
+  const three = extractStateMove(two.clean, { today: localToday(ctx.profile?.data?.tz) })
+  const shown = three.clean
   const letter = one.letter
   const form = two.form
+  const mv = three.move
 
   // 工作稿存进 meta：不摆在她眼前、不进下一轮 prompt，但一个字都没销毁，
   // 查得回来。recovered 也记一笔——那条回复是拿工作稿顶上的，将来看日志得认得出。
@@ -493,9 +519,11 @@ async function handleChat(body, onEvent = null) {
     ...(recovered ? { recovered: true } : {}),
     ...(letter ? { letter } : {}),
     ...(form ? { form } : {}),
+    ...(mv ? { state_move: { ...mv, line: moveLine(mv) } } : {}),
   }
   const theirs = await addMessage(owner, 'producer', shown, 'message',
     Object.keys(extra).length ? extra : null)
+  if (mv) await applyStateMove(owner, mv, theirs)
   return { mine, reply: theirs }
 }
 
@@ -1280,10 +1308,14 @@ async function timerPass({ cap = TIMER_CAP } = {}) {
         buildUser(ctx, say, null), READ_TOOLS, buildSystem(ctx), null, null, null,
       )
       const one = extractLetter(reply)
-      await addMessage(owner, 'producer', one.clean, 'message', {
+      // 到点给的法子也能顺手拨提醒（0123）：「打电话，等到 9/12」= wait
+      const mvx = extractStateMove(one.clean, { today: localToday(ctx.profile?.data?.tz) })
+      const bubble = await addMessage(owner, 'producer', mvx.clean, 'message', {
         ...(one.letter ? { letter: one.letter } : {}),
+        ...(mvx.move ? { state_move: { ...mvx.move, line: moveLine(mvx.move) } } : {}),
         timer: { key: timerKey(r), state: r.state },
       })
+      if (mvx.move) await applyStateMove(owner, mvx.move, bubble)
       acted++
     } catch (err) { console.error(`  ✗ ${r.subject_name} 这条没动成：${err.message}`) }
   }

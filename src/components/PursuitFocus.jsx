@@ -18,6 +18,7 @@ import Deliverables from './Deliverables.jsx'
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
+import StateMoveCard from './StateMoveCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
 import DeskToggle from './DeskToggle.jsx'
@@ -225,6 +226,11 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
           复制走的话上限会丢，你到提交前一刻才发现某格超了。 */}
       {m.meta?.form && (
         <FormCard form={m.meta.form} owner={owner} onAdopted={onAdopted} />
+      )}
+      {/* 它在聊天里改了提醒（0123）—— 出现的时候已经改完了，卡上只有【撤回】。
+          只画落上了的（applied）：没落上的，日志里有原因，界面不画一张骗人的卡。 */}
+      {m.meta?.state_move?.applied && (
+        <StateMoveCard msgId={m.id} move={m.meta.state_move} />
       )}
     </div>
   )

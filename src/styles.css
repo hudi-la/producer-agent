@@ -939,6 +939,11 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .lcard-sub { margin: 4px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .lcard-err { margin-bottom: 8px; font-size: 12px; color: var(--accent); }
 .lcard-ok { font-size: 12px; color: var(--ink-3); }
+/* 它在聊天里改了提醒（0123）：跟信卡同一副骨架，多一行「凭什么」。
+   撤回了就整张变灰 —— 还留着，是让你看得见曾经改过什么。 */
+.scard-why { margin: -4px 0 8px; font-size: 12px; color: var(--ink-3); }
+.scard-undone { opacity: .6; }
+.scard-undone .lcard-sub { text-decoration: line-through; }
 /* 表卡上那份题目清单。字数上限要看得见——听错的上限比没有上限更坏，
    你会照着那个假的去改。 */
 .fcard-qs { margin: 0 0 8px; padding: 0; list-style: none; }

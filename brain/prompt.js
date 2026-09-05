@@ -31,6 +31,7 @@
 
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from '@anthropic-ai/claude-agent-sdk'
 import { isImage, IMG_CAP } from './files.js'
+import { STATE_RULE, stateBlock } from './stateMove.js'
 
 export { SYSTEM_PROMPT_DYNAMIC_BOUNDARY }
 
@@ -121,7 +122,9 @@ export const systemFor = (profile) => {
 
 ${LETTER_RULE}
 
-${FORM_RULE}`
+${FORM_RULE}
+
+${STATE_RULE}`
 }
 
 // 履历那些「一条」的关键事实——学校名、机构、起止年份、地点——存在 meta 这个
@@ -268,7 +271,9 @@ const askBlock = (incoming) => [
 export function promptParts(ctx, incoming, exceptId) {
   return {
     fixed:   [...profileBlock(ctx.profile), ...entriesBlock(ctx.entries)],
-    perLine: [...filesBlock(ctx.raw?.attachments), ...ownerBlock(ctx)],
+    // 提醒栏那一行（0123）：每条线不同、一次会话内不变，所以在 perLine。
+    // 不是让它顺着提醒说 —— 是让它知道自己要改的是哪条。
+    perLine: [...filesBlock(ctx.raw?.attachments), ...ownerBlock(ctx), ...stateBlock(ctx.state)],
     talk:    [...historyBlock(ctx, exceptId), ...askBlock(incoming)],
   }
 }
