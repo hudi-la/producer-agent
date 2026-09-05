@@ -186,19 +186,24 @@ function One({ email, meta, contacts, onDone, onCancel }) {
         <span className="prow-n"><Veil>{meta?.信头署名 || email}</Veil></span>
         {meta?.信头署名 && <span className="pf-note"><Veil>{email}</Veil></span>}
         <span className="prow-sp" />
-        {meta && <>
+        {meta && !meta.prefill && <>
           <span className="pchip">{meta.封数} 封</span>
           <span className="pf-note">
             他发来 {meta.他发来的} · 你发去 {meta.你发去的} · {md(meta.第一次)}–{md(meta.最近一次)}
           </span>
         </>}
+        {/* 被抄送的（0121）：它自己一封没发过，没信可读；理由已经在手上，直接摆名片 */}
+        {meta?.prefill && !who && <button className="nopen" onClick={() => setWho(meta.prefill)}>
+          {meta.prefill.kind === 'shared_box' ? '登记成共享信箱' : '加进通讯录'}
+        </button>}
         {/* 这是整块唯一的操作口，得长得像个按钮 —— 文字链他真的没认出来
             （2026-08-20：「没有可以操作的地方啊」）。 */}
-        {!who && <button className="nopen" onClick={ask} disabled={busy}>
+        {!who && !meta?.prefill && <button className="nopen" onClick={ask} disabled={busy}>
           {busy ? '读信中…' : '这是谁？'}
         </button>}
       </div>
 
+      {meta?.why && <div className="pf-note"><Veil>{meta.why}</Veil></div>}
       {meta?.出现在哪些机会线?.length > 0 && (
         <div className="pf-note">出现在：{meta.出现在哪些机会线.join(' · ')}</div>
       )}

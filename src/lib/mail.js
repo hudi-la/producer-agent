@@ -25,6 +25,16 @@ export async function fetchGreetable() {
 }
 
 /**
+ * 一伙人：一串信里好几个人来回说话，其中还有人没进通讯录。
+ * 浏览器直连读——脑子没开也看得见；只有「收」那一下要脑子（走 adopt）。
+ */
+export const fetchGroups = () => rpc('pa_group_threads', { p_min_people: 5 })
+
+/** 这串处理过了：collected（收了，note 是活动名）| skip（这串不算） */
+export const markThread = (thread, mark, note = null) =>
+  rpc('pa_mark_thread', { p_thread: thread, p_mark: mark, p_note: note })
+
+/**
  * 档案柜：判掉的一个都不删，全在这儿。
  *
  * 这一页不是待办清单，你不需要清空它。它存在的意义是：万一它冤枉了一个

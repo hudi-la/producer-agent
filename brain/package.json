@@ -11,6 +11,7 @@
     "mail:classify": "node --env-file=.env mail/classify-run.js",
     "mail:merge": "node --env-file=.env mail/merge-run.js",
     "mail:cast": "node --env-file=.env mail/cast-run.js",
+    "mail:copied": "node --env-file=.env mail/copied-run.js",
     "import:xlsx": "node --env-file=.env import-xlsx.js"
   },
   "dependencies": {

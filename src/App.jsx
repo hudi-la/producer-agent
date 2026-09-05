@@ -766,7 +766,9 @@ export default function App() {
           <PickBar picking={picking} pickedCount={picked.size} saying={saying}
                    onStart={() => setPicking(true)} onCancel={cancelPick}
                    onSay={() => setSayOpen(true)} onPickAll={pickAll}>
-            <button className="wbtn" onClick={() => setAddOpen(true)}>＋ 新联系人</button>
+            <button className="wbtn" onClick={() => setAddOpen(true)}>
+              ＋ 新联系人{ct?.groups?.length ? ` · ${ct.groups.length} 伙人等着收` : ''}
+            </button>
           </PickBar>
           <People
             contacts={ct?.contacts || []}
@@ -840,6 +842,7 @@ export default function App() {
           aside 而不是 dialog——它不挡着你操作，就是旁边多开的一块地方。
           头上那颗「展开」是开关：按了人留在原地，三处翻面。 */}
       {drawered && (
+            groups={ct?.groups || []}
         <aside className="drawer" aria-label={view.name === 'pursuit' ? view.pursuit.title : view.name === 'person' ? '名片' : view.org.org}>
           {/* 左沿那条可以拉的边 —— 33vw 是个猜的数，屏幕不一样合适的宽度也不一样 */}
           <DrawerGrip />

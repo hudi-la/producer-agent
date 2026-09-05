@@ -26,6 +26,8 @@ import { incremental, auditPass } from './sync.js'
 import { classify } from './classify.js'
 import { carryPass } from './carry.js'
 import { attributePass } from './attribute.js'
+import { copiedPass } from './copied.js'
+import { groupNamesPass } from './groups.js'
 import { db } from './store.js'
 import { MailAuthError } from './auth.js'
 
@@ -107,6 +109,22 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
       }
     } catch (err) { console.warn('  ⚠️ 收编信箱没走成：' + err.message) }
 
+    // ④.6 抄送栏里的人、同机构回信的人 → 自动进通讯录、挂上线（0121）。
+    // 真事：Brooke 回信抄送了 Rachel，Lorna 抄送了 Meighan，Meighan 自己回信
+    // 还被休假自动回复连累判成「群发」—— 三个人系统里一个都没有。
+    // 同机构 + 有人名署名是规则级证据，不劳他点头；其余进「新联系人」面板。
+    try {
+      const cp = await copiedPass({ log: () => {} })
+      out.copied = (cp.adopted || []).length
+      out.carried += cp.carried || 0
+      if (cp.adopted?.length) log(`  ↳ 收进抄送的人：${cp.adopted.map((a) => `${a.name}（${a.title}）`).join('、')}`)
+      if (cp.greeted?.length) log(`  ↳ 端给你点头：${cp.greeted.map((g) => g.email).join('、')}`)
+    } catch (err) { console.warn('  ⚠️ 收抄送的人没走成：' + err.message) }
+
+    // ④.7 一伙人（0122）：只补老信的署名，收不收由他在「等你点头」里点。
+    try { await groupNamesPass({ log }) }
+    catch (err) { console.warn('  ⚠️ 一伙人补署名没走成：' + err.message) }
+
     // ⑤ 归属：只在真有孤儿来信时才问模型
     const attr = await attributePass({ apply: true, log: () => {} })
     out.attached = (attr.attached || []).length
@@ -117,8 +135,8 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
       note: out.added ? `收到 ${out.added} 封新信` : '没有新信',
     }
     const ms = Date.now() - t0
-    if (out.added || out.judged || out.carried || out.linked || out.attached) {
-      log(`  ↳ 邮件：新信 ${out.added}｜判地址 ${out.judged}｜进对话 ${out.carried}｜认亲 ${out.linked}｜归线 ${out.attached}（${(ms / 1000).toFixed(1)}s）`)
+    if (out.added || out.judged || out.carried || out.linked || out.attached || out.copied) {
+      log(`  ↳ 邮件：新信 ${out.added}｜判地址 ${out.judged}｜进对话 ${out.carried}｜认亲 ${out.linked}｜归线 ${out.attached}｜抄送的人 ${out.copied || 0}（${(ms / 1000).toFixed(1)}s）`)
     }
     return out
   } catch (err) {

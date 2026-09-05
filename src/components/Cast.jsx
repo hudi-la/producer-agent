@@ -76,6 +76,8 @@ export default function Cast({ pursuitId, onOpenPerson, onChanged }) {
               <b><Veil>{r.name}</Veil></b>
               {r.is_mailbox && <span className="cast-tag">机构信箱</span>}
               {r.org && !r.is_mailbox && <span className="cast-org"><Veil>{r.org}</Veil></span>}
+              {/* 不是你亲手挂的，就说清是怎么上来的：谁、哪天、抄送还是回信（0121） */}
+              {r.note && r.added_by !== 'you' && <span className="cast-note"><Veil>{r.note}</Veil></span>}
             </button>
             <span className="cast-meta">
               {r.mails ? `${r.mails} 封` : '还没往来'}{r.last_at ? ` · ${String(r.last_at).slice(5).replace('-', '/')}` : ''}

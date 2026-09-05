@@ -1,6 +1,7 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import Strangers from './Strangers.jsx'
+import Groups from './Groups.jsx'
 import Veil from './Veil.jsx'
 import { goldLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
@@ -34,7 +35,7 @@ function channelsOf(c) {
 }
 
 export default function People({
-  contacts = [], orgs = [], strangers = [], onOpen, onOpenOrg, onAdded, fellBack = null,
+  contacts = [], orgs = [], strangers = [], groups = [], onOpen, onOpenOrg, onAdded, fellBack = null,
   // 「新联系人」那一格开没开，在 App 手里（按钮在这一页头一行，跟看板同一个道理）
   addOpen = false, onCloseAdd,
   picking = false, picked, onPick,
@@ -193,6 +194,8 @@ export default function People({
               <span className="sp" />
               <button className="lnk" onClick={() => onCloseAdd?.()}>收起</button>
             </div>
+            {/* 一伙人（0122）先于单个地址：一串信里十几个人，一下收完 */}
+            <Groups rows={groups} onDone={onAdded} />
             <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
           </section>
         )}
