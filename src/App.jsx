@@ -25,7 +25,7 @@ import { onPulse } from './lib/pulse.js'
 import { cleanCopy } from './lib/cleanCopy.js'
 import SayTo from './components/SayTo.jsx'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, select as queueSelect, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
-import { deskTabs, deskView } from './lib/desk.js'
+import { deskTabs, deskView, autoOpen } from './lib/desk.js'
 import { flyTo } from './lib/fly.js'
 import { refreshPursuit } from './lib/refresh.js'
 import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
@@ -159,6 +159,9 @@ export default function App() {
   // 必须待在这儿（状态旁边）：下半截在「载入中」的早退 return 下面，
   // hook 写在那儿会让两次渲染的 hook 数量对不上，整页白。
   const deskBtnRef = useRef(null)
+  // 这一轮已经自动摆进「展开的卡片」的线（见 lib/desk.js 的 autoOpen）。
+  // 用 ref 不用 state：它只是「别重复摆」的记性，变了不该引起重画。
+  const autoOpened = useRef(new Set())
   const migratedRef = useRef(false)
 
   // 顶栏有多高。通讯录抽屉从它的下沿开始（见 .ppl-drawer 的 top），所以得有这个数。
@@ -227,6 +230,21 @@ export default function App() {
   }, [])
 
   useEffect(() => { saveQueue(queue) }, [queue])
+
+  // ── 有话没读到的，自己摆到「展开的卡片」里 ────────────────────
+  //
+  // 小红点说的是「Fairwind 说了话，你还没读到」。那正是今天该弄的事，
+  // 不该等你去看板上一列一列找它。所以它自己摆进那一排（判据和挑选规则
+  // 在 lib/desk.js 的 autoOpen）。
+  // **不换你正看着的那格**（enqueue 不动 at）：手上的位置不许被别的东西挪走。
+  // 读了红点自己灭（markSeen）；按 × 关掉的这一轮不会再自己回来。
+  useEffect(() => {
+    if (!pl) return
+    const add = autoOpen(pl.pursuits, autoOpened.current)
+    if (!add.length) return
+    for (const e of add) autoOpened.current.add(e.id)
+    setQueue((q) => enqueue(q, add))
+  }, [pl])
 
   // ── 顶栏那个 🔔 ────────────────────────────────────────────────
   //
@@ -500,6 +518,8 @@ export default function App() {
       .filter((p) => p.unread && p.id !== seenId)
       .map((p) => p.id)
   )
+  // 同一件事换个说法：那一排卡片上要按 key 认（线和人混在一排里）。
+  const unreadKeys = new Set([...unseen].map((id) => qKey('pursuit', id)))
 
   // 移卡：先乐观更新，再写回库；写失败就回滚 + 提示
   const moveCard = async (id, stage) => {
@@ -560,9 +580,18 @@ export default function App() {
   // 按下去三处当场翻面（这颗、顶栏数字、卡角上的记号），你看得见东西去了哪。
   // 放上去的那一下再多一件事：一个带卡名的小标签从按钮飞到顶栏那个字上（lib/fly.js）——
   // 跟购物车一样，你看得见它去了哪。拿回来不飞：收回去没有「去了哪」可讲。
-  const toggleDesk = (kind, id, fromEl, label) => {
+  // 抽屉头上那颗按钮按下去。两种意思，看它现在是哪一面（见 DeskToggle）：
+  //   没展开 → 摆进去，人留在原地，一个带卡名的小标签飞到顶栏那个字上（lib/fly.js）
+  //   已展开 → 带你过去看它。**不是拿走**：拿走只有 × 一个出口。
+  //     一颗按钮既放进去又拿走，看着一样、按下去两个结果，你得先想它现在是哪面。
+  const deskPress = (kind, id, fromEl, label) => {
     const k = qKey(kind, id)
-    if (inQueue(queue, k)) { setQueue((q) => queueDone(q, k)); return }
+    if (inQueue(queue, k)) {
+      setQueue((q) => queueSelect(q, k))
+      closeDrawer()
+      setArea('desk')
+      return
+    }
     setQueue((q) => enqueue(q, [{ kind, id, via: 'pick' }]))
     flyTo(fromEl, deskBtnRef.current, label)
   }
@@ -695,7 +724,7 @@ export default function App() {
           任何人都会当成它的分栏，可它混着人。位置在说一件事、内容在说另一件事，
           就是要教才会用的界面。空桌连带子都不画——一条空带子是占位，占位就是骗人。 */}
       {area === 'desk' && queue.items.length > 0 && (
-        <DeskTabs tabs={deskTabs(queue, deskData)} at={queue.at}
+        <DeskTabs tabs={deskTabs(queue, deskData)} at={queue.at} unread={unreadKeys}
                   onPick={(k) => setQueue((q) => queueSelect(q, k))}
                   onClose={(k) => setQueue((q) => queueDone(q, k))} />
       )}
@@ -819,18 +848,18 @@ export default function App() {
               messages={pl.messagesByPursuit[view.pursuit.id]}
               onOpenPerson={(c) => { setArea('people'); openPerson(c) }}
               onBack={closeDrawer} onMove={moveCard} onSetBall={markBall}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => toggleDesk('pursuit', view.pursuit.id, el, openedPursuit.title)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('pursuit', view.pursuit.id, el, openedPursuit.title)} />
           ) : view.name === 'person' ? (
             <PersonFocus key={view.person.id} variant="drawer" person={openedPerson}
               onBack={closeDrawer} onChanged={reloadContacts}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => toggleDesk('contact', view.person.id, el, veiled ? '联系人' : openedPerson.name)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('contact', view.person.id, el, veiled ? '联系人' : openedPerson.name)} />
           ) : (
             <OrgFocus key={view.org.org} variant="drawer" org={ct?.orgs?.find((o) => o.org === view.org.org) || view.org}
               onBack={closeDrawer}
               onOpenPerson={(id) => { const c = ct?.contacts?.find((x) => x.id === id); if (c) openPerson(c) }}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => toggleDesk('org', view.org.org, el, veiled ? '机构' : view.org.org)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('org', view.org.org, el, veiled ? '机构' : view.org.org)} />
           )}
         </aside>
       )}

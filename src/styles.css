@@ -96,6 +96,9 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .dtab-k { width: 7px; height: 7px; border-radius: 2px; background: var(--line-2); flex: none; }
 .dtab-k.pursuit { background: var(--accent); }
 .dtab-k.contact { border-radius: 50%; background: var(--g2); }
+/* 这一格是「Fairwind 说了话你还没读到」。跟看板上那颗红点同一个意思、同一个色，
+   读了就灭——一排里哪个是新的，一眼看得出。 */
+.dtab-k.new { background: var(--g2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--g2) 28%, transparent); }
 .dtab-x { font: inherit; font-size: 15px; line-height: 1; color: var(--ink-3); background: none; border: 0; padding: 4px 8px 4px 2px; cursor: pointer; border-radius: 6px; }
 .dtab-x:hover { color: var(--ink); }
 .dtab-x:focus-visible, .dtab-t:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -1239,6 +1242,15 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .gr-hint { color: #a8a49c; }
 .gr-ok  { margin: 10px 0 0; font-size: 13px; color: #4a6b45; }
 .gr-err { margin: 10px 0 0; font-size: 13px; color: #9b4a3f; }
+/* 一伙人（0122）：一串信里好几个人来回说话，一格收一伙 */
+.gr-group { border-left: 3px solid #d9c9a8; padding-left: 10px; }
+.gr-kind.is-group { background: #f1e9d6; color: #7a6238; }
+.gr-names { font-size: 12px; margin-top: 6px; line-height: 1.9; }
+.gr-name { display: inline-block; margin: 0 6px 0 0; padding: 0 6px; border-radius: 3px;
+           background: #f0eee9; color: #4a463f; }
+.gr-name.is-bare { color: #8a857a; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.gr-event { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #6d685f; }
+.gr-event input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 3px 6px; }
 
 /* 「这一轮发生了什么」——不是出事，所以不红不黄。说完一句等你划掉。
    它存在的理由：原来整轮跑完屏幕上一点动静没有，于是「没有新信」和
@@ -1261,6 +1273,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .cast-tag { margin-left: 6px; font-size: 10px; padding: 1px 5px; border-radius: 3px;
             background: #e8eef2; color: #4a6070; }
 .cast-meta { flex: none; font-size: 11px; color: #97928a; }
+.cast-note { display: block; font-size: 11px; color: #97928a; margin-top: 1px; }
 .cast-x { flex: none; font-size: 11px; color: #a8a49c; }
 .cast-add { align-self: flex-start; margin-top: 6px; font-size: 12px; }
 .cast-pick { margin-top: 6px; }

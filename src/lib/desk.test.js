@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { enqueue, EMPTY, select, key } from './queue.js'
-import { deskTabs, deskView } from './desk.js'
+import { deskTabs, deskView, autoOpen } from './desk.js'
 
 const data = {
   pursuits: [{ id: 'p1', title: 'Kunstverein 申请' }],
@@ -32,4 +32,15 @@ test('deskView 给出当前那格的 view；空桌和找不到都是 home', () =
   assert.deepEqual(deskView(select(q, key('pursuit', 'p1')), data), { name: 'pursuit', pursuit: data.pursuits[0] })
   assert.deepEqual(deskView(select(q, key('pursuit', 'gone')), data), { name: 'home' })
   assert.deepEqual(deskView(EMPTY, data), { name: 'home' })
+})
+
+test('有未读的自动摆进去；读过的、已经摆过的都不再摆', () => {
+  const ps = [{ id: 'a', unread: true }, { id: 'b', unread: false }, { id: 'c', unread: true }]
+  assert.deepEqual(autoOpen(ps), [
+    { kind: 'pursuit', id: 'a', via: 'update' },
+    { kind: 'pursuit', id: 'c', via: 'update' },
+  ])
+  assert.deepEqual(autoOpen(ps, new Set(['a'])), [{ kind: 'pursuit', id: 'c', via: 'update' }])
+  assert.deepEqual(autoOpen(ps, new Set(['a', 'c'])), [])
+  assert.deepEqual(autoOpen(), [])
 })

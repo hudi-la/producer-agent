@@ -31,3 +31,19 @@ export function deskView(q, data = {}) {
     : kind === 'contact' ? { name: 'person', person: hit }
     : { name: 'org', org: hit }
 }
+
+/**
+ * 有未读回复、这一轮还没自动开过的线 —— 该自动摆进「展开的卡片」的就是它们。
+ *
+ * 小红点说的是「Fairwind 说了话你还没读到」。那正是「今天要弄的」，所以不该
+ * 等你去看板上找，它自己就摆到那一排里。读了（markSeen）红点自己灭。
+ *
+ * already：这一轮已经自动开过的 id。**关掉了就不许再自己回来**——
+ * 你按 × 是在说「这张我不要摆着」，它不认这句话就成了赶不走的东西。
+ * 刷新之后 already 清空，还没读的会再摆一次：那时它仍然是「你没读到的话」。
+ */
+export function autoOpen(pursuits = [], already = new Set()) {
+  return (pursuits || [])
+    .filter((p) => p && p.unread && p.id && !already.has(p.id))
+    .map((p) => ({ kind: 'pursuit', id: p.id, via: 'update' }))
+}
