@@ -44,3 +44,15 @@ test('有未读的自动摆进去；读过的、已经摆过的都不再摆', ()
   assert.deepEqual(autoOpen(ps, new Set(['a', 'c'])), [])
   assert.deepEqual(autoOpen(), [])
 })
+
+test('人也一样：有未读的自动摆进去，跟线混在一排', () => {
+  const ps = [{ id: 'p1', unread: true }]
+  const cs = [{ id: 'c1', unread: true }, { id: 'c2', unread: false }]
+  assert.deepEqual(autoOpen(ps, new Set(), cs), [
+    { kind: 'pursuit', id: 'p1', via: 'update' },
+    { kind: 'contact', id: 'c1', via: 'update' },
+  ])
+  assert.deepEqual(autoOpen(ps, new Set(['p1', 'c1']), cs), [])
+  // 库还没升级（人那半没有 unread 这一列）也不许炸
+  assert.deepEqual(autoOpen(ps, new Set(), [{ id: 'c3' }]), [{ kind: 'pursuit', id: 'p1', via: 'update' }])
+})

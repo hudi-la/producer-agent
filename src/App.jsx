@@ -3,7 +3,7 @@ import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
 import { loadProfile, ProfileContext, PROFILE_FALLBACK } from './lib/profile.js'
-import { setStage, setBall, setJot, sendMessage, markSeen as markSeenDb } from './lib/chat.js'
+import { setStage, setBall, setJot, sendMessage, markSeen as markSeenDb, markContactSeen as markContactSeenDb } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -202,6 +202,15 @@ export default function App() {
     markSeenDb(id).catch(() => {})
   }
 
+  // 人卡的「已看」（0124）。跟机会线那份一个道理：先就地把红点关掉再写库，
+  // 红点该在你点开的那一瞬间灭，不该等一趟网络。没红点就一个字都不写。
+  const markContactSeen = (id) => {
+    const hit = ct?.contacts?.find((c) => c.id === id)
+    if (!hit || !hit.unread) return
+    setCt((cur) => (cur ? { ...cur, contacts: cur.contacts.map((c) => (c.id === id ? { ...c, unread: false } : c)) } : cur))
+    markContactSeenDb(id).catch(() => {})
+  }
+
   const reloadContacts = () => loadContacts().then(setCt)
 
   useEffect(() => {
@@ -240,11 +249,11 @@ export default function App() {
   // 读了红点自己灭（markSeen）；按 × 关掉的这一轮不会再自己回来。
   useEffect(() => {
     if (!pl) return
-    const add = autoOpen(pl.pursuits, autoOpened.current)
+    const add = autoOpen(pl.pursuits, autoOpened.current, ct?.contacts)
     if (!add.length) return
     for (const e of add) autoOpened.current.add(e.id)
     setQueue((q) => enqueue(q, add))
-  }, [pl])
+  }, [pl, ct])
 
   // ── 顶栏那个 🔔 ────────────────────────────────────────────────
   //
@@ -377,6 +386,12 @@ export default function App() {
   useEffect(() => {
     if (seenId) markSeen(seenId)
   }, [seenId, pl])
+  // 人那半同理（0124）：正看着的那张名片，随时算已看。
+  const seenContactId = view.name === 'person' ? view.person?.id
+    : deskAt?.kind === 'contact' ? deskAt.id : null
+  useEffect(() => {
+    if (seenContactId) markContactSeen(seenContactId)
+  }, [seenContactId, ct])
 
   // 看板跟着计数器刷——Fairwind 在后台想完的回复、别处的改动都会自动进来，
   // 不用你手动刷新。原来是每 8 秒硬拉一遍全表（161 KB），一天好几个 GB
@@ -519,7 +534,12 @@ export default function App() {
       .map((p) => p.id)
   )
   // 同一件事换个说法：那一排卡片上要按 key 认（线和人混在一排里）。
-  const unreadKeys = new Set([...unseen].map((id) => qKey('pursuit', id)))
+  const unreadKeys = new Set([
+    ...[...unseen].map((id) => qKey('pursuit', id)),
+    // 人那半（0124）。库还没升级时 unread 是 undefined —— 那就一颗红点都不点，
+    // 不假装知道。
+    ...(ct?.contacts || []).filter((c) => c.unread && c.id !== seenContactId).map((c) => qKey('contact', c.id)),
+  ])
 
   // 移卡：先乐观更新，再写回库；写失败就回滚 + 提示
   const moveCard = async (id, stage) => {

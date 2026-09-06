@@ -295,6 +295,13 @@ export async function markTouched(pursuitId) {
  * at 传值只有一个用处：把旧的 localStorage 记录搬上来（见 App.jsx 的一次性搬迁）。
  * 平时不传 = 现在。库里那边只前进不后退，并发的标签页不会把进度往回拨。
  */
+/** 这个人的卡读到哪儿了（0124）。跟机会线那份同一套：时间只前进不后退。 */
+export async function markContactSeen(contactId, at = null) {
+  if (!supa) return
+  const { error } = await supa.rpc('pa_mark_contact_seen', { p_contact_id: contactId, p_at: at })
+  if (error) throw new Error(error.message)
+}
+
 export async function markSeen(pursuitId, at = null) {
   if (!supa) return
   const { error } = await supa.rpc('pa_mark_seen', { p_pursuit_id: pursuitId, p_at: at })
