@@ -184,9 +184,16 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .desktg:hover { color: var(--ink); border-color: var(--accent); }
 .desktg.on { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 .desktg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* 名片 / 机构塞进抽屉：三栏叠成一栏，各自不再单独滚，整个抽屉滚。 */
-.focus.drawer .focus-cols { flex: 1; min-height: 0; overflow-y: auto; display: block; }
+/* 名片 / 机构塞进抽屉：三栏叠成一栏，各自不再单独滚，整个抽屉滚。
+   底下留出输入框那一组的位置——不留的话最后一条对话被压在框底下。 */
+.focus.drawer .focus-cols { flex: 1; min-height: 0; overflow-y: auto; display: block;
+  padding-bottom: calc(var(--composer-h, 104px) + 40px); }
 .focus.drawer .fc-l, .focus.drawer .fc-r { border: none; overflow: visible; padding: 14px 18px 0; }
+/* 输入框在抽屉里也得**浮在底下**，不许跟着对话滚走。
+   病根是定位锚：.fc-m 在整页里是一栏（高度就是那一屏），可在抽屉里三栏叠成一栏之后，
+   它的高度 = 整条对话，于是「贴着 .fc-m 的底」= 贴在对话末尾，你得滚到底才看得见它。
+   把锚换成抽屉本身（.focus 是 position: relative，撑满抽屉），它就一直浮在眼前。 */
+.focus.drawer .fc-m { position: static; }
 
 /* z-index 得压过 20：抽屉里那层 PursuitFocus 的根节点是 <div class="focus drawer">，
    它身上那个 drawer 是**变体名**，可选择器不分变体不变体——上面 .drawer 那条
@@ -329,7 +336,8 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .stg-sel:hover { border-color: var(--accent); }
 .focus-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 /* 上边距从 30 收到 22：标题搬去顶条了，这儿第一眼看到的是事实标签，不用留那么多气 */
-.focus-inner { max-width: var(--focus-col); margin: 0 auto; padding: 22px var(--focus-pad) 120px; }
+.focus-inner { max-width: var(--focus-col); margin: 0 auto;
+  padding: 22px var(--focus-pad) calc(var(--composer-h, 80px) + 40px); }
 .fh .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 26px; }
 .fh .facts b { color: var(--ink); }
 .fh .facts .warn { color: var(--wait); font-weight: 600; }
@@ -1389,12 +1397,14 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .msg.note .bubble { background: transparent; border: 1px dashed var(--line-2);
   color: var(--ink-2); }
 .fc-m { position: relative; }          /* .composer 是绝对定位的，得有个落脚点 */
-/* 输入框浮在底部，所以滚动区底下要留出它的位置，不然最后一条被压住 */
-.focus.page .fc-m .focus-inner { padding-bottom: 96px; }
+/* 输入框浮在底部，所以滚动区底下要留出它的位置，不然最后一条被压住。
+   --composer-h 是 lib/useGrow.js 量出来的**整组实际高度**（框长高了它跟着变）；
+   还没量到之前退回 76px（单行时那么高）。+40px 是框跟最后一条之间那口气。 */
+.focus.page .fc-m .focus-inner { padding-bottom: calc(var(--composer-h, 76px) + 40px); }
 /* 名片那栏底下还多一行「记一笔」，得再让出它的高度。
    用 :has 认那个壳，而不是给名片再加个 class——.fc-m 是两边共用的，
    多一个只在一边出现的修饰类，下次改的人得先搞清楚它凭什么在那儿。 */
-.focus.page .fc-m:has(.composer-dock) .focus-inner { padding-bottom: 124px; }
+.focus.page .fc-m:has(.composer-dock) .focus-inner { padding-bottom: calc(var(--composer-h, 104px) + 40px); }
 /* 名片中栏：输入框和「记一笔」是一组，一起浮在底部。
    「记一笔」处置的是输入框里那句话，所以它跟着输入框走，不跟着对话走 ——
    挂在时间线末尾的话，你打完字得抬头去够一个已经滚走了的按钮。

@@ -22,6 +22,7 @@ import StateMoveCard from './StateMoveCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
 import DeskToggle from './DeskToggle.jsx'
+import { useGrow } from '../lib/useGrow.js'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
 import Md from './Md.jsx'
@@ -416,15 +417,8 @@ export default function PursuitFocus({
     if (live && stick.current) endRef.current?.scrollIntoView({ block: 'end' })
   }, [live])
 
-  // 输入框按内容撑高。必须先归零再量 scrollHeight——不归零的话 scrollHeight
-  // 永远不小于当前高度，删字的时候框只会长不会缩。上限在 CSS 的 max-height，
-  // 到顶了 textarea 自己滚。
-  useEffect(() => {
-    const el = taRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }, [text])
+  // 输入框按内容长高（往上长）。跟名片那边同一份 —— 见 lib/useGrow.js。
+  useGrow(taRef, text)
 
   // 产出和附件。只有整页要，抽屉不拉——省一次往返。
   async function reloadDeliv() {

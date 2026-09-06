@@ -6,6 +6,7 @@ import Md from './Md.jsx'
 import SayBubble from './Resay.jsx'
 import Pool from './Pool.jsx'
 import DeskToggle from './DeskToggle.jsx'
+import { useGrow } from '../lib/useGrow.js'
 import { MailList } from './Mail.jsx'
 import { isLetter, isExchange } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
@@ -112,6 +113,9 @@ export default function PersonFocus({
   const [touching, setTouching] = useState(false)   // 「刚聊过」展开了输入
   const [touchText, setTouchText] = useState('')
   const taRef = useRef(null)
+  // 输入框按内容长高（往上长）。跟机会线那边同一份 —— 见 lib/useGrow.js。
+  // 这一段原来整个漏了：名片这边的框永远一行高，多打两行就得在框里滚。
+  useGrow(taRef, text)
   const [claim, setClaim] = useState('')
   const [onLine, setOnLine] = useState('')        // 这次接触也算在哪条线上
   const [note, setNote] = useState(null)      // 收信结果那句实话
