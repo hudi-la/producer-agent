@@ -28,9 +28,16 @@ export function stateLine(it) {
       if (it.replied_at) return `对方 ${月日(it.replied_at)}来信了 —— 该你回`
       // 到点的等待 = 「等够了，该催了」。原来写「在等 X」又摆在「该动的」，
       // 他一眼看出自相矛盾（「等回信应该在等待里面呀」）——位置和话要说同一件事。
-      return it.zone === 'due'
-        ? `等了 ${n} 天没等到 —— 该催了，follow up 在卡里`
-        : `已经过去 ${n} 天，设定 follow up 时间为 ${月日(it.due_at)}`
+      // 第几次 follow up 要说出来（0117，2026-09-02 他要的）：催过一两回之后
+      // 这句要是跟第一次一模一样，就看不出这条线已经追到第几回了。
+      // m = 这个等待开了之后你发出去的信数，库里数的（followups），不是判断。
+      const m = it.followups || 0
+      if (it.zone === 'due') {
+        return m
+          ? `第 ${m} 次 follow up 等了 ${n} 天没等到 —— 该催了，第 ${m + 1} 次 follow up 在卡里`
+          : `等了 ${n} 天没等到 —— 该催了，第 1 次 follow up 在卡里`
+      }
+      return `已经过去 ${n} 天，设定 follow up 时间为 ${月日(it.due_at)}`
     case 'NEEDS_REPLY':
       return `发来邮件，「${it.what || '（没摘出梗概）'}」需要回复`
     case 'MEETING_SET':

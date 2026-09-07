@@ -130,6 +130,16 @@ test('等待的措辞带着设定的日子；到点说「等够了、该催了�
   assert.match(whyLine(row({ zone: 'due' })), /没等到的是：/)
 })
 
+test('到点那句说清是第几次 follow up（0117）', () => {
+  // 还没催过：第一封在等，卡里是第 1 次
+  assert.match(stateLine(row({ zone: 'due', followups: 0 })), /^等了 \d+ 天没等到 —— 该催了，第 1 次 follow up 在卡里$/)
+  assert.match(stateLine(row({ zone: 'due' })), /第 1 次 follow up 在卡里$/)          // 库里没这列也不炸
+  // 催过两次：第 2 次等了 n 天，卡里是第 3 次
+  assert.match(stateLine(row({ zone: 'due', followups: 2 })), /^第 2 次 follow up 等了 \d+ 天没等到 —— 该催了，第 3 次 follow up 在卡里$/)
+  // 没到点的那句不动
+  assert.doesNotMatch(stateLine(row({ followups: 2 })), /follow up 等了/)
+})
+
 test('人家回信了就不许说「没等到」—— 该催的是没回你的人', () => {
   // 2026-09-02 他拍的：Francesca 已经回信定了 9/9，面板还在写「等了 4 天
   // 没等到 —— 该催了」。判断排着队还没轮到这封信，可信就躺在库里，
