@@ -794,6 +794,7 @@ export default function App() {
             contacts={ct?.contacts || []}
             orgs={ct?.orgs || []}
             strangers={ct?.strangers || []}
+            groups={ct?.groups || []}
             fellBack={ct?.reason || null}
             /* 2026-09-02：点人 / 点机构跟看板点卡片一样，先出抽屉，看一眼就走。
                原来是原地换页——线和人两套规矩就得教。⌘/Ctrl+点新开标签页那条路
@@ -862,7 +863,6 @@ export default function App() {
           aside 而不是 dialog——它不挡着你操作，就是旁边多开的一块地方。
           头上那颗「展开」是开关：按了人留在原地，三处翻面。 */}
       {drawered && (
-            groups={ct?.groups || []}
         <aside className="drawer" aria-label={view.name === 'pursuit' ? view.pursuit.title : view.name === 'person' ? '名片' : view.org.org}>
           {/* 左沿那条可以拉的边 —— 33vw 是个猜的数，屏幕不一样合适的宽度也不一样 */}
           <DrawerGrip />
