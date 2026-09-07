@@ -130,6 +130,24 @@ test('等待的措辞带着设定的日子；到点说「等够了、该催了�
   assert.match(whyLine(row({ zone: 'due' })), /没等到的是：/)
 })
 
+test('人家回信了就不许说「没等到」—— 该催的是没回你的人', () => {
+  // 2026-09-02 他拍的：Francesca 已经回信定了 9/9，面板还在写「等了 4 天
+  // 没等到 —— 该催了」。判断排着队还没轮到这封信，可信就躺在库里，
+  // 「没等到」是一句现成的假话，而按下 follow up 的是他自己的手。
+  const it = row({ zone: 'due', replied_at: '2026-09-02T20:19:01Z',
+                   what: 'Francesca 从这些日期里选一个并确认具体时间' })
+  assert.match(stateLine(it), /对方 9 月 2 日来信了 —— 该你回/)
+  assert.doesNotMatch(stateLine(it), /该催了|没等到/)
+  // 等的是什么不能丢 —— 那是你为什么该管这封信
+  assert.match(whyLine(it), /你等的是：Francesca 从这些日期里选一个/)
+})
+
+test('判完了就交还给判断：replied_at 一空，「该催了」照旧', () => {
+  // 「还没判过」那个闸的整个意义：自动回复 / 答非所问判完之后 replied_at
+  // 变回 null，这条该催还是该催 —— 不许把等待永远钉在该动的里。
+  assert.match(stateLine(row({ zone: 'due', replied_at: null })), /等了 \d+ 天没等到 —— 该催了/)
+})
+
 test('判「要回」的理由要显示出来 —— 原来完全不显示', () => {
   const it = row({ state: 'NEEDS_REPLY', what: '她在等你点头', why: '她明说了等你确认九月对接 Joo' })
   assert.match(whyLine(it), /凭什么：她明说了/)
