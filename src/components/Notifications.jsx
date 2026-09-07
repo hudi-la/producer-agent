@@ -65,9 +65,10 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
           现在线和人都能勾，两者一致。 */}
       {!能勾 && (
       <div className="nrow-a">
-        {it.zone === 'due' && (
+        {it.zone !== 'waiting' && (
           /* 表单交了、微信里说了、当面聊了 —— 系统看不见邮箱外的事。
-             这一下是**记一笔**（进时间线，留痕迹），不是把提醒抹掉。 */
+             这一下是**记一笔**（进时间线，留痕迹），不是把提醒抹掉。
+             停了的（连发三封没回）也要有这个出口：换了法子、或决定收了。 */
           <button className="nbtn" title="已处理 —— 记一笔，留痕迹" aria-label="已处理"
                   onClick={() => onHandled(it)}>✓</button>
         )}

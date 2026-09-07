@@ -167,3 +167,23 @@ test('OWE_* 的整句直接用库里拼好的 what', () => {
   const it = row({ state: 'OWE_THANKS', what: '见到了你经「Weidi」介绍认识的「Biayna」，跟他说一声谢谢。' })
   assert.equal(stateLine(it), it.what)
 })
+
+// ── 三次规矩（0118，2026-09-02 他拍的）──────────────────────────
+// 连发三封没回就别再催了；条目不消失，换法子。
+test('连发三封没回：到点那句不再说「该催了」，说换法子', () => {
+  const it = row({ zone: 'stopped', followups: 2 })
+  assert.match(stateLine(it), /^连发 3 封没等到回复 —— 别再催了，换个法子（Fairwind 在卡里给建议）$/)
+  assert.doesNotMatch(stateLine(it), /该催了/)
+  assert.match(whyLine(it), /没等到的是：等 Sarah 排 2027 的课/)
+})
+
+test('第三封发出去还没到点：说清这是最后一封，到点就不催了', () => {
+  const it = row({ zone: 'waiting', followups: 2 })
+  assert.match(stateLine(it), /已经过去 \d+ 天，这是连发的第 3 封 —— 9 月 28 日前没回就不再催/)
+})
+
+test('停了的进等待区，不进「今天」，也不丢', () => {
+  const { due, waiting } = splitStates([row({ key: 's', zone: 'stopped', followups: 2 }), row({ key: 'd', zone: 'due' })])
+  assert.deepEqual(due.map((x) => x.key), ['d'])
+  assert.deepEqual(waiting.map((x) => x.key), ['s'])
+})
