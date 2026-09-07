@@ -42,7 +42,7 @@ function Row({ r, onOpen }) {
 
 const WEEKDAY = ['一', '', '三', '', '五', '', '']   // 跟 GitHub 一样隔行标，七行都标太吵
 
-export default function Timeline({ states = [], onOpen }) {
+export default function Timeline({ states = [], onOpen, tick = 0 }) {
   // 日历 / 流水：看哪一半。切换从导航带子搬进页里（2026-09-02）——它不是「去哪儿」，
   // 是「看哪一半」；两半都得看得见，撤掉切换让日历不可见就是丢信息。
   const [tab, setTab] = useState('cal')
@@ -50,7 +50,10 @@ export default function Timeline({ states = [], onOpen }) {
   const [span, setSpan] = useState(365)
   const [pickedDay, setPickedDay] = useState(null)
   const gridRef = useRef(null)
-  useEffect(() => { loadLedger(span).then(setData) }, [span])
+  // tick 是 App 那个「现在」的心跳（App.jsx 的 FACTS_MS）。挂上它，流水和
+  // 通知栏就是同一个时刻的两半 —— 不挂的话反过来也一样会分叉：面板刷新了、
+  // 一个等待关掉不见了，这边的流水却还没记上那一笔。
+  useEffect(() => { loadLedger(span).then(setData) }, [span, tick])
 
   // 已办：你动的手那几种（发出 / 记一笔 / 办到了）。
   // 收到的信和 Fairwind 干的事不进日历 —— 那不是你办的，堆进来只会

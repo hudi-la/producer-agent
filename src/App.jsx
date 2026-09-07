@@ -56,6 +56,11 @@ const AREAS = [
   ['ledger', '时间线'],
 ]
 
+// 页面隔多久重新问一次「现在是什么样」。跟 brain 那一轮同拍（server.js 的
+// MAIL_MS：收信 → 过转移表 → 判一批），它判完，页面下一拍就看得见。
+// 快过它没意义（库里没新东西），慢过它就是让人盯着一个过期的世界。
+const FACTS_MS = 5 * 60 * 1000
+
 // 日期一律走 lib/when.js —— 全 app 只有那一份，按你住的地方算。
 export default function App() {
   const [lib, setLib] = useState(null)
@@ -157,7 +162,7 @@ export default function App() {
   const restoredRef = useRef(false)
   // 顶栏那颗「展开的卡片」——飞入动画的落点（lib/fly.js）。
   // 必须待在这儿（状态旁边）：下半截在「载入中」的早退 return 下面，
-  // hook 写在那儿会让两次渲染的 hook 数量对不上，整页白。
+  // hook 写在那儿会让两次渲染的 hook 数量对不上。
   const deskBtnRef = useRef(null)
   // 这一轮已经自动摆进「展开的卡片」的线（见 lib/desk.js 的 autoOpen）。
   // 用 ref 不用 state：它只是「别重复摆」的记性，变了不该引起重画。
@@ -243,8 +248,8 @@ export default function App() {
   // ── 有话没读到的，自己摆到「展开的卡片」里 ────────────────────
   //
   // 小红点说的是「Fairwind 说了话，你还没读到」。那正是今天该弄的事，
-  // 不该等你去看板上一列一列找它。所以它自己摆进那一排（判据和挑选规则
-  // 在 lib/desk.js 的 autoOpen）。
+  // 不该等你去看板上一列一列找它。所以它自己摆进那一排（判据和这一摞的
+  // 挑选规则在 lib/desk.js 的 autoOpen）。
   // **不换你正看着的那格**（enqueue 不动 at）：手上的位置不许被别的东西挪走。
   // 读了红点自己灭（markSeen）；按 × 关掉的这一轮不会再自己回来。
   useEffect(() => {
@@ -271,6 +276,48 @@ export default function App() {
   // 开机先把旧的 localStorage['pa_cue_off'] 迁进库，再拉。
   // **升级前关掉的那些不许悄悄复活** —— 那是「你以为处理过了，其实系统忘了」。
   useEffect(() => { migrateCueOff().then(pullNotes) }, [])
+
+  // ── 一个页面只有一个「现在」（2026-09-02，他撞上的）──────────────
+  //
+  // 真事：左边流水已经写着「关掉一个等待 · 工作坊提案 · Descanso Gardens ·
+  // Francesca 定在 9/9」，右边通知栏还在喊「等了 4 天没等到 —— 该催了」。
+  // 两句话都不假，只是**隔了半天**：通知栏是开机拉的那份 v_pa_state，
+  // 时间线是你翻到这一页时才拉的 pa_ledger。
+  //
+  // 病根不在判断，在**页面上有两个不同的「现在」**：brain 每 5 分钟在后台
+  // 收信、过转移表、判一批（server.js 的 mailLoop），判完库里两边都变了，
+  // 可页面只有时间线会再去拿。开着不刷新，通知栏就一直是几个钟头前的世界。
+  //
+  // 所以现在两边同一个钟：后台判完一轮（同 5 分钟），页面跟着拿一次；
+  // 切回这个标签页立刻拿一次 —— 合上电脑那几个钟头，回来第一眼就得是真的。
+  // 拉的是四条纯 SQL（v_pa_state / cue_facts / verdicts / 未归户），不动模型，
+  // 一分钱不花。判到一半（judging）时不插队，免得把手上那批的结果盖掉。
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const beat = () => setTick((n) => n + 1)
+    const onBack = () => { if (document.visibilityState === 'visible') beat() }
+    const iv = setInterval(beat, FACTS_MS)
+    document.addEventListener('visibilitychange', onBack)
+    window.addEventListener('focus', onBack)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onBack)
+      window.removeEventListener('focus', onBack)
+    }
+  }, [])
+  // 背景那一拍**只许换上真数据**：拉失败（断网、限额）时 loadNotifications
+  // 返回的是一份空的（source='empty'），照单收下就等于一次网络抖动把整块
+  // 「今天要做的」抹平 —— 那是「看不见 = 丢了」。你自己按的那几个口子照旧
+  // 收下失败结果（该说拉不下来就得说），背景心跳不许。
+  useEffect(() => {
+    if (!tick || judging) return
+    let alive = true
+    loadNotifications().then((out) => {
+      if (alive && out?.source === 'live') setNotes(out)
+    })
+    return () => { alive = false }
+  }, [tick])
+
   // 抽屉宽度：上次拉成什么样，开机就摆成什么样
   useEffect(() => { restoreDrawerWidth() }, [])
 
@@ -600,10 +647,11 @@ export default function App() {
   // 按下去三处当场翻面（这颗、顶栏数字、卡角上的记号），你看得见东西去了哪。
   // 放上去的那一下再多一件事：一个带卡名的小标签从按钮飞到顶栏那个字上（lib/fly.js）——
   // 跟购物车一样，你看得见它去了哪。拿回来不飞：收回去没有「去了哪」可讲。
+  // （ref 的定义在上面状态区：这儿在「载入中」那次早退 return **下面**，
+  //   写在这儿的 hook 数据到了才执行，前后两次渲染 hook 数量对不上，整页白。）
   // 抽屉头上那颗按钮按下去。两种意思，看它现在是哪一面（见 DeskToggle）：
   //   没展开 → 摆进去，人留在原地，一个带卡名的小标签飞到顶栏那个字上（lib/fly.js）
   //   已展开 → 带你过去看它。**不是拿走**：拿走只有 × 一个出口。
-  //     一颗按钮既放进去又拿走，看着一样、按下去两个结果，你得先想它现在是哪面。
   const deskPress = (kind, id, fromEl, label) => {
     const k = qKey(kind, id)
     if (inQueue(queue, k)) {
@@ -820,6 +868,8 @@ export default function App() {
         <Timeline
           /* 待办从这儿来：跟 🔔 同一份 v_pa_state，不另查一遍 */
           states={[...(notes?.due || []), ...(notes?.waiting || [])]}
+          /* 流水跟通知栏同一个钟 —— 两半必须是同一个时刻的 */
+          tick={tick}
           onOpen={(r) => {
           if (r.subject_kind === 'pursuit') {
             const p = pl.pursuits.find((x) => x.id === r.subject_id)
