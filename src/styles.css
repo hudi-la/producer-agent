@@ -464,10 +464,13 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .page-head .note b { color: var(--ink-2); font-weight: 600; }
 .page-head .note .bx { color: var(--accent); }
 
-/* 档案页：左边一列格名，右边一次开一格。
-   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。 */
+/* 档案页：左边一列格名，中间一次开一格，右边一张书桌。
+   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。
+   .widest 是加了书桌那一栏之后的（0127）。 */
 .page-inner.wide { max-width: 1040px; }
+.page-inner.widest { max-width: 1480px; }
 .lib-two { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 30px; margin-top: 26px; align-items: start; }
+.lib-three { display: grid; grid-template-columns: 200px minmax(0, 1fr) 380px; gap: 26px; margin-top: 26px; align-items: start; }
 .lib-rail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; }
 .rail-b { display: flex; align-items: center; gap: 10px; width: 100%; font: inherit; font-size: 13px; text-align: left;
   padding: 8px 11px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-3);
@@ -477,13 +480,61 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .rail-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rail-l { flex: 1; min-width: 0; }
 .rail-n { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* 「N 条在写」。写申请时翻不到那几条，而他写完忘了点标不会收到任何提示——
+   这个数字就是那个提示，所以它得在左栏一眼看得见的位置。 */
+.rail-d { font-size: 10.5px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
 .lib-pane .kind { margin-top: 0; }
+
+/* 「加一条」：在这之前档案页压根没有这个动作。 */
+.kind-add { font: inherit; font-size: 11.5px; margin-left: 10px; padding: 2px 9px; border-radius: 6px;
+  border: 1px dashed var(--line-2); background: transparent; color: var(--ink-3); cursor: pointer;
+  transition: color .14s, border-color .14s; }
+.kind-add:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); border-style: solid; }
+
+/* 「在写 / 写完了」那个标。挨着盒子那个 chip。 */
+.draftchip { font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--line-2); background: transparent; color: var(--ink-3); transition: all .14s; }
+.draftchip:hover { border-color: var(--ink-3); color: var(--ink-2); }
+.draftchip.on { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+/* ── 档案里那张书桌（0127）────────────────────────────────────
+   它写的每个字都是稿子，进不了档案 —— 所以这一栏比机会线那边干净得多：
+   没有信卡、没有表卡、没有状态卡，因为它没有那些能力。 */
+.studio { position: sticky; top: 0; display: flex; flex-direction: column;
+  max-height: calc(100vh - 120px); border: 1px solid var(--line-2); border-radius: 14px;
+  background: var(--paper-2); overflow: hidden; }
+.studio-hd { padding: 13px 16px 11px; border-bottom: 1px solid var(--line); }
+.studio-hd b { font-size: 13px; font-weight: 600; color: var(--ink); }
+/* 它眼前摆着什么，说出来 —— 不说的话「它到底知不知道我在看哪条」只能靠猜。 */
+.studio-sub { display: block; margin-top: 4px; font-size: 11.5px; color: var(--ink-3); line-height: 1.55; }
+.studio-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+.studio-thread .thread { display: flex; flex-direction: column; gap: 16px; }
+.studio-thread .empty-thread { padding: 14px; font-size: 12.5px; }
+.studio-err { margin: 0 16px 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
+.studio-composer { display: flex; align-items: flex-end; gap: 9px; padding: 11px 12px;
+  border-top: 1px solid var(--line); background: var(--paper); }
+.studio-composer textarea { flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 1.6;
+  resize: none; max-height: 160px; border: 1px solid var(--line-2); border-radius: 12px;
+  padding: 8px 11px; background: var(--paper-2); color: var(--ink); }
+.studio-composer textarea:focus { outline: none; border-color: var(--accent); }
+.studio-composer button { font: inherit; font-size: 12.5px; padding: 8px 15px; border-radius: 10px;
+  border: none; cursor: pointer; background: var(--ink); color: var(--paper); }
+.studio-composer button:disabled { opacity: .35; cursor: default; }
+.studio-composer button.stop { background: var(--ink-3); }
 
 /* 窄屏退回单栏：格名变成顶上一条横着滚的 chip 行。
    -webkit-overflow-scrolling 之外不做别的——这条 rail 短，不值得再加箭头。 */
+/* 中屏：书桌先收起来 —— 三栏挤到 300px 以下的中栏，改描述这件事就没法做了。
+   收起来不是砍掉：宽一点它就回来，对话一条都没丢。 */
+@media (max-width: 1200px) {
+  .lib-three { grid-template-columns: 200px minmax(0, 1fr); }
+  .studio { display: none; }
+}
+
 @media (max-width: 860px) {
-  .page-inner.wide { max-width: 720px; }
-  .lib-two { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .page-inner.wide, .page-inner.widest { max-width: 720px; }
+  .lib-two, .lib-three { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .lib-rail { position: static; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
   .rail-b { width: auto; flex: none; border-color: var(--line); }
   .rail-l { flex: none; white-space: nowrap; }

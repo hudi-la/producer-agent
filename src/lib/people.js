@@ -141,7 +141,15 @@ const post = async (path, body) => {
  *
  * 它**只提议不写库**。认错人比不认更麻烦，所以最后那下点头永远是你的。
  */
-export const identifyEmail = (email) => post('/identify', { email })
+/**
+ * 这个地址背后是谁。脑子去读信，信里没有的机构和头衔上网查。
+ *
+ * hint / name 是被引荐、被抄送的人才有的东西：来路那句话（谁在哪封信里
+ * 带他进来的）和信头上的署名。**它们是确凿的**，递过去当线索，
+ * 也省得它把名字重猜一遍。
+ */
+export const identifyEmail = (email, { hint = null, name = null } = {}) =>
+  post('/identify', { email, hint, name })
 
 /** 认领共享信箱后立刻搬它名下的信 —— 不等每小时的兜底。 */
 export const carryMailbox = (email) => post('/mailbox/carry', { email })

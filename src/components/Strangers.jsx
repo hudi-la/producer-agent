@@ -24,6 +24,16 @@ const md = (s) => {
   return `${Number(m)}/${Number(d)}`
 }
 
+/**
+ * 只留真有值的那些键。
+ *
+ * 认人的结果里「没查到」是 null，而手上的 prefill 里署名是确凿的。
+ * 直接 {...pre, ...got} 会让一个 null 把信头上的名字抹掉 —— 那是拿
+ * 「不知道」覆盖「知道」。
+ */
+const filled = (o) => Object.fromEntries(
+  Object.entries(o || {}).filter(([, v]) => v !== null && v !== undefined && v !== ''))
+
 /** Fairwind 认出来的那张草稿名片。你改得动，也可以整个否掉。 */
 function Proposal({ who, email, contacts, onDone, onCancel }) {
   const [busy, setBusy] = useState(false)
@@ -140,6 +150,9 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         </div>
       )}
 
+      {/* 机构和头衔是哪儿来的。**不是要他去核对** —— 是这两格不再是他敲的，
+          那就得说得出出处，跟卡上「它提的 / 认了」同一条规矩。 */}
+      {who.found_by && how !== 'merge' && <p className="pf-note">机构和头衔：<Veil>{who.found_by}</Veil></p>}
       {who.site && <p className="pf-note">个人站 <Veil>{who.site}</Veil></p>}
       {who.intro_by && <p className="pf-note">谁介绍的：<Veil>{who.intro_by}</Veil></p>}
       {f.notes && how !== 'org' && (
@@ -172,12 +185,33 @@ function One({ email, meta, contacts, onDone, onCancel }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
+  const pre = meta?.prefill || null
+
+  // 去认一次。
+  //
+  // 被引荐、被抄送的人（0121/0125）以前不走这儿 —— 当时的理由是「它自己一封
+  // 没发过，没信可读」，于是直接摆一张**机构和头衔全空**的表单。结果那两格
+  // 就落到他头上：2026-09-11「你这个机构和职位都非得要我填吗？你自己去网上
+  // 查一查不行吗？」他说得对。这个文件开头写着「这些信里全都有，凭什么让你敲」，
+  // 空着两格递过去，是同一个错的第三版。
+  //
+  // 现在同一条路：带他进来的那封信在 `to:他` 里搜得到（引荐信的正文往往
+  // 就是他是谁的最好说明），信里没有的机构和头衔，那边会上网查。
+  // 署名和来路这边是确凿的，一并递过去当线索，认完再拿它兜底 —— 查不到
+  // 也至少不比以前少。
   const ask = async () => {
     if (busy) return
     setBusy(true); setErr(null)
-    try { setWho(await identifyEmail(email)) }
-    catch (e) { setErr(e.message) }
-    finally { setBusy(false) }
+    try {
+      const got = await identifyEmail(email, { hint: meta?.why || null, name: pre?.name || meta?.信头署名 || null })
+      // 空值不许覆盖已有的：它查不到机构，不等于要把信头上的署名也抹掉。
+      setWho({ ...(pre || {}), ...filled(got) })
+    } catch (e) {
+      // 认不成也别把他卡在这儿：手上本来就有署名和来路，摆出来让他点头，
+      // 跟改之前一样 —— 只是多试了一次。
+      if (pre) { setWho(pre); setErr(e.message + '（网上没查着，先按信头上的来）') }
+      else setErr(e.message)
+    } finally { setBusy(false) }
   }
 
   return (
@@ -192,14 +226,12 @@ function One({ email, meta, contacts, onDone, onCancel }) {
             他发来 {meta.他发来的} · 你发去 {meta.你发去的} · {md(meta.第一次)}–{md(meta.最近一次)}
           </span>
         </>}
-        {/* 被抄送的（0121）：它自己一封没发过，没信可读；理由已经在手上，直接摆名片 */}
-        {meta?.prefill && !who && <button className="nopen" onClick={() => setWho(meta.prefill)}>
-          {meta.prefill.kind === 'shared_box' ? '登记成共享信箱' : '加进通讯录'}
-        </button>}
         {/* 这是整块唯一的操作口，得长得像个按钮 —— 文字链他真的没认出来
-            （2026-08-20：「没有可以操作的地方啊」）。 */}
-        {!who && !meta?.prefill && <button className="nopen" onClick={ask} disabled={busy}>
-          {busy ? '读信中…' : '这是谁？'}
+            （2026-08-20：「没有可以操作的地方啊」）。
+            被引荐、被抄送的人也走这儿：他们的机构和头衔要上网查，
+            不能空着两格递给他自己敲（2026-09-11）。 */}
+        {!who && <button className="nopen" onClick={ask} disabled={busy}>
+          {busy ? (pre ? '读信、上网查…' : '读信中…') : '这是谁？'}
         </button>}
       </div>
 

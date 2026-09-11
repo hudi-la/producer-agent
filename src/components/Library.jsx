@@ -4,6 +4,8 @@ import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
+import { focusOf, addEntry, setEntryDraft } from '../lib/studio.js'
+import StudioChat from './StudioChat.jsx'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
@@ -46,14 +48,26 @@ function EntryFields({ e, ro, save }) {
   )
 }
 
-function Entry({ e, onSaved }) {
-  const [open, setOpen] = useState(false)
+// 展开状态住在 Library 里，不住在这儿。
+//
+// 原来是每条自己一个 useState，于是「他现在展开着哪几条」没有任何地方知道
+// —— 而那正是右边那张桌子要报给脑子的东西（focusOf）。提上去之后行为一个字
+// 没变：还是点空白展开、点 › 展开，还是可以同时开好几条。
+function Entry({ e, open, onToggle, onSaved }) {
   const entries = boxEntries(e.box)
   const facts = subInfo(e)
   const imgs = e.images || []
   const ro = !canEdit(e)
   const save = async (patch) => { await saveEntry({ id: e.id, ...patch }); await onSaved?.() }
-  const toggle = () => setOpen((o) => !o)
+  const toggle = () => onToggle(e.id)
+  // 「在写」：外面写申请时翻不到这条，档案页和书桌上照常看得见。
+  // 点一下就切——这是他自己的判断，不该有第二道确认。
+  const flipDraft = async (ev) => {
+    ev.stopPropagation()
+    if (ro) return
+    await setEntryDraft(e.id, !e.draft)
+    await onSaved?.()
+  }
 
   return (
     <div className="work">
@@ -71,6 +85,12 @@ function Entry({ e, onSaved }) {
             <span className={'boxchip' + (entries.length ? ' filled' : '')}>
               {entries.length ? `盒子 · 已补 ${entries.length} 条` : '盒子 · 空'}
             </span>
+            {!ro && (
+              <button className={'draftchip' + (e.draft ? ' on' : '')} onClick={flipDraft}
+                      title={e.draft ? '点一下算写完 —— 写申请时它才翻得到' : '点一下标成在写 —— 写申请时翻不到'}>
+                {e.draft ? '在写' : '写完了'}
+              </button>
+            )}
             {facts.map((f, i) => <span className="w-medium" key={i}>{f}</span>)}
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
           </div>
@@ -117,21 +137,31 @@ function subGroups(items, sub, concerns) {
   return groups
 }
 
-function KindSection({ label, items, sub, concerns, onSaved }) {
+function KindSection({ label, items, sub, concerns, onSaved, openIds, onToggle, onAdd }) {
   // 只有一个子组时不写子标题——「策展」那一格底下再顶一行「策展项目」是重复的。
   const groups = sub ? subGroups(items, sub, concerns) : null
+  const one = (e) => (
+    <Entry e={e} key={e.id || e.title + e.sort}
+           open={openIds.has(e.id)} onToggle={onToggle} onSaved={onSaved} />
+  )
   return (
     <section className="kind">
-      <div className="kind-h">{label} · {items.length}</div>
+      <div className="kind-h">
+        {label} · {items.length}
+        {/* 在这之前档案页**没有任何一个「加一条」的入口**：pa_set_entry 只能改
+            已有的那条，Library 里那行「+ 补一条」是一段死文字。想往「工作坊」
+            那栏放一份新 proposal，只有开 SQL 一条路。 */}
+        {onAdd && <button className="kind-add" onClick={onAdd}>+ 加一条</button>}
+      </div>
       {groups ? (
         groups.map(([subLabel, g]) => (
           <div className="concern" key={subLabel}>
             {groups.length > 1 && <div className="cn-h">{subLabel}</div>}
-            <div className="works">{g.map((e) => <Entry e={e} onSaved={onSaved} key={e.id || e.title + e.sort} />)}</div>
+            <div className="works">{g.map(one)}</div>
           </div>
         ))
       ) : (
-        <div className="works">{items.map((e) => <Entry e={e} onSaved={onSaved} key={e.id || e.title + e.sort} />)}</div>
+        <div className="works">{items.map(one)}</div>
       )}
     </section>
   )
@@ -159,21 +189,21 @@ function buildSections(entries) {
     seen.add(k.key)
     if (!items?.length) continue
     if (k.key !== 'credit') {
-      secs.push({ key: k.key, label: k.label, items, sub: k.sub })
+      secs.push({ key: k.key, label: k.label, kind: k.key, items, sub: k.sub })
       continue
     }
     const placed = new Set()
     for (const g of CREDIT_GROUPS) {
       const items_ = items.filter((e) => g.types.includes(e.meta?.type))
       items_.forEach((e) => placed.add(e))
-      if (items_.length) secs.push({ key: `credit:${g.key}`, label: g.label, items: items_, sub: 'credit' })
+      if (items_.length) secs.push({ key: `credit:${g.key}`, label: g.label, kind: 'credit', items: items_, sub: 'credit' })
     }
     const rest = items.filter((e) => !placed.has(e))
-    if (rest.length) secs.push({ key: 'credit:rest', label: '其他战绩', items: rest, sub: 'credit' })
+    if (rest.length) secs.push({ key: 'credit:rest', label: '其他战绩', kind: 'credit', items: rest, sub: 'credit' })
   }
 
   for (const [kind, items] of byKind) {
-    if (!seen.has(kind)) secs.push({ key: kind, label: kind, items })
+    if (!seen.has(kind)) secs.push({ key: kind, label: kind, kind, items })
   }
   return secs
 }
@@ -185,32 +215,62 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
   // 选中的格可能因为库变了而消失（比如某类被清空）——退回「关于你」，别渲染空白。
   const cur = sections.find((s) => s.key === pick) || sections[0]
 
+  // 展开着哪几条。提到这一层，是因为右边那张桌子要靠它知道「他在说哪一件」
+  // ——焦点不新造动作，就是他本来就在做的「点开一条」。
+  const [openIds, setOpenIds] = useState(new Set())
+  const toggle = (id) => setOpenIds((cur_) => {
+    const next = new Set(cur_)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const focus = focusOf(cur, openIds)
+
+  // 加一条。新那条库里标着「在写」，建完自动展开，标题就地改。
+  // 「关于你」那一格没有这个按钮 —— 它是 profile，不是条目。
+  const add = cur.kind ? async () => {
+    const id = await addEntry(cur.kind, null)
+    setOpenIds((cur_) => new Set(cur_).add(id))
+    await onEntrySaved?.()
+  } : null
+
+  // 左栏那一格上「N 条在写」。这一条不能省：在写的东西 Fairwind 写申请时
+  // 翻不到，而你写完忘了点标的话，收不到任何提示。这个数字就是那个提示。
+  const draftsIn = (s) => (s.items || []).filter((e) => e.draft).length
+
   return (
     <div className="page">
-      <div className="page-inner wide">
+      <div className="page-inner widest">
         <header className="page-head">
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
-        <div className="lib-two">
+        <div className="lib-three">
           <nav className="lib-rail" aria-label="档案分类">
-            {sections.map((s) => (
-              <button
-                key={s.key}
-                className={'rail-b' + (s.key === cur.key ? ' on' : '')}
-                onClick={() => setPick(s.key)}
-                aria-current={s.key === cur.key ? 'true' : undefined}
-              >
-                <span className="rail-l">{s.label}</span>
-                {s.items && <span className="rail-n">{s.items.length}</span>}
-              </button>
-            ))}
+            {sections.map((s) => {
+              const d = draftsIn(s)
+              return (
+                <button
+                  key={s.key}
+                  className={'rail-b' + (s.key === cur.key ? ' on' : '')}
+                  onClick={() => setPick(s.key)}
+                  aria-current={s.key === cur.key ? 'true' : undefined}
+                >
+                  <span className="rail-l">{s.label}</span>
+                  {d > 0 && <span className="rail-d" title="写申请时翻不到这几条">{d} 在写</span>}
+                  {s.items && <span className="rail-n">{s.items.length}</span>}
+                </button>
+              )
+            })}
           </nav>
           <div className="lib-pane">
             {cur.about
               ? <Identity onSaved={onProfileSaved} />
-              : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns} onSaved={onEntrySaved} />}
+              : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns}
+                             onSaved={onEntrySaved} openIds={openIds} onToggle={toggle} onAdd={add} />}
           </div>
+          {/* 一栏一张书桌。换栏就是换一条对话，各记各的。 */}
+          <StudioChat section={cur.key} focus={focus} />
         </div>
       </div>
     </div>
