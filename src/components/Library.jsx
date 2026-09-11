@@ -85,11 +85,11 @@ function Entry({ e, open, onToggle, onSaved }) {
             <span className={'boxchip' + (entries.length ? ' filled' : '')}>
               {entries.length ? `盒子 · 已补 ${entries.length} 条` : '盒子 · 空'}
             </span>
-            {!ro && (
-              <button className={'draftchip' + (e.draft ? ' on' : '')} onClick={flipDraft}
-                      title={e.draft ? '点一下算写完 —— 写申请时它才翻得到' : '点一下标成在写 —— 写申请时翻不到'}>
-                {e.draft ? '在写' : '写完了'}
-              </button>
+            {/* 只有「在写」才挂标。写完的是常态，61 条各顶一个「写完了」全是噪音。
+                要把一条标成在写，在展开后那块里切（见下面 EntryFields 上面那一行）。 */}
+            {e.draft && (
+              <button className="draftchip on" onClick={flipDraft} disabled={ro}
+                      title="写申请时翻不到这条。点一下算写完">在写</button>
             )}
             {facts.map((f, i) => <span className="w-medium" key={i}>{f}</span>)}
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
@@ -103,6 +103,15 @@ function Entry({ e, open, onToggle, onSaved }) {
         <div className="box">
           {imgs.length > 1 && (
             <div className="w-imgs">{imgs.map((src, i) => <img src={src} alt="" key={i} loading="lazy" />)}</div>
+          )}
+          {!ro && (
+            <div className="draftrow">
+              <span>{e.draft ? '这条还在写' : '这条写完了'}</span>
+              <button className="draftflip" onClick={flipDraft}>
+                {e.draft ? '标成写完了' : '标成还在写'}
+              </button>
+              <i>{e.draft ? '写申请时它翻不到这条' : '写申请时它会拿这条当战绩用'}</i>
+            </div>
           )}
           <EntryFields e={e} ro={ro} save={save} />
           <div className="bx-h">盒子 · 网站装不下的</div>

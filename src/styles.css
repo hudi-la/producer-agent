@@ -491,18 +491,28 @@ body.resizing .drawer-grip::before { opacity: .75; }
   transition: color .14s, border-color .14s; }
 .kind-add:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); border-style: solid; }
 
-/* 「在写 / 写完了」那个标。挨着盒子那个 chip。 */
+/* 「在写」那个标。只有在写的才挂 —— 写完的是常态，常态不占一个 chip。 */
 .draftchip { font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 5px; cursor: pointer;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent); background: var(--accent-soft); font-weight: 600; transition: all .14s; }
+.draftchip:disabled { cursor: default; opacity: .7; }
+
+/* 展开后那块顶上的开关。写完的条目要标成在写，只有这一个入口 —— 那是个
+   少见又慎重的动作，不该在折叠行上天天杵着。 */
+.draftrow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.draftrow i { font-style: normal; color: var(--ink-3); font-size: 11.5px; }
+.draftflip { font: inherit; font-size: 11.5px; padding: 2px 9px; border-radius: 6px; cursor: pointer;
   border: 1px solid var(--line-2); background: transparent; color: var(--ink-3); transition: all .14s; }
-.draftchip:hover { border-color: var(--ink-3); color: var(--ink-2); }
-.draftchip.on { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.draftflip:hover { color: var(--ink); border-color: var(--ink-3); }
 
 /* ── 档案里那张书桌（0127）────────────────────────────────────
    它写的每个字都是稿子，进不了档案 —— 所以这一栏比机会线那边干净得多：
    没有信卡、没有表卡、没有状态卡，因为它没有那些能力。 */
 .studio { position: sticky; top: 0; display: flex; flex-direction: column;
-  max-height: calc(100vh - 120px); border: 1px solid var(--line-2); border-radius: 14px;
+  /* 减掉的是顶栏 + 页头那一块。输入框必须一进页面就看得见 —— 它是这一栏
+     唯一的入口，藏在折叠线以下等于没有。 */
+  height: calc(100vh - 300px); min-height: 380px; border: 1px solid var(--line-2); border-radius: 14px;
   background: var(--paper-2); overflow: hidden; }
 .studio-hd { padding: 13px 16px 11px; border-bottom: 1px solid var(--line); }
 .studio-hd b { font-size: 13px; font-weight: 600; color: var(--ink); }
