@@ -3,9 +3,14 @@
 // 前端 POST /chat → ①你的话先落库 ②读这条线的全部往来拼成上下文
 // ③交给 Agent SDK 去想（可以联网搜/读网页）④回复写回同一张表。
 //
-// 护栏：这个进程是唯一能写库的地方，且只写 pursuit_messages。
-// Fairwind 本人只拿到 WebSearch / WebFetch —— 它碰不到数据库，改不了 stage、改不了盒子。
-// 这是结构上的限制，不是嘱咐它别做。
+// 护栏：这个进程是唯一能写库的地方，且只写那两张往来表（pursuit_messages /
+// studio_messages）。Fairwind 本人只拿到 WebSearch / WebFetch，外加两台按当次
+// 对话现造的读取工具（open_file 开这条线的文件、open_work_image 看作品的图，
+// 能碰哪几份写死在闭包里）—— 它碰不到数据库，改不了 stage、改不了盒子、
+// 改不了他档案里任何一个字。这是结构上的限制，不是嘱咐它别做。
+//
+// 三种主人（ownerOf）：机会线、人、档案里的一张书桌。前两种干外联的活，
+// 第三种陪他把自己的东西写准，不写信、不填表、不动状态机。
 
 import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
@@ -19,6 +24,9 @@ import {
   artistOf, idOf, mailboxOf, systemFor,
   buildSystem, buildUser, buildBriefSystem, buildBriefUser,
 } from './prompt.js'
+// 档案里那张书桌（0127）：同一个 Fairwind，换一张桌子。那边的活是外联，
+// 这边的活是陪他把自己的东西写准——而且它**写不了库**，见 studio.js 开头。
+import { buildStudioSystem, buildStudioUser } from './studio.js'
 // 从一次「想」里挑出给人看的那一段：动工具之前说的都是工作稿。
 import { foldReply } from './reply.js'
 // 它写完一封信会在末尾报一声。摘出来存进 meta，正文里不留那行机器读的字。
@@ -56,7 +64,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-09-11b'
+export const BRAIN_BUILD = '2026-09-11c'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -102,6 +110,10 @@ async function loadContext(pursuitId) {
 function ownerOf(body) {
   if (body?.contact_id) return { kind: 'contact', id: body.contact_id }
   if (body?.pursuit_id) return { kind: 'pursuit', id: body.pursuit_id }
+  // 第三种主人：档案里的一张书桌（0127）。id 是「哪一栏」的 key，不是 uuid。
+  // 它跟前两种的差别不只是主人不同——那张桌子上不写信、不填表、不动状态机，
+  // 见 handleChat 里 isStudio 那一岔。
+  if (body?.section) return { kind: 'studio', id: body.section }
   return null
 }
 const asOwner = (x) => (x && typeof x === 'object' && x.kind ? x : { kind: 'pursuit', id: x })
@@ -125,8 +137,31 @@ async function loadPersonContext(contactId) {
   }
 }
 
-async function loadOwnerContext(owner) {
+// 书桌的上下文。比那两支小得多：没有机会线、没有产出、没有邮件线索、没有附件。
+//
+// entries 这边**不滤 draft**（跟外联那两支相反）：他正是在书桌上写那几条的，
+// 藏起来他那份 proposal 就从陪他写的人眼前消失了。哪几条没写完，
+// 由条目自己的 draft 字段说，studio.js 那边标出来。
+//
+// focus 不是库里的东西，是界面告诉我们的「他现在开着哪一栏、展开着哪几条」，
+// 所以从参数进来、原样挂上。
+async function loadStudioContext(section, focus) {
+  const { data, error } = await db.rpc('pa_studio_context', { p_section: section })
+  if (error) throw new Error('读上下文失败：' + error.message)
+  return {
+    kind: 'studio',
+    p: { title: focus?.label || section },   // 日志和错误话术里说得出是哪一栏
+    msgs: data.messages || [],
+    entries: data.entries || [],
+    profile: data.profile || null,
+    focus: focus || null,
+    raw: data,
+  }
+}
+
+async function loadOwnerContext(owner, focus = null) {
   const o = asOwner(owner)
+  if (o.kind === 'studio') return loadStudioContext(o.id, focus)
   return o.kind === 'contact'
     ? loadPersonContext(o.id)
     : { ...(await loadContext(o.id)), kind: 'pursuit' }
@@ -135,9 +170,11 @@ async function loadOwnerContext(owner) {
 async function addMessage(owner, role, content, kind = 'message', meta = null) {
   const o = asOwner(owner)
   const { data, error } = await db.rpc(
-    o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_message',
+    o.kind === 'studio' ? 'pa_add_studio_message'
+      : o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_message',
     {
-      ...(o.kind === 'contact' ? { p_contact_id: o.id } : { p_pursuit_id: o.id }),
+      ...(o.kind === 'studio' ? { p_section: o.id }
+        : o.kind === 'contact' ? { p_contact_id: o.id } : { p_pursuit_id: o.id }),
       p_role: role, p_content: content, p_kind: kind,
       // 不传就完全不带这个键，走函数默认值（0031）——现有那几处 4 参调用一处都不用改。
       ...(meta ? { p_meta: meta } : {}),
@@ -301,6 +338,83 @@ function filesServer(atts) {
   })
 }
 
+// ── 书桌上：看一眼作品长什么样 ──────────────────────────────────
+//
+// 在这之前，**Fairwind 从没见过他任何一件作品长什么样**。images 那一列
+// 0007 就有了，但上下文一直没取——于是让一个没看过画的人去改画的描述。
+// 0127 把 images 补进了上下文，这台工具让它真的看得见。
+//
+// 跟 filesServer 是同一套：护栏**长在闭包里，不在提示词里**。工具是按这一次
+// 对话现造的，能开的图写死成传进来的这些条目的 images；别的栏、别人的东西，
+// 不是「不许它碰」，是够不到。
+//
+// 跟文件那边有一处不一样：images 是**外站 URL**（0007 那行注释：referenced,
+// not hosted），所以这儿自己 fetch 回字节，而不是从 storage 下载。
+const WORK_IMG_TOOL = 'mcp__studio_works__open_work_image'
+
+function worksServer(entries) {
+  const withImg = entries.filter((e) => e.images?.length)
+  const find = (name) => {
+    const n = (name || '').trim().toLowerCase()
+    return withImg.find((e) => (e.title || '').toLowerCase() === n)
+      || withImg.find((e) => (e.title || '').toLowerCase().includes(n))
+  }
+  // 图的额度跟着这一次对话活。造在这儿而不是模块顶上——放顶上会跨对话累加，
+  // 聊到第四栏就再也开不了图了。
+  const budget = imageBudget()
+  return createSdkMcpServer({
+    name: 'studio_works',
+    tools: [
+      tool(
+        'open_work_image',
+        `看一眼某件作品长什么样。要判断画面里的东西（这件作品是什么形态、那个装置多大、颜色什么调子）才开——光是"这条有图"不是理由。
+
+一段文字开完就沉进历史，**一张图进来就一直占着上下文、后面每一轮都重付一次**。一条对话最多 ${IMG_CAP} 张。`,
+        {
+          title: z.string().describe('作品标题（写个能认出来的片段也行）'),
+          index: z.number().optional().describe('第几张，从 1 数。不传就是第一张'),
+        },
+        async ({ title, index }) => {
+          const e = find(title)
+          if (!e) {
+            const list = withImg.map((x) => `《${x.title}》`).join('、') || '（这一栏没有带图的条目）'
+            return { content: [{ type: 'text', text: `没有叫「${title}」的带图条目。这一栏有图的是：${list}` }] }
+          }
+          const nth = index || 1
+          const url = e.images[nth - 1]
+          if (!url) {
+            return { content: [{ type: 'text', text: `《${e.title}》一共 ${e.images.length} 张图，没有第 ${nth} 张。` }] }
+          }
+          const pass = budget.admit(`${e.title}#${nth}`)
+          if (!pass.ok) {
+            console.log(`  ↳ 它想再开一张《${e.title}》，挡了：${pass.why}`)
+            return { content: [{ type: 'text', text: pass.why }] }
+          }
+          try {
+            const r = await fetch(url)
+            if (!r.ok) throw new Error(`取不回来（HTTP ${r.status}）`)
+            const buf = Buffer.from(await r.arrayBuffer())
+            const got = await read(buf, url.split('?')[0].split('/').pop() || 'image',
+                                  r.headers.get('content-type'))
+            if (got.kind !== 'image') throw new Error('这个地址取回来的不是一张看得了的图')
+            console.log(`  ↳ 它看了《${e.title}》第 ${nth} 张（进上下文了）`)
+            return {
+              content: [
+                { type: 'text', text: `# ${e.title}（第 ${nth} 张，共 ${e.images.length} 张）` },
+                { type: 'image', data: got.data, mimeType: got.mimeType },
+              ],
+            }
+          } catch (err) {
+            // 取不回来就明说取不回来。返回半通不通的东西更糟——那会被当成
+            // 「我看过这张图了」，然后基于没看见的东西去改一段描述。
+            return { content: [{ type: 'text', text: `《${e.title}》第 ${nth} 张打不开：${err.message}` }] }
+          }
+        },
+      ),
+    ],
+  })
+}
+
 /**
  * 让它想。
  *
@@ -442,9 +556,12 @@ async function think(prompt, tools = READ_TOOLS, system = null, abortController 
 // ── HTTP ────────────────────────────────────────────────────
 
 async function handleChat(body, onEvent = null) {
-  const { text, meta, run_id } = body
+  const { text, meta, run_id, focus } = body
   const owner = ownerOf(body)
-  if (!owner || !text?.trim()) throw new Error('要有 pursuit_id 或 contact_id，外加 text')
+  if (!owner || !text?.trim()) throw new Error('要有 pursuit_id / contact_id / section，外加 text')
+  // 档案里那张书桌（0127）。从「拼 prompt」起跟外联那两条路分家：
+  // 前半截（你的话先落库、报 mine、起 AbortController）完全一样。
+  const isStudio = owner.kind === 'studio'
 
   // 先落库：哪怕后面想崩了，你说的话也不会丢。
   // meta 只贴在**你这条**上——它记的是「你这句是怎么发出来的」（群发/单发），
@@ -457,15 +574,23 @@ async function handleChat(body, onEvent = null) {
   // 这儿判一次，同一次回复里 Fairwind 又报 [[STATE]]。现在 DEBRIEF 跟别的状态一样，
   // 你说的话交给同一次回复判，见成了就报 met（笔的正文是你的原话）。
 
-  const ctx = await loadOwnerContext(owner)
-  // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件。
+  const ctx = await loadOwnerContext(owner, focus)
+  // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件，书桌也没有。
   const atts = ctx.raw?.attachments || []
-  console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库${atts.length ? ` / ${atts.length} 份文件` : ''}`)
+  // 书桌那边能开的是作品的图，不是这条线的文件。一张图都没有就不挂那台工具。
+  const imgEntries = isStudio ? ctx.entries.filter((e) => e.images?.length) : []
+  console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库` +
+              (atts.length ? ` / ${atts.length} 份文件` : '') +
+              (isStudio ? ` / ${imgEntries.length} 条带图` : ''))
 
-  // 有文件才给这台工具。没文件还挂着，等于告诉它「你可以去开文件」，
+  // 有东西可开才给这台工具。没有还挂着，等于告诉它「你可以去开」，
   // 然后它去开一个不存在的东西——白跑一轮，还得自己想明白为什么开不到。
-  const tools = atts.length ? [...READ_TOOLS, FILE_TOOL] : READ_TOOLS
-  const servers = atts.length ? { pursuit_files: filesServer(atts) } : null
+  const tools = isStudio
+    ? (imgEntries.length ? [...READ_TOOLS, WORK_IMG_TOOL] : READ_TOOLS)
+    : (atts.length ? [...READ_TOOLS, FILE_TOOL] : READ_TOOLS)
+  const servers = isStudio
+    ? (imgEntries.length ? { studio_works: worksServer(ctx.entries) } : null)
+    : (atts.length ? { pursuit_files: filesServer(atts) } : null)
 
   const ac = run_id ? new AbortController() : null
   if (ac) RUNS.set(run_id, ac)
@@ -473,7 +598,10 @@ async function handleChat(body, onEvent = null) {
   try {
     ;({ text: reply, usage, notes, recovered } = await think(
       // user message 只剩往来 + 你刚说的那句；档案、信息库、卡上字段都进了 systemPrompt。
-      buildUser(ctx, text.trim(), mine.id), tools, buildSystem(ctx), ac, servers, onEvent,
+      isStudio ? buildStudioUser(ctx, text.trim(), mine.id) : buildUser(ctx, text.trim(), mine.id),
+      tools,
+      isStudio ? buildStudioSystem(ctx) : buildSystem(ctx),
+      ac, servers, onEvent,
     ))
   } catch (err) {
     // 你按了终止：不写回复，也不算出错。你那条留着（是你说的话，不是它想的）。
@@ -488,6 +616,19 @@ async function handleChat(body, onEvent = null) {
   // 首字比总耗时要紧：边想边出字的意义全在第一个字来得早。
   const firstSay = usage.firstMs != null ? ` / 首字 ${(usage.firstMs / 1000).toFixed(1)}s` : ''
   console.log(`  ↳ Fairwind 想完了：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s${firstSay}`)
+
+  // 书桌这边到此为止：不写信、不填表、不动状态机，所以下面那一整套信封
+  // 一个都不剥。人格里也没教它那几行标记——**万一它学别处的样子吐了一行
+  // [[STATE]]，那行不该真的去动谁的卡**。不剥就不会有人照着它办事。
+  if (isStudio) {
+    const extra = {
+      ...(notes?.length ? { notes } : {}),
+      ...(recovered ? { recovered: true } : {}),
+    }
+    const theirs = await addMessage(owner, 'producer', reply, 'message',
+      Object.keys(extra).length ? extra : null)
+    return { mine, reply: theirs }
+  }
 
   // 信封摘出来存进 meta，**正文里不留那行机器读的字**——留着的话，你从
   // 气泡里复制走的时候会把它一起粘进 Gmail。界面据 meta.letter 画那张信卡。
@@ -843,11 +984,18 @@ async function handleIdentify(body) {
   const { data: prof } = await db.from('v_pa_profile').select('*').limit(1)
   const profile = prof?.[0] || null
 
+  // 来路那句话（0121/0125 端出来的行带着它）：「谁在什么时候的哪封信里带进来的」。
+  // 给它当线索——被抄送的人自己一封没发过，这句话常常是唯一的抓手。
+  const hint = String(body?.hint || '').trim()
+  const knownName = String(body?.name || '').trim()
+
   const { text } = await think(
     `查清 ${email} 这个地址背后是谁。
-
+${knownName ? `\n信头上的署名是 **${knownName}**。名字以这个为准，别改。\n` : ''}${hint ? `他是这么进来的：${hint}\n` : ''}
 先用 mcp__claude_ai_Gmail__search_threads 搜 \`from:${email} OR to:${email}\`，
 再用 get_thread 读最近那一两条（要正文——签名在正文里）。
+**被抄送、被引荐的人自己可能一封都没发过**，但带他进来的那封信在
+\`to:${email}\` 里搜得到 —— 引荐信的正文往往就是他是谁的最好说明。
 
 【已经在通讯录里的人】
 ${(known || []).map((k) => `- ${k.name}｜邮箱：${(k.emails || []).join(', ') || '（无）'}｜机构：${k.org || '（无）'}`).join('\n') || '（通讯录是空的）'}
@@ -867,9 +1015,22 @@ ${(known || []).flatMap((k) => k.mailboxes || []).join(', ') || '（还没有）
 留了新地址）。名字对得上、或者同一个机构同一件事在接着聊，就算命中。
 **名字像但机构和事情都对不上的，不算**——那多半是两个人。
 
-**三、如果是新人，从信里能认出什么？**
+**三、如果是新人，他是谁？**
 名字（签名）、机构、他管什么、个人网站、**谁介绍的**（主题行和正文第一句常有）。
-认不出的字段就留空，别编。
+
+**机构和头衔，信里没有就去网上查 —— 这一格绝不能丢给他自己填。**
+（2026-09-11 他的原话：「你这个机构和职位都非得要我填吗？你自己去网上查一查不行吗？」）
+被引荐的人尤其如此：引荐信只说「这是 David」，他是干什么的一个字没有。
+怎么查：
+· 域名先看 —— \`@usc.edu\` 就是 USC，\`@asu.edu\` 就是 ASU，先把大机构定下来。
+· 再用 WebSearch 搜「姓名 + 机构」「姓名 + 邮箱本地部分 + 学校」，
+  找到本人主页 / 院系名录 / 展览页，WebFetch 打开确认。
+· **要找到写着这个人名字的那一页才算数。** 同名的人很多：机构、城市、
+  研究方向、跟信里说的事对不对得上，四样至少对上两样，才认。
+· 查到了就写具体的那一级（「USC Pacific Asia Museum · 策展人」比「USC」有用）。
+
+认不出的字段留空，**但空之前必须真的搜过**。编一个听起来合理的头衔，
+比留空坏得多 —— 他会拿着它去写信。confidence 按最弱的一环给。
 
 **notes 里人称只有一条规矩：「他 / 她」永远指 ${email} 这个人，
 永远不指${artistOf(profile) ? ` ${artistOf(profile)}` : '收件人'}本人。**
@@ -881,10 +1042,14 @@ ${(known || []).flatMap((k) => k.mailboxes || []).join(', ') || '（还没有）
       ✗「她请他去做 workshop」——两个「他」，一个是对方一个是本人，读不出来
 
 **最后一行**单独输出，别的什么都不要加：
-[[WHO]] {"kind":"person|shared_box|unknown","name":"…","org":"…","role":"…","site":"…","intro_by":"…","notes":"中文，两三句说清这段关系是怎么回事、他最近说了什么、下一步该干嘛。**「他/她」只能指对方**","match_name":"命中通讯录里哪位，没有就 null","match_why":"…","threads":["thread id"],"confidence":"high|low"}
+[[WHO]] {"kind":"person|shared_box|unknown","name":"…","org":"…","role":"…","site":"…","intro_by":"…","notes":"中文，两三句说清这段关系是怎么回事、他最近说了什么、下一步该干嘛。**「他/她」只能指对方**","match_name":"命中通讯录里哪位，没有就 null","match_why":"…","threads":["thread id"],"found_by":"org/role 是哪儿来的：信里 / 网上（写出那一页是什么）/ 没查到","confidence":"high|low"}
 
 字段没有就用 null。**认不出来就 kind:"unknown"，别硬凑一个人出来。**`,
-    GMAIL_TOOLS,
+    // 联网这一格是 2026-09-11 加的。ask.js 那条批量判定线**依然不给联网**
+    // （那儿一次判几十个地址，联网会慢十倍，而且给它编故事的材料）；
+    // 这儿是他盯着一个人点了「查」才走一次，该查就得查 —— 引荐来的人
+    // 机构和头衔信里根本没有，不上网就只能让他自己敲。
+    [...GMAIL_TOOLS, ...READ_TOOLS],
     profile,
   )
 
@@ -1726,7 +1891,8 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const body = JSON.parse(raw || '{}')
-        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}`)
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}` +
+                    (body.section ? `（书桌 · ${body.section}）` : ''))
         console.log(`  ${String(body.text).slice(0, 50)}`)
         send(res, 200, await handleChat(body))
       } catch (err) {
@@ -1760,7 +1926,8 @@ const server = http.createServer(async (req, res) => {
       let body = {}
       try {
         body = JSON.parse(raw || '{}')
-        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}（流）`)
+        console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}` +
+                    (body.section ? `（书桌 · ${body.section}，流）` : '（流）'))
         console.log(`  ${String(body.text).slice(0, 50)}`)
       } catch (err) {
         frame({ t: 'error', error: '请求读不动：' + err.message })
