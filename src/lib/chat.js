@@ -71,16 +71,18 @@ export async function fetchContactMessages(contactId) {
  * 不传就完全不带这个键，走 RPC 的默认值 —— 单发的调用方一个字都不用改。
  */
 /**
- * 说话的对象：机会线还是人。
+ * 说话的对象：机会线、人，还是档案里那张书桌。
  *
- * 传字符串 = 机会线（老调用方一个字不用改）；传 {kind,id} 两种都行。
- * brain 那边 ownerOf 本来就两种都收（server.js 的 contact_id / pursuit_id），
- * 只是前端一直只会发前一种 —— 群发要发给人，缺的就是这一层。
+ * 传字符串 = 机会线（老调用方一个字不用改）；传 {kind,id} 三种都行。
+ * brain 那边 ownerOf 收的就是这三样（server.js 的 contact_id / pursuit_id / section）。
+ *
+ * 书桌那种的 id 是**栏的 key**（'work' / 'credit:exhibition'），不是 uuid。
  */
 export const ownerBody = (owner) =>
   typeof owner === 'string' ? { pursuit_id: owner }
     : owner?.kind === 'contact' ? { contact_id: owner.id }
-      : { pursuit_id: owner?.id }
+      : owner?.kind === 'studio' ? { section: owner.id }
+        : { pursuit_id: owner?.id }
 
 export async function sendMessage(owner, text, meta, runId) {
   let res
@@ -168,14 +170,21 @@ export async function streamChat(body, onEvent) {
  * 脑子是旧的（还没有 /chat/stream）就退回原来那条路 —— 一次改动不该让
  * 没重启 brain 的人连话都说不了，只是没有流而已。
  */
-export async function sendMessageStream(pursuitId, text, meta, runId, onEvent) {
+export async function sendMessageStream(owner, text, meta, runId, onEvent, focus) {
   try {
     return await streamChat(
-      { pursuit_id: pursuitId, text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) },
+      {
+        ...ownerBody(owner), text,
+        ...(meta ? { meta } : {}),
+        ...(runId ? { run_id: runId } : {}),
+        // 「他现在开着哪一栏、展开着哪几条」。只有书桌那条路带它；
+        // brain 那边不认得就当没有，不会出错。
+        ...(focus ? { focus } : {}),
+      },
       onEvent,
     )
   } catch (e) {
-    if (e instanceof NoStream) return sendMessage(pursuitId, text, meta, runId)
+    if (e instanceof NoStream) return sendMessage(owner, text, meta, runId)
     throw e
   }
 }
