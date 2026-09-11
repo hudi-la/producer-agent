@@ -62,10 +62,14 @@
 
 ## 三、库
 
-### 3.1 新表 `producer.desk_messages`
+### 3.1 新表 `producer.studio_messages`
+
+（稿子原来叫 `desk_messages`。改了：`desk` 这个词仓库里已经被「展开的卡片」
+那个工作区占着（[`App.jsx:47`](../../src/App.jsx#L47)、[`lib/desk.js`](../../src/lib/desk.js)），
+再用一次会撞。）
 
 ```sql
-create table producer.desk_messages (
+create table producer.studio_messages (
   id          uuid primary key default gen_random_uuid(),
   section     text not null,                       -- 左栏那一格的 key
   role        text not null,                       -- artist | producer | system
@@ -75,8 +79,8 @@ create table producer.desk_messages (
   created_at  timestamptz not null default now(),
   deleted_at  timestamptz                          -- 「重说」打标，绝不真删
 );
-create index desk_messages_sec_idx
-  on producer.desk_messages (section, created_at) where deleted_at is null;
+create index studio_messages_sec_idx
+  on producer.studio_messages (section, created_at) where deleted_at is null;
 ```
 
 `section` 取值跟 [`schema.js`](../../src/data/schema.js) 里 `buildSections()`
@@ -105,14 +109,14 @@ alter table producer.works add column draft boolean not null default false;
 
 | 名字 | 谁调 | 干什么 |
 |---|---|---|
-| `pa_desk_thread(p_section)` | 浏览器 anon | 读这一栏的对话（滤掉 `deleted_at`） |
-| `pa_rewind_desk(p_msg_id)` | 浏览器 anon | 「重说」：这条和它之后的全打 `deleted_at`，返回撤了几条 |
+| `pa_studio_thread(p_section)` | 浏览器 anon | 读这一栏的对话（滤掉 `deleted_at`） |
+| `pa_rewind_studio(p_msg_id)` | 浏览器 anon | 「重说」：这条和它之后的全打 `deleted_at`，返回撤了几条 |
 | `pa_set_entry_draft(p_id, p_draft)` | 浏览器 anon | 切「在写 / 写完」 |
 
-写库那支（`pa_add_desk_message`）只给 `service_role`，走 brain——跟
+写库那支（`pa_add_studio_message`）只给 `service_role`，走 brain——跟
 [0009](../../supabase/migrations/0009_brain_rpc.sql) 那套一样。
 
-`pa_rewind_desk` 照抄 [0066](../../supabase/migrations/0066_say_it_again.sql) 的写法。
+`pa_rewind_studio` 照抄 [0066](../../supabase/migrations/0066_say_it_again.sql) 的写法。
 
 ### 3.4 `pa_brain_context` 补两个字段
 
@@ -144,7 +148,7 @@ Fairwind 不该看见。其余字段建完在页面上就地改（`InlineText` /
 [`server.js`](../../brain/server.js#L102) 的 `ownerOf()` 现在认两种。加第三种：
 
 ```js
-if (body?.section) return { kind: 'desk', id: body.section }
+if (body?.section) return { kind: 'studio', id: body.section }
 ```
 
 `/chat` 和 `/chat/stream` 两条路都过这个口，所以前端沿用
@@ -152,7 +156,7 @@ if (body?.section) return { kind: 'desk', id: body.section }
 **边想边出字、终止、重说，一样都不用重做。**
 
 上下文不走 `pa_brain_context`（那支要 `p_pursuit_id`），单开一支
-`pa_desk_context()`：`{ entries, profile, messages }`——没有 pursuit、没有 attachments。
+`pa_studio_context()`：`{ entries, profile, messages }`——没有 pursuit、没有 attachments。
 
 ### 4.2 摆在眼前的
 
@@ -233,7 +237,7 @@ if (body?.section) return { kind: 'desk', id: body.section }
 `Library` 从两栏变三栏。[`styles.css:470`](../../src/styles.css#L470) 的
 `208px + 1fr` 变成 `208px + 1fr + 聊天`，`page-inner.wide` 从 1040px 放宽。
 
-聊天那栏是个新组件 `DeskChat`，props 只有 `section` 和 `focus`（展开着哪几条）。
+聊天那栏是个新组件 `StudioChat`，props 只有 `section` 和 `focus`（展开着哪几条）。
 消息的渲染、气泡、流式那个三点、「重说」——从
 [`PursuitFocus`](../../src/components/PursuitFocus.jsx#L157) 抽出来共用，
 不复制一份。**这是这次唯一的重构，而且是必要的**：复制一份的话，
@@ -281,11 +285,11 @@ if (body?.section) return { kind: 'desk', id: body.section }
 
 ## 八、施工顺序
 
-1. 迁移：`desk_messages` + `works.draft` + `v_pa_entries` 补列 + 五支 RPC
-   （`pa_desk_thread` / `pa_rewind_desk` / `pa_set_entry_draft` / `pa_add_entry` /
-   `pa_add_desk_message`）+ `pa_brain_context` 补 `id`/`images`
-2. brain：`ownerOf` 第三种 + `pa_desk_context` + 桌子那版人格 +
+1. 迁移：`studio_messages` + `works.draft` + `v_pa_entries` 补列 + 五支 RPC
+   （`pa_studio_thread` / `pa_rewind_studio` / `pa_set_entry_draft` / `pa_add_entry` /
+   `pa_add_studio_message`）+ `pa_brain_context` 补 `id`/`images`
+2. brain：`ownerOf` 第三种 + `pa_studio_context` + 桌子那版人格 +
    `open_work_image` + `entriesBlock` 滤 `draft`（**这条要测**）
-3. 前端：`chat.js` 收 `{section}` + 抽出共用的消息渲染 + `DeskChat` + 三栏
+3. 前端：`chat.js` 收 `{section}` + 抽出共用的消息渲染 + `StudioChat` + 三栏
 4. 「加一条」按钮 + `draft` 的 chip 和左栏计数
 5. 跑起来，截图
