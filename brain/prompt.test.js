@@ -404,6 +404,7 @@ test('有 state 时 perLine 带着提醒栏那句，在动态块里，不在静�
 test('拨提醒的规矩在静态块里，七种 move 都点了名', () => {
   const sys = systemFor(profile)
   assert.ok(sys.includes('[[STATE]]'))
+  assert.ok(sys.includes('[[MEMO]]'))
   for (const m of ['resolved', 'wait', 'reschedule', 'park', 'needs_reply', 'meeting', 'done'])
     assert.ok(sys.includes(`"${m}"`), m)
 })

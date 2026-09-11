@@ -50,6 +50,12 @@ export const logMeet = (contactId, text, pursuitId = null) =>
     p_pursuit_id: pursuitId,
   })
 
+/** 脑子没开时，输入框那句直接记成一笔（kind='note'，脑子醒了由盲格子判）。 */
+export const logNote = (contactId, text) =>
+  rpc('pa_add_contact_message', {
+    p_contact_id: contactId, p_role: 'note', p_kind: 'note', p_content: text,
+  })
+
 /** 微信 / 电话 / 线下聊完了，打个卡。系统看不见那些渠道，所以靠你这一下。 */
 export const checkin = (contactId) => rpc('pa_contact_checkin', { p_contact_id: contactId })
 

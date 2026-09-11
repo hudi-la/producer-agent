@@ -803,7 +803,7 @@ export default function App() {
           if (!queue.items.length) return <div className="desk-empty">没有展开的卡片。去看板或通讯录挑，抽屉头上按「展开」。</div>
           if (cur.name === 'home') return <div className="desk-empty">这一格对应的东西找不到了——库里没有它。关掉它就行。</div>
           if (cur.name === 'pursuit') return (
-            <PursuitFocus
+            <PursuitFocus brainUp={brain ? brain.up : true}
               // key：换一条线就换一个实例。不加的话 React 复用同一个，thinking / text /
               // 在飞的请求会跨卡片留着——你在 A 卡问完立刻点开 B 卡，B 卡会凭空转起点点，
               // 而 A 的回复回来时还会塞进你正看着的 B 卡里。
@@ -816,7 +816,7 @@ export default function App() {
               onBack={() => setArea('pursue')} onMove={moveCard} onSetBall={markBall} />
           )
           if (cur.name === 'person') return (
-            <PersonFocus key={cur.person.id} person={cur.person} variant="page"
+            <PersonFocus brainUp={brain ? brain.up : true} key={cur.person.id} person={cur.person} variant="page"
               onBack={() => setArea('people')} onChanged={reloadContacts}
               onOpenPursuit={(id) => openOnDesk('pursuit', id)} />
           )
@@ -917,13 +917,13 @@ export default function App() {
           {/* 左沿那条可以拉的边 —— 33vw 是个猜的数，屏幕不一样合适的宽度也不一样 */}
           <DrawerGrip />
           {view.name === 'pursuit' ? (
-            <PursuitFocus key={view.pursuit.id} variant="drawer" pursuit={openedPursuit}
+            <PursuitFocus brainUp={brain ? brain.up : true} key={view.pursuit.id} variant="drawer" pursuit={openedPursuit}
               messages={pl.messagesByPursuit[view.pursuit.id]}
               onOpenPerson={(c) => { setArea('people'); openPerson(c) }}
               onBack={closeDrawer} onMove={moveCard} onSetBall={markBall}
               onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('pursuit', view.pursuit.id, el, openedPursuit.title)} />
           ) : view.name === 'person' ? (
-            <PersonFocus key={view.person.id} variant="drawer" person={openedPerson}
+            <PersonFocus brainUp={brain ? brain.up : true} key={view.person.id} variant="drawer" person={openedPerson}
               onBack={closeDrawer} onChanged={reloadContacts}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
               onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('contact', view.person.id, el, veiled ? '联系人' : openedPerson.name)} />

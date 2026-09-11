@@ -19,6 +19,7 @@ import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
 import StateMoveCard from './StateMoveCard.jsx'
+import MemoCard from './MemoCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
 import DeskToggle from './DeskToggle.jsx'
@@ -164,7 +165,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   if (m.role === 'note') {
     return (
       <div id={'msg-' + m.id} className="notecard">
-        <span className="ntag">{m.kind === 'decision' ? '决定' : '备注'}</span>
+        <span className="ntag">{m.kind === 'decision' ? '决定' : m.kind === 'memo' ? '记忆' : m.kind === 'meet' ? '见面' : '备注'}</span>
         <div className="md"><Md>{m.content}</Md></div>
       </div>
     )
@@ -233,6 +234,9 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
       {m.meta?.state_move?.applied && (
         <StateMoveCard msgId={m.id} move={m.meta.state_move} />
       )}
+      {m.meta?.memo?.applied && (
+        <MemoCard msgId={m.id} memo={m.meta.memo} />
+      )}
     </div>
   )
 }
@@ -284,6 +288,8 @@ export default function PursuitFocus({
   onDesk = false, onToggleDesk,
   // 这张是怎么上桌的（queue.js 的 via）。只有 'update'（收信收出来的）要交代。
   via = null,
+  // 脑子开没开（App 每轮问 /health）。没开 = 输入框直接记笔，不聊天（0125）。
+  brainUp = true,
 }) {
   const inDrawer = variant === 'drawer'
   const [msgs, setMsgs] = useState(messages || [])
@@ -317,31 +323,6 @@ export default function PursuitFocus({
   // 两样都删了：写 next_action 的那个消化环节早就不在了，留着就是一行
   // 永远不会更新的字。要不要重做那套是另一场讨论。
   // 见 docs/specs/2026-08-12-four-signals-design.md
-  // 「记一笔」旁边那层说明：悬停一秒才出来，跟人卡那边同一套（见 PersonFocus）。
-  const [howto, setHowto] = useState(false)
-  const howtoT = useRef(0)
-  const howtoIn = () => {
-    clearTimeout(howtoT.current)
-    if (!howto) howtoT.current = setTimeout(() => setHowto(true), 1000)
-  }
-  const howtoOut = () => {
-    clearTimeout(howtoT.current)
-    howtoT.current = setTimeout(() => setHowto(false), 240)
-  }
-  useEffect(() => () => clearTimeout(howtoT.current), [])
-
-  // 把输入框里那句话记成一次真实来往。商量不算往来，笔算——它进时间线，
-  // 线立刻变「脏」（0079 现算），「这条线在等什么」也靠它才知道你在邮箱外办了事。
-  const jot = async () => {
-    const t = text.trim()
-    if (!t || busy) return
-    try {
-      await addPursuitNote(p.id, t)
-      setText('')
-      const rows = await fetchMessages(p.id)
-      if (rows) setMsgs(rows)
-    } catch (e) { setErr('没记上：' + (e?.message || e)) }
-  }
 
   const endRef = useRef(null)
   const scrollRef = useRef(null)    // 对话那一栏本体，用来判断你是不是贴着底在看
@@ -502,6 +483,21 @@ export default function PursuitFocus({
   async function send(said) {
     const t = (said ?? text).trim()
     if (!t || busy) return
+    // 脑子没开：这句直接记成一笔（不是聊天），走浏览器直连；脑子醒了由盲格子判。
+    // 「记一笔」按钮 2026-09-11 退场了 —— 脑子醒着时，说什么该记成什么由它判（0125）。
+    if (!brainUp) {
+      if (said == null) setText('')
+      setErr(null)
+      try {
+        await addPursuitNote(p.id, t)
+        const rows = await fetchMessages(p.id)
+        if (rows) setMsgs(rows)
+      } catch (e) {
+        setErr('没记上：' + (e?.message || e))
+        if (said == null) setText((cur) => cur || t)
+      }
+      return
+    }
     // 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底。
     stick.current = true
     if (said == null) setText('')
@@ -680,8 +676,8 @@ export default function PursuitFocus({
       </div>
 
       {err && <div className="composer-err">{err}</div>}
-      {/* 跟人卡同一套：输入框和「记一笔」是一组。.composer-dock 是定位锚 ——
-          jot-howto 的绝对定位落在它身上（styles.css 1280 行那段注释）。 */}
+      {/* 一个框两种落法（0125）：脑子醒着 = 聊天，Fairwind 顺便判该记成什么；
+          脑子没开 = 直接记成一笔。「记一笔」按钮退场了。 */}
       <div className="composer-dock">
       <div className="composer">
         {/* textarea 而不是 input：一行装不下就自己长高（上限在 CSS 的 max-height，
@@ -694,7 +690,9 @@ export default function PursuitFocus({
           rows={1}
           value={text}
           disabled={busy}
-          placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）' : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
+          placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
+            : !brainUp ? '脑子没开：这句会直接记成一笔，不是聊天'
+            : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
@@ -712,26 +710,6 @@ export default function PursuitFocus({
           <button className="send" aria-label="发送" onClick={() => send()} disabled={!text.trim()}>
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-        )}
-      </div>
-      <div className="jot-row"
-           onMouseEnter={howtoIn} onMouseLeave={howtoOut}
-           onFocusCapture={() => setHowto(true)}>
-        {/* 点完就把说明收掉：点击会让按钮拿到焦点，不收的话你刚记完
-            它反而弹出来解释「记一笔是什么」——你显然已经知道了。 */}
-        <button className="lnk jot-go"
-                onClick={() => { clearTimeout(howtoT.current); setHowto(false); jot() }}
-                disabled={busy || !text.trim()}>记一笔</button>
-        {howto && (
-          <div className="jot-howto" role="tooltip"
-               onMouseEnter={howtoIn} onMouseLeave={howtoOut}>
-            <p>回车 = 跟 <b>Fairwind</b> 商量（商量只是商量，不算往来）。</p>
-            <p>
-              电话里说定了、表单交出去了、线下见了面？写一句按 <b>记一笔</b>——
-              它跟邮件一样是一次真实来往，进时间线，Fairwind 会据此重判这条线。
-              「这条线在等什么」也靠它才知道你在邮箱外把事办了。
-            </p>
-          </div>
         )}
       </div>
       </div>

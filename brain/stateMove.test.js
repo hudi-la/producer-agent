@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extractStateMove, moveLine, stateBlock, stateLine, localToday, MOVES } from './stateMove.js'
+import { extractStateMove, extractMemo, peelEnvelopes, moveLine, memoLine, stateBlock, stateLine, localToday, MOVES, MEMO_RULE } from './stateMove.js'
 
 const today = '2026-09-04'
 const 信封 = (j) => `我看不用再催了。\n\n[[STATE]] ${JSON.stringify(j)}`
@@ -80,4 +80,34 @@ test('localToday 按时区', () => {
   assert.equal(localToday('Asia/Shanghai', at), '2026-09-05')
 })
 
-test('七种拨法是封闭的', () => assert.equal(MOVES.length, 7))
+test('八种拨法是封闭的', () => assert.equal(MOVES.length, 8))
+
+test('met：只要 why；小卡说「见成了」', () => {
+  const { move } = extractStateMove(信封({ move: 'met', why: '他说今天见了' }), { today })
+  assert.deepEqual(move, { move: 'met', why: '他说今天见了' })
+  assert.equal(moveLine(move), '见成了')
+})
+
+test('MEMO：to 只认 line|person，text 空的不算', () => {
+  assert.deepEqual(extractMemo('x\n[[MEMO]] {"to":"line","text":"资助只报销机票"}').memo, { to: 'line', text: '资助只报销机票' })
+  assert.equal(extractMemo('x\n[[MEMO]] {"to":"org","text":"y"}').memo, null)
+  assert.equal(extractMemo('x\n[[MEMO]] {"to":"person","text":"  "}').memo, null)
+  assert.equal(extractMemo('x\n[[MEMO]] {坏的').clean, 'x\n[[MEMO]] {坏的')
+})
+
+test('两个信封同出，顺序不定，都剥得下来，正文干净', () => {
+  const a = '见成了，那就等他上司的话。\n\n[[STATE]] {"move":"met","why":"他说见了"}\n[[MEMO]] {"to":"line","text":"报价 500"}'
+  const b = '见成了，那就等他上司的话。\n\n[[MEMO]] {"to":"line","text":"报价 500"}\n[[STATE]] {"move":"met","why":"他说见了"}'
+  for (const t of [a, b]) {
+    const r = peelEnvelopes(t, { today })
+    assert.equal(r.clean, '见成了，那就等他上司的话。', t)
+    assert.equal(r.move?.move, 'met'); assert.equal(r.memo?.text, '报价 500')
+  }
+  const only = peelEnvelopes('普通一句。', { today })
+  assert.equal(only.clean, '普通一句。'); assert.equal(only.move, null); assert.equal(only.memo, null)
+})
+
+test('memoLine 截到 80 字', () => {
+  assert.equal(memoLine({ text: 'a'.repeat(100) }).length, 80)
+  assert.ok(MEMO_RULE.includes('[[MEMO]]'))
+})

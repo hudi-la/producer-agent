@@ -25,11 +25,11 @@ import { foldReply } from './reply.js'
 import { extractLetter } from './letter.js'
 // 填完一张表也报一声。逐格的字数闸靠它带过来——那是申请表的要害。
 import { extractForm } from './form.js'
-import { extractStateMove, moveLine, localToday } from './stateMove.js'
+import { extractStateMove, peelEnvelopes, moveLine, memoLine, localToday } from './stateMove.js'
 
 import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
-import { eventOf, parseTag, cellFor, parseMet } from './judge.js'
+import { eventOf, parseTag, cellFor } from './judge.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 定时造卡那一轮的纯函数：拼提示词、解析信封、去重、判门槛、写战报。scout.test.js 按着。
 import {
@@ -56,7 +56,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-09-03a'
+export const BRAIN_BUILD = '2026-09-11b'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -152,18 +152,33 @@ async function addMessage(owner, role, content, kind = 'message', meta = null) {
 // 一个口：pa_apply_state_move 记一条 decision 笔 + 标签，并把 applied / note_id
 // 回写进气泡的 meta —— 界面只在 applied 时画那张带【撤回】的小卡。
 // 失败只出声不挡聊天：回复已经存了，小卡不画，日志里有原因。
-async function applyStateMove(owner, mv, bubble) {
+async function applyStateMove(owner, mv, bubble, text = null) {
   const o = asOwner(owner)
   const { data, error } = await db.rpc('pa_apply_state_move', {
     p_kind: o.kind, p_subject: o.id, p_move: mv.move, p_why: mv.why, p_line: moveLine(mv),
     p_awaiting: mv.awaiting || null, p_due: mv.due || null, p_meet_at: mv.meet_at || null,
     p_needs_reply: mv.needs_reply ?? null, p_reply_why: mv.reply_why || null,
     p_src_msg: bubble?.id || null,
+    p_text: text || null,     // 他刚说的那句 = 笔的正文（0125）；到点那条路没有
   })
   if (error) { console.warn(`  ⚠️ 拨提醒没落上（${mv.move}）：${error.message}`); return null }
   console.log(`  · 拨提醒：${moveLine(mv)}（凭什么：${mv.why}）`)
   // 界面拿的是这一份（SSE 的 done 事件），不重读库 —— 就地补上落地的结果
   if (bubble?.meta?.state_move) Object.assign(bubble.meta.state_move, { applied: true, note_id: data })
+  return data
+}
+
+// 记忆（0125）：不动状态机。线上是 kind='memo' 的笔；人身上是关系记忆末尾追加一段。
+// to='person' 只在跟一个人聊时合法 —— 跟线聊时说的人的事一律进线的 memo，不猜是谁。
+async function applyMemo(owner, memo, bubble) {
+  const o = asOwner(owner)
+  const to = memo.to === 'person' && o.kind !== 'contact' ? 'line' : memo.to
+  const { data, error } = await db.rpc('pa_apply_memo', {
+    p_kind: o.kind, p_subject: o.id, p_to: to, p_text: memo.text, p_src_msg: bubble?.id || null,
+  })
+  if (error) { console.warn(`  ⚠️ 记忆没落上（${to}）：${error.message}`); return null }
+  console.log(`  · 记住了（${to === 'person' ? '关系记忆' : '线上'}）：${memoLine(memo)}`)
+  if (bubble?.meta?.memo) Object.assign(bubble.meta.memo, { applied: true, to, ...(data ? { note_id: data } : {}) })
   return data
 }
 
@@ -438,33 +453,9 @@ async function handleChat(body, onEvent = null) {
   // 早点报出去：界面拿它把乐观插入的那条临时消息换成真的（带 id、带时间）。
   onEvent?.({ t: 'mine', row: mine })
 
-  // 见面复盘：正等着你说「见得怎么样」的时候，你说的这句就是答案。
-  // 判「见成了吗」——成了就把你的原话记成一条 kind='meet' 的笔（那才是
-  // 事实），48 小时信、回谢介绍人都从那条笔自己长出来（0097 的两支）。
-  // 改约了就把新时间写回原来那个约的标签上。判不出来就什么都不动。
-  try {
-    const o = asOwner(owner)
-    const { data: st } = await db.from('v_pa_state').select('*')
-      .eq('subject_kind', o.kind).eq('subject_id', o.id).maybeSingle()
-    if (st?.state === 'DEBRIEF') {
-      const cell = cellFor('DEBRIEF', 'YOUR_ANSWER')
-      const { text: verdict } = await think(cell.ask(text.trim(), st), [], JUDGE_SYSTEM, null, null, null, 1)
-      const met = parseMet(verdict)
-      if (met?.met === true) {
-        await db.rpc(o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_pursuit_note',
-          o.kind === 'contact'
-            ? { p_contact_id: o.id, p_role: 'note', p_kind: 'meet', p_content: text.trim() }
-            : { p_pursuit_id: o.id, p_text: text.trim(), p_kind: 'meet' })
-        console.log(`  · 见成了 —— 记成一条 meet 笔（${met.gist || ''}）`)
-      } else if (met?.met === false && met.meet_at && st.anchor_id) {
-        await db.rpc('pa_tag_message', {
-          p_message_id: st.anchor_id, p_situation: 'DEBRIEF x YOUR_ANSWER',
-          p_meet_at: met.meet_at, p_gist: met.gist || '改约了',
-        })
-        console.log(`  · 没见成，改约到 ${met.meet_at}`)
-      }
-    }
-  } catch (err) { console.warn('  ⚠️ 复盘那一步没走成（不挡聊天）：' + err.message) }
+  // 见面复盘那段（DEBRIEF 下先问一次「见成了吗」）2026-09-11 删了：那是双判 ——
+  // 这儿判一次，同一次回复里 Fairwind 又报 [[STATE]]。现在 DEBRIEF 跟别的状态一样，
+  // 你说的话交给同一次回复判，见成了就报 met（笔的正文是你的原话）。
 
   const ctx = await loadOwnerContext(owner)
   // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件。
@@ -505,12 +496,13 @@ async function handleChat(body, onEvent = null) {
   // 所以是串起来摘，前一个的 clean 交给后一个。
   const one = extractLetter(reply)
   const two = extractForm(one.clean)
-  // 第三种信封：它在改提醒（0123）。串在后面摘，前一个的 clean 交给后一个。
-  const three = extractStateMove(two.clean, { today: localToday(ctx.profile?.data?.tz) })
+  // 第三、四种信封：它在改提醒（0123）/ 它要记一句（0125）。顺序不定，轮着剥。
+  const three = peelEnvelopes(two.clean, { today: localToday(ctx.profile?.data?.tz) })
   const shown = three.clean
   const letter = one.letter
   const form = two.form
   const mv = three.move
+  const memo = three.memo
 
   // 工作稿存进 meta：不摆在她眼前、不进下一轮 prompt，但一个字都没销毁，
   // 查得回来。recovered 也记一笔——那条回复是拿工作稿顶上的，将来看日志得认得出。
@@ -520,10 +512,12 @@ async function handleChat(body, onEvent = null) {
     ...(letter ? { letter } : {}),
     ...(form ? { form } : {}),
     ...(mv ? { state_move: { ...mv, line: moveLine(mv) } } : {}),
+    ...(memo ? { memo: { ...memo, line: memoLine(memo) } } : {}),
   }
   const theirs = await addMessage(owner, 'producer', shown, 'message',
     Object.keys(extra).length ? extra : null)
-  if (mv) await applyStateMove(owner, mv, theirs)
+  if (mv) await applyStateMove(owner, mv, theirs, mine.content)   // 笔的正文 = 你刚说的那句
+  if (memo) await applyMemo(owner, memo, theirs)
   return { mine, reply: theirs }
 }
 

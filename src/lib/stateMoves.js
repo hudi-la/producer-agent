@@ -11,3 +11,11 @@ export async function undoStateMove(msgId) {
   if (error) throw new Error(error.message)
   return data
 }
+
+/** 记忆那张小卡的撤回（0125）：线上的 memo 笔软删；人的关系记忆长回旧值。 */
+export async function undoMemo(msgId) {
+  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  const { data, error } = await supa.rpc('pa_undo_memo', { p_src_msg: msgId })
+  if (error) throw new Error(error.message)
+  return data
+}

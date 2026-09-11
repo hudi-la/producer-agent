@@ -14,12 +14,12 @@ import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
 import StateMoveCard from './StateMoveCard.jsx'
+import MemoCard from './MemoCard.jsx'
 import { sendLetterNow } from '../lib/letters.js'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
   fetchThreads, fetchContactDeliverables,
-  refreshContact, sayToContactStream, draftToGmail,
-} from '../lib/people.js'
+  refreshContact, sayToContactStream, draftToGmail, logNote } from '../lib/people.js'
 import { useLiveReply } from '../lib/useLiveReply.js'
 import Veil from './Veil.jsx'
 import { useVeiled } from '../lib/veil.js'
@@ -80,6 +80,8 @@ export default function PersonFocus({
   variant = 'page',
   // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
   onDesk = false, onToggleDesk,
+  // 脑子开没开（App 每轮问 /health）。没开 = 输入框直接记笔，不聊天（0125）。
+  brainUp = true,
 }) {
   const c = person
   const [msgs, setMsgs] = useState(null)
@@ -91,24 +93,6 @@ export default function PersonFocus({
   // 它正在打的那段字（还没落库），跟机会线那边同一套
   const { live, act, onEvent: onLive, reset: resetLive } = useLiveReply()
 
-  // 「记一笔」旁边那层说明：悬停一秒才出来。
-  //
-  // 一秒是故意的——手划过去不该弹东西，只有停下来看才算在问。
-  // 收起来留 240ms 缓冲：从按钮挪到说明层上，中间那几像素的空隙不该把它关掉。
-  // pinRef 是给下拉框用的：原生下拉展开时鼠标其实已经离开了这一层，
-  // 不按住就会选到一半自己关掉。
-  const [howto, setHowto] = useState(false)
-  const howtoT = useRef(0)
-  const pinRef = useRef(false)
-  const howtoIn = () => {
-    clearTimeout(howtoT.current)
-    if (!howto) howtoT.current = setTimeout(() => setHowto(true), 1000)
-  }
-  const howtoOut = () => {
-    clearTimeout(howtoT.current)
-    howtoT.current = setTimeout(() => { if (!pinRef.current) setHowto(false) }, 240)
-  }
-  useEffect(() => () => clearTimeout(howtoT.current), [])
   const [text, setText] = useState('')
   const [touching, setTouching] = useState(false)   // 「刚聊过」展开了输入
   const [touchText, setTouchText] = useState('')
@@ -186,6 +170,14 @@ export default function PersonFocus({
   const say = async (said) => {
     const t = (said ?? text).trim()
     if (!t || busy) return
+    // 脑子没开：这句直接记成一笔（不是聊天），脑子醒了由盲格子判（0125）
+    if (!brainUp) {
+      setBusy('talk'); if (said == null) setText('')
+      try { await logNote(c.id, t); await reload(); onChanged?.() }
+      catch (err) { alert('没记上：' + err.message); if (said == null) setText((cur) => cur || t) }
+      finally { setBusy(null) }
+      return
+    }
     setBusy('talk'); if (said == null) setText('')
     // run_id 不是给「终止」用的（这一栏没有终止按钮），是给「你把页面关了」用的：
     // 脑子那边靠它把没人等的那一次掐掉。
@@ -255,7 +247,6 @@ export default function PersonFocus({
     try { await logMeet(c.id, t.trim(), onLine || null); await reload(); onChanged?.(); after?.() }
     catch (e) { alert('没记上：' + e.message) } finally { setBusy(null) }
   }
-  const jot = () => logTouch(text, () => setText(''))
 
   // 「刚聊过」：**一定顺手写一句**。空打卡只留一个日期，
   // 而一个说不出内容的日期正是「上次碰」原来那么难用的原因。
@@ -488,7 +479,7 @@ export default function PersonFocus({
                   return (
                     <div key={m.id} className={'msg' + (mine ? ' you' : isNote ? ' note' : ' producer')}>
                       <span className="who">
-                        {isNote ? '你记的一次接触' : mine ? '你' : 'Fairwind'}
+                        {isNote ? (m.kind === 'memo' ? '记住的一句' : '你记的一次接触') : mine ? '你' : 'Fairwind'}
                         <span className="viamail"> · {md(m.created_at)}</span>
                       </span>
                       {/* 库里存的是 markdown。不渲的话「**这一类事**」在页面上
@@ -525,6 +516,9 @@ export default function PersonFocus({
                       {m.meta?.state_move?.applied && (
                         <StateMoveCard msgId={m.id} move={m.meta.state_move} onUndone={reload} />
                       )}
+                      {m.meta?.memo?.applied && (
+                        <MemoCard msgId={m.id} memo={m.meta.memo} onUndone={async () => { await reload(); onChanged?.() }} />
+                      )}
                     </div>
                   )
                 })
@@ -549,9 +543,8 @@ export default function PersonFocus({
             </div>
           </div>
 
-          {/* 输入框和「记一笔」是一组，一起浮在底部。
-              「记一笔」处置的是**输入框里那句话**，不是对话里的某条——所以它得跟着
-              输入框走。原来它挂在时间线末尾，于是你打完字要抬头去够一个滚走了的按钮。 */}
+          {/* 一个框两种落法（0125）：脑子醒着 = 聊天，Fairwind 顺便判该记成什么；
+              脑子没开 = 直接记成一笔。「记一笔」按钮退场了。 */}
           <div className="composer-dock">
             {/* 输入框跟机会线那个一模一样：一行装不下自己长高、Enter 发送
                 Shift+Enter 换行。isComposing 那句不能删——中文输入法选词也敲
@@ -565,6 +558,7 @@ export default function PersonFocus({
                 disabled={busy === 'talk'}
                 placeholder={busy === 'talk'
                   ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
+                  : !brainUp ? '脑子没开：这句会直接记成一笔，不是聊天'
                   : '一起想点什么…… Fairwind 带着这个人的全部往来，你不用重讲'}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
@@ -584,49 +578,6 @@ export default function PersonFocus({
                 </button>
             </div>
 
-            {/* 回车 = 跟 Fairwind 商量；这一行 = 把同一句话记成一次真实来往。
-                同一个框两个去处，这个区别值得说清楚——但只值得说一次，所以原委
-                收进悬停一秒才出来的那层，平时这儿只有三个字。
-
-                下拉框跟着进悬浮层，没有删掉：它是**控件**不是说明。这次聊的常常
-                就是某条线的事，挂上去那条线的卷宗里也看得见（同时挂两边，不是搬
-                过去）。不让 AI 猜是哪条：他可能挂着三条，猜错了那段记忆就长在错
-                的项目上，而项目卡是你写申请时照着看的。 */}
-            <div className="jot-row"
-                 onMouseEnter={howtoIn} onMouseLeave={howtoOut}
-                 onFocusCapture={() => setHowto(true)}>
-              {/* 点完就把说明收掉：点击会让按钮拿到焦点，不收的话你刚记完
-                  它反而弹出来解释「记一笔是什么」——你显然已经知道了。 */}
-              <button className="lnk jot-go"
-                      onClick={() => { clearTimeout(howtoT.current); setHowto(false); jot() }}
-                      disabled={busy === 'talk' || !text.trim()}>记一笔</button>
-              {howto && (
-                <div className="jot-howto" role="tooltip"
-                     onMouseEnter={howtoIn} onMouseLeave={howtoOut}>
-                  <p>回车 = 跟 <b>Fairwind</b> 商量（这一栏只装商量，不算往来）。</p>
-                  <p>
-                    线下见了面、通了电话、微信聊了？写一句按 <b>记一笔</b>——
-                    它跟邮件一样是一次真实来往，进<b>左栏的往来</b>，并把「上次碰」记成今天。
-                  </p>
-                  {c.pursuits?.length > 0 && (
-                    <p className="jot-online">
-                      也算在
-                      <select className="pf-online" value={onLine}
-                              onMouseDown={() => { pinRef.current = true }}
-                              onBlur={() => { pinRef.current = false }}
-                              onChange={(e) => setOnLine(e.target.value)}>
-                        <option value="">（不挂线）</option>
-                        {c.pursuits.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-                      </select>
-                      上
-                    </p>
-                  )}
-                  <p>他在找什么、答应过什么这类<b>认识</b>，写进左栏的<b>关系记忆</b>——那儿是累积的。</p>
-                  {/* 按钮灰着却不说为什么，是最招人烦的一种沉默 */}
-                  {!text.trim() && <p className="jot-need">现在灰着，是因为下面还没写字。</p>}
-                </div>
-              )}
-            </div>
           </div>
         </section>
 

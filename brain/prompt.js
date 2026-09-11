@@ -31,7 +31,7 @@
 
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from '@anthropic-ai/claude-agent-sdk'
 import { isImage, IMG_CAP } from './files.js'
-import { STATE_RULE, stateBlock } from './stateMove.js'
+import { STATE_RULE, MEMO_RULE, stateBlock } from './stateMove.js'
 
 export { SYSTEM_PROMPT_DYNAMIC_BOUNDARY }
 
@@ -124,7 +124,9 @@ ${LETTER_RULE}
 
 ${FORM_RULE}
 
-${STATE_RULE}`
+${STATE_RULE}
+
+${MEMO_RULE}`
 }
 
 // 履历那些「一条」的关键事实——学校名、机构、起止年份、地点——存在 meta 这个
