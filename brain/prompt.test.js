@@ -16,7 +16,7 @@ import { isImage, IMG_CAP } from './files.js'
 import {
   buildPrompt, buildSystem, buildUser, promptParts,
   buildBriefPrompt, buildBriefSystem, buildBriefUser,
-  systemFor, SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
+  systemFor, entriesBlock, SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
 } from './prompt.js'
 
 // ── 尺子：老实现的逐字复刻 ──────────────────────────────────
@@ -407,4 +407,40 @@ test('拨提醒的规矩在静态块里，七种 move 都点了名', () => {
   assert.ok(sys.includes('[[MEMO]]'))
   for (const m of ['resolved', 'wait', 'reschedule', 'park', 'needs_reply', 'meeting', 'done'])
     assert.ok(sys.includes(`"${m}"`), m)
+})
+
+// ── 「在写」的条目（0127）─────────────────────────────────────
+//
+// 这个标只管一件事：**没写完的东西不许被当成战绩发出去**。所以外联这两条路
+// （对话 / 讲懂）看不见它。书桌那边是另一回事——他正在那儿写它，见 studio.test.js。
+
+test('在写的条目不进外联的信息库', () => {
+  const es = [
+    { kind: 'work', title: '写完的那件' },
+    { kind: 'work', title: '还在写的那件', draft: true },
+  ]
+  const out = entriesBlock(es).join('\n')
+  assert.ok(out.includes('写完的那件'))
+  assert.ok(!out.includes('还在写的那件'))
+})
+
+test('全是在写的，整块不出现——不留一个空标题在那儿', () => {
+  assert.deepEqual(entriesBlock([{ kind: 'work', title: 'x', draft: true }]), [])
+})
+
+test('反过来要得到在写的那几条：drafts:true', () => {
+  const es = [
+    { kind: 'offer', title: '写完的工作坊' },
+    { kind: 'offer', title: '在写的 proposal', draft: true },
+  ]
+  const out = entriesBlock(es, { drafts: true, title: '## 他还在写的' }).join('\n')
+  assert.ok(out.includes('## 他还在写的'))
+  assert.ok(out.includes('在写的 proposal'))
+  assert.ok(!out.includes('写完的工作坊'))
+})
+
+test('整条路走一遍：在写的既不进静态块，也不进讲懂', () => {
+  const ctx = { ...pursuitCtx, entries: [...pursuitCtx.entries, { kind: 'work', title: '半成品XYZ', draft: true }] }
+  assert.ok(!buildSystem(ctx)[0].includes('半成品XYZ'))
+  assert.ok(!buildBriefSystem(ctx)[0].includes('半成品XYZ'))
 })
