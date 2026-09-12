@@ -74,14 +74,14 @@ export async function fetchContactMessages(contactId) {
  * 说话的对象：机会线、人，还是档案里那张书桌。
  *
  * 传字符串 = 机会线（老调用方一个字不用改）；传 {kind,id} 三种都行。
- * brain 那边 ownerOf 收的就是这三样（server.js 的 contact_id / pursuit_id / section）。
+ * brain 那边 ownerOf 收的就是这三样（server.js 的 contact_id / pursuit_id / entry_id）。
  *
- * 书桌那种的 id 是**栏的 key**（'work' / 'credit:exhibition'），不是 uuid。
+ * 书桌那种的 id 是**那一条条目的 id** —— 对话挂在一条具体的东西上。
  */
 export const ownerBody = (owner) =>
   typeof owner === 'string' ? { pursuit_id: owner }
     : owner?.kind === 'contact' ? { contact_id: owner.id }
-      : owner?.kind === 'studio' ? { section: owner.id }
+      : owner?.kind === 'studio' ? { entry_id: owner.id }
         : { pursuit_id: owner?.id }
 
 export async function sendMessage(owner, text, meta, runId) {
@@ -170,17 +170,10 @@ export async function streamChat(body, onEvent) {
  * 脑子是旧的（还没有 /chat/stream）就退回原来那条路 —— 一次改动不该让
  * 没重启 brain 的人连话都说不了，只是没有流而已。
  */
-export async function sendMessageStream(owner, text, meta, runId, onEvent, focus) {
+export async function sendMessageStream(owner, text, meta, runId, onEvent) {
   try {
     return await streamChat(
-      {
-        ...ownerBody(owner), text,
-        ...(meta ? { meta } : {}),
-        ...(runId ? { run_id: runId } : {}),
-        // 「他现在开着哪一栏、展开着哪几条」。只有书桌那条路带它；
-        // brain 那边不认得就当没有，不会出错。
-        ...(focus ? { focus } : {}),
-      },
+      { ...ownerBody(owner), text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) },
       onEvent,
     )
   } catch (e) {

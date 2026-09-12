@@ -11,10 +11,9 @@ test('三种主人各自的身份证', () => {
   assert.deepEqual(ownerBody('p1'), { pursuit_id: 'p1' })               // 老调用方：字符串 = 机会线
   assert.deepEqual(ownerBody({ kind: 'pursuit', id: 'p2' }), { pursuit_id: 'p2' })
   assert.deepEqual(ownerBody({ kind: 'contact', id: 'c1' }), { contact_id: 'c1' })
-  assert.deepEqual(ownerBody({ kind: 'studio', id: 'work' }), { section: 'work' })
+  assert.deepEqual(ownerBody({ kind: 'studio', id: 'e1' }), { entry_id: 'e1' })
 })
 
-test('书桌的 id 是栏的 key，可以带冒号', () => {
-  assert.deepEqual(ownerBody({ kind: 'studio', id: 'credit:exhibition' }),
-                   { section: 'credit:exhibition' })
+test('书桌的 id 是那一条条目的 id —— 对话挂在一条具体的东西上', () => {
+  assert.deepEqual(ownerBody({ kind: 'studio', id: '3f2a-uuid' }), { entry_id: '3f2a-uuid' })
 })

@@ -9,8 +9,8 @@
 // 能碰哪几份写死在闭包里）—— 它碰不到数据库，改不了 stage、改不了盒子、
 // 改不了他档案里任何一个字。这是结构上的限制，不是嘱咐它别做。
 //
-// 三种主人（ownerOf）：机会线、人、档案里的一张书桌。前两种干外联的活，
-// 第三种陪他把自己的东西写准，不写信、不填表、不动状态机。
+// 三种主人（ownerOf）：机会线、人、**档案里的一条**。前两种干外联的活，
+// 第三种陪他把那一条写准，不写信、不填表、不动状态机。
 
 import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
@@ -64,7 +64,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-09-11c'
+export const BRAIN_BUILD = '2026-09-11d'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -110,10 +110,10 @@ async function loadContext(pursuitId) {
 function ownerOf(body) {
   if (body?.contact_id) return { kind: 'contact', id: body.contact_id }
   if (body?.pursuit_id) return { kind: 'pursuit', id: body.pursuit_id }
-  // 第三种主人：档案里的一张书桌（0127）。id 是「哪一栏」的 key，不是 uuid。
+  // 第三种主人：档案里的一条（0127）。点开哪一条的编辑栏，就聊哪一条。
   // 它跟前两种的差别不只是主人不同——那张桌子上不写信、不填表、不动状态机，
   // 见 handleChat 里 isStudio 那一岔。
-  if (body?.section) return { kind: 'studio', id: body.section }
+  if (body?.entry_id) return { kind: 'studio', id: body.entry_id }
   return null
 }
 const asOwner = (x) => (x && typeof x === 'object' && x.kind ? x : { kind: 'pursuit', id: x })
@@ -139,29 +139,30 @@ async function loadPersonContext(contactId) {
 
 // 书桌的上下文。比那两支小得多：没有机会线、没有产出、没有邮件线索、没有附件。
 //
+// 三样：这条对话、**桌上摊着的那一条**（entry）、全部条目（他写一份 proposal
+// 时要引得出自己的展览和作品，所以全给，也所以静态块跨条目缓存得住）。
+//
 // entries 这边**不滤 draft**（跟外联那两支相反）：他正是在书桌上写那几条的，
 // 藏起来他那份 proposal 就从陪他写的人眼前消失了。哪几条没写完，
 // 由条目自己的 draft 字段说，studio.js 那边标出来。
-//
-// focus 不是库里的东西，是界面告诉我们的「他现在开着哪一栏、展开着哪几条」，
-// 所以从参数进来、原样挂上。
-async function loadStudioContext(section, focus) {
-  const { data, error } = await db.rpc('pa_studio_context', { p_section: section })
+async function loadStudioContext(entryId) {
+  const { data, error } = await db.rpc('pa_studio_context', { p_entry_id: entryId })
   if (error) throw new Error('读上下文失败：' + error.message)
+  if (!data?.entry) throw new Error('档案里没有这一条：' + entryId)
   return {
     kind: 'studio',
-    p: { title: focus?.label || section },   // 日志和错误话术里说得出是哪一栏
+    entry: data.entry,
+    p: { title: data.entry.title || '（未命名）' },   // 日志和错误话术里说得出是哪一条
     msgs: data.messages || [],
     entries: data.entries || [],
     profile: data.profile || null,
-    focus: focus || null,
     raw: data,
   }
 }
 
-async function loadOwnerContext(owner, focus = null) {
+async function loadOwnerContext(owner) {
   const o = asOwner(owner)
-  if (o.kind === 'studio') return loadStudioContext(o.id, focus)
+  if (o.kind === 'studio') return loadStudioContext(o.id)
   return o.kind === 'contact'
     ? loadPersonContext(o.id)
     : { ...(await loadContext(o.id)), kind: 'pursuit' }
@@ -173,7 +174,7 @@ async function addMessage(owner, role, content, kind = 'message', meta = null) {
     o.kind === 'studio' ? 'pa_add_studio_message'
       : o.kind === 'contact' ? 'pa_add_contact_message' : 'pa_add_message',
     {
-      ...(o.kind === 'studio' ? { p_section: o.id }
+      ...(o.kind === 'studio' ? { p_entry_id: o.id }
         : o.kind === 'contact' ? { p_contact_id: o.id } : { p_pursuit_id: o.id }),
       p_role: role, p_content: content, p_kind: kind,
       // 不传就完全不带这个键，走函数默认值（0031）——现有那几处 4 参调用一处都不用改。
@@ -556,9 +557,9 @@ async function think(prompt, tools = READ_TOOLS, system = null, abortController 
 // ── HTTP ────────────────────────────────────────────────────
 
 async function handleChat(body, onEvent = null) {
-  const { text, meta, run_id, focus } = body
+  const { text, meta, run_id } = body
   const owner = ownerOf(body)
-  if (!owner || !text?.trim()) throw new Error('要有 pursuit_id / contact_id / section，外加 text')
+  if (!owner || !text?.trim()) throw new Error('要有 pursuit_id / contact_id / entry_id，外加 text')
   // 档案里那张书桌（0127）。从「拼 prompt」起跟外联那两条路分家：
   // 前半截（你的话先落库、报 mine、起 AbortController）完全一样。
   const isStudio = owner.kind === 'studio'
@@ -574,14 +575,15 @@ async function handleChat(body, onEvent = null) {
   // 这儿判一次，同一次回复里 Fairwind 又报 [[STATE]]。现在 DEBRIEF 跟别的状态一样，
   // 你说的话交给同一次回复判，见成了就报 met（笔的正文是你的原话）。
 
-  const ctx = await loadOwnerContext(owner, focus)
+  const ctx = await loadOwnerContext(owner)
   // 这条线上的文件。人没有就是空数组——人那一层（contact）不带附件，书桌也没有。
   const atts = ctx.raw?.attachments || []
-  // 书桌那边能开的是作品的图，不是这条线的文件。一张图都没有就不挂那台工具。
-  const imgEntries = isStudio ? ctx.entries.filter((e) => e.images?.length) : []
+  // 书桌那边能开的是**桌上这一条**的图，不是整个档案的。护栏跟 open_file 一样
+  // 长在闭包里：别的条目的图它够不到，不是「不许开」，是没有那个入口。
+  const imgEntries = isStudio && ctx.entry?.images?.length ? [ctx.entry] : []
   console.log(`  ↳ 上下文：${ctx.msgs.length} 条往来 / ${ctx.entries.length} 条信息库` +
               (atts.length ? ` / ${atts.length} 份文件` : '') +
-              (isStudio ? ` / ${imgEntries.length} 条带图` : ''))
+              (isStudio ? `（桌上：《${ctx.entry?.title}》${imgEntries.length ? ' · 带图' : ''}）` : ''))
 
   // 有东西可开才给这台工具。没有还挂着，等于告诉它「你可以去开」，
   // 然后它去开一个不存在的东西——白跑一轮，还得自己想明白为什么开不到。
@@ -589,7 +591,7 @@ async function handleChat(body, onEvent = null) {
     ? (imgEntries.length ? [...READ_TOOLS, WORK_IMG_TOOL] : READ_TOOLS)
     : (atts.length ? [...READ_TOOLS, FILE_TOOL] : READ_TOOLS)
   const servers = isStudio
-    ? (imgEntries.length ? { studio_works: worksServer(ctx.entries) } : null)
+    ? (imgEntries.length ? { studio_works: worksServer(imgEntries) } : null)
     : (atts.length ? { pursuit_files: filesServer(atts) } : null)
 
   const ac = run_id ? new AbortController() : null
@@ -1892,7 +1894,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}` +
-                    (body.section ? `（书桌 · ${body.section}）` : ''))
+                    (body.entry_id ? '（书桌）' : ''))
         console.log(`  ${String(body.text).slice(0, 50)}`)
         send(res, 200, await handleChat(body))
       } catch (err) {
@@ -1927,7 +1929,7 @@ const server = http.createServer(async (req, res) => {
       try {
         body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}` +
-                    (body.section ? `（书桌 · ${body.section}，流）` : '（流）'))
+                    (body.entry_id ? '（书桌，流）' : '（流）'))
         console.log(`  ${String(body.text).slice(0, 50)}`)
       } catch (err) {
         frame({ t: 'error', error: '请求读不动：' + err.message })

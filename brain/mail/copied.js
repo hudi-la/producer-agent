@@ -66,26 +66,37 @@ const md = (t) => {
  *   base   谁、什么时候、在哪条线、怎么带进来的
  *   note   写进名片（带「自动收进」的标记）
  *   party  写进线上那一行（短）
+ *
+ * pursuit_id 为空 = 人脉往来，**没有线**（0126）。那就别说「在『X』那条线」——
+ * 那条线不存在，编一个出来比不说更坏。改说「跟谁的往来里」。
  */
 export function provenance(r) {
   const d = md(r.sent_at)
-  const line = `「${r.pursuit_title}」`
+  const onLine = r.pursuit_id ? `在「${r.pursuit_title}」` : ''
   const via = r.via_name || r.via_email || ''
   let base, party
   if (r.kind === 'reply') {
-    base = `${d} 在${line}那条线的信串里回了信，跟线上的人同一个机构`
+    // reply 这一路只从机会线来（0121 的第二支），没有线的情况理论上到不了这儿；
+    // 真到了也得说人话，不能吐出「9/4 那条线的信串里」这种半截话。
+    base = r.pursuit_id
+      ? `${d} 在「${r.pursuit_title}」那条线的信串里回了信，跟线上的人同一个机构`
+      : `${d} 在你们的信串里回了信，跟已经认识的人同一个机构`
     party = `${d} 在这条线的信串里回信，同机构`
   } else {
     const verb = r.kind === 'to' ? '也发给了' : '抄送了'
     if (r.via_direction === 'out') {
-      base = `你 ${d} 在${line}写给 ${via} 时${verb}这个地址`
+      base = `你 ${d} ${onLine}写给 ${via} 时${verb}这个地址`
       party = `你 ${d} 写给 ${via} 时${verb}`
     } else {
-      base = `${via} ${d} 在${line}回信时${verb}这个地址`
+      // 没有线的时候不说「回信时」—— 引荐信多半是人家主动发来的第一封，
+      // 说成「回信」就把事情讲错了。
+      base = r.pursuit_id
+        ? `${via} ${d} 在「${r.pursuit_title}」回信时${verb}这个地址`
+        : `${via} ${d} 发给你的信里${verb}这个地址`
       party = `${via} ${d} 回信时${verb}`
     }
   }
-  return { base, note: `${base}（自动收进通讯录，0121）`, party }
+  return { base: base.replace(/ {2,}/g, ' '), note: `${base.replace(/ {2,}/g, ' ')}（自动收进通讯录，0121）`, party }
 }
 
 /**
@@ -93,10 +104,14 @@ export function provenance(r) {
  *   adopt  同机构 + 署名像人 → 自动建人挂线
  *   greet  其余 → 写一条判定进「新联系人」面板（person 或 shared_box）
  *   skip   外机构、早有判定的（它自己的信早判过了，别重判）
+ *
+ * **没有线的一律 greet**（0126）。人脉往来里同席的陌生人没有线可挂，
+ * 也就没有「同机构 = 这条线的人」那种规则级证据 —— 自动收就成了瞎收。
+ * 加人还是只在「新联系人」面板。
  */
 export function decide(r) {
   const shape = looksLike({ email: r.email, name: r.name, org: r.org_guess })
-  if (r.same_org && shape === 'person') return { act: 'adopt' }
+  if (r.pursuit_id && r.same_org && shape === 'person') return { act: 'adopt' }
   if (!r.same_org && r.verdict) return { act: 'skip', why: '外机构地址，早有判定' }
   if (shape === 'mailbox') return { act: 'greet', verdict: 'shared_box' }
   return { act: 'greet', verdict: 'person', unsure: shape === 'unsure' }

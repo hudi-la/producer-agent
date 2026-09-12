@@ -16,15 +16,16 @@
 // 照 prompt.js 那套（缓存是前缀匹配，见那边开头的长注释）：
 //
 //   fixed   人格 + 档案 + 写完的那些条目（19,486 字符）→ 静态块，跨会话缓存
-//   perLine 空。书桌没有「每条线不同、一次会话内不变」的东西
-//   talk    在写的那几条 + 往来 + 他在写哪个 + 他刚说的那句 → user message
+//   perLine 空。一条一个对话，没有「一次会话内不变但各条不同」的东西
+//   talk    在写的那几条 + **正在改的这一条** + 往来 + 他刚说的那句 → user message
 //
-// **静态块按栏切不得。** 切了就是七八个不同的开头，每一栏各自全价读一遍那两万字
-// ——为了省而切，结果花得更多。而且全给对这件事是好处：他写工作坊 proposal 时，
-// 它得能张口引用他那 22 个展览。
+// **静态块按条目切不得。** 切了就是几十个不同的开头，每一条各自全价读一遍
+// 那两万字——为了省而切，结果花得更多。而且全给对这件事是好处：
+// 他写工作坊 proposal 时，它得能张口引用他那 22 个展览。
 //
-// **在写的那几条放 talk 不放 fixed。** 他正在改它们，每改一下 fixed 就变一次，
-// 那两万字的缓存就废一次。它们本来就短，放在每轮都变的地方不花什么钱。
+// **在写的那几条、和正在改的这一条，放 talk 不放 fixed。** 他正在改它们，
+// 每改一下 fixed 就变一次，那两万字的缓存就废一次。它们本来就短，
+// 放在每轮都变的地方不花什么钱。
 
 import { entriesBlock, SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from './prompt.js'
 
@@ -36,9 +37,13 @@ export const STUDIO_SYSTEM = (profile) => {
   const who = name ? `你服务的艺术家是 ${name}${site ? `，作品站 ${site}` : ''}。` : ''
   return `你是「 Fairwind 」，一位艺术家的 producer / 外联搭档。${who}
 
-现在你坐在**他档案里的一张书桌前**。这儿的活跟外联那摊不一样：
-陪他把**他自己的东西**说准——改一件作品的描述、想清楚某件作品到底在讲什么、
-一起搭一份课程或工作坊 proposal 的骨架、把一段自述改到像他说的话。
+现在你坐在**他档案里的一张书桌前**，桌上摊着**一条具体的东西**——
+下面「他正在改这一条」那一段就是。这儿的活跟外联那摊不一样：
+陪他把这一条说准——改描述、想清楚这件作品到底在讲什么、
+搭一份课程或工作坊 proposal 的骨架、把一段自述改到像他说的话。
+
+**你们这次就说这一条。** 别的条目在下面的信息库里，是弹药（引得出他的展览、
+别的作品），不是这次要改的东西。
 
 ## 你不动他的档案
 
@@ -84,20 +89,35 @@ const profileBlock = (profile) =>
   profile ? ['## 关于这位艺术家', JSON.stringify(profile, null, 2), ''] : []
 
 /**
- * 「他现在在写哪个」。
+ * 「他正在改这一条」。
  *
- * 焦点靠**他本来就在做的事**定：展开着哪几条，就是哪几条。没有新按钮、
- * 没有「选中」这个动作要他学。
+ * 这一段是整个 prompt 里最要紧的一块：对话挂在哪一条，桌上就摊着哪一条。
+ * 全文原样摊开——信息库里那一行已经带着 body 了，但那是一长串里的一行，
+ * 这儿要它**看着这一条说话**。
  *
- * count 是这一栏一共几条，open 是展开着的 [{id, title}]。
+ * 盒子也摊开：那是他补的私密外联层（为什么是现在、想触达谁、隐线、验证过的
+ * 打法），改描述时正是该用的料。
  */
-export function focusBlock(f) {
-  if (!f?.label) return []
-  const lines = ['## 他现在在写哪个', `他开着「${f.label}」这一栏，里面 ${f.count ?? 0} 条。`]
-  if (f.open?.length) {
-    lines.push('展开着这几条（他多半就在说它们）：')
-    for (const e of f.open) lines.push(`- 《${e.title}》（id ${e.id}）`)
-    lines.push('指其中哪一条时把标题说出来，他好对上。')
+export function entryBlock(e) {
+  if (!e?.id) return []
+  const lines = [
+    '## 他正在改这一条',
+    `《${e.title || '（未命名）'}》（id ${e.id}，类型 ${e.kind}${e.draft ? '，他标着「还在写」' : ''}）`,
+  ]
+  const bits = [e.year, e.medium, e.concern].filter(Boolean).join(' · ')
+  if (bits) lines.push(bits)
+  const m = e.meta || {}
+  const facts = Object.entries(m).filter(([, v]) => v != null && String(v).trim() !== '')
+  if (facts.length) lines.push('字段：' + facts.map(([k, v]) => `${k}=${v}`).join('，'))
+  lines.push('', '现在的描述：')
+  lines.push(e.body ? e.body : '（空的——还没写。）')
+  const box = Object.entries(e.box || {}).filter(([, v]) => v != null && String(v).trim() !== '')
+  if (box.length) {
+    lines.push('', '盒子（他补的私密层，是给你的料，不是对外文案）：')
+    for (const [k, v] of box) lines.push(`· ${k}：${v}`)
+  }
+  if (e.images?.length) {
+    lines.push('', `这条挂着 ${e.images.length} 张图。要判断画面里的东西才开 open_work_image。`)
   }
   lines.push('')
   return lines
@@ -107,9 +127,9 @@ export function focusBlock(f) {
 // 否则它会在 prompt 里出现两次。
 function historyBlock({ msgs, profile }, exceptId) {
   const history = (msgs || []).filter((m) => m.id !== exceptId && !m.deleted_at)
-  if (!history.length) return ['（这张桌子上还没聊过，刚开始。）\n']
+  if (!history.length) return ['（这一条还没聊过，刚开始。）\n']
   const who = (m) => (m.role === 'artist' ? (profile?.name || '这位艺术家') : m.role === 'producer' ? '你（Fairwind）' : m.role)
-  return ['## 你们在这张桌子上聊过的（从早到晚）', ...history.map((m) => `${who(m)}：${m.content}`), '']
+  return ['## 你们为这一条聊过的（从早到晚）', ...history.map((m) => `${who(m)}：${m.content}`), '']
 }
 
 const askBlock = (incoming) => [
@@ -127,14 +147,17 @@ const DRAFTS_TITLE =
  * 都从它派生，所以「三档拼起来 = 整个 prompt」是结构上成立的。
  */
 export function studioParts(ctx, incoming, exceptId) {
+  // **信息库一条不筛。** 差点在这儿栽一跤：本想把「正在改的这一条」从信息库
+  // 里摘掉免得重复，但那样每一条条目就各有一个不同的静态块开头 —— 缓存是
+  // 前缀匹配，等于每开一条都全价重读那两万字。重复一行的代价远小于这个。
   const entries = ctx.entries || []
   return {
     fixed: [...profileBlock(ctx.profile), ...entriesBlock(entries)],
     perLine: [],
     talk: [
       ...entriesBlock(entries, { drafts: true, title: DRAFTS_TITLE }),
+      ...entryBlock(ctx.entry),
       ...historyBlock(ctx, exceptId),
-      ...focusBlock(ctx.focus),
       ...askBlock(incoming),
     ],
   }
@@ -150,7 +173,7 @@ export function buildStudioSystem(ctx) {
   ]
 }
 
-/** user message：在写的那几条 + 往来 + 他在写哪个 + 他刚说的那句。 */
+/** user message：在写的那几条 + 正在改的这一条 + 往来 + 他刚说的那句。 */
 export function buildStudioUser(ctx, incoming, exceptId) {
   return studioParts(ctx, incoming, exceptId).talk.join('\n')
 }

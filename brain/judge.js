@@ -180,17 +180,41 @@ ${收尾(`${F_GIST},${F_WAIT},${F_MEET}`)}` },
 ${收尾(`${F_GIST},${F_MEET},${F_WAIT}`)}` },
   },
 
+  // ── 两问分开答：**没解决 ≠ 什么都没说** ──────────────────────
+  //
+  // 真事（2026-09-06）：Tom 来信「Let's aim for Friday the 11th or Saturday
+  // the 12th. I'll let you know which day works best for me...」——收进来了、
+  // 两分钟内判过了，通知栏一个字没有。原来这一格只问「解决了我们等的那件事
+  // 吗」，「没解决」的两支写着**其余 null**；那封信落在 UCSB 线上，那条线
+  // 等的是「Young Joon 回复」，于是判成 (c) 说的是别的事 → 全 null，
+  // 「哪天我再通知你」跟着一起没了。
+  //
+  // 同一个黑洞在库里吞了 9 封，包括 CultureHub 那封「LOA 签回、交 W9、
+  // 8/11 前交营销素材」。而同一封信落在 IDLE 格从来不丢（7 封 0 全 null）——
+  // 差别只有这句「其余 null」：那是**拿「它跟我们等的事没关系」当成
+  // 「它什么都没说」**。别的事也是事。
+  //
+  // 所以拆成两问，互不连坐：①它解决了我们等的事吗 ②它自己说了什么。
   WAITING_REPLY: {
     THEIR_LETTER: { ask: (fact, state) => `${开头(fact, 'THEIR_LETTER')}
 
 我们在等：**${state?.what || '（没写）'}**（${due日(state)} 到点该催）。
 
-这封信解决了它吗？
-(a) 解决了 → resolves=true + resolves_why 凭什么算解决。
-    然后这封信自己：要你回吗（needs_reply）？又起了新的等吗（awaiting+wait_days）？
-    约了日子吗（meet_at）？
-(b) 只是客套 / 说收到了、回头看 → resolves=false，其余 null。**等待继续，别动它。**
-(c) 说的是别的事 → resolves=false，其余 null（等待照旧）。
+**两个问题分开答，互不影响。**
+
+① 这封信解决了它吗？
+   · 解决了 → resolves=true + resolves_why 凭什么算解决。
+   · 只是客套 / 说收到了、回头看 → resolves=false。**等待继续，别动它。**
+   · 说的是别的事 → resolves=false（等待照旧）。
+
+② **不管①答的是什么，这封信自己说了什么？** 这一问永远要答 ——
+   「它没解决我们等的那件事」不等于「它什么都没说」，别的事也是事：
+   · 要你回吗？凭什么？（客套收尾、单纯确认、通知类的告知 = 不用回。
+     你已经回过了也算不用回。**拿不准算要回。**）
+   · 约了具体的见面/通话时间 → meet_at（约了时间的，meet_at 优先于 awaiting）。
+   · 它让你开始等一件新的事吗 —— 「我再通知你是哪天」「月底给你日期」
+     就是在等那一天 → awaiting=「他说＜原话＞」+ wait_days 到那天。
+   · 真的什么都没有（纯客套、纯致谢、纯告知）→ 这三样都 null。
 ${锚点规矩}
 ${收尾(`${F_GIST},${F_RESOLVE},${F_REPLY},${F_WAIT},${F_MEET}`)}` },
 

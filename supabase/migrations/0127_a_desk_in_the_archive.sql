@@ -2,9 +2,11 @@
 --
 -- 设计稿：docs/specs/2026-09-11-a-desk-in-the-archive-design.md
 --
--- 「我的档案」每一栏右边开一条对话：陪他把自己的东西写准（改作品描述、
--- 搭一份课程 proposal）。它**一个字都写不进库** —— 所有进档案的字是他自己
--- 复制过去、在那一格里自己改的。所以这支迁移里没有一支给 agent 的写入口。
+-- 点开档案里的一条，那条的编辑栏里开一个抽屉：陪他把这一条写准（改作品描述、
+-- 搭一份课程 proposal）。**一条一个对话**，各记各的。
+--
+-- 它**一个字都写不进库** —— 所有进档案的字是他自己复制过去、在那一格里
+-- 自己改的。所以这支迁移里没有一支给 agent 的写入口。
 --
 -- ── 为什么是新表，不挂进 pursuit_messages ─────────────────────────
 --
@@ -28,7 +30,10 @@
 
 create table if not exists producer.studio_messages (
   id          uuid primary key default gen_random_uuid(),
-  section     text not null,                          -- 档案页左栏那一格的 key
+  -- 对话挂在**一条具体的东西**上：这件作品、这份自述、这份 proposal。
+  -- 不挂在「栏」上 —— 一栏一条的话，他在作品栏改三件作品的描述，
+  -- 三件事挤在同一条流里，回头翻不出「上次那段是怎么改的」。
+  entry_id    uuid not null references producer.works(id) on delete cascade,
   role        text not null,                          -- artist | producer | system
   kind        text not null default 'message',
   content     text not null,
@@ -37,16 +42,13 @@ create table if not exists producer.studio_messages (
   deleted_at  timestamptz                             -- 「重说」打标，行还在
 );
 
--- section 不设外键、不设枚举：「格」是前端 buildSections() 算出来的，
--- 库里没有这张表。写死一个 check 的话，以后加一类条目就会在这儿炸，
--- 而炸的形式是「他打的字存不进去」。
-comment on column producer.studio_messages.section is
-  '档案页左栏那一格：about / work / statement / job / education / skill / offer / credit:exhibition …。故意不设约束，见 0127 顶上的注释';
+comment on column producer.studio_messages.entry_id is
+  '这段对话是关于哪一条的。没有条目就没有对话 —— 想从零起一份 proposal，先加一条，再点开它聊';
 comment on column producer.studio_messages.deleted_at is
   '「重说」撤掉的那几条。读面一律滤掉，行还在（照 0066 的规矩）';
 
-create index if not exists studio_messages_sec_idx
-  on producer.studio_messages (section, created_at) where deleted_at is null;
+create index if not exists studio_messages_entry_idx
+  on producer.studio_messages (entry_id, created_at) where deleted_at is null;
 
 -- ══ 二、「在写」那个标 ═════════════════════════════════════════
 --
@@ -138,7 +140,7 @@ grant execute on function public.pa_set_entry_draft(uuid, boolean) to anon, auth
 
 -- ══ 四、读书桌上的对话 ═════════════════════════════════════════
 -- 给 anon：跟 v_pa_pursuit_messages 一样，读自己的对话是浏览器直连的事。
-create or replace function public.pa_studio_thread(p_section text)
+create or replace function public.pa_studio_thread(p_entry_id uuid)
 returns jsonb
 language sql
 security definer
@@ -147,19 +149,19 @@ as $$
   select coalesce((
     select jsonb_agg(to_jsonb(m) order by m.created_at)
     from producer.studio_messages m
-    where m.section = p_section and m.deleted_at is null
+    where m.entry_id = p_entry_id and m.deleted_at is null
   ), '[]'::jsonb);
 $$;
 
-revoke all on function public.pa_studio_thread(text) from public;
-grant execute on function public.pa_studio_thread(text) to anon, authenticated, service_role;
+revoke all on function public.pa_studio_thread(uuid) from public;
+grant execute on function public.pa_studio_thread(uuid) to anon, authenticated, service_role;
 
 -- 「重说」：把说错的那句和它之后的撤掉。照 0066 那支的写法。
 --
 -- 锚点必须是他自己说的一句普通话 —— 这个函数不该能拿来撤别的东西，
 -- 而「拿不到就静悄悄什么都不做」会让界面以为撤成功了。
 --
--- 范围锁死在同一个 section 里：一栏一条对话，撤不到别栏去。
+-- 范围锁死在同一条条目上：一条一个对话，撤不到别条去。
 create or replace function public.pa_rewind_studio(p_msg_id uuid)
 returns int
 language plpgsql
@@ -185,7 +187,7 @@ begin
   -- 也有确定的先后，不会漏一条也不会多撤一条。
   update producer.studio_messages m
      set deleted_at = now()
-   where m.section = a.section
+   where m.entry_id = a.entry_id
      and (m.created_at, m.id) >= (a.created_at, a.id)
      and m.deleted_at is null;
 
@@ -202,9 +204,12 @@ grant execute on function public.pa_rewind_studio(uuid) to anon, authenticated, 
 -- pa_brain_context 要 p_pursuit_id，书桌这边没有线，所以单开一支。
 -- 形状比那两支小得多：没有机会线、没有产出、没有邮件线索、没有附件。
 --
+-- 三样东西：这条对话、**正在改的那一条**（entry）、全部条目（他写一份 proposal
+-- 时要引得出自己的展览和作品，所以全给）。
+--
 -- entries **不滤 draft**（见第二节）：他正在书桌上写那几条。
 -- 哪几条没写完由 draft 这个字段自己说，brain 那边照着标出来。
-create or replace function public.pa_studio_context(p_section text)
+create or replace function public.pa_studio_context(p_entry_id uuid)
 returns jsonb
 language sql
 security definer
@@ -214,8 +219,16 @@ as $$
     'messages', coalesce((
       select jsonb_agg(to_jsonb(m) order by m.created_at)
       from producer.studio_messages m
-      where m.section = p_section and m.deleted_at is null
+      where m.entry_id = p_entry_id and m.deleted_at is null
     ), '[]'::jsonb),
+    'entry', (
+      select jsonb_build_object(
+        'id', e.id, 'kind', e.kind, 'title', e.title, 'body', e.body,
+        'concern', e.concern, 'year', e.year, 'medium', e.medium,
+        'site_path', e.site_path, 'box', e.box, 'meta', e.meta,
+        'tags', e.tags, 'images', e.images, 'draft', e.draft
+      ) from producer.works e where e.id = p_entry_id
+    ),
     'entries', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', e.id, 'kind', e.kind, 'title', e.title, 'body', e.body,
@@ -229,17 +242,17 @@ as $$
   );
 $$;
 
-revoke all on function public.pa_studio_context(text) from public, anon, authenticated;
-grant execute on function public.pa_studio_context(text) to service_role;
+revoke all on function public.pa_studio_context(uuid) from public, anon, authenticated;
+grant execute on function public.pa_studio_context(uuid) to service_role;
 
 -- 写：只能往书桌上加一条对话。给 service_role —— 落库走 brain，
 -- 跟 pa_add_message / pa_add_contact_message 一路。
 create or replace function public.pa_add_studio_message(
-  p_section text,
-  p_role    text,
-  p_content text,
-  p_kind    text  default 'message',
-  p_meta    jsonb default null
+  p_entry_id uuid,
+  p_role     text,
+  p_content  text,
+  p_kind     text  default 'message',
+  p_meta     jsonb default null
 )
 returns jsonb
 language plpgsql
@@ -248,8 +261,8 @@ set search_path = public, producer
 as $$
 declare r producer.studio_messages;
 begin
-  if coalesce(btrim(p_section), '') = '' then
-    raise exception 'section 不能为空';
+  if p_entry_id is null then
+    raise exception 'entry_id 不能为空 —— 对话得挂在一条具体的东西上';
   end if;
   if p_role not in ('artist', 'producer', 'system') then
     raise exception 'role 只能是 artist|producer|system，收到 %', p_role;
@@ -258,8 +271,8 @@ begin
     raise exception 'content 不能为空';
   end if;
 
-  insert into producer.studio_messages (section, role, kind, content, meta)
-  values (btrim(p_section), p_role,
+  insert into producer.studio_messages (entry_id, role, kind, content, meta)
+  values (p_entry_id, p_role,
           coalesce(nullif(btrim(p_kind), ''), 'message'),
           p_content,
           coalesce(p_meta, '{}'::jsonb))
@@ -269,9 +282,9 @@ begin
 end
 $$;
 
-revoke all on function public.pa_add_studio_message(text, text, text, text, jsonb)
+revoke all on function public.pa_add_studio_message(uuid, text, text, text, jsonb)
   from public, anon, authenticated;
-grant execute on function public.pa_add_studio_message(text, text, text, text, jsonb)
+grant execute on function public.pa_add_studio_message(uuid, text, text, text, jsonb)
   to service_role;
 
 -- ══ 六、外联那两支上下文：滤掉在写的，并补上 id / images ═══════════

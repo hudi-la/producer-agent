@@ -32,6 +32,8 @@ test('没署名的看不出来——不编名字', () => {
 const base = {
   email: 'rachel.masters@arboretum.org', name: 'Rachel Masters', same_org: true,
   verdict: null, business: null, org_guess: 'Los Angeles County Arboretum',
+  // 真实的行在机会线上一定带着线。没有线的那一路（0126）单独测。
+  pursuit_id: '11111111-1111-1111-1111-111111111111',
 }
 
 test('同机构 + 像人 → 自动收', () => {
@@ -72,7 +74,7 @@ test('同机构的，哪怕被误判成群发也要收——休假自动回复�
 const at = '2026-08-16T20:00:00-07:00'
 
 test('对方回信时抄送的', () => {
-  const p = provenance({ kind: 'cc', via_direction: 'in', via_name: 'Lorna Turner',
+  const p = provenance({ kind: 'cc', via_direction: 'in', via_name: 'Lorna Turner', pursuit_id: 'p1',
                          via_email: 'lorna@printmuseum.org', pursuit_title: '工作坊提案 · IPM', sent_at: at })
   assert.equal(p.base, 'Lorna Turner 8/16 在「工作坊提案 · IPM」回信时抄送了这个地址')
   assert.equal(p.party, 'Lorna Turner 8/16 回信时抄送了')
@@ -80,25 +82,59 @@ test('对方回信时抄送的', () => {
 })
 
 test('你写信时抄送的', () => {
-  const p = provenance({ kind: 'cc', via_direction: 'out', via_name: 'Brooke Applegate',
+  const p = provenance({ kind: 'cc', via_direction: 'out', via_name: 'Brooke Applegate', pursuit_id: 'p1',
                          pursuit_title: '合作开课 · Arboretum', sent_at: '2026-08-12T10:00:00-07:00' })
   assert.equal(p.base, '你 8/12 在「合作开课 · Arboretum」写给 Brooke Applegate 时抄送了这个地址')
 })
 
 test('收件人栏里的说「也发给了」', () => {
-  const p = provenance({ kind: 'to', via_direction: 'in', via_name: 'Lorna', pursuit_title: 'X', sent_at: at })
+  const p = provenance({ kind: 'to', via_direction: 'in', via_name: 'Lorna', pursuit_id: 'p1', pursuit_title: 'X', sent_at: at })
   assert.match(p.base, /也发给了/)
 })
 
 test('从自己地址回信的', () => {
-  const p = provenance({ kind: 'reply', pursuit_title: '工作坊提案 · IPM', sent_at: '2026-09-04T09:00:00-07:00' })
+  const p = provenance({ kind: 'reply', pursuit_id: 'p1', pursuit_title: '工作坊提案 · IPM', sent_at: '2026-09-04T09:00:00-07:00' })
   assert.equal(p.base, '9/4 在「工作坊提案 · IPM」那条线的信串里回了信，跟线上的人同一个机构')
 })
 
 test('没有署名就用地址称呼带进来的人', () => {
   const p = provenance({ kind: 'cc', via_direction: 'in', via_name: null, via_email: 'a@b.org',
-                         pursuit_title: 'X', sent_at: at })
+                         pursuit_id: 'p1', pursuit_title: 'X', sent_at: at })
   assert.match(p.base, /^a@b\.org /)
+})
+
+// ── 人脉往来：没有线的那一路（0126）───────────────────────────────
+//
+// 真事：Stacy 9/8 发来 "Introduction: HuDi and David"，收件人是 David 和你。
+// Stacy 是纯人脉名片，名下没有机会线 —— 「在『X』那条线」这句话无处可说。
+
+test('没有线时，理由说「跟谁的往来里」，不编一条线出来', () => {
+  const p = provenance({ kind: 'to', via_direction: 'in', via_name: 'Stacy Dawson Stearns',
+                         via_email: 'sdsproduction@pm.me', pursuit_id: null,
+                         pursuit_title: 'Stacy Dawson Stearns', sent_at: '2026-09-08T15:46:44-07:00' })
+  assert.equal(p.base, 'Stacy Dawson Stearns 9/8 发给你的信里也发给了这个地址')
+  assert.doesNotMatch(p.base, /那条线|「/)
+})
+
+test('没有线、你自己写的信里带的人', () => {
+  const p = provenance({ kind: 'cc', via_direction: 'out', via_name: 'Stacy Dawson Stearns',
+                         pursuit_id: null, pursuit_title: 'Stacy Dawson Stearns',
+                         sent_at: '2026-09-10T08:49:00-07:00' })
+  assert.equal(p.base, '你 9/10 写给 Stacy Dawson Stearns 时抄送了这个地址')
+})
+
+test('没有线 → 只端不收，同机构也不自动建人', () => {
+  // 没有线就没有「同机构就是这条线的人」那种证据，也没有线可挂。
+  assert.deepEqual(decide({ ...base, pursuit_id: null }), { act: 'greet', verdict: 'person', unsure: false })
+})
+
+test('没有线、看着是共享信箱 → 照旧标成机构信箱', () => {
+  assert.deepEqual(decide({ ...base, pursuit_id: null, email: 'programs@usc.edu', name: 'Programs' }),
+                   { act: 'greet', verdict: 'shared_box' })
+})
+
+test('有线的老路一个字没变 —— 同机构 + 像人还是自动收', () => {
+  assert.deepEqual(decide({ ...base, pursuit_id: '11111111-1111-1111-1111-111111111111' }), { act: 'adopt' })
 })
 
 // ── 从信头补署名 ─────────────────────────────────────────────────

@@ -72,9 +72,10 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
     if (sync.skipped) { out.note = sync.note }
     if (sync.rebuilt) out.rebuilt = true
 
-    // ①.5 补核：预约发送的信真发出那刻只是标签翻成 SENT（labelAdded），
-    // 增量只听 messageAdded 听不见 —— 每轮把「时间已过、没核过标签」的
-    // 拿一次标签写审计。队列平时是空的，一次 SQL 而已。
+    // ①.5 补核：预约发送的信真发出那刻只是标签翻成 SENT（labelAdded）——
+    // 每轮把「时间已过、没核过标签」的拿一次标签写审计。队列平时是空的，
+    // 一次 SQL 而已。（增量现在也收标签事件了，见 gmail.js 的 idsFromHistory；
+    // 这一条留着兜「事件早过去了、游标已经推过」的那些。）
     try { const a = await auditPass({ log: () => {} }); if (a.audited) out.audited = a.audited }
     catch (err) { console.warn('  ⚠️ 补核标签没走成：' + err.message) }
 

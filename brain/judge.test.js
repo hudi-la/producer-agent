@@ -169,3 +169,22 @@ test('parseMet：见成了 / 没见成改约 / 看不出来', () => {
   assert.equal(parseMet('x\n[[TAG]] {"met":"maybe"}').met, null)
   assert.equal(parseMet('没标记'), null)
 })
+
+// 2026-09-06 Tom 那封信：「Let's aim for Friday the 11th or Saturday the 12th.
+// I'll let you know which day works best for me...」——收进来了、判过了、
+// 通知栏一声不吭。查下去是这一格的锅：它只问「解决了我们等的那件事吗」，
+// 而「没解决」的两支都写着**其余 null**。Tom 的信没解决 UCSB 线上「等
+// Young Joon 回复」那件事，于是它自己说的「哪天我再通知你」也被一起丢了。
+// 库里同一个黑洞吞了 9 封，其中有 CultureHub 那封「LOA 签回、交 W9、8/11
+// 前交营销素材」。同一封信落在 IDLE 格从来不会丢（7 封 0 全 null）——
+// 差别就在这句「其余 null」。
+//
+// **没解决 ≠ 什么都没说。** 两问分开答。
+test('WAITING_REPLY x THEIR_LETTER：这封信自己的三件事无条件问，不许被「没解决」连坐', () => {
+  const p = cellFor('WAITING_REPLY', 'THEIR_LETTER').ask(fact(), state)
+  assert.doesNotMatch(p, /其余 null/)
+  assert.match(p, /不管①答的是什么，这封信自己说了什么/)
+  assert.match(p, /要你回吗/)
+  assert.match(p, /meet_at/)
+  assert.match(p, /awaiting/)
+})

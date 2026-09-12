@@ -4,8 +4,8 @@ import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
-import { focusOf, addEntry, setEntryDraft } from '../lib/studio.js'
-import StudioChat from './StudioChat.jsx'
+import { addEntry, setEntryDraft } from '../lib/studio.js'
+import EntryChat from './EntryChat.jsx'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
@@ -48,11 +48,9 @@ function EntryFields({ e, ro, save }) {
   )
 }
 
-// 展开状态住在 Library 里，不住在这儿。
-//
-// 原来是每条自己一个 useState，于是「他现在展开着哪几条」没有任何地方知道
-// —— 而那正是右边那张桌子要报给脑子的东西（focusOf）。提上去之后行为一个字
-// 没变：还是点空白展开、点 › 展开，还是可以同时开好几条。
+// 展开状态住在 Library 里，不住在这儿 —— 「加一条」建完要把新那条自动展开，
+// 而那个动作发生在 Library。行为一个字没变：还是点空白展开、点 › 展开，
+// 还是可以同时开好几条。
 function Entry({ e, open, onToggle, onSaved }) {
   const entries = boxEntries(e.box)
   const facts = subInfo(e)
@@ -120,6 +118,8 @@ function Entry({ e, open, onToggle, onSaved }) {
             <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
           ))}
           <div className="add">+ 补一条 / 丢进材料</div>
+          {/* 这一条的抽屉。点开哪一条，就聊哪一条 —— 没有条目就没有对话。 */}
+          {!ro && <EntryChat entry={e} />}
         </div>
       )}
     </div>
@@ -224,16 +224,13 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
   // 选中的格可能因为库变了而消失（比如某类被清空）——退回「关于你」，别渲染空白。
   const cur = sections.find((s) => s.key === pick) || sections[0]
 
-  // 展开着哪几条。提到这一层，是因为右边那张桌子要靠它知道「他在说哪一件」
-  // ——焦点不新造动作，就是他本来就在做的「点开一条」。
+  // 展开着哪几条。提到这一层，是因为「加一条」建完要把新那条自动展开。
   const [openIds, setOpenIds] = useState(new Set())
   const toggle = (id) => setOpenIds((cur_) => {
     const next = new Set(cur_)
     next.has(id) ? next.delete(id) : next.add(id)
     return next
   })
-
-  const focus = focusOf(cur, openIds)
 
   // 加一条。新那条库里标着「在写」，建完自动展开，标题就地改。
   // 「关于你」那一格没有这个按钮 —— 它是 profile，不是条目。
@@ -249,12 +246,12 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
 
   return (
     <div className="page">
-      <div className="page-inner widest">
+      <div className="page-inner wide">
         <header className="page-head">
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
-        <div className="lib-three">
+        <div className="lib-two">
           <nav className="lib-rail" aria-label="档案分类">
             {sections.map((s) => {
               const d = draftsIn(s)
@@ -278,8 +275,6 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
               : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns}
                              onSaved={onEntrySaved} openIds={openIds} onToggle={toggle} onAdd={add} />}
           </div>
-          {/* 一栏一张书桌。换栏就是换一条对话，各记各的。 */}
-          <StudioChat section={cur.key} focus={focus} />
         </div>
       </div>
     </div>

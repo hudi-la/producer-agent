@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMessages, sendMessageStream, stopThinking, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
-import { useLiveReply } from '../lib/useLiveReply.js'
+import { fetchMessages, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
+import { useChat } from '../lib/useChat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
 import { md } from '../lib/when.js'
@@ -292,15 +292,20 @@ export default function PursuitFocus({
   brainUp = true,
 }) {
   const inDrawer = variant === 'drawer'
-  const [msgs, setMsgs] = useState(messages || [])
-  const [text, setText] = useState('')
-  const [thinking, setThinking] = useState(false)
-  // 它正在打的那段字（还没落库）。live 有内容就渲染成一个真气泡，
-  // 而不是三个点——你能一行一行看着它想。
-  const { live, act, onEvent: onLive, reset: resetLive } = useLiveReply()
-  const [err, setErr] = useState(null)
-  // 正在就地改的那一句。库里还什么都没动——见 Resay.jsx 顶上那段。
-  const [editId, setEditId] = useState(null)
+  // 说话那一整套（发、边想边出字、重说、终止）在 useChat 里，跟档案里那张
+  // 书桌共用同一份 —— 照抄两份的话，出错那几条路迟早只修好一边。
+  // 这一页多出来的东西（笔卡、信卡、邮件锚点、stalled、stoppedId）留在这儿。
+  const chat = useChat({
+    owner: p.id,
+    reload: () => fetchMessages(p.id),
+    rewind: rewindChat,
+    // 脑子没开：这句直接记成一笔（不是聊天），走浏览器直连；脑子醒了由盲格子判。
+    // 「记一笔」按钮 2026-09-11 退场了 —— 脑子醒着时说什么该记成什么由它判（0125）。
+    offline: { up: brainUp, note: (t) => addPursuitNote(p.id, t) },
+  })
+  const { msgs, setMsgs, text, setText, err, setErr, editId, setEditId, live, act, runIdRef } = chat
+  const thinking = chat.busy
+  // （正在就地改的那一句也在 chat 里。库里还什么都没动——见 Resay.jsx 顶上那段。）
   const [stage, setStageLocal] = useState(p.stage)
   // 球权本地先动，写库由 App 负责回滚。装的是「球在谁那边」这个答案本身，
   // 不是「你有没有手动改过」——后者不是你要看的东西。
@@ -332,7 +337,6 @@ export default function PursuitFocus({
   // 出字那一轮一秒好几帧，等于每秒被拽好几次。
   const stick = useRef(true)
   const taRef = useRef(null)        // 输入框本体，用来按内容撑高
-  const runIdRef = useRef(null)     // 正在跑的那一次，「终止」靠它找到对应的活
   // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
   const threeCol = !inDrawer
   const [deliv, setDeliv] = useState([])
@@ -477,115 +481,22 @@ export default function PursuitFocus({
     })
   }), [p.id])
 
-  // said 是「重说」交过来的那句改完的话。不传就是输入框里那句。
-  // 两条路必须共用这一个函数：乐观插入、换掉临时条、失败时话还不还给你——
-  // 那三件事分两份写，迟早有一边漏掉，而漏掉的那边会静悄悄吞掉你打的字。
+  // 说一句。真正的那一套在 useChat 里；这儿只加这一页专有的两件事：
+  //   · 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底
+  //   · 终止了要把「这条就停在这儿」记下来，好让 stalled 那句话不冤枉它
   async function send(said) {
-    const t = (said ?? text).trim()
-    if (!t || busy) return
-    // 脑子没开：这句直接记成一笔（不是聊天），走浏览器直连；脑子醒了由盲格子判。
-    // 「记一笔」按钮 2026-09-11 退场了 —— 脑子醒着时，说什么该记成什么由它判（0125）。
-    if (!brainUp) {
-      if (said == null) setText('')
-      setErr(null)
-      try {
-        await addPursuitNote(p.id, t)
-        const rows = await fetchMessages(p.id)
-        if (rows) setMsgs(rows)
-      } catch (e) {
-        setErr('没记上：' + (e?.message || e))
-        if (said == null) setText((cur) => cur || t)
-      }
-      return
-    }
-    // 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底。
+    if (said == null && !brainUp) return chat.send(said)   // 记笔那条路不动滚动
     stick.current = true
-    if (said == null) setText('')
-    setErr(null)
-    setThinking(true)
-    // run_id 在这儿生成，跟着请求一起发过去——不能等回来再拿：
-    // /chat 是想完了才返回的，那时候早没得停了。
-    const runId = crypto.randomUUID()
-    runIdRef.current = runId
-    const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: t }
-    setMsgs((m) => [...m, tmp])
-    let landedMine = null
-    try {
-      const { mine, reply, aborted } = await sendMessageStream(p.id, t, undefined, runId, (e) => {
-        // 你那条一落库就回来了：拿真的换掉临时那条（临时的没有 id、没有时间）。
-        // 换早一点，3 秒轮询就不会跟它撞出两条一样的。
-        if (e.t === 'mine') {
-          landedMine = e.row
-          setMsgs((m) => m.map((x) => (x.id === tmp.id ? e.row : x)))
-        } else {
-          onLive(e)
-        }
-      })
-      // 终止了就只留你那条：它没写回复，reply 是 null。
-      const you = mine || landedMine
-      setMsgs((m) => [
-        ...m.filter((x) => x.id !== tmp.id && x.id !== you?.id),
-        ...(you ? [you] : []),
-        ...(reply ? [reply] : []),
-      ])
-      if (aborted && you) setStoppedId(you.id)
-    } catch (e) {
-      // 脑子是先存你的话、再去想的，所以失败有两种：
-      //   连不上 → 一个字都没存 → 把内容还回输入框，别让你白打
-      //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
-      const rows = await fetchMessages(p.id)
-      const landed = rows?.some((m) => m.role === 'artist' && m.content === t)
-      if (rows) setMsgs(rows)
-      else setMsgs((m) => m.filter((x) => x.id !== tmp.id))
-      if (!landed) {
-        setText((cur) => cur || t)   // 期间你要是又打了别的，就别覆盖
-        setErr(e.message + '（你的话还在框里，没丢）')
-      } else {
-        setErr(e.message + '（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）')
-      }
-    } finally {
-      setThinking(false)
-      resetLive()
-      runIdRef.current = null
-    }
+    const r = await chat.send(said)
+    if (r?.aborted && r.you) setStoppedId(r.you.id)
+    return r
   }
 
-  /**
-   * 重说：撤掉这句和它之后的对话，然后把改完的这句照常发出去。
-   *
-   * 顺序不能反。先撤再发的话，Fairwind 拿到的是干净的往来；先发再撤，
-   * 它已经带着那句错话想过一轮了——而那正是你按这个按钮要躲开的事。
-   *
-   * 撤失败就停在编辑态：话还在框里，错话摆在下面，你可以再按一次。
-   * （照 EditRow 那条规矩：存不上不退回原值，退了你刚写的就没了。）
-   */
-  async function resay(id, said) {
-    const t = said.trim()
-    if (!t || busy) return
-    setErr(null)
-    try {
-      await rewindChat(id)
-    } catch (e) {
-      setErr('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
-      return
-    }
-    setEditId(null)
-    setMsgs((cur) => dropFrom(cur, id))
-    await send(t)
-  }
+  const resay = chat.resay
 
-  // 终止：掐掉正在跑的那一次，不写回复。你说的那句留着——它是你说的话，不是它想的。
-  //
-  // 拿不到 run_id 也照样把界面解开：可能是脑子重启过、或者这条「在想」是上次
-  // 开着页面时留下的。那种情况下本来也没东西在跑，卡着输入框没有意义。
   async function stop() {
-    const rid = runIdRef.current
     if (lastMsg) setStoppedId(lastMsg.id)
-    setThinking(false)
-    // 打到一半的那段也一起收掉：它不会落库，留在屏幕上等于给你看一份不存在的回复。
-    resetLive()
-    runIdRef.current = null
-    if (rid) await stopThinking(rid)
+    await chat.stop()
   }
 
   // 哪些消息已经被搬进右栏当产出了（deliverables.source_msg 指着它）

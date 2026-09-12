@@ -2,15 +2,15 @@
 //
 // 这支盯着两件不能出错的事：
 //   · 它手里没有写库的能力，人格里也不许装出有（「我帮你改好了」是句假话）
-//   · 19,486 字符的信息库留在静态块里，焦点留在 user message 里
-//     ——切错一边，每一栏各自全价读一遍那两万字
+//   · 19,486 字符的信息库留在静态块里，「正在改的这一条」留在 user message 里
+//     ——切错一边，每开一条条目都各自全价读一遍那两万字
 //
 // 跑：node --test brain/studio.test.js
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  STUDIO_SYSTEM, focusBlock, studioParts,
+  STUDIO_SYSTEM, entryBlock, studioParts,
   buildStudioSystem, buildStudioUser,
 } from './studio.js'
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from './prompt.js'
@@ -23,10 +23,8 @@ const entries = [
   { id: 'o2', kind: 'offer', title: '在写的驻校课', body: '才起了个头', draft: true },
 ]
 
-const ctx = {
-  profile, entries, msgs: [],
-  focus: { label: '工作坊 · 可提供', count: 2, open: [{ id: 'o2', title: '在写的驻校课' }] },
-}
+// 桌上摊着的那一条 = entries 里的 o2（同一个东西，库那边分两个键给回来）。
+const ctx = { profile, entries, msgs: [], entry: entries[2] }
 
 // ── 人格 ────────────────────────────────────────────────────
 
@@ -53,51 +51,60 @@ test('人格里交代了查回来的东西要说出处', () => {
   assert.ok(/哪儿来|出处|来源/.test(STUDIO_SYSTEM(profile)))
 })
 
-// ── 焦点 ────────────────────────────────────────────────────
+// ── 桌上摊着的那一条 ────────────────────────────────────────────────────
 
-test('焦点：展开着的条目带 id 列出来', () => {
-  const out = focusBlock(ctx.focus).join('\n')
-  assert.ok(out.includes('工作坊 · 可提供'))
-  assert.ok(out.includes('2'))
-  assert.ok(out.includes('在写的驻校课'))
-  assert.ok(out.includes('o2'))
+test('桌上那一条：标题、id、全文描述都摊开', () => {
+  const out = entryBlock(entries[0]).join('\n')
+  assert.ok(out.includes('花园'))
+  assert.ok(out.includes('w1'))
+  assert.ok(out.includes('一段旧描述'))
 })
 
-test('焦点：一条没展开就只说栏，不留一个空的「展开着：」', () => {
-  const out = focusBlock({ label: '自述 · Bio', count: 2, open: [] }).join('\n')
-  assert.ok(out.includes('自述 · Bio'))
-  assert.ok(!out.includes('展开着'))
+test('桌上那一条：描述是空的就说空的，不留一段假装有内容的空白', () => {
+  const out = entryBlock({ id: 'x', kind: 'offer', title: '刚建的' }).join('\n')
+  assert.ok(/空的|还没写/.test(out))
 })
 
-test('焦点：没有焦点就整块不出现', () => {
-  assert.deepEqual(focusBlock(null), [])
-  assert.deepEqual(focusBlock({}), [])
+test('桌上那一条：盒子摊开 —— 改描述时正该用那些料', () => {
+  const out = entryBlock({ id: 'x', kind: 'work', title: 'A',
+                          box: { guardrail: '还没真教过', 没填的那格: '' } }).join('\n')
+  assert.ok(out.includes('还没真教过'))
+  assert.ok(!out.includes('没填的那格'))
+})
+
+test('桌上那一条：在写的说出来，它才知道这是个半成品', () => {
+  assert.ok(entryBlock(entries[2]).join('\n').includes('还在写'))
+  assert.ok(!entryBlock(entries[0]).join('\n').includes('还在写'))
+})
+
+test('没有条目就没有这一段 —— 没有条目就没有对话', () => {
+  assert.deepEqual(entryBlock(null), [])
+  assert.deepEqual(entryBlock({}), [])
 })
 
 // ── 三档切在哪儿 ─────────────────────────────────────────────
 
-test('信息库在静态块，焦点在 user message——切反了每栏都要重读两万字', () => {
+test('信息库在静态块，桌上那一条在 user message——切反了每条都要重读两万字', () => {
   const [静, 界, 动] = buildStudioSystem(ctx)
   assert.equal(界, SYSTEM_PROMPT_DYNAMIC_BOUNDARY)
   assert.ok(静.includes('花园'), '写完的条目该在静态块里')
-  assert.ok(!静.includes('o2'), '焦点不许进静态块')
-  assert.ok(!静.includes('工作坊 · 可提供'), '栏名不许进静态块')
-  assert.equal(动, '', '书桌没有「每条线不同」的东西，动态块是空的')
+  assert.ok(!静.includes('## 他正在改这一条'), '桌上那一条不许进静态块')
+  assert.equal(动, '', '一条一个对话，动态块是空的')
 
   const u = buildStudioUser(ctx, '这段描述不准', null)
-  assert.ok(u.includes('o2'))
+  assert.ok(u.includes('## 他正在改这一条'))
   assert.ok(u.includes('这段描述不准'))
 })
 
-test('两栏之间静态块逐字相同——缓存能不能跨栏命中就看这个', () => {
+test('换一条，静态块逐字相同——缓存能不能跨条目命中就看这个', () => {
   const a = buildStudioSystem(ctx)[0]
-  const b = buildStudioSystem({ ...ctx, focus: { label: '作品', count: 11, open: [] } })[0]
+  const b = buildStudioSystem({ ...ctx, entry: entries[0] })[0]
   assert.equal(a, b)
 })
 
 test('在写的那几条在 user message 里，不在静态块里——他每改一下不该废掉缓存', () => {
   const [静] = buildStudioSystem(ctx)
-  assert.ok(!静.includes('在写的驻校课'))
+  assert.ok(!静.includes('还在写的（标着'))
   const u = buildStudioUser(ctx, '继续写', null)
   assert.ok(u.includes('在写的驻校课'))
   assert.ok(/还在写|没写完/.test(u), '得标出来这几条是没写完的')
@@ -122,4 +129,8 @@ test('三档首尾相接就是整根 prompt——没有一段走丢', () => {
   assert.ok(全.includes('o2'))
   assert.ok(全.includes('刚说的'))
   assert.deepEqual(perLine, [])
+})
+
+test('人格里交代了「这次就说这一条」——别的条目是弹药不是任务', () => {
+  assert.ok(/就说这一条/.test(STUDIO_SYSTEM(profile)))
 })
