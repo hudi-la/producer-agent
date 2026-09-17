@@ -40,6 +40,15 @@ test('/setup 写 settings、注册用户,之后 /me ready:true', async () => {
   const p = await pg.query('select count(*)::int as n from public.v_pa_profile'); assert.equal(p.rows[0].n, 1)
 })
 
+test('/settings:GET 不回显 key,只给末四位;POST 空 key 不动原来的,改模型档位当场进 env', async () => {
+  const g = res(); await handleLocalRoute(req('GET', '/settings'), g, ctx)
+  const j = g.json(); assert.equal(j.apiKeySet, true); assert.equal(j.apiKeyHint, 'sk-ant-…nt-1'); assert.equal(JSON.stringify(j).includes('sk-ant-1'), false)
+  const w = res(); await handleLocalRoute(req('POST', '/settings', { apiKey: '', model: 'claude-opus-5', modelCheap: 'claude-haiku-4-5-20251001' }), w, ctx)
+  assert.equal(w.json().apiKeySet, true); assert.equal(process.env.ANTHROPIC_API_KEY, 'sk-ant-1'); assert.equal(process.env.BRAIN_MODEL, 'claude-opus-5')
+  const w2 = res(); await handleLocalRoute(req('POST', '/settings', { apiKey: 'sk-ant-9999' }), w2, ctx)
+  assert.equal(w2.json().apiKeyHint, 'sk-ant-…9999'); assert.equal(process.env.ANTHROPIC_API_KEY, 'sk-ant-9999')
+})
+
 test('/db/rpc 和 /db/from 原样转发', async () => {
   const w = res(); await handleLocalRoute(req('POST', '/db/rpc/pa_set_profile', { p_name: 'X' }), w, ctx)
   assert.equal(w.json().error, null)

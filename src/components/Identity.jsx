@@ -59,18 +59,65 @@ export default function Identity({ onSaved }) {
 }
 
 // 账号那一行:登录身份和登出住在「关于你」的最底下——账号的事在账号该住的
-// 地方,不占顶栏。没配库(演示模式)时整行不出现。
+// 地方,不占顶栏。没配库(演示模式)时整行不出现。本机模式没有登录这回事,
+// 这块换成 LocalAccount:邮箱、API key、模型档位、备份目录——首次启动问过的那几样,
+// 之后在这儿改(2026-09-16)。
 function AccountRow() {
   const [email, setEmail] = useState(null)
   useEffect(() => {
-    if (!supa) return
+    if (!supa || supa.mode === 'local') return
     supa.auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
   }, [])
+  if (supa?.mode === 'local') return <LocalAccount />
   if (!supa || !email) return null
   return (
     <div className="idnote acct">
       登录身份:{email}
       <button type="button" className="acct-out" onClick={() => supa.auth.signOut()}>登出</button>
     </div>
+  )
+}
+
+// 本机模式的账号块。key **永远不回显**:brain 只给「设了没有」和末四位,
+// 这儿的输入框空着 = 不动原来的,填了 = 换掉。改完当场生效,brain 不用重启。
+function LocalAccount() {
+  const [cur, setCur] = useState(null)
+  const [form, setForm] = useState({ email: '', apiKey: '', model: '', modelCheap: '', backupDir: '' })
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, apiKey: '' })) } })
+  useEffect(() => { load() }, [])
+  if (!cur) return null
+  const dirty = form.apiKey || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir
+  const save = async (e) => {
+    e.preventDefault(); setBusy(true); setNote('')
+    const r = await supa.settings.set(form)
+    setBusy(false)
+    if (r?.error) return setNote('没存上:' + r.error.message)
+    setNote('存好了,下一次开口就用新的'); await load()
+  }
+  const F = ({ k, label, hint, type = 'text', placeholder }) => (
+    <label className="la-row">
+      <span className="la-k">{label}</span>
+      <input type={type} value={form[k]} placeholder={placeholder} autoComplete="off"
+             onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} />
+      {hint && <small>{hint}</small>}
+    </label>
+  )
+  return (
+    <form className="local-account" onSubmit={save}>
+      <div className="kind-h la-h">账号<small>都在你这台机器上,不上传</small></div>
+      <F k="email" label="邮箱" type="email" hint="只用来在这台机器上认出你" />
+      <F k="apiKey" label="API key" type="password"
+         placeholder={cur.apiKeySet ? `已设置 · ${cur.apiKeyHint}(要换就填新的)` : '还没设——填一个 sk-ant- 开头的'}
+         hint="模型的钱走你自己的 key。空着 = 不动原来的" />
+      <F k="model" label="好档模型" placeholder="空 = 默认" hint="聊天、写信、讲懂用这档" />
+      <F k="modelCheap" label="便宜档模型" placeholder="空 = 默认" hint="判断、收信那些小活用这档" />
+      <F k="backupDir" label="备份目录" placeholder="/Users/你/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" hint="选一个在 iCloud Drive 或 Google Drive 里的" />
+      <div className="la-acts">
+        <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? '存着…' : '保存'}</button>
+        {note && <span className={'la-note' + (note.startsWith('没存上') ? ' bad' : '')}>{note}</span>}
+      </div>
+    </form>
   )
 }

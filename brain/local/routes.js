@@ -10,6 +10,20 @@ const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'applic
 const readAll = (req) => new Promise((ok, no) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); req.on('error', no) })
 const readJson = async (req) => { const b = await readAll(req); return b.length ? JSON.parse(b.toString()) : {} }
 
+/** settings 里能给页面看的那几样。**key 永不回显**,只给「设了没有」和末四位。 */
+export function publicSettings(s) {
+  const k = s.apiKey || ''
+  return { email: s.email || '', model: s.model || '', modelCheap: s.modelCheap || '', backupDir: s.backupDir || '',
+           ready: Boolean(s.ready), apiKeySet: Boolean(k), apiKeyHint: k ? `${k.slice(0, 7)}…${k.slice(-4)}` : '' }
+}
+
+/** 把 settings 推进 process.env。启动时(server.js connect)和改完都调。 */
+export function exportEnv(s) {
+  if (s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey
+  process.env.BRAIN_MODEL = s.model || ''
+  process.env.BRAIN_MODEL_CHEAP = s.modelCheap || ''
+}
+
 /**
  * 处理了返回 true;不是这儿的事返回 false,交给 server.js 原来的分发。
  * ctx = { db, pg, mode, dataDir, settings, distDir, onSetup }
@@ -26,17 +40,24 @@ export async function handleLocalRoute(req, res, ctx) {
     return true
   }
 
-  if (req.method === 'POST' && p === '/setup') {
+  // 首次启动(/setup)和之后在「关于你」底下改(/settings)走同一条:存盘、登记、把 key 和模型档位
+  // 推进 process.env(SDK 起子进程、models.js 挑档位,读的都是 env,所以改完当场生效,不用重启)。
+  if (req.method === 'POST' && (p === '/setup' || p === '/settings')) {
     const body = await readJson(req)
-    const s = saveSettings(dataDir, { email: body.email || '', apiKey: body.apiKey || '', model: body.model || '', modelCheap: body.modelCheap || '', backupDir: body.backupDir || '' })
+    const patch = {}
+    for (const k of ['email', 'model', 'modelCheap', 'backupDir']) if (typeof body[k] === 'string') patch[k] = body[k].trim()
+    if (typeof body.apiKey === 'string' && body.apiKey.trim()) patch.apiKey = body.apiKey.trim()   // 空着 = 不动原来的
+    const s = saveSettings(dataDir, patch)
     ctx.settings = s
     if (s.email) await registerLocalUser(ctx.pg, { id: s.uid, email: s.email })
-    if (s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey          // SDK 起子进程时读的是 process.env
+    exportEnv(s)
     db.setUser?.({ id: s.uid, email: s.email })
     await ctx.onSetup?.(s)
-    json(res, 200, { ok: true, ready: s.ready })
+    json(res, 200, { ok: true, ready: s.ready, ...publicSettings(s) })
     return true
   }
+
+  if (req.method === 'GET' && p === '/settings') { json(res, 200, publicSettings(ctx.settings)); return true }
 
   if (req.method === 'POST' && p.startsWith('/db/rpc/')) {
     const name = p.slice('/db/rpc/'.length)

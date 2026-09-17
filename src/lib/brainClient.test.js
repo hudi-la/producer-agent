@@ -46,3 +46,10 @@ test('storage:签名 URL 直接拼,不问网络', async () => {
   const c = brainClient('http://b', fakeFetch({}))
   assert.deepEqual(await c.storage.from('pursuit-files').createSignedUrl('a/b.txt', 60), { data: { signedUrl: 'http://b/files/a%2Fb.txt' }, error: null })
 })
+
+test('settings:get 走 GET /settings,set 走 POST', async () => {
+  calls.length = 0
+  const c = brainClient('http://b', fakeFetch({ email: 'e', apiKeySet: true, apiKeyHint: 'sk-ant-…1234' }))
+  const g = await c.settings.get(); assert.equal(g.apiKeyHint, 'sk-ant-…1234'); assert.equal(calls[0].url, 'http://b/settings')
+  await c.settings.set({ model: 'x' }); assert.equal(calls[1].init.method, 'POST'); assert.deepEqual(JSON.parse(calls[1].init.body), { model: 'x' })
+})

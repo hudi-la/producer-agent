@@ -43,7 +43,7 @@ import { modelFor, GOOD, CHEAP } from './models.js'
 import { makeDb, requireUser } from './dbauth.js'
 // 本机模式(2026-09-16):前端借这几条路碰库、碰文件、问「我是谁」;云端模式下它什么都不做
 import { fileURLToPath } from 'node:url'
-import { handleLocalRoute } from './local/routes.js'
+import { handleLocalRoute, exportEnv } from './local/routes.js'
 // 模块是能力开关(设计稿 D5):关着的模块,路由 404、定时器不起、Gmail 工具不进白名单。云端永远全开
 import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
 import { initStore } from './mail/store.js'
@@ -100,7 +100,7 @@ async function connect() {
       distDir: process.env.FAIRWIND_DIST_DIR || fileURLToPath(new URL('../dist/', import.meta.url)),
       onSetup: async (settings) => { LOCAL_MODE.settings = settings },
     }
-    if (r.settings.apiKey) process.env.ANTHROPIC_API_KEY = r.settings.apiKey
+    exportEnv(r.settings)   // key 和两档模型:settings.json 是学员机器上唯一的一份,不用 .env
     console.log(`· 本机库:${LOCAL_MODE.dataDir}${r.settings.ready ? '' : '(还没初始化,等页面上填)'}`)
   }
   initStore(db)
