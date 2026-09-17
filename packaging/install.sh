@@ -57,6 +57,9 @@ ROOT="$HOME/Applications/Fairwind"
 exec "$ROOT/current/node" "$ROOT/current/launcher.cjs"
 SH
 chmod +x "$APPB/Contents/MacOS/Fairwind"
+# 本机临时签名(ad-hoc,不用苹果账号):Apple Silicon 对完全没签名的程序有时会拒。
+# 这不是公证——真要浏览器下载后双击就开,得有开发者账号(见 packaging/ACCEPTANCE.md)。
+codesign --force --sign - "$APPB" >/dev/null 2>&1 || true
 cat > "$APPB/Contents/Info.plist" <<'PL'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

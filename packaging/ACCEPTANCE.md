@@ -27,6 +27,14 @@
 4. 学员粘：`curl -fsSL https://github.com/<你>/fairwind-releases/releases/latest/download/install.sh | sh`
 5. 以后发新版：改 `package.json` 的 version → 重打 → 传上去。学员那边「检查更新」自己看见。
 
+## 双击安装(问过,2026-09-17)
+
+浏览器下载的东西带隔离标记,没公证的应用双击会被拦(Sequoia 起右键打开也不行)。三条路:
+① 苹果开发者账号 $99/年 + 公证 → 发 `.dmg`,双击拖进应用程序;签名公证接进 build.mjs 最后一段。
+② 装机答疑那天用 U 盘拷(Finder 从外置盘拷的文件不打隔离标记)。
+③ 现在的粘一行(curl 下的没有标记,.app 本机生成)。
+第一期走 ③;真卡人再花 $99 走 ①。install.sh 已顺手做 ad-hoc 签名。
+
 ## 没做的
 
 - win / mac-x64 包（要在那个平台上编字节码；CI 矩阵）
