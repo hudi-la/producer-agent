@@ -26,6 +26,20 @@ export async function fetchStudioThread(entryId) {
 }
 
 /**
+ * 「重开一轮」：在流里划一道线。返回那条线（空对话、或上一条已经是线时返回 null）。
+ *
+ * 线以上的照常摆在界面上 —— 往上滚就看得见。变的只有一件事：Fairwind 的
+ * prompt 只读最后一道线以下的。**不存档、不藏起来**：藏起来就欠一个
+ * 「翻旧对话」的界面，而没有那个界面时「存起来了」等于「丢了」。
+ */
+export async function restartStudio(entryId) {
+  needDb()
+  const { data, error } = await supa.rpc('pa_restart_studio', { p_entry_id: entryId })
+  if (error) throw new Error(error.message)
+  return data ?? null
+}
+
+/**
  * 「重说」：把他点的那句和它之后的对话撤掉。返回撤了几条。
  *
  * 撤掉的话库里还在（打了 deleted_at 的标），只是读面全部滤掉：界面看不见，

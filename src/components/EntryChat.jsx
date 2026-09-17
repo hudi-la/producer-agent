@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { useChat } from '../lib/useChat.js'
 import { useGrow } from '../lib/useGrow.js'
-import { fetchStudioThread, rewindStudio } from '../lib/studio.js'
+import { fetchStudioThread, rewindStudio, restartStudio } from '../lib/studio.js'
 import SayBubble from './Resay.jsx'
 import Md from './Md.jsx'
 
@@ -26,6 +26,16 @@ export default function EntryChat({ entry, onClose }) {
     rewind: rewindStudio,
   })
   const { msgs, setMsgs, text, setText, busy, err, setErr, editId, setEditId, live, act } = chat
+
+  // 重开一轮：划一道线。线以上的留在屏幕上，只是它不再读了。
+  const restart = async () => {
+    if (busy) return
+    setErr(null)
+    try {
+      const row = await restartStudio(entry.id)
+      if (row) setMsgs((m) => [...m, row])
+    } catch (e) { setErr('没划上：' + e.message) }
+  }
   const endRef = useRef(null)
   const taRef = useRef(null)
   useGrow(taRef, text)
@@ -49,6 +59,18 @@ export default function EntryChat({ entry, onClose }) {
             两个开关各管一半的话，你会关掉抽屉却不知道怎么让它回来。 */}
         {onClose && <button className="echat-x" onClick={onClose} aria-label="收起这一条">×</button>}
         一起写《{entry.title || '未命名'}》
+        {/* 重开一轮 = 划一道线，不是清空。上面那些话还在，往上滚就看得见；
+            变的只是它不再读线以上的。所以没有「确定要清空吗」这道问 —— 没什么会没。 */}
+        {msgs.length > 0 && (
+          <button className="echat-new" onClick={restart} disabled={busy}
+                  title="从这儿重开一轮：上面的话还在，但它不再带着它们想">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+                 strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+            </svg>
+            重开一轮
+          </button>
+        )}
         <i>它带着你整个档案，但这次只说这一条。
           写出来的字进不了档案——你自己复制到左边那一格里。</i>
       </div>
@@ -61,6 +83,9 @@ export default function EntryChat({ entry, onClose }) {
           </div>
         )}
         {msgs.map((m, i) => {
+          if (m.kind === 'restart') {
+            return <div className="echat-line" key={m.id || i}><span>从这儿重开的</span></div>
+          }
           const mine = m.role === 'artist'
           return (
             <div id={'msg-' + m.id} key={m.id || i} className={'msg' + (mine ? ' you' : ' producer')}>
@@ -95,28 +120,37 @@ export default function EntryChat({ entry, onClose }) {
       </div>
 
       {err && <div className="echat-err">{err}</div>}
+      {/* 输入框跟机会卡那边是同一套：同样的胶囊、同样那颗圆按钮（.composer .ph / .send）。
+          原来这儿是一颗写着「说」的方按钮 —— 同一个动作在两处长两个样，没有道理。 */}
       <div className="echat-composer">
-        {/* isComposing 那句不能删——中文输入法选词时也会敲 Enter，
-            不挡的话你选个词就把半句话发出去了。 */}
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={text}
-          disabled={busy}
-          placeholder={busy ? '在想……（想完会自动出现，你不用守着）'
-            : '这段描述哪儿不准？想把它写成什么样？'}
-          onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
-            e.preventDefault()
-            chat.send()
-          }}
-        />
-        {busy ? (
-          <button className="stop" onClick={chat.stop}>停</button>
-        ) : (
-          <button onClick={() => chat.send()} disabled={!text.trim()}>说</button>
-        )}
+        <div className="composer flat">
+          {/* isComposing 那句不能删——中文输入法选词时也会敲 Enter，
+              不挡的话你选个词就把半句话发出去了。 */}
+          <textarea
+            ref={taRef}
+            className="ph"
+            rows={1}
+            value={text}
+            disabled={busy}
+            placeholder={busy ? '在想……（想完会自动出现，你不用守着）'
+              : '这段描述哪儿不准？想把它写成什么样？'}
+            onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+              e.preventDefault()
+              chat.send()
+            }}
+          />
+          {busy ? (
+            <button className="send stop" aria-label="终止" title="终止——停掉它这次的回复" onClick={chat.stop}>
+              <svg width="15" height="15" viewBox="0 0 16 16"><rect x="4.5" y="4.5" width="7" height="7" rx="1.4" fill="#fff" /></svg>
+            </button>
+          ) : (
+            <button className="send" aria-label="发送" onClick={() => chat.send()} disabled={!text.trim()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

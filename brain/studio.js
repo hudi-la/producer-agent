@@ -123,11 +123,25 @@ export function entryBlock(e) {
   return lines
 }
 
-// 往来。incoming 那句刚已经落库了，所以要从历史里摘出去（exceptId），
-// 否则它会在 prompt 里出现两次。
+/**
+ * 往来。
+ *
+ * incoming 那句刚已经落库了，所以要从历史里摘出去（exceptId），否则它会在
+ * prompt 里出现两次。
+ *
+ * **只读最后一道线以下的**（0128）：他按过「重开一轮」，线以上的那些话
+ * 界面上照常摆着（往上滚就看得见），但你不该再背着它们想 —— 他按那一下
+ * 要的就是这个。线本身也不进 prompt：它不是谁说的话。
+ */
 function historyBlock({ msgs, profile }, exceptId) {
-  const history = (msgs || []).filter((m) => m.id !== exceptId && !m.deleted_at)
-  if (!history.length) return ['（这一条还没聊过，刚开始。）\n']
+  const all = (msgs || []).filter((m) => !m.deleted_at)
+  const cut = all.map((m) => m.kind).lastIndexOf('restart')
+  const history = all.slice(cut + 1).filter((m) => m.id !== exceptId && m.kind !== 'restart')
+  if (!history.length) {
+    return [cut >= 0
+      ? '（他刚按了「重开一轮」—— 上面那些话你不用管了，从这儿重新开始。）\n'
+      : '（这一条还没聊过，刚开始。）\n']
+  }
   const who = (m) => (m.role === 'artist' ? (profile?.name || '这位艺术家') : m.role === 'producer' ? '你（Fairwind）' : m.role)
   return ['## 你们为这一条聊过的（从早到晚）', ...history.map((m) => `${who(m)}：${m.content}`), '']
 }

@@ -134,3 +134,62 @@ test('三档首尾相接就是整根 prompt——没有一段走丢', () => {
 test('人格里交代了「这次就说这一条」——别的条目是弹药不是任务', () => {
   assert.ok(/就说这一条/.test(STUDIO_SYSTEM(profile)))
 })
+
+// ── 重开一轮（0128）─────────────────────────────────────────
+
+test('划了线之后，只读线以下的 —— 线以上的不再进 prompt', () => {
+  const c = { ...ctx, msgs: [
+    { id: 'm1', role: 'artist', content: '上一轮说的话' },
+    { id: 'm2', role: 'producer', content: '上一轮的回答' },
+    { id: 'm3', role: 'system', kind: 'restart', content: '从这儿重开一轮' },
+    { id: 'm4', role: 'artist', content: '这一轮说的话' },
+  ] }
+  const u = buildStudioUser(c, '刚说的', null)
+  assert.ok(!u.includes('上一轮说的话'))
+  assert.ok(!u.includes('上一轮的回答'))
+  assert.ok(u.includes('这一轮说的话'))
+  assert.ok(!u.includes('从这儿重开一轮'), '线本身不是谁说的话，不进 prompt')
+})
+
+test('刚划完线还没说话：明说「从这儿重新开始」，不假装这一条没聊过', () => {
+  const c = { ...ctx, msgs: [
+    { id: 'm1', role: 'artist', content: '上一轮说的话' },
+    { id: 'm3', role: 'system', kind: 'restart', content: '从这儿重开一轮' },
+  ] }
+  const u = buildStudioUser(c, '刚说的', null)
+  assert.ok(!u.includes('上一轮说的话'))
+  assert.ok(/重开一轮|重新开始/.test(u))
+})
+
+test('划了两道线，只认最后那道', () => {
+  const c = { ...ctx, msgs: [
+    { id: 'a', role: 'artist', content: '第一轮' },
+    { id: 'b', role: 'system', kind: 'restart', content: '线' },
+    { id: 'c', role: 'artist', content: '第二轮' },
+    { id: 'd', role: 'system', kind: 'restart', content: '线' },
+    { id: 'e', role: 'artist', content: '第三轮' },
+  ] }
+  const u = buildStudioUser(c, '刚说的', null)
+  assert.ok(!u.includes('第一轮') && !u.includes('第二轮'))
+  assert.ok(u.includes('第三轮'))
+})
+
+test('没划过线的照旧：全部往来都在', () => {
+  const c = { ...ctx, msgs: [
+    { id: 'm1', role: 'artist', content: '很早说的' },
+    { id: 'm2', role: 'producer', content: '它的回答' },
+  ] }
+  const u = buildStudioUser(c, '刚说的', null)
+  assert.ok(u.includes('很早说的') && u.includes('它的回答'))
+})
+
+test('撤掉的那几条仍然不算数（线以下也一样）', () => {
+  const c = { ...ctx, msgs: [
+    { id: 'b', role: 'system', kind: 'restart', content: '线' },
+    { id: 'c', role: 'artist', content: '撤掉的那句', deleted_at: '2026-09-17T00:00:00Z' },
+    { id: 'e', role: 'artist', content: '留着的那句' },
+  ] }
+  const u = buildStudioUser(c, '刚说的', null)
+  assert.ok(!u.includes('撤掉的那句'))
+  assert.ok(u.includes('留着的那句'))
+})
