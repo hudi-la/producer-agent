@@ -15,8 +15,10 @@
 Task 1–12 全部做完，`npm test` 573 全绿，无头浏览器验收（首次启动 → 只有我的档案 → 开关开出机会线/邮件 → 刷新还在）12 条全过。
 施工中改了设计稿两处（5.2 前言补 storage 桩；5.4 本机会话切成 authenticated，RLS 跟云端一样生效）。
 
-**没做完、等人的**：Task 2 Step 4 的 dev 库从零重建 + 隔离测试——dev 项目 `jsmdnzkoxudzppaczwsl` 免费档闲置已暂停，
-唤醒被拦，要他在 Supabase 后台点 Restore（或允许我做）。从零建库这件事先由 PGlite 那条测试证明了（126 支全绿）。
+**不做了（2026-09-16 他拍板）**：Task 2 Step 4 的 dev 库从零重建 + 隔离测试。dev 项目 `jsmdnzkoxudzppaczwsl` 睡着就睡着——
+他自己用的是另一份（生产库），不跟学员搅在一起；学员那份不碰任何 Supabase。云端多租户那条路（设计稿十三节第二步）
+代码留着，不再验。从零建库由 PGlite 那条测试证明（126 支全绿）。`scripts/setup.mjs` / `setup/defaults.mjs` 是云端学员路的装机，
+随之退役，等 ⑤ 的装机脚本替掉。
 
 **顺手发现、留给下一份计划**：学员出厂的 scout 任务（0141 注册礼包里那条）没有 `prompt`，主线的 scout 靠 `prompt` 跑——
 机会线模块要给它一份不含作者内容的默认提示词。`brain/files.js` 和 `brain/mail/auth.js` 各有一处对外部包的动态 `import()`，

@@ -389,6 +389,8 @@ mac `~/Library/Application Support/Fairwind/`，win `%APPDATA%\Fairwind\`。更�
 
 ## 十三、往云上走的三步
 
+> 2026-09-16 他拍板：他自己用的是另一份（生产库），不跟学员搅在一起。第二步的代码留着，**不再验**；dev 项目睡着就睡着。
+
 ```
 第一步（这次）   前端 ─┐
                  brain ─┴─→ pa_* / v_pa_* →  本机 PGlite
