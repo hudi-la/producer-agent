@@ -60,6 +60,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
     /** 首次启动页用 */
     setup: (body) => post('/setup', body),
     /** 「关于你」底下的账号那块用:读到的永远没有 key 本身,只有「设了没有」和末四位 */
+    judgments: { preview: (limit = 20) => post('/judgments/preview', { limit }) },
     settings: {
       async get() { try { const r = await fetchImpl(`${base}/settings`); return await r.json() } catch (e) { return null } },
       set: (patch) => post('/settings', patch),

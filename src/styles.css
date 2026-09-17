@@ -1844,3 +1844,17 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .la-acts { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
 .la-note { font-size: 12.5px; color: var(--good, #4a7); }
 .la-note.bad { color: var(--bad, #a44); }
+
+/* ── 我的判据（本机模式，关于你 · 账号块上面）───────────────── */
+.judgments { margin-top: 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); display: grid; gap: 10px; }
+.jd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.jd-switch { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.jd-dir { color: var(--ink-2); font-size: 12px; }
+.jd-dir code { font-size: 11.5px; }
+.jd-sum { font-size: 12.5px; color: var(--ink-2); }
+.jd-empty { font-size: 12.5px; color: var(--ink-3); }
+.jd-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.jd-table th { text-align: left; font-weight: 600; font-size: 11px; color: var(--ink-3); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.jd-table td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.jd-table tr.changed td { background: color-mix(in srgb, var(--wait) 12%, transparent); }
+.jd-tag small { color: var(--ink-3); }

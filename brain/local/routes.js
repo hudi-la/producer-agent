@@ -4,6 +4,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
 import { saveSettings } from './settings.js'
 import { registerLocalUser } from './migrate.js'
+import { setJudgmentsEnabled } from '../judgments.js'
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.map': 'application/json' }
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)) }
@@ -14,6 +15,7 @@ const readJson = async (req) => { const b = await readAll(req); return b.length 
 export function publicSettings(s) {
   const k = s.apiKey || ''
   return { email: s.email || '', model: s.model || '', modelCheap: s.modelCheap || '', backupDir: s.backupDir || '',
+           judgmentsEnabled: s.judgmentsEnabled !== false,
            ready: Boolean(s.ready), apiKeySet: Boolean(k), apiKeyHint: k ? `${k.slice(0, 7)}…${k.slice(-4)}` : '' }
 }
 
@@ -22,6 +24,7 @@ export function exportEnv(s) {
   if (s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey
   process.env.BRAIN_MODEL = s.model || ''
   process.env.BRAIN_MODEL_CHEAP = s.modelCheap || ''
+  setJudgmentsEnabled(s.judgmentsEnabled !== false)
 }
 
 /**
@@ -47,6 +50,7 @@ export async function handleLocalRoute(req, res, ctx) {
     const patch = {}
     for (const k of ['email', 'model', 'modelCheap', 'backupDir']) if (typeof body[k] === 'string') patch[k] = body[k].trim()
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) patch.apiKey = body.apiKey.trim()   // 空着 = 不动原来的
+    if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     const s = saveSettings(dataDir, patch)
     ctx.settings = s
     if (s.email) await registerLocalUser(ctx.pg, { id: s.uid, email: s.email })

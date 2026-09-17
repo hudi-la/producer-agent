@@ -9,7 +9,7 @@ const withReady = (s) => ({ ...s, ready: Boolean(s.email && s.apiKey) })
 export function loadSettings(dataDir) {
   mkdirSync(dataDir, { recursive: true })
   if (!existsSync(FILE(dataDir))) {
-    const fresh = { uid: randomUUID(), email: '', apiKey: '', model: '', modelCheap: '', backupDir: '' }
+    const fresh = { uid: randomUUID(), email: '', apiKey: '', model: '', modelCheap: '', backupDir: '', judgmentsEnabled: true }
     writeFileSync(FILE(dataDir), JSON.stringify(fresh, null, 2))
     return withReady(fresh)
   }

@@ -23,7 +23,7 @@ import { read, slice, imageBudget, IMG_CAP } from './files.js'
 import {
   artistOf, idOf, mailboxOf, systemFor,
   buildSystem, buildUser, buildBriefSystem, buildBriefUser,
-  JUDGE_RULE,
+  JUDGE_RULE, judgeSystemFor,
 } from './prompt.js'
 // 档案里那张书桌（0127）：同一个 Fairwind，换一张桌子。那边的活是外联，
 // 这边的活是陪他把自己的东西写准——而且它**写不了库**，见 studio.js 开头。
@@ -46,6 +46,10 @@ import { fileURLToPath } from 'node:url'
 import { handleLocalRoute, exportEnv } from './local/routes.js'
 // 模块是能力开关(设计稿 D5):关着的模块,路由 404、定时器不起、Gmail 工具不进白名单。云端永远全开
 import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
+// 学员自己的判据文档(<数据目录>/judgments/*.md),拼进每一格的收尾之前;判不出来回退出厂判据
+import { useJudgmentsDir, judgeWithFallback, hasJudgments } from './judgments.js'
+import { copyFileSync, existsSync as fsExists, mkdirSync as fsMkdir } from 'node:fs'
+import { join as pathJoin } from 'node:path'
 import { initStore } from './mail/store.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 定时造卡那一轮的纯函数：拼提示词、解析信封、去重、判门槛、写战报。scout.test.js 按着。
@@ -101,6 +105,13 @@ async function connect() {
       onSetup: async (settings) => { LOCAL_MODE.settings = settings },
     }
     exportEnv(r.settings)   // key 和两档模型:settings.json 是学员机器上唯一的一份,不用 .env
+    // 判据文档目录。README 由安装包带着,第一次开库放进去(已有就不动——那是他自己改过的)
+    const jdir = pathJoin(LOCAL_MODE.dataDir, 'judgments')
+    fsMkdir(jdir, { recursive: true })
+    for (const cand of [process.env.FAIRWIND_JUDGMENTS_README, fileURLToPath(new URL('./judgments-README.md', import.meta.url)), fileURLToPath(new URL('../packaging/data/judgments-README.md', import.meta.url))]) {
+      if (cand && fsExists(cand) && !fsExists(pathJoin(jdir, 'README.md'))) { copyFileSync(cand, pathJoin(jdir, 'README.md')); break }
+    }
+    useJudgmentsDir(jdir, { log: (m) => console.log(m) })
     console.log(`· 本机库:${LOCAL_MODE.dataDir}${r.settings.ready ? '' : '(还没初始化,等页面上填)'}`)
   }
   initStore(db)
@@ -1273,7 +1284,15 @@ async function handlePersonRefresh(contactId) {
 // 判断用的 system。原文和「为什么跟 Fairwind 人格无关」的道理都搬去了
 // prompt.js（语气是数据那一刀，2026-08-24）——原来这儿和 replay.js 各抄
 // 一份，改一处漏一处。多租户接上后这里改用 judgeSystemFor(voice)。
-const JUDGE_SYSTEM = JUDGE_RULE
+// 2026-09-16 接上了:语气五栏里的 judge_rule 从 v_pa_voice 读,缓存一分钟。空 = 出厂原文。
+let VOICE_CACHE = { at: 0, voice: null }
+async function judgeSystem() {
+  if (Date.now() - VOICE_CACHE.at > 60_000) {
+    try { const { data } = await db.from('v_pa_voice').select('*').limit(1); VOICE_CACHE = { at: Date.now(), voice: data?.[0] || null } }
+    catch (_) { VOICE_CACHE = { at: Date.now(), voice: null } }
+  }
+  return judgeSystemFor(VOICE_CACHE.voice)
+}
 
 /**
  * 重判一批对象。**路由和收信循环共用这一份** ——
@@ -1290,7 +1309,7 @@ async function rejudgeThese(want) {
 
   const t = new Date().toLocaleTimeString('zh-CN')
   console.log(`\n→ ${t} 重判 ${subjects.length} 个对象`)
-  const { text } = await think(rejudgePrompt(subjects), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
+  const { text } = await think(rejudgePrompt(subjects), [], await judgeSystem(), null, null, null, 1, CHEAP)
   const byId = Object.fromEntries(parseRejudge(text).map((v) => [v.id, v]))
 
   let judged = 0, touched = 0
@@ -1336,7 +1355,7 @@ async function triageThese(ids) {
 
   const t = new Date().toLocaleTimeString('zh-CN')
   console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
-  const { text } = await think(triagePrompt(letters), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
+  const { text } = await think(triagePrompt(letters), [], await judgeSystem(), null, null, null, 1, CHEAP)
   let judged = 0
   for (const v of parseTriage(text)) {
     const { data } = await db.rpc('pa_judge_letter', {
@@ -1360,6 +1379,29 @@ async function triageThese(ids) {
 //
 // **跳过要出声**：静默的跳过跟「判过了」长得一样 —— 这次重做的起因
 // 之一就是「判不出来时的跳过完全无声」。
+// 判据文档改了,拿最近判过的 N 件事再判一遍,看结论变了哪几条。只判不写标签——跟 replay 同一条规矩。
+async function previewJudgments({ limit = 20 } = {}) {
+  const { data: facts, error } = await db.rpc('pa_judged_facts', { p_limit: Math.min(Number(limit) || 20, 40) })
+  if (error) throw new Error('读不到判过的事:' + error.message)
+  const sys = await judgeSystem()
+  const rows = []
+  const pick = (t) => (t ? { needs_reply: t.needs_reply ?? null, wait_days: t.wait_days ?? null, meet_at: t.meet_at ?? null, gist: t.gist ?? null } : null)
+  for (const f of facts || []) {
+    const m = String(f.situation || '').match(/^(\S+) x (\S+)$/)
+    if (!m) continue
+    const cell = cellFor(m[1], m[2])
+    if (!cell || !cell.ask) continue
+    let fresh = null, note = ''
+    try { fresh = parseTag((await think(cell.ask(f, {}), [], sys, null, null, null, 1, CHEAP)).text) }
+    catch (err) { note = err.message }
+    if (!fresh && !note) note = '没按格式回话'
+    const o = pick(f.old_tag), n = pick(fresh)
+    const changed = n ? ['needs_reply', 'wait_days', 'meet_at'].some((k) => String(o?.[k] ?? '') !== String(n[k] ?? '')) : false
+    rows.push({ id: f.id, subject: f.subject_name, who: f.who, when: f.created_at, situation: f.situation, old: o, new: n, changed, note })
+  }
+  return { rows, usingJudgments: hasJudgments(), n: rows.length, changed: rows.filter((r) => r.changed).length }
+}
+
 async function tagPass({ limit = 12 } = {}) {
   let facts = []
   try {
@@ -1409,14 +1451,16 @@ async function tagPass({ limit = 12 } = {}) {
       try {
         const owner = { kind: f.subject_kind, id: f.subject_id }
         const ctx = await loadOwnerContext(owner)
-        const { text } = await think(
-          buildUser(ctx, cell.ask(f, st), null), [], buildSystem(ctx), null, null, null, 1)
-        tag = parseTag(text)
+        ;({ tag } = await judgeWithFallback(
+          async () => (await think(buildUser(ctx, cell.ask(f, st), null), [], buildSystem(ctx), null, null, null, 1)).text,
+          parseTag, { log: (m) => console.log(m), what: `${f.subject_name} ${stateName} x ${ev}` }))
       } catch (err) { skipped.push(`${f.subject_name}：${err.message}`); continue }
     } else {
       try {
-        const { text } = await think(cell.ask(f, st), [], JUDGE_SYSTEM, null, null, null, 1, CHEAP)
-        tag = parseTag(text)
+        const sys = await judgeSystem()
+        ;({ tag } = await judgeWithFallback(
+          async () => (await think(cell.ask(f, st), [], sys, null, null, null, 1, CHEAP)).text,
+          parseTag, { log: (m) => console.log(m), what: `${f.subject_name} ${stateName} x ${ev}` }))
       } catch (err) { skipped.push(`${f.subject_name}：${err.message}`); continue }
     }
     // 没判成不写标签 —— 标签的存在 = 「判过了」，假装判过比不判坏
@@ -1917,6 +1961,17 @@ const server = http.createServer(async (req, res) => {
   }
   const mod = moduleOf(req.url)
   if (!isEnabled(MODS, mod)) return send(res, 404, { error: 'module off', module: mod })
+
+  // 「看看会怎么变」:最近判过的 N 件事,用现在的判据文档再判一遍(只判不写),跟原结论并排
+  if (req.method === 'POST' && req.url === '/judgments/preview') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try { send(res, 200, await previewJudgments(JSON.parse(raw || '{}'))) }
+      catch (err) { send(res, 500, { error: err.message }) }
+    })
+    return
+  }
 
   if (req.method === 'GET' && req.url === '/health') {
     // 邮件那一轮的状态跟着 /health 走：界面每 8 秒本来就在问它，

@@ -39,7 +39,7 @@ export function setModules({ dataDir, mode }, patch) {
 // 关了 pursuits 前端就不会拿机会线来聊,所以路由层只要保证书桌能聊。
 const ROUTE_MODULE = [
   ['/health', 'core'], ['/me', 'core'], ['/setup', 'core'], ['/modules', 'core'], ['/db/', 'core'], ['/files/', 'core'],
-  ['/chat', 'profile'],
+  ['/chat', 'profile'], ['/judgments/', 'profile'],   // 判据文档是人的东西,机会线关着也能看、能开关
   ['/mail/', 'mail'], ['/gmail-draft', 'mail'], ['/sync', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/', 'mail'], ['/letters/', 'mail'],
 ]
 export function moduleOf(url) {

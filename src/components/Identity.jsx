@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { saveProfile, useProfile } from '../lib/profile.js'
 import { supa } from '../lib/backends.js'
 import { EditRow } from './EditRow.jsx'
+import Judgments from './Judgments.jsx'
 
 // 「关于你」——档案页最上面那一块。
 //
@@ -68,7 +69,7 @@ function AccountRow() {
     if (!supa || supa.mode === 'local') return
     supa.auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
   }, [])
-  if (supa?.mode === 'local') return <LocalAccount />
+  if (supa?.mode === 'local') return <><Judgments /><LocalAccount /></>
   if (!supa || !email) return null
   return (
     <div className="idnote acct">

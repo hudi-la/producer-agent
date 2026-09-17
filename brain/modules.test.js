@@ -35,7 +35,7 @@ test('开 mail 自动开 pursuits;关 pursuits 自动关 mail;profile 关不掉'
 test('路由归属(2026-09-16 server.js 里的全部路由)', () => {
   for (const [u, m] of [
     ['/health', 'core'], ['/me', 'core'], ['/db/rpc/x', 'core'], ['/db/from', 'core'], ['/files/a%2Fb', 'core'], ['/modules', 'core'], ['/setup', 'core'], ['/', 'core'], ['/assets/index-abc.js', 'core'],
-    ['/chat', 'profile'], ['/chat/stream', 'profile'], ['/chat/stop', 'profile'],
+    ['/chat', 'profile'], ['/chat/stream', 'profile'], ['/chat/stop', 'profile'], ['/judgments/preview', 'profile'],
     ['/stage', 'pursuits'], ['/ball', 'pursuits'], ['/brief', 'pursuits'], ['/subjects/rejudge', 'pursuits'], ['/something-new', 'pursuits'],
     ['/mail/sync', 'mail'], ['/mail/adopt', 'mail'], ['/mail/send', 'mail'], ['/gmail-draft', 'mail'], ['/sync', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/carry', 'mail'], ['/letters/triage', 'mail'],
   ]) assert.equal(moduleOf(u), m, u)

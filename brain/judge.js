@@ -22,6 +22,7 @@
 // 设计稿：docs/specs/2026-08-19-what-this-line-is-waiting-on-design.md
 
 import { takeTag, clean1 } from './tag.js'
+import { judgmentsFor } from './judgments.js'
 
 /** Fairwind 开工那天。更早的往来只归属，不进转移表（稿子第十节）。 */
 export const EPOCH = '2026-08-03'
@@ -112,7 +113,10 @@ ${上下文(fact)}
 【${信头(fact, ev)}】
 ${factText(fact)}`
 
-const 收尾 = (fields) => `
+// 收尾是硬边界——字段规格必须是提示词的最后一段。学员的判据文档(judgments.js)拼在它**前面**:
+// 占位符在这儿,cellFor 返回的 ask 负责换。
+export const JUDGMENTS_SLOT = '\u0000JUDGMENTS\u0000'
+const 收尾 = (fields) => `${JUDGMENTS_SLOT}
 **最后一行**单独输出，别的什么都不要加：
 [[TAG]] {${fields}}`
 
@@ -384,7 +388,18 @@ TRANSITIONS.OWE_MEETING_NOTE = {
 // MEETING_SET 到点自动变 DEBRIEF 是视图算的；到点前后来的事各查各的格。
 
 /** 查表。查不到 = 这格还没想清楚该问什么 —— 调用方必须出声，绝不静默跳过。 */
-export const cellFor = (state, ev) => TRANSITIONS[state]?.[ev] || null
+// 拿一格。ask 包了一层:把收尾前的占位符换成这个人的判据文档(没有就是空串)。
+// server.js / replay.js 里调 cell.ask() 的地方一个不改。
+// 同一格永远是同一个对象(OWE_* 借 IDLE 的格子,测试按引用比),所以包过的缓存起来;
+// 纯规则格没有 ask,原样给。
+const WRAPPED = new WeakMap()
+export const cellFor = (state, ev) => {
+  const c = TRANSITIONS[state]?.[ev]
+  if (!c) return null
+  if (typeof c.ask !== 'function') return c
+  if (!WRAPPED.has(c)) WRAPPED.set(c, { ...c, ask: (...a) => c.ask(...a).replace(JUDGMENTS_SLOT, judgmentsFor(ev)) })
+  return WRAPPED.get(c)
+}
 
 /** DEBRIEF 的回答判「见成了吗」：met / gist / meet_at 三个字段，成对规矩同上。 */
 export function parseMet(text) {
