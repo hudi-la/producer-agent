@@ -6,6 +6,11 @@
 
 **Spec:** `docs/specs/2026-09-16-one-machine-fairwind-design.md` 第八、九、十、十一、十七节。计划（一）已做完 ⓪–③。
 
+## 2026-09-16 完成情况
+
+Task 1–7 全部做完，`npm test` 588 全绿，干净目录全流程验收 11 条全过（记录在 `packaging/ACCEPTANCE.md`）。
+第一个包 `packaging/out/Fairwind-0.1.0-mac-arm64.zip`（177MB，gitignore）。真发一版要做的一次性动作见 ACCEPTANCE.md 末尾。
+
 ## Global Constraints
 
 计划（一）的全部约束照旧。另加：
