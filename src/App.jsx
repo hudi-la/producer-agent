@@ -68,6 +68,9 @@ const FACTS_MS = 5 * 60 * 1000
 // 日期一律走 lib/when.js —— 全 app 只有那一份，按你住的地方算。
 export default function App() {
   const [lib, setLib] = useState(null)
+  // 档案页右边那个对话抽屉开着没有。Library 自己管开关，这儿只要知道「开着」——
+  // 好让顶栏跟机会卡的抽屉一样让出位置。
+  const [studioOpen, setStudioOpen] = useState(false)
   const [pl, setPl] = useState(null)
   const [tk, setTk] = useState(null)
   // 人这一层。名片 + 他名下的往来 —— 人际管理页和过卡队列都靠它。
@@ -691,7 +694,12 @@ export default function App() {
   }
 
   // 抽屉只在两个架子旁边开：看板旁、通讯录旁。桌上没有抽屉。
+  // App 自己那个抽屉（机会卡 / 名片 / 机构）开没开。
   const drawered = (area === 'pursue' || area === 'people') && view.name !== 'home'
+  // 顶栏要不要让位。档案页那个抽屉是 Library 自己挂的（摊开一条才出来），
+  // 它也盖在右沿，🔔 一样得让。**跟上面分开算**：混成一个的话，档案页一开抽屉
+  // App 就以为自己也该开一个，去读一个不存在的机构，整页崩掉（真崩过一次）。
+  const yielding = drawered || (area === 'profile' && studioOpen)
   // 打开的那条线，永远取 pl 里最新的那一份。
   // view.pursuit 是**你点开那一刻的快照**——乐观更新和轮询都只动 pl，不动它，
   // 所以照着快照渲染的话，你在抽屉里点「认了」，看板上的记号消失了、抽屉里那个还在。
@@ -708,7 +716,7 @@ export default function App() {
   return (
    <ProfileContext.Provider value={profile}>
    <VeilContext.Provider value={veiled}>
-    <div className={'wrap' + (drawered ? ' drawered' : '')}>
+    <div className={'wrap' + (yielding ? ' drawered' : '')}>
       <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label="主区">
@@ -871,7 +879,8 @@ export default function App() {
         <>
           <Library entries={lib.entries} concerns={lib.concerns}
                    onProfileSaved={() => loadProfile().then(setProfile)}
-                   onEntrySaved={() => loadLibrary().then(setLib)} />
+                   onEntrySaved={() => loadLibrary().then(setLib)}
+                   onDrawerChange={setStudioOpen} />
           <ModulesPanel />
         </>
       ) : area === 'ledger' ? (

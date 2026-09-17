@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
@@ -6,6 +6,7 @@ import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
 import { addEntry, setEntryDraft } from '../lib/studio.js'
 import EntryChat from './EntryChat.jsx'
+import DrawerGrip from './DrawerGrip.jsx'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
@@ -51,7 +52,7 @@ function EntryFields({ e, ro, save }) {
 // 展开状态住在 Library 里，不住在这儿 —— 「加一条」建完要把新那条自动展开，
 // 而那个动作发生在 Library。行为一个字没变：还是点空白展开、点 › 展开，
 // 还是可以同时开好几条。
-function Entry({ e, open, onToggle, onSaved }) {
+function Entry({ e, open, active, onToggle, onSaved }) {
   const entries = boxEntries(e.box)
   const facts = subInfo(e)
   const imgs = e.images || []
@@ -68,10 +69,10 @@ function Entry({ e, open, onToggle, onSaved }) {
   }
 
   return (
-    <div className="work">
+    <div className={'work' + (active ? ' active' : '')}>
       {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
           输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
-          点空白处仍然展开/收起；键盘走右边那个真按钮。 */}
+          点空白处仍然开/关编辑；键盘走右边那个真按钮（编辑 / 完成）。 */}
       <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
@@ -93,9 +94,20 @@ function Entry({ e, open, onToggle, onSaved }) {
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
           </div>
         </div>
-        <button className={'chev' + (open ? ' open' : '')} aria-expanded={open}
-                aria-label={open ? '收起' : '展开'}
-                onClick={(ev) => { ev.stopPropagation(); toggle() }}>›</button>
+        {/* 以前这儿是 › / ⌄ —— 那个符号说的是「底下还有详情没展开」。可折叠着的时候
+            文案本来就全摆着，打开之后多出来的是字段、盒子、和右边的对话：那是**改这一条**，
+            不是看详情。所以按钮直说：编辑 / 完成。 */}
+        <button type="button" className={'edtg' + (open ? ' on' : '')} aria-pressed={open}
+                title={open ? '改完了，收起字段和右边的对话' : '改这一条：打开字段、盒子，右边开这一条的对话'}
+                onClick={(ev) => { ev.stopPropagation(); toggle() }}>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+               strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {open
+              ? <path d="M20 6 9 17l-5-5" />
+              : <><path d="M12 20h9" /><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" /></>}
+          </svg>
+          {open ? '完成' : '编辑'}
+        </button>
       </div>
       {open && (
         <div className="box">
@@ -118,8 +130,6 @@ function Entry({ e, open, onToggle, onSaved }) {
             <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
           ))}
           <div className="add">+ 补一条 / 丢进材料</div>
-          {/* 这一条的抽屉。点开哪一条，就聊哪一条 —— 没有条目就没有对话。 */}
-          {!ro && <EntryChat entry={e} />}
         </div>
       )}
     </div>
@@ -146,12 +156,13 @@ function subGroups(items, sub, concerns) {
   return groups
 }
 
-function KindSection({ label, items, sub, concerns, onSaved, openIds, onToggle, onAdd }) {
+function KindSection({ label, items, sub, concerns, onSaved, openIds, activeId, onToggle, onAdd }) {
   // 只有一个子组时不写子标题——「策展」那一格底下再顶一行「策展项目」是重复的。
   const groups = sub ? subGroups(items, sub, concerns) : null
   const one = (e) => (
     <Entry e={e} key={e.id || e.title + e.sort}
-           open={openIds.has(e.id)} onToggle={onToggle} onSaved={onSaved} />
+           open={openIds.has(e.id)} active={e.id === activeId}
+           onToggle={onToggle} onSaved={onSaved} />
   )
   return (
     <section className="kind">
@@ -217,26 +228,47 @@ function buildSections(entries) {
   return secs
 }
 
-export default function Library({ entries, concerns, onProfileSaved, onEntrySaved }) {
+export default function Library({ entries, concerns, onProfileSaved, onEntrySaved, onDrawerChange }) {
   const profile = useProfile()
   const sections = buildSections(entries)
   const [pick, setPick] = useState('about')
   // 选中的格可能因为库变了而消失（比如某类被清空）——退回「关于你」，别渲染空白。
   const cur = sections.find((s) => s.key === pick) || sections[0]
 
-  // 展开着哪几条。提到这一层，是因为「加一条」建完要把新那条自动展开。
+  // 展开着哪几条，以及**右边正在聊哪一条**。
+  //
+  // 右边跟着你最后点开的那条走。不新造「选中」这个动作要你学：展开 = 那条
+  // 摆到右边，收起 = 退回另一条还开着的（都关了就空着）。
   const [openIds, setOpenIds] = useState(new Set())
+  const [activeId, setActiveId] = useState(null)
   const toggle = (id) => setOpenIds((cur_) => {
     const next = new Set(cur_)
-    next.has(id) ? next.delete(id) : next.add(id)
+    if (next.has(id)) {
+      next.delete(id)
+      // 关掉的正是右边那条：退回另一条还开着的，别把对话留在一条看不见的东西上
+      setActiveId((a) => (a === id ? [...next][next.size - 1] ?? null : a))
+    } else {
+      next.add(id)
+      setActiveId(id)
+    }
     return next
   })
+
+  // 右边摊的那一条。它可能因为库变了而消失（换了栏、被删了）——那就空着，
+  // 别拿一个不存在的 id 去拉对话。
+  const active = entries.find((e) => e.id === activeId && e.id) || null
+
+  // 告诉外面抽屉开着没有：顶栏要让位（跟机会卡的抽屉同一套 .wrap.drawered）。
+  // 离开这一页时关掉 —— 不然去了看板，顶栏还让着一个不存在的抽屉。
+  useEffect(() => { onDrawerChange?.(!!active) }, [active, onDrawerChange])
+  useEffect(() => () => onDrawerChange?.(false), [onDrawerChange])
 
   // 加一条。新那条库里标着「在写」，建完自动展开，标题就地改。
   // 「关于你」那一格没有这个按钮 —— 它是 profile，不是条目。
   const add = cur.kind ? async () => {
     const id = await addEntry(cur.kind, null)
     setOpenIds((cur_) => new Set(cur_).add(id))
+    setActiveId(id)
     await onEntrySaved?.()
   } : null
 
@@ -246,7 +278,7 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
 
   return (
     <div className="page">
-      <div className="page-inner wide">
+      <div className={'page-inner widest' + (active ? ' drawered' : '')}>
         <header className="page-head">
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
@@ -273,10 +305,21 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
             {cur.about
               ? <Identity onSaved={onProfileSaved} />
               : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns}
-                             onSaved={onEntrySaved} openIds={openIds} onToggle={toggle} onAdd={add} />}
+                             onSaved={onEntrySaved} openIds={openIds} activeId={activeId}
+                             onToggle={toggle} onAdd={add} />}
           </div>
         </div>
       </div>
+      {/* 右边那个抽屉 —— **跟机会卡片的是同一个**：同一个 .drawer 外壳，
+          从窗口顶贴到底，左沿能拉宽，不跟着页面滚。
+          平时不在：一条都没摊开时整块不渲染。摊开哪一条它才划出来，聊的就是那一条。
+          页面自己往左让出抽屉那么宽，所以原文不会被盖住，左右对着看。 */}
+      {active && (
+        <aside className="drawer" aria-label={`一起写《${active.title || '未命名'}》`}>
+          <DrawerGrip />
+          <EntryChat entry={active} key={active.id} onClose={() => toggle(active.id)} />
+        </aside>
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { useGrow } from '../lib/useGrow.js'
 import { TASK_DESC } from '../data/schema.js'
 import { WEEKDAYS, HOURS, scheduleText, runState, setTask, runTaskNow, groupTasks } from '../lib/tasks.js'
 import { onPulse } from '../lib/pulse.js'
@@ -30,6 +31,8 @@ function PromptBox({ value, onSave }) {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
   useEffect(() => { if (!editing) setText(value || '') }, [value, editing])
+  const ta = useRef(null)
+  useGrow(ta, text, editing)
 
   const start = () => { setErr(null); setText(value || ''); setEditing(true) }
   const cancel = () => { setText(value || ''); setErr(null); setEditing(false) }
@@ -46,7 +49,7 @@ function PromptBox({ value, onSave }) {
     return (
       <div className="tk-prompt-edit">
         <textarea
-          className="idin tk-ta" value={text} rows={14} autoFocus
+          ref={ta} className="idin tk-ta" value={text} rows={6} autoFocus
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') { e.preventDefault(); cancel() }

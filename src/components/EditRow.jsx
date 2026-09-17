@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useVeiled } from '../lib/veil.js'
+import { useGrow } from '../lib/useGrow.js'
 import { Flower } from './Veil.jsx'
 
 // 页面上「能改的字」——两种长相，一套规矩。
@@ -89,6 +90,8 @@ export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
   const empty = !asText(value, list)
   const veiled = useVeiled()          // hook 不能放在 && 后面：条件调用会乱掉 hook 顺序
   const 盖着 = veil && veiled
+  const ta = useRef(null)
+  useGrow(ta, d.text, d.editing)
 
   if (盖着) {
     return (
@@ -109,7 +112,7 @@ export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
         {d.editing ? (
           <>
             {long
-              ? <textarea className="idin" value={d.text} rows={4} autoFocus
+              ? <textarea ref={ta} className="idin" value={d.text} rows={4} autoFocus
                           onChange={(e) => d.setText(e.target.value)} onKeyDown={keyHandler(d, true)} />
               : <input className="idin" value={d.text} autoFocus
                        onChange={(e) => d.setText(e.target.value)} onKeyDown={keyHandler(d, false)} />}
@@ -138,6 +141,9 @@ export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
 export function InlineText({ value, cls, long, ro, placeholder, onSave }) {
   const d = useDraft(value, onSave, (v) => asText(v), (s) => asValue(s))
   const box = useRef(null)
+  const ta = useRef(null)
+  // 双击进编辑那一刻就量：一段 Research Statement 不该塞在五行里滚着看
+  useGrow(ta, d.text, d.editing)
   const empty = !asText(value)
 
   // 编辑态里的点击不许冒泡到外面——外面那层点一下是展开/收起，
@@ -148,7 +154,7 @@ export function InlineText({ value, cls, long, ro, placeholder, onSave }) {
     return (
       <div className="inl-edit" ref={box} onClick={stop} onDoubleClick={stop}>
         {long
-          ? <textarea className={'inl-in ' + cls} value={d.text} rows={5} autoFocus
+          ? <textarea ref={ta} className={'inl-in ' + cls} value={d.text} rows={3} autoFocus
                       onChange={(e) => d.setText(e.target.value)} onKeyDown={keyHandler(d, true)} />
           : <input className={'inl-in ' + cls} value={d.text} autoFocus
                    onChange={(e) => d.setText(e.target.value)} onKeyDown={keyHandler(d, false)} />}

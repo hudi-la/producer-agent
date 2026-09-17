@@ -1,5 +1,6 @@
 import { key as qKey } from '../lib/queue.js'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useGrow } from '../lib/useGrow.js'
 import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, openLine } from '../lib/nextAction.js'
 import { goldLine } from '../lib/stateText.js'
@@ -34,6 +35,8 @@ const STACK_MIN = 3
 function Jot({ p, onSave }) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(p.jot || '')
+  const ta = useRef(null)
+  useGrow(ta, text, editing)
 
   // 别人改了这张卡（Fairwind 后台、或另一个标签页），没在编辑就跟着更新
   useEffect(() => { if (!editing) setText(p.jot || '') }, [p.jot, editing])
@@ -49,6 +52,7 @@ function Jot({ p, onSave }) {
   if (editing) {
     return (
       <textarea
+        ref={ta}
         className="pc-jot-in"
         value={text}
         autoFocus

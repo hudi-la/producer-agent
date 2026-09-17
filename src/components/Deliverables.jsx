@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { checkRules, itemProgress, formProgress } from '../lib/rules.js'
+import { useGrow } from '../lib/useGrow.js'
 import { editDeliverable, setFinal, newDeliverable, deleteDeliverable, putInDraftbox } from '../lib/deliverables.js'
 import { sendLetterNow } from '../lib/letters.js'
 import { setAnswer } from '../lib/forms.js'
@@ -28,6 +29,8 @@ function Editor({ d, onSaved, onErr, onChanged, pursuitId }) {
   const [body, setBody] = useState(d.body || '')
   const [dirty, setDirty] = useState(false)
   const first = useRef(true)
+  const ta = useRef(null)
+  useGrow(ta, body)
 
   // 换一份产出时重置，别把上一份的正文留在框里
   useEffect(() => { setBody(d.body || ''); setDirty(false); first.current = true }, [d.id])
@@ -51,6 +54,7 @@ function Editor({ d, onSaved, onErr, onChanged, pursuitId }) {
   return (
     <>
       <textarea
+        ref={ta}
         className="dv-edit"
         value={body}
         rows={d.kind === 'bio' ? 5 : 8}
@@ -87,6 +91,8 @@ function Field({ d, f, check, onErr, onChanged }) {
   const [text, setText] = useState(saved)
   const [dirty, setDirty] = useState(false)
   const first = useRef(true)
+  const ta = useRef(null)
+  useGrow(ta, text)
 
   // 换一份产出、或者 Fairwind 重写了一版收进来，都要把框里的字换成库里那份。
   // 不换的话你看到的是上一份的答案，而它跟下面那条闸算的**不是同一段字**。
@@ -113,6 +119,7 @@ function Field({ d, f, check, onErr, onChanged }) {
       {/* 题目用**原文**摆着——你要照着往网页表单里填，翻译过的对不上号 */}
       <label className="dvf-q">{f.q}</label>
       <textarea
+        ref={ta}
         className="dv-edit"
         value={text}
         rows={4}

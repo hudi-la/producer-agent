@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
+import { useGrow } from '../lib/useGrow.js'
 import {
   identifyEmail, claimEmail, markOrgMailbox, upsertContact, claimThread, refreshContact,
   attachAddressLines, carryMailbox,
@@ -41,6 +42,8 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
     name: who.name || '', org: who.org || '', role: who.role || '',
     notes: who.notes || '',
   })
+  const notesRef = useRef(null)
+  useGrow(notesRef, f.notes)
   // 它命中了通讯录里某位 → 默认走「合并」；否则默认建新人
   const matched = who.match_name
     ? contacts.find((c) => c.name === who.match_name)
@@ -157,7 +160,7 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
       {who.intro_by && <p className="pf-note">谁介绍的：<Veil>{who.intro_by}</Veil></p>}
       {f.notes && how !== 'org' && (
         <label className="prop-notes">关系记忆
-          <textarea rows={4} value={f.notes}
+          <textarea ref={notesRef} rows={4} value={f.notes}
                     onChange={(e) => setF({ ...f, notes: e.target.value })} />
         </label>
       )}

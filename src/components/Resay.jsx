@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useGrow } from '../lib/useGrow.js'
 import Md from './Md.jsx'
 import { canRewind, wipeCount } from '../lib/rewind.js'
 
@@ -52,12 +53,7 @@ export default function SayBubble({ m, msgs, editing, disabled, onStart, onCance
     el.style.height = el.scrollHeight + 'px'
   }, [editing])
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el || !editing) return
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }, [draft, editing])
+  useGrow(ref, draft, editing)
 
   if (editing) {
     return (

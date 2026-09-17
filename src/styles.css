@@ -450,7 +450,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
   display: flex; flex-direction: column; gap: 10px; }
 .sayto-t { font-family: var(--serif); font-size: 16px; font-weight: 600; margin: 0; }
 .sayto-s { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin: 0; }
-.sayto-in { font: inherit; font-size: 13.5px; line-height: 1.6; resize: vertical;
+.sayto-in { font: inherit; font-size: 13.5px; line-height: 1.6; resize: none; max-height: 50vh; overflow-y: auto;
   padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2);
   background: var(--paper); color: var(--ink); }
 .sayto-in:focus { outline: none; border-color: var(--accent); }
@@ -464,10 +464,17 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .page-head .note b { color: var(--ink-2); font-weight: 600; }
 .page-head .note .bx { color: var(--accent); }
 
-/* 档案页：左边一列格名，右边一次开一格。
-   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。 */
+/* 档案页：左边一列格名，中间一次开一格，右边摊开那一条的对话。
+   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。
+   .widest 是加了对话那一栏之后的：要的就是原文和商量在同一屏上对着看。 */
 .page-inner.wide { max-width: 1040px; }
+.page-inner.widest { max-width: min(1720px, 96vw); }
 .lib-two { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 30px; margin-top: 26px; align-items: start; }
+/* 摊开一条，右边那个抽屉（跟机会卡是同一个 .drawer）从窗口右沿划出来。
+   页面自己往左让出抽屉那么宽 —— 不让的话原文被盖住，就没法左右对着看了。
+   吃的是同一个 --drawer-w：你拉宽抽屉，这边让出的地方跟着变。 */
+.page-inner.widest.drawered { max-width: none; margin-right: 0;
+  padding-right: calc(var(--drawer-w) + 26px); }
 .lib-rail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; }
 .rail-b { display: flex; align-items: center; gap: 10px; width: 100%; font: inherit; font-size: 13px; text-align: left;
   padding: 8px 11px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-3);
@@ -503,34 +510,37 @@ body.resizing .drawer-grip::before { opacity: .75; }
   border: 1px solid var(--line-2); background: transparent; color: var(--ink-3); transition: all .14s; }
 .draftflip:hover { color: var(--ink); border-color: var(--ink-3); }
 
-/* ── 条目里那个抽屉（0127）────────────────────────────────────
+/* ── 右边那一栏：摊开那一条的对话（0127）──────────────────────
    它写的每个字都是稿子，进不了档案 —— 所以这儿比机会线那边干净得多：
    没有信卡、没有表卡、没有状态卡，因为它没有那些能力。 */
-.echat { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
-.echat-hd { font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--ink-3); font-weight: 600; margin-bottom: 12px; }
-.echat-hd i { display: block; margin-top: 6px; font-style: normal; font-size: 11.5px;
+.echat { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%;
+  background: var(--paper); }
+.echat-hd { position: relative; padding: 18px 44px 14px 20px; border-bottom: 1px solid var(--line);
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; }
+.echat-x { position: absolute; top: 14px; right: 14px; width: 24px; height: 24px; line-height: 1;
+  font: inherit; font-size: 17px; border: none; border-radius: 7px; background: transparent;
+  color: var(--ink-3); cursor: pointer; transition: color .14s, background .14s; }
+.echat-x:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.echat-hd i { display: block; margin-top: 5px; font-style: normal; font-size: 11.5px;
   letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--ink-3); line-height: 1.6; }
-.echat-thread { display: flex; flex-direction: column; gap: 16px; margin-bottom: 14px;
-  max-height: 520px; overflow-y: auto; }
-.echat-err { margin-bottom: 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
-.echat-composer { display: flex; align-items: flex-end; gap: 9px; }
+.echat-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 16px; }
+.echat-err { margin: 0 16px 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
+.echat-composer { display: flex; align-items: flex-end; gap: 9px; padding: 12px 16px 16px;
+  border-top: 1px solid var(--line); background: var(--paper); }
 .echat-composer textarea { flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 1.6;
-  resize: none; max-height: 180px; border: 1px solid var(--line-2); border-radius: 12px;
-  padding: 9px 12px; background: var(--paper); color: var(--ink); }
+  resize: none; max-height: 38vh; overflow-y: auto; border: 1px solid var(--line-2); border-radius: 12px;
+  padding: 9px 12px; background: var(--paper-2); color: var(--ink); }
 .echat-composer textarea:focus { outline: none; border-color: var(--accent); }
 .echat-composer button { font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 10px;
   border: none; cursor: pointer; background: var(--ink); color: var(--paper); }
 .echat-composer button:disabled { opacity: .35; cursor: default; }
 .echat-composer button.stop { background: var(--ink-3); }
 
-@media (max-width: 860px) {
-  .page-inner.wide { max-width: 720px; }
-  .lib-two { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .lib-rail { position: static; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
-  .rail-b { width: auto; flex: none; border-color: var(--line); }
-  .rail-l { flex: none; white-space: nowrap; }
-}
+/* 右边聊的是哪一条，左边那条要认得出来。只加一道竖线，不改底色——
+   底色一变，这一栏里哪条展开着就看不清了。 */
+.work.active { box-shadow: inset 3px 0 0 var(--accent); }
 
 /* 还没做的页面：说清楚将来是什么，别假装这儿有东西 */
 .soon { margin-top: 26px; border: 1px dashed var(--line-2); border-radius: 14px; padding: 20px 22px 18px; }
@@ -556,7 +566,8 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .idval.empty { color: var(--ink-3); }
 .idin { display: block; width: 100%; padding: 2px 6px; margin-left: -6px;
   font: inherit; font-size: 13px; color: var(--ink); line-height: 1.55;
-  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 5px; resize: vertical; }
+  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 5px; resize: none; }
+textarea.idin { max-height: 60vh; overflow-y: auto; }
 .idin:focus { outline: none; }
 .idhint { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.5; }
 .idhint.bad { color: var(--g2); }
@@ -589,7 +600,9 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .inl-edit { margin: 2px 0 4px; }
 .inl-in { display: block; width: 100%; padding: 3px 6px; margin-left: -6px;
   background: var(--paper-2); border: 1px solid var(--accent); border-radius: 5px;
-  color: var(--ink); resize: vertical; }
+  color: var(--ink); resize: none; }
+/* 多行那种按内容长高（useGrow）。封顶 65vh：再高「确定 / 取消」就要滚出屏幕了。 */
+textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .inl-in:focus { outline: none; }
 /* 编辑态沿用显示态的字号行高，双击的瞬间整行才不会抖 */
 .inl-in.w-t { font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
@@ -604,7 +617,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .works { display: flex; flex-direction: column; gap: 8px; }
 .work { border: 1px solid var(--line); border-radius: 11px; background: var(--paper-2); box-shadow: var(--shadow); overflow: hidden; }
 /* 以前是 <button>，现在是 div —— 标题和描述要能就地双击编辑，套在按钮里不行。
-   点空白处照旧展开/收起；键盘走右边那个真按钮（.chev）。 */
+   点空白处照旧开/关编辑；键盘走右边那个真按钮（.edtg 编辑 / 完成）。 */
 .work-hd { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 12px 13px; }
 .work-hd:hover { background: color-mix(in srgb, var(--paper-2) 70%, var(--paper-3)); }
 .work-main { flex: 1; min-width: 0; }
@@ -621,6 +634,16 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .chev { color: var(--ink-3); font-size: 20px; line-height: 1; transition: transform .18s; margin-top: 2px;
   background: none; border: 0; padding: 0 2px; cursor: pointer; font-family: inherit; }
 .chev.open { transform: rotate(90deg); }
+/* 档案条目右上角那颗「编辑 / 完成」。长得跟机会卡上「展开」那颗（.desktg）一家：
+   胶囊、图标 + 两个字，打开时换强调色不换位——位置一动你就找不到它了。 */
+.edtg { display: inline-flex; align-items: center; gap: 5px; flex: none; margin-top: 1px;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
+  background: transparent; border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 3px 10px 3px 8px; cursor: pointer; transition: color .14s, border-color .14s, background .14s; }
+.edtg:hover { color: var(--ink); border-color: var(--accent); }
+.edtg.on { color: var(--accent); background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.edtg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .box { border-top: 1px dashed var(--line); padding: 13px 13px 14px; display: grid; gap: 8px; }
 .bx-h { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
 .bx-empty { font-size: 12px; color: var(--ink-3); line-height: 1.55; }
@@ -655,7 +678,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .tk-prompt { font: inherit; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--paper-2); border: 1px solid var(--line); max-height: 320px; overflow-y: auto; }
 .task.open .tk-prompt { background: var(--paper-2); }
 .tk-prompt:hover { border-color: var(--line-2); }
-.tk-ta { font: inherit; font-size: 12.5px; line-height: 1.55; width: 100%; margin-left: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; resize: vertical; }
+.tk-ta { font: inherit; font-size: 12.5px; line-height: 1.55; width: 100%; margin-left: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; resize: none; max-height: 70vh; overflow-y: auto; }
 .tk-hint { font-size: 11px; color: var(--ink-3); margin-top: 6px; line-height: 1.5; }
 .tk-result { font: inherit; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--ink-2); }
 .tk-warn { font-size: 12.5px; line-height: 1.5; padding: 9px 12px; border-radius: 10px; margin: 0 0 12px; background: color-mix(in srgb, var(--wait) 11%, var(--paper)); color: var(--ink); }
@@ -703,7 +726,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
   border-left: 2px solid var(--line-2); padding-left: 8px; }
 .pc-jot:hover { color: var(--ink); }
 .pc-jot-in { display: block; width: 100%; font: inherit; font-size: 11.5px; line-height: 1.5;
-  margin-top: 7px; padding: 6px 8px; resize: vertical; color: var(--ink);
+  margin-top: 7px; padding: 6px 8px; resize: none; max-height: 30vh; overflow-y: auto; color: var(--ink);
   background: var(--paper); border: 1px solid var(--accent); border-radius: 7px; outline: none; }
 
 /* ── 「该干什么」那一行 ──
@@ -1052,7 +1075,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
   background: none; border: 0; padding: 0; cursor: pointer; }
 .dv-edit { width: 100%; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-2);
   color: var(--ink); font-family: var(--serif); font-size: 13px; line-height: 1.6; padding: 10px 11px;
-  resize: vertical; outline: none; }
+  resize: none; max-height: 70vh; overflow-y: auto; outline: none; }
 .dv-edit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .dv-rule { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3);
   margin-top: 6px; font-variant-numeric: tabular-nums; }
@@ -1270,6 +1293,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .prop-fields input, .prop-notes textarea { font: inherit; font-weight: 400; letter-spacing: 0;
   font-size: 12.5px; color: var(--ink); padding: 5px 9px; border: 1px solid var(--line-2);
   border-radius: 7px; background: var(--paper); min-width: 190px; resize: vertical; }
+.prop-notes textarea { resize: none; max-height: 40vh; overflow-y: auto; }
 .prop-fields input:disabled { color: var(--ink-3); }
 
 /* ── 等你点头 / 它判掉的 ─────────────────────────────────────────
