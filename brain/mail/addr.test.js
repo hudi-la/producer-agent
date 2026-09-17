@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { headerMap, parseAddr, parseAddrList, isBulk, classify } from './addr.js'
+import { headerMap, parseAddr, parseAddrList, isBulk, classify, namesOf } from './addr.js'
 
 const ME = 'hudi.creates@gmail.com'
 const ME2 = 'hudi@calarts.edu'          // 以后要接的第二个地址
@@ -245,4 +245,28 @@ test('没有这几个头就是 null / 空数组，不编', () => {
   assert.equal(r.message_id, null)
   assert.equal(r.in_reply_to, null)
   assert.deepEqual(r.refs, [])
+})
+
+// ── 署名跟地址一起存（0121）────────────────────────────────────
+// 抄送栏里的人以前只留了地址。Rachel 被 Brooke 抄送了四回，系统连她叫什么
+// 都不知道——因为 To/Cc 的署名从来没落库。
+
+test('From/To/Cc 里的署名都存下来，按地址索引', () => {
+  const r = classify(msg({
+    From: 'Lorna Turner <lorna@printmuseum.org>',
+    To: `Di Hu <${ME}>`,
+    Cc: 'Meighan Maguire <meighan@printmuseum.org>, ipm@printmuseum.org',
+    Subject: 'Re: Workshop Proposal',
+  }), ME)
+  assert.deepEqual(r.names, {
+    'lorna@printmuseum.org': 'Lorna Turner',
+    [ME]: 'Di Hu',
+    'meighan@printmuseum.org': 'Meighan Maguire',
+  })
+})
+
+test('没署名的地址不出现在署名表里——不编名字', () => {
+  assert.deepEqual(namesOf([{ email: 'a@x.org', name: null }, { email: 'b@x.org', name: 'B' }]),
+    { 'b@x.org': 'B' })
+  assert.deepEqual(namesOf([]), {})
 })

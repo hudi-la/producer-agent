@@ -130,6 +130,34 @@ test('等待的措辞带着设定的日子；到点说「等够了、该催了�
   assert.match(whyLine(row({ zone: 'due' })), /没等到的是：/)
 })
 
+test('到点那句说清是第几次 follow up（0117）', () => {
+  // 还没催过：第一封在等，卡里是第 1 次
+  assert.match(stateLine(row({ zone: 'due', followups: 0 })), /^等了 \d+ 天没等到 —— 该催了，第 1 次 follow up 在卡里$/)
+  assert.match(stateLine(row({ zone: 'due' })), /第 1 次 follow up 在卡里$/)          // 库里没这列也不炸
+  // 催过两次：第 2 次等了 n 天，卡里是第 3 次
+  assert.match(stateLine(row({ zone: 'due', followups: 2 })), /^第 2 次 follow up 等了 \d+ 天没等到 —— 该催了，第 3 次 follow up 在卡里$/)
+  // 没到点的那句不动
+  assert.doesNotMatch(stateLine(row({ followups: 2 })), /follow up 等了/)
+})
+
+test('人家回信了就不许说「没等到」—— 该催的是没回你的人', () => {
+  // 2026-09-02 他拍的：Francesca 已经回信定了 9/9，面板还在写「等了 4 天
+  // 没等到 —— 该催了」。判断排着队还没轮到这封信，可信就躺在库里，
+  // 「没等到」是一句现成的假话，而按下 follow up 的是他自己的手。
+  const it = row({ zone: 'due', replied_at: '2026-09-02T20:19:01Z',
+                   what: 'Francesca 从这些日期里选一个并确认具体时间' })
+  assert.match(stateLine(it), /对方 9 月 2 日来信了 —— 该你回/)
+  assert.doesNotMatch(stateLine(it), /该催了|没等到/)
+  // 等的是什么不能丢 —— 那是你为什么该管这封信
+  assert.match(whyLine(it), /你等的是：Francesca 从这些日期里选一个/)
+})
+
+test('判完了就交还给判断：replied_at 一空，「该催了」照旧', () => {
+  // 「还没判过」那个闸的整个意义：自动回复 / 答非所问判完之后 replied_at
+  // 变回 null，这条该催还是该催 —— 不许把等待永远钉在该动的里。
+  assert.match(stateLine(row({ zone: 'due', replied_at: null })), /等了 \d+ 天没等到 —— 该催了/)
+})
+
 test('判「要回」的理由要显示出来 —— 原来完全不显示', () => {
   const it = row({ state: 'NEEDS_REPLY', what: '她在等你点头', why: '她明说了等你确认九月对接 Joo' })
   assert.match(whyLine(it), /凭什么：她明说了/)
@@ -138,4 +166,24 @@ test('判「要回」的理由要显示出来 —— 原来完全不显示', () 
 test('OWE_* 的整句直接用库里拼好的 what', () => {
   const it = row({ state: 'OWE_THANKS', what: '见到了你经「Weidi」介绍认识的「Biayna」，跟他说一声谢谢。' })
   assert.equal(stateLine(it), it.what)
+})
+
+// ── 三次规矩（0118，2026-09-02 他拍的）──────────────────────────
+// 连发三封没回就别再催了；条目不消失，换法子。
+test('连发三封没回：到点那句不再说「该催了」，说换法子', () => {
+  const it = row({ zone: 'stopped', followups: 2 })
+  assert.match(stateLine(it), /^连发 3 封没等到回复 —— 别再催了，换个法子（Fairwind 在卡里给建议）$/)
+  assert.doesNotMatch(stateLine(it), /该催了/)
+  assert.match(whyLine(it), /没等到的是：等 Sarah 排 2027 的课/)
+})
+
+test('第三封发出去还没到点：说清这是最后一封，到点就不催了', () => {
+  const it = row({ zone: 'waiting', followups: 2 })
+  assert.match(stateLine(it), /已经过去 \d+ 天，这是连发的第 3 封 —— 9 月 28 日前没回就不再催/)
+})
+
+test('停了的进等待区，不进「今天」，也不丢', () => {
+  const { due, waiting } = splitStates([row({ key: 's', zone: 'stopped', followups: 2 }), row({ key: 'd', zone: 'due' })])
+  assert.deepEqual(due.map((x) => x.key), ['d'])
+  assert.deepEqual(waiting.map((x) => x.key), ['s'])
 })

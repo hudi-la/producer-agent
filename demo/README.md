@@ -16,8 +16,9 @@
 
 ```
 demo/                        ← 你在这儿
-  scout-prompt.md            找机会那个 cron 的提示词:整篇是画像和筛选标准
-  scout-sync-prompt.md       同上
+  scout-prompt.md            「每周找机会」的提示词:整篇是画像、来源和筛选标准
+                             (同一段字也存在 producer.tasks.prompt 里,界面上能改;
+                              src/demo/tasks.js 和 supabase/demo/0006 各有一份,改一边记得改另一边)
 src/demo/                    前端在连不上库时的回落数据
   entries.js                 57 条:11 件作品 + 自述 / 工作 / 教育 / 展览 / 技能
   concerns.js                三个母题(作品按它分组)

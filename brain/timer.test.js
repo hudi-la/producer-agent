@@ -41,3 +41,15 @@ test('钥匙 = state:subject:since 那天；等待换了就是新钥匙', () => 
   assert.equal(timerKey(row()), 'WAITING_REPLY:abc-123:2026-08-12')
   assert.notEqual(timerKey(row()), timerKey(row({ since_at: '2026-08-20T09:00:00Z' })))
 })
+
+test('连发三封没回（zone=stopped）：不起草第四封，给别的法子', () => {
+  const d = directive(row({ zone: 'stopped', followups: 2, days_over: 4 }))
+  assert.ok(!d.includes('[[LETTER]]'))
+  assert.match(d, /等平面图和技术对接人/)
+  assert.match(d, /3 封/)
+  assert.match(d, /电话|换个诉求|先放着/)
+})
+
+test('到点但还没连发三封：照旧起草 follow-up', () => {
+  assert.match(directive(row({ zone: 'due', followups: 1 })), /\[\[LETTER\]\]/)
+})

@@ -13,6 +13,7 @@ const TOOL_SAY = {
   WebSearch: '在网上找资料…',
   WebFetch: '在读一个网页…',
   mcp__pursuit_files__open_file: '在翻这条线上的文件…',
+  mcp__studio_works__open_work_image: '在看那件作品的图…',
 }
 const toolSay = (name) =>
   TOOL_SAY[name] || (name?.startsWith('mcp__gmail') ? '在翻信箱…' : null)

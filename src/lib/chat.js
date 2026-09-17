@@ -71,16 +71,18 @@ export async function fetchContactMessages(contactId) {
  * 不传就完全不带这个键，走 RPC 的默认值 —— 单发的调用方一个字都不用改。
  */
 /**
- * 说话的对象：机会线还是人。
+ * 说话的对象：机会线、人，还是档案里那张书桌。
  *
- * 传字符串 = 机会线（老调用方一个字不用改）；传 {kind,id} 两种都行。
- * brain 那边 ownerOf 本来就两种都收（server.js 的 contact_id / pursuit_id），
- * 只是前端一直只会发前一种 —— 群发要发给人，缺的就是这一层。
+ * 传字符串 = 机会线（老调用方一个字不用改）；传 {kind,id} 三种都行。
+ * brain 那边 ownerOf 收的就是这三样（server.js 的 contact_id / pursuit_id / entry_id）。
+ *
+ * 书桌那种的 id 是**那一条条目的 id** —— 对话挂在一条具体的东西上。
  */
 export const ownerBody = (owner) =>
   typeof owner === 'string' ? { pursuit_id: owner }
     : owner?.kind === 'contact' ? { contact_id: owner.id }
-      : { pursuit_id: owner?.id }
+      : owner?.kind === 'studio' ? { entry_id: owner.id }
+        : { pursuit_id: owner?.id }
 
 export async function sendMessage(owner, text, meta, runId) {
   let res
@@ -168,14 +170,14 @@ export async function streamChat(body, onEvent) {
  * 脑子是旧的（还没有 /chat/stream）就退回原来那条路 —— 一次改动不该让
  * 没重启 brain 的人连话都说不了，只是没有流而已。
  */
-export async function sendMessageStream(pursuitId, text, meta, runId, onEvent) {
+export async function sendMessageStream(owner, text, meta, runId, onEvent) {
   try {
     return await streamChat(
-      { pursuit_id: pursuitId, text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) },
+      { ...ownerBody(owner), text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) },
       onEvent,
     )
   } catch (e) {
-    if (e instanceof NoStream) return sendMessage(pursuitId, text, meta, runId)
+    if (e instanceof NoStream) return sendMessage(owner, text, meta, runId)
     throw e
   }
 }
@@ -295,6 +297,13 @@ export async function markTouched(pursuitId) {
  * at 传值只有一个用处：把旧的 localStorage 记录搬上来（见 App.jsx 的一次性搬迁）。
  * 平时不传 = 现在。库里那边只前进不后退，并发的标签页不会把进度往回拨。
  */
+/** 这个人的卡读到哪儿了（0124）。跟机会线那份同一套：时间只前进不后退。 */
+export async function markContactSeen(contactId, at = null) {
+  if (!supa) return
+  const { error } = await supa.rpc('pa_mark_contact_seen', { p_contact_id: contactId, p_at: at })
+  if (error) throw new Error(error.message)
+}
+
 export async function markSeen(pursuitId, at = null) {
   if (!supa) return
   const { error } = await supa.rpc('pa_mark_seen', { p_pursuit_id: pursuitId, p_at: at })

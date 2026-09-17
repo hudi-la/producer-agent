@@ -306,6 +306,7 @@ state 一直是 `IDLE`，通知栏什么都不出。
 | **规则**（不花钱） | 清洗（草稿/群发/日历回执）、钟（follow-up 的到点日从你最后一封发出现算）、记一笔关「要回」、暂停静音 | 无标签或 situation 注明 |
 | **Fairwind 内部 agent** | 转移表的格子（信走盲格子；**记一笔走带全卷宗**——聊天里的知识在场）、到点起草 | `tagged_by='fairwind'` |
 | **你 / 后台开发** | 【已处理】、改期、放回、手工补账 | `tagged_by='user' / 'dev-*'`，凭什么写进 situation |
+| **Fairwind 在聊天里**（带全卷宗，2026-09-04 起） | 七种拨法（resolved / wait / reschedule / park / needs_reply / meeting / done），默认落地、你能撤回 | `tagged_by='fairwind-chat'`，`situation='聊天里定的：<move>'`，锚在一条 decision 笔上 |
 
 ## 十四、实战修出的硬规矩（活的登记簿——改判据先改这儿）
 
@@ -323,5 +324,7 @@ state 一直是 `IDLE`，通知栏什么都不出。
 | **follow-up 的钟从你最后一封真发出的信起算**——事实现算，发跟进自动重走 | 0114 |
 | awaiting 里带明确日期/窗口的，等待必须盖过它 | judge.js 锚点规矩 |
 | 到点日可改：面板「改期」/ 记一笔「说好周四再催」 | 0103 |
+| **聊天为准，默认落地，按了能撤回**：`[[STATE]]` 信封 → 记笔 + 标签，全锚在新笔上，撤回只有一个动作；笔开的等待 followups 从 0 起算 | 0123 / [稿子](2026-09-04-chat-moves-the-state-design.md) |
+| **你说一句，Fairwind 判该记成什么**：事件 → STATE（笔正文是原话，多一种 met）；记忆 → MEMO（`memo` 笔不算事件）；商量不记。记一笔按钮退场，脑子没开时输入框直接记 note 笔。同一件事只判一次，DEBRIEF × YOUR_ANSWER 那格成了死代码 | 0125 / [稿子](2026-09-11-say-it-and-fairwind-files-it-design.md) |
 | 到点的等待说「等了 N 天没等到——该催了」；「在等 X」只在等待区 | stateText.js |
 | 认领地址：立即搬信、人跟着信挂线、登记过的信箱归属挂得上 | 0106 / 0107 |

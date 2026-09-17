@@ -35,3 +35,20 @@ export const KIND_LABEL = {
   sent: '发出', got: '收到', note: '记了一笔',
   wait_open: '开始等', wait_close: '关掉一个等待', fairwind: 'Fairwind',
 }
+
+/**
+ * 「时间线」分两半（2026-08-23 他拍的）。分的不是时间，是**谁动的手**：
+ *
+ *   日历 —— 你动的手。发出去的信、你记的一笔、办到了的那些（已办），
+ *           加上还没到点的那些（待办，来自 v_pa_state 的 due_at）。
+ *           摆成方格是因为你问的是「这个月我干了多少 / 还欠着什么」，
+ *           那是个形状问题。
+ *   流水 —— 不是你动的手。收到的信、Fairwind 到点干的事、系统开的等待。
+ *           摆成一条流是因为你问的是「刚刚发生了什么」，那是个顺序问题。
+ *
+ * 「开始等」归流水而不是日历：一个等待开起来，是系统读完信之后替你记下的，
+ * 不是你办了什么。真轮到你动的时候它会到点，那一天自然出现在日历上。
+ */
+export const MINE = new Set(['sent', 'note', 'wait_close'])
+export const FLOW = new Set(['got', 'fairwind', 'wait_open'])
+export const isMine = (r) => MINE.has(r.kind)

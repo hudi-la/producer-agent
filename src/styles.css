@@ -73,6 +73,56 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tab[aria-pressed="true"] { color: var(--ink); background: var(--paper-2); border-color: var(--line-2); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .app-top .sp { flex: 1; }
+/* 收信状态是顶栏里唯一能缩的：抽屉开着时顶栏让出 33vw，别的都是字不能缩，
+   这一段长句先缩、超出省略——不然整条顶栏折成两行，「我」掉到底下去。 */
+.app-top .mailst { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-top .brand, .app-top .areas, .app-top .bellbtn, .app-top .veilbtn { flex: none; }
+.wrap.drawered .app-top { flex-wrap: nowrap; }
+.area-n { font-weight: 500; color: var(--ink-3); }
+.area.on .area-n { color: var(--accent); }
+
+/* 各区自己的头一行：动作跟着它作用的东西走，不再站在导航带子上 */
+.areabar { display: flex; align-items: center; gap: 12px; padding: 9px 22px; border-bottom: 1px solid var(--line); flex: none; }
+.areabar .sp { flex: 1; }
+
+/* 桌上那排窗口（工作区底下那一排）。横向滚，格子不缩——看不见题目等于没开。 */
+.desk-tabs { flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding: 7px 18px; }
+.dtab { display: inline-flex; align-items: center; flex: none; border: 1px solid transparent; border-radius: 9px; }
+.dtab.on { background: var(--paper-2); border-color: var(--line-2); }
+.dtab-t { font: inherit; font-size: 12.5px; color: var(--ink-3); background: none; border: 0; padding: 6px 4px 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtab-t:hover { color: var(--ink-2); }
+.dtab.on .dtab-t { color: var(--ink); font-weight: 600; }
+.dtab-t em { font-style: normal; color: var(--ink-3); }
+.dtab-k { width: 7px; height: 7px; border-radius: 2px; background: var(--line-2); flex: none; }
+.dtab-k.pursuit { background: var(--accent); }
+.dtab-k.contact { border-radius: 50%; background: var(--g2); }
+/* 这一格是「Fairwind 说了话你还没读到」。跟看板上那颗红点同一个意思、同一个色，
+   读了就灭——一排里哪个是新的，一眼看得出。 */
+.dtab-k.new { background: var(--g2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--g2) 28%, transparent); }
+.dtab-x { font: inherit; font-size: 15px; line-height: 1; color: var(--ink-3); background: none; border: 0; padding: 4px 8px 4px 2px; cursor: pointer; border-radius: 6px; }
+.dtab-x:hover { color: var(--ink); }
+.dtab-x:focus-visible, .dtab-t:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.desk-empty { padding: 60px 26px; color: var(--ink-3); font-family: var(--serif); font-size: 14px; }
+
+/* 飞进购物车的那个小标签（lib/fly.js 生的，飞完自己删）。长得像抽屉里那颗开关按下去的样子。 */
+.fly { position: fixed; z-index: 60; pointer-events: none; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; padding: 5px 11px; border-radius: 999px; color: var(--accent); background: var(--paper); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: 0 6px 18px -8px #241f1b80; will-change: transform, opacity; }
+/* 落地：顶栏那个字弹一下 */
+.area.landed { animation: landed .45s cubic-bezier(.34,1.56,.64,1); }
+@keyframes landed { 0% { transform: scale(1); } 35% { transform: scale(1.12); color: var(--accent); } 100% { transform: scale(1); } }
+
+/* 卡角上的记号：这张今天挑了。跟顶栏数字、抽屉那颗开关一起翻面。 */
+.pc-desk { display: inline-block; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 6px; margin-left: 6px; border-radius: 5px; color: var(--accent); background: var(--accent-soft); vertical-align: 2px; }
+
+/* ── 展示模式（见 lib/veil.js）───────────────────────────────────
+   .veilbtn 右上角你的名字，点一下进入/退出展示模式。
+   .veil    盖在私人信息上的那朵小花。字不在 DOM 里，是换掉不是糊掉。 */
+.veilbtn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 6px 13px; border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--ink-2); cursor: pointer; transition: color .14s, background .14s; }
+.veilbtn:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.veilbtn.on { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); font-weight: 600; }
+.veilbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.veil { display: inline-flex; align-items: center; justify-content: center; min-width: 2.4em; padding: 0 .5em; border-radius: 6px; background: var(--accent-soft); color: var(--accent); vertical-align: -0.15em; line-height: 1.25; }
+/* 花跟着周围的字号走：标题里的花大，脚注里的花小。 */
+.veil svg { width: .95em; height: .95em; }
 .wbtn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
 .wbtn:hover { border-color: var(--accent); }
 .wbtn:disabled { opacity: .4; cursor: default; border-color: var(--line); }
@@ -89,13 +139,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 工具条上的过卡入口。像一叠东西，不像一个通知。
    字号和内边距跟 .wbtn 一模一样——它现在跟一排 .wbtn 站一起，
    长得不一样会让人以为它是另一种东西（它只是多了个「一叠」的记号）。 */
-.qbtn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 12.5px; font-weight: 600;
-  padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2);
-  color: var(--ink); cursor: pointer; font-variant-numeric: tabular-nums; }
-.qbtn:hover { border-color: var(--accent); }
-.qbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.qpile { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); flex: none;
-  box-shadow: 2px -2px 0 -1px var(--paper-2), 3px -3px 0 0 var(--accent); }
 /* ── 出事了才说话 ──
    正常状态不渲染任何东西。两档：danger = 你看到的是假数据；warn = 数据真，
    但渡不干活。危险那档用醒目的暖色铺底——它必须刺眼，看漏了会让你在假数据上做决定。 */
@@ -118,11 +161,11 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 /* 给看板补一段右内边距，末尾那几列才滑得出抽屉底下——
    不补的话「谈成」「暂停处理」两列就永远够不着了。 */
 .wrap.drawered .board { padding-right: calc(var(--drawer-w) + 24px); }
-/* 🔔 现在钉在带子右端（.subbar），所以让位的是带子不是顶栏。
-   机会线抽屉顶到最上沿、整条盖住右边，不让位的话 🔔 就压在它底下——
-   一个常驻入口有一半时间点不着，等于没有。
-   通讯录不在这儿让位：它 2026-08-23 摊回页面上了，压根碰不到 🔔。 */
-.wrap.drawered .subbar { padding-right: calc(var(--drawer-w) + 24px); }
+/* 🔔 和收信状态在顶栏右端（2026-09-02 搬上去的）。抽屉顶到窗口最上沿、
+   整条盖住右边，不让位的话 🔔 就压在它底下——一个常驻入口有一半时间点不着，
+   等于没有。看板 / 通讯录自己的头一行（.areabar）同理。 */
+.wrap.drawered .app-top { padding-right: calc(var(--drawer-w) + 24px); }
+.wrap.drawered .areabar { padding-right: calc(var(--drawer-w) + 24px); }
 
 /* 从右侧贴边落下来的一整条，顶到窗口最上沿（连顶栏一起盖住）。
    宽度就是一句 --drawer-w：33vw，窄窗口不低于 400px。嫌窄改这一个数。 */
@@ -136,6 +179,22 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
    条子本身 11px 宽（骑在边框上，左右各露一半）—— 2px 的话你得瞄着点，
    而这是个纯手感的控件，够得着比好看重要。平时完全不显形，
    鼠标扫过 / 键盘选中 / 正在拉的时候才现出一道强调色。 */
+/* 抽屉头上那颗「放到工作区」开关。翻面之后换色不换位——位置一动你就找不到它了。 */
+.desktg { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 11px; cursor: pointer; flex: none; }
+.desktg:hover { color: var(--ink); border-color: var(--accent); }
+.desktg.on { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.desktg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 名片 / 机构塞进抽屉：三栏叠成一栏，各自不再单独滚，整个抽屉滚。
+   底下留出输入框那一组的位置——不留的话最后一条对话被压在框底下。 */
+.focus.drawer .focus-cols { flex: 1; min-height: 0; overflow-y: auto; display: block;
+  padding-bottom: calc(var(--composer-h, 104px) + 40px); }
+.focus.drawer .fc-l, .focus.drawer .fc-r { border: none; overflow: visible; padding: 14px 18px 0; }
+/* 输入框在抽屉里也得**浮在底下**，不许跟着对话滚走。
+   病根是定位锚：.fc-m 在整页里是一栏（高度就是那一屏），可在抽屉里三栏叠成一栏之后，
+   它的高度 = 整条对话，于是「贴着 .fc-m 的底」= 贴在对话末尾，你得滚到底才看得见它。
+   把锚换成抽屉本身（.focus 是 position: relative，撑满抽屉），它就一直浮在眼前。 */
+.focus.drawer .fc-m { position: static; }
+
 /* z-index 得压过 20：抽屉里那层 PursuitFocus 的根节点是 <div class="focus drawer">，
    它身上那个 drawer 是**变体名**，可选择器不分变体不变体——上面 .drawer 那条
    z-index: 20 照样罩在它头上。不写这一句，条子只有露在抽屉外面的那 4px 点得着。 */
@@ -176,6 +235,8 @@ body.resizing .drawer-grip::before { opacity: .75; }
    前者同时把最小内容宽度也算小，这才是让上面那句 min-width:0 真正生效的另一半。 */
 .pcard, .stack-head { overflow-wrap: anywhere; }
 .pcard { position: relative; }
+.pc-fresh { display: inline-block; vertical-align: 2px; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; margin-right: 6px; border-radius: 5px; color: #fff; background: var(--accent); letter-spacing: .04em; }
+.stack-c .pc-fresh { margin: 0 4px 0 0; }
 .pc-badge { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--g2); box-shadow: 0 0 0 3px var(--paper-2); }
 .stack-head { position: relative; }
 .stack-head .pc-badge { top: 12px; right: 12px; }
@@ -257,34 +318,16 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* 队头只报位置。翻页什么都不改，所以这儿没有任何「已处理」的记号。
    两个出口原来在抽屉底部，跟输入框叠在一起被盖住了——挪上来，
    「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */
-.qnav { display: flex; align-items: center; gap: 8px; padding: 0 0 9px; margin-bottom: 2px;
-  border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.qnav .qsp { flex: 1; }
 /* 横在名片头条里的那一份（人也进队之后，2026-08-21）。那身默认样式是给
    抽屉里竖排用的：下边框和底部留白横过来就是半截多余的线。
    flex:none 也是必须的 —— .ft-head 里 .ft-title 是 flex:1，不写就被挤成零宽，
    DOM 里在、屏幕上没有。 */
-.qnav.in-head { border-bottom: none; padding: 0; margin: 0; flex: none; gap: 7px; }
-.qnav.in-head .qsp { display: none; }
-.qarrow { font: inherit; font-size: 16px; line-height: 1; width: 26px; height: 26px; border-radius: 7px;
-  border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
-.qarrow:hover:not(:disabled) { border-color: var(--accent); }
-.qarrow:disabled { opacity: .35; cursor: default; }
-.qarrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.qcount { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 /* 你什么时候放过它的。放过 ≠ 翻过去，所以得留个痕。 */
 .qskip { font-size: 11.5px; color: var(--ink-3); }
 /* 这儿原来有条 .qwhy（「到日子了 · 为什么」）。「行动时间到了」那套判据撤了，它也就没人用了。 */
 
 /* 剩下的全放过了。不无限转圈。 */
-.qrest { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
-  gap: 9px; padding: 0 26px; }
-.qrest-t { font-family: var(--serif); font-size: 15px; font-weight: 600; margin: 0; }
-.qrest-s { font-size: 12.5px; color: var(--ink-3); margin: 0 0 6px; }
 /* 「整页 ↗」：抽屉里唯一一个把你送出去的出口，所以给它边框、跟旁边的开关区分开 */
-.expand { font: inherit; font-size: 12px; color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 5px 10px; cursor: pointer; flex: none; }
-.expand:hover { color: var(--ink); border-color: var(--accent); }
-.expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .focus-top .back { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .focus-top .back:hover { color: var(--ink); }
 .focus-top .stg { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
@@ -293,7 +336,8 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .stg-sel:hover { border-color: var(--accent); }
 .focus-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 /* 上边距从 30 收到 22：标题搬去顶条了，这儿第一眼看到的是事实标签，不用留那么多气 */
-.focus-inner { max-width: var(--focus-col); margin: 0 auto; padding: 22px var(--focus-pad) 120px; }
+.focus-inner { max-width: var(--focus-col); margin: 0 auto;
+  padding: 22px var(--focus-pad) calc(var(--composer-h, 80px) + 40px); }
 .fh .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 26px; }
 .fh .facts b { color: var(--ink); }
 .fh .facts .warn { color: var(--wait); font-weight: 600; }
@@ -433,10 +477,53 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .rail-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rail-l { flex: 1; min-width: 0; }
 .rail-n { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* 「N 条在写」。写申请时翻不到那几条，而他写完忘了点标不会收到任何提示——
+   这个数字就是那个提示，所以它得在左栏一眼看得见的位置。 */
+.rail-d { font-size: 10.5px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
 .lib-pane .kind { margin-top: 0; }
 
-/* 窄屏退回单栏：格名变成顶上一条横着滚的 chip 行。
-   -webkit-overflow-scrolling 之外不做别的——这条 rail 短，不值得再加箭头。 */
+/* 「加一条」：在这之前档案页压根没有这个动作。 */
+.kind-add { font: inherit; font-size: 11.5px; margin-left: 10px; padding: 2px 9px; border-radius: 6px;
+  border: 1px dashed var(--line-2); background: transparent; color: var(--ink-3); cursor: pointer;
+  transition: color .14s, border-color .14s; }
+.kind-add:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); border-style: solid; }
+
+/* 「在写」那个标。只有在写的才挂 —— 写完的是常态，常态不占一个 chip。 */
+.draftchip { font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 5px; cursor: pointer;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent); background: var(--accent-soft); font-weight: 600; transition: all .14s; }
+.draftchip:disabled { cursor: default; opacity: .7; }
+
+/* 展开后那块顶上的开关。写完的条目要标成在写，只有这一个入口 —— 那是个
+   少见又慎重的动作，不该在折叠行上天天杵着。 */
+.draftrow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.draftrow i { font-style: normal; color: var(--ink-3); font-size: 11.5px; }
+.draftflip { font: inherit; font-size: 11.5px; padding: 2px 9px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line-2); background: transparent; color: var(--ink-3); transition: all .14s; }
+.draftflip:hover { color: var(--ink); border-color: var(--ink-3); }
+
+/* ── 条目里那个抽屉（0127）────────────────────────────────────
+   它写的每个字都是稿子，进不了档案 —— 所以这儿比机会线那边干净得多：
+   没有信卡、没有表卡、没有状态卡，因为它没有那些能力。 */
+.echat { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.echat-hd { font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; margin-bottom: 12px; }
+.echat-hd i { display: block; margin-top: 6px; font-style: normal; font-size: 11.5px;
+  letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--ink-3); line-height: 1.6; }
+.echat-thread { display: flex; flex-direction: column; gap: 16px; margin-bottom: 14px;
+  max-height: 520px; overflow-y: auto; }
+.echat-err { margin-bottom: 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
+.echat-composer { display: flex; align-items: flex-end; gap: 9px; }
+.echat-composer textarea { flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 1.6;
+  resize: none; max-height: 180px; border: 1px solid var(--line-2); border-radius: 12px;
+  padding: 9px 12px; background: var(--paper); color: var(--ink); }
+.echat-composer textarea:focus { outline: none; border-color: var(--accent); }
+.echat-composer button { font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 10px;
+  border: none; cursor: pointer; background: var(--ink); color: var(--paper); }
+.echat-composer button:disabled { opacity: .35; cursor: default; }
+.echat-composer button.stop { background: var(--ink-3); }
+
 @media (max-width: 860px) {
   .page-inner.wide { max-width: 720px; }
   .lib-two { grid-template-columns: minmax(0, 1fr); gap: 18px; }
@@ -543,14 +630,48 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .box .add { font-size: 11.5px; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 8px; padding: 7px 10px; text-align: center; margin-top: 2px; }
 
 /* ── 造卡任务 modal ── */
-.taskmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(520px,92vw); max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 24px 24px 26px; }
+.taskmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(560px,92vw); max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 24px 24px 26px; }
 .taskmodal.open { transform: translate(-50%,-50%) scale(1); opacity: 1; pointer-events: auto; }
 .tm-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .tm-head h3 { font-family: var(--serif); font-size: 19px; margin: 0; font-weight: 600; }
 .tm-intro { font-size: 13px; color: var(--ink-2); line-height: 1.55; margin: 0 0 18px; font-family: var(--serif); }
 .tm-intro b { color: var(--ink); font-weight: 600; }
 .tm-list { display: flex; flex-direction: column; gap: 9px; }
-.task { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 13px 14px; }
+.task { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 13px 14px; }
+.task-head { display: flex; align-items: flex-start; gap: 12px; }
+.task.real .task-head { cursor: pointer; }
+.task.real .task-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.task.open { border-color: var(--line-2); background: var(--paper); }
+/* 定时任务展开的那块 */
+.tk-body { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); cursor: default; }
+.tk-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tk-k { font-size: 11px; color: var(--ink-3); letter-spacing: .02em; }
+.tk-k2 { margin-top: 14px; margin-bottom: 4px; }
+.tk-sel { font: inherit; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--paper); color: var(--ink); }
+.tk-run { font-size: 12px; padding: 5px 12px; }
+.tk-state { font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.tk-state.running { color: var(--accent); font-weight: 600; }
+.tk-state.off { color: var(--wait); }
+.tk-prompt { font: inherit; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--paper-2); border: 1px solid var(--line); max-height: 320px; overflow-y: auto; }
+.task.open .tk-prompt { background: var(--paper-2); }
+.tk-prompt:hover { border-color: var(--line-2); }
+.tk-ta { font: inherit; font-size: 12.5px; line-height: 1.55; width: 100%; margin-left: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; resize: vertical; }
+.tk-hint { font-size: 11px; color: var(--ink-3); margin-top: 6px; line-height: 1.5; }
+.tk-result { font: inherit; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--ink-2); }
+.tk-warn { font-size: 12.5px; line-height: 1.5; padding: 9px 12px; border-radius: 10px; margin: 0 0 12px; background: color-mix(in srgb, var(--wait) 11%, var(--paper)); color: var(--ink); }
+.tk-warn code { font-size: 12px; }
+/* 面板分组：只有第一组是真会跑的，后面几组连开关都没有 */
+.tm-sec { font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 20px 0 4px; }
+.tm-sec:first-of-type { margin-top: 4px; }
+.tm-intro.sub { margin-bottom: 12px; font-size: 12px; }
+.task.past { background: transparent; border-style: dashed; }
+.task.past .task-t { font-weight: 600; }
+.task-when { font-size: 11px; color: var(--ink-3); flex: none; }
+.tk-result.past { margin-top: 8px; font-size: 11.5px; color: var(--ink-3); max-height: 130px; overflow-y: auto; }
+.tm-line { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin-top: 14px; padding-left: 2px; }
+.tm-line b { color: var(--ink-2); font-weight: 600; }
+.toggle:is(button) { border: 0; padding: 0; cursor: pointer; }
+.toggle:is(button):disabled { opacity: .5; cursor: default; }
 .task.off { opacity: .62; border-style: dashed; background: transparent; }
 .task-main { flex: 1; min-width: 0; }
 .task-t { font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
@@ -563,8 +684,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .toggle.on { background: var(--accent); }
 .toggle .knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s; }
 .toggle.on .knob { transform: translateX(14px); }
-.tm-add { margin-top: 14px; font-size: 12.5px; color: var(--ink-3); text-align: center; padding: 10px; border: 1px dashed var(--line-2); border-radius: 10px; cursor: pointer; }
-.tm-add:hover { border-color: var(--accent); color: var(--ink-2); }
 
 /* ── card ddl ── */
 .pc-stars { font-size: 11px; color: var(--accent); letter-spacing: 1.5px; margin-top: 5px; }
@@ -871,6 +990,11 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .lcard-sub { margin: 4px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .lcard-err { margin-bottom: 8px; font-size: 12px; color: var(--accent); }
 .lcard-ok { font-size: 12px; color: var(--ink-3); }
+/* 它在聊天里改了提醒（0123）：跟信卡同一副骨架，多一行「凭什么」。
+   撤回了就整张变灰 —— 还留着，是让你看得见曾经改过什么。 */
+.scard-why { margin: -4px 0 8px; font-size: 12px; color: var(--ink-3); }
+.scard-undone { opacity: .6; }
+.scard-undone .lcard-sub { text-decoration: line-through; }
 /* 表卡上那份题目清单。字数上限要看得见——听错的上限比没有上限更坏，
    你会照着那个假的去改。 */
 .fcard-qs { margin: 0 0 8px; padding: 0; list-style: none; }
@@ -1174,6 +1298,15 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .gr-hint { color: #a8a49c; }
 .gr-ok  { margin: 10px 0 0; font-size: 13px; color: #4a6b45; }
 .gr-err { margin: 10px 0 0; font-size: 13px; color: #9b4a3f; }
+/* 一伙人（0122）：一串信里好几个人来回说话，一格收一伙 */
+.gr-group { border-left: 3px solid #d9c9a8; padding-left: 10px; }
+.gr-kind.is-group { background: #f1e9d6; color: #7a6238; }
+.gr-names { font-size: 12px; margin-top: 6px; line-height: 1.9; }
+.gr-name { display: inline-block; margin: 0 6px 0 0; padding: 0 6px; border-radius: 3px;
+           background: #f0eee9; color: #4a463f; }
+.gr-name.is-bare { color: #8a857a; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.gr-event { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #6d685f; }
+.gr-event input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 3px 6px; }
 
 /* 「这一轮发生了什么」——不是出事，所以不红不黄。说完一句等你划掉。
    它存在的理由：原来整轮跑完屏幕上一点动静没有，于是「没有新信」和
@@ -1196,6 +1329,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .cast-tag { margin-left: 6px; font-size: 10px; padding: 1px 5px; border-radius: 3px;
             background: #e8eef2; color: #4a6070; }
 .cast-meta { flex: none; font-size: 11px; color: #97928a; }
+.cast-note { display: block; font-size: 11px; color: #97928a; margin-top: 1px; }
 .cast-x { flex: none; font-size: 11px; color: #a8a49c; }
 .cast-add { align-self: flex-start; margin-top: 6px; font-size: 12px; }
 .cast-pick { margin-top: 6px; }
@@ -1282,7 +1416,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .ppl-add .psect { margin-bottom: 6px; }
 
 /* 带子最左边那个区名 */
-.barname { font-family: var(--serif); font-size: 13.5px; font-weight: 600; flex: none; }
 
 /* 由头那一条：点名字进卡，点叉叉先不看它。
    叉叉平时淡着，鼠标扫过才明显——它是退路，不是主要动作。 */
@@ -1307,12 +1440,14 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .msg.note .bubble { background: transparent; border: 1px dashed var(--line-2);
   color: var(--ink-2); }
 .fc-m { position: relative; }          /* .composer 是绝对定位的，得有个落脚点 */
-/* 输入框浮在底部，所以滚动区底下要留出它的位置，不然最后一条被压住 */
-.focus.page .fc-m .focus-inner { padding-bottom: 96px; }
+/* 输入框浮在底部，所以滚动区底下要留出它的位置，不然最后一条被压住。
+   --composer-h 是 lib/useGrow.js 量出来的**整组实际高度**（框长高了它跟着变）；
+   还没量到之前退回 76px（单行时那么高）。+40px 是框跟最后一条之间那口气。 */
+.focus.page .fc-m .focus-inner { padding-bottom: calc(var(--composer-h, 76px) + 40px); }
 /* 名片那栏底下还多一行「记一笔」，得再让出它的高度。
    用 :has 认那个壳，而不是给名片再加个 class——.fc-m 是两边共用的，
    多一个只在一边出现的修饰类，下次改的人得先搞清楚它凭什么在那儿。 */
-.focus.page .fc-m:has(.composer-dock) .focus-inner { padding-bottom: 124px; }
+.focus.page .fc-m:has(.composer-dock) .focus-inner { padding-bottom: calc(var(--composer-h, 104px) + 40px); }
 /* 名片中栏：输入框和「记一笔」是一组，一起浮在底部。
    「记一笔」处置的是输入框里那句话，所以它跟着输入框走，不跟着对话走 ——
    挂在时间线末尾的话，你打完字得抬头去够一个已经滚走了的按钮。
@@ -1376,7 +1511,6 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* margin-left:auto 顶到最右：带子里有 .sp（flex:1）的区它吃不到剩余空间，
    自然就跟在最后一颗按钮后面；没有 .sp 的区（我的档案、整页）靠它顶到右端。
    两种情况一句话管完，不用每个区各摆一个占位。 */
-.subbar .bellbtn { margin-left: auto; }
 .bellbtn { position: relative; background: none; border: 0; cursor: pointer;
            padding: 3px 6px 1px; line-height: 1; color: var(--ink-2); }
 .bellbtn:hover { color: var(--ink); }
@@ -1548,6 +1682,11 @@ button.lg-cell { cursor: pointer; }
 .lg-cell.lv2 { background: color-mix(in srgb, var(--accent) 50%, var(--paper)); }
 .lg-cell.lv3 { background: color-mix(in srgb, var(--accent) 75%, var(--paper)); }
 .lg-cell.lv4 { background: var(--accent); }
+/* 还没到的那几天：空心。**染成实心就等于说「这事办了」** ——
+   日历上最不能撒的谎就是把待办画得像已办。 */
+.lg-cell.ahead { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+.lg-cell.ahead.lv0 { color: var(--line-2); }
+.lg-cell.ahead.lv1, .lg-cell.ahead.lv2, .lg-cell.ahead.lv3, .lg-cell.ahead.lv4 { color: var(--accent); }
 button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .lg-cell.on { outline: 2px solid var(--ink); outline-offset: 1px; }
 .lg-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1568,6 +1707,8 @@ button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .lg-kind { flex: none; width: 92px; font-size: 11px; color: var(--ink-3);
   text-align: right; }
 .lg-row.wait_close .lg-kind { color: var(--good, #4a7); font-weight: 600; }
+/* 待办那一行：空心方块是同一个记号，说的是同一件事——还没发生 */
+.lg-row.todo .lg-kind { color: var(--accent); font-weight: 600; }
 .lg-row.sent .lg-kind, .lg-row.got .lg-kind { color: var(--ink-2); }
 .lg-b { flex: 1; min-width: 0; }
 .lg-what { font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
@@ -1602,3 +1743,50 @@ button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .acct-out { font: inherit; font-size: 12px; background: none; border: none; cursor: pointer;
   color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; padding: 0; }
 .acct-out:hover { color: var(--ink); }
+/* ── 机会池：那张 Excel ──────────────────────────────────────
+   是表不是卡。宽、能滚、行紧凑——82 行要一眼扫得完，
+   而不是 82 个需要点开的东西。 */
+.opmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(1180px,95vw); max-height: 88vh; display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 22px 22px 18px; }
+.opmodal.open { transform: translate(-50%,-50%) scale(1); opacity: 1; pointer-events: auto; }
+.op-round { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; margin: 2px 0 14px; font-family: var(--serif); }
+.op-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.op-q { font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); min-width: 190px; }
+.op-q:focus { outline: none; border-color: var(--accent); }
+.op-wrap { overflow: auto; flex: 1; min-height: 120px; border-top: 1px solid var(--line); }
+.op-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.op-table th { position: sticky; top: 0; z-index: 1; background: var(--paper); text-align: left; font-weight: 600; font-size: 11px; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.op-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.op-row:hover td { background: var(--paper-2); }
+/* 已经捡过的、划掉的沉底并且淡下去——**但不消失**：消失了他会以为丢了 */
+.op-row.lane-onboard td, .op-row.lane-dropped td { opacity: .5; }
+.op-c-st { white-space: nowrap; color: var(--ink-2); }
+.op-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--line-2); vertical-align: 1px; }
+.op-dot.s-open { background: var(--good); }
+.op-dot.s-closed { background: var(--line-2); }
+.op-dot.s-unknown { background: var(--wait); }
+.op-c-t { min-width: 240px; max-width: 420px; }
+.op-title { font-family: var(--serif); font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: none; }
+a.op-title:hover { color: var(--accent); text-decoration: underline; }
+.op-org { font-size: 11.5px; color: var(--ink-3); margin-left: 7px; }
+.op-hold { font-size: 10.5px; color: var(--wait); border: 1px solid var(--wait); border-radius: 5px; padding: 1px 5px; margin-left: 7px; white-space: nowrap; }
+.op-why { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.op-c-k, .op-c-w, .op-c-ck { white-space: nowrap; color: var(--ink-2); font-size: 11.5px; }
+.op-c-f { white-space: nowrap; }
+.op-stars { color: var(--accent); letter-spacing: .5px; }
+.op-dim { color: var(--ink-3); }
+.op-c-r { white-space: nowrap; }
+/* 四档要分得开。「没查到」不是「不行」——它是灰的，不是红的。 */
+.op-reach { font-size: 11.5px; border-radius: 5px; padding: 1px 6px; border: 1px solid transparent; }
+.op-reach.r-realistic { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.op-reach.r-stretch { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 40%, transparent); }
+.op-reach.r-longshot { color: var(--ink-3); border-color: var(--line-2); }
+.op-reach.r-unknown { color: var(--ink-3); border-style: dashed; border-color: var(--line-2); }
+.op-ev { font-style: normal; margin-left: 3px; opacity: .7; }   /* 有凭证：停上去看得到 */
+.op-c-a { white-space: nowrap; text-align: right; }
+.op-btn { font: inherit; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--paper-2); color: var(--ink); cursor: pointer; margin-left: 5px; }
+.op-btn:hover { border-color: var(--accent); }
+.op-btn.ghost { background: transparent; color: var(--ink-3); font-weight: 500; }
+.op-btn:disabled { opacity: .4; cursor: default; }
+.op-empty { padding: 34px 10px; text-align: center; font-size: 12.5px; color: var(--ink-3); font-family: var(--serif); }
+@media (prefers-reduced-motion: reduce) { .opmodal { transition: none; } }
+.op-c-w.past { color: var(--wait); }   /* 截止日已经过了：那个日子不该看着像还有效 */

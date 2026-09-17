@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { md } from '../lib/when.js'
+import Veil from './Veil.jsx'
 
 // 往来里的一条。**机会线的卷宗和人的名片共用这一份。**
 //
@@ -21,7 +22,10 @@ export default function Mail({ m, onJump }) {
   return (
     <div id={'dmail-' + m.id} className={'mail' + (open ? ' open' : '') + (isNote ? ' note' : '')}>
       <div className="mail-top">
-        <span className={'who ' + (isNote ? 'note' : mine ? 'you' : 'org')}>{who}</span>
+        {/* 对方的名字要过展示模式；「你」「你记的」不是私人信息，不用过 */}
+        <span className={'who ' + (isNote ? 'note' : mine ? 'you' : 'org')}>
+          {isNote || mine ? who : <Veil>{who}</Veil>}
+        </span>
         <span className="when">{md(m.created_at)}</span>
         {/* 不是邮件的那种得标出来源，否则你分不清这条是从信箱来的还是你自己写的 */}
         {isNote && <span className="flag soft">{m.meta?.how || '当面 / 电话 / 微信'}</span>}

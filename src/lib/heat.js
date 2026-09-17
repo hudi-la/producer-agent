@@ -35,16 +35,23 @@ export function levelOf(n) {
 }
 
 /**
- * 铺格子。从 today 往回数 span 天，补齐到整周。
+ * 铺格子。从 today 往回数 span 天，往后数 ahead 天，补齐到整周。
  *
- * 返回 weeks：每项是一列（七格，周一在上）。格子是 { day, n } 或 null——
+ * **往后那一段是「待办」**：日历上不该只有已经发生的事 —— 你要问的
+ * 「这个月我还欠着什么」跟「上个月我干了什么」是同一个问题的两头。
+ * 格子上带 future 标，让画的人把它画成空心的：还没发生的事染成实心，
+ * 看着就像已经办了。
+ *
+ * 返回 weeks：每项是一列（七格，周一在上）。格子是 { day, n, future } 或 null——
  * null 是补齐用的空位（头一周开头、末一周结尾），不画也不占键盘焦点。
  */
-export function weeksOf(counts, span, today = new Date()) {
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12)
-  const first = shift(end, -(span - 1))
+export function weeksOf(counts, span, today = new Date(), ahead = 0) {
+  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12)
+  const end = shift(now, ahead)
+  const first = shift(now, -(span - 1))
   const firstKey = dayKey(first)
   const endKey = dayKey(end)
+  const todayKey = dayKey(now)
 
   const weeks = []
   let cur = mondayOf(first)
@@ -53,7 +60,8 @@ export function weeksOf(counts, span, today = new Date()) {
     for (let i = 0; i < 7; i++) {
       const d = shift(cur, i)
       const k = dayKey(d)
-      col.push(k < firstKey || k > endKey ? null : { day: k, n: counts.get(k) || 0 })
+      col.push(k < firstKey || k > endKey ? null
+        : { day: k, n: counts.get(k) || 0, future: k > todayKey })
     }
     weeks.push(col)
     cur = shift(cur, 7)

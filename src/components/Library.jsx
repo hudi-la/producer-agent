@@ -4,6 +4,8 @@ import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
+import { addEntry, setEntryDraft } from '../lib/studio.js'
+import EntryChat from './EntryChat.jsx'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
@@ -46,14 +48,24 @@ function EntryFields({ e, ro, save }) {
   )
 }
 
-function Entry({ e, onSaved }) {
-  const [open, setOpen] = useState(false)
+// 展开状态住在 Library 里，不住在这儿 —— 「加一条」建完要把新那条自动展开，
+// 而那个动作发生在 Library。行为一个字没变：还是点空白展开、点 › 展开，
+// 还是可以同时开好几条。
+function Entry({ e, open, onToggle, onSaved }) {
   const entries = boxEntries(e.box)
   const facts = subInfo(e)
   const imgs = e.images || []
   const ro = !canEdit(e)
   const save = async (patch) => { await saveEntry({ id: e.id, ...patch }); await onSaved?.() }
-  const toggle = () => setOpen((o) => !o)
+  const toggle = () => onToggle(e.id)
+  // 「在写」：外面写申请时翻不到这条，档案页和书桌上照常看得见。
+  // 点一下就切——这是他自己的判断，不该有第二道确认。
+  const flipDraft = async (ev) => {
+    ev.stopPropagation()
+    if (ro) return
+    await setEntryDraft(e.id, !e.draft)
+    await onSaved?.()
+  }
 
   return (
     <div className="work">
@@ -71,6 +83,12 @@ function Entry({ e, onSaved }) {
             <span className={'boxchip' + (entries.length ? ' filled' : '')}>
               {entries.length ? `盒子 · 已补 ${entries.length} 条` : '盒子 · 空'}
             </span>
+            {/* 只有「在写」才挂标。写完的是常态，61 条各顶一个「写完了」全是噪音。
+                要把一条标成在写，在展开后那块里切（见下面 EntryFields 上面那一行）。 */}
+            {e.draft && (
+              <button className="draftchip on" onClick={flipDraft} disabled={ro}
+                      title="写申请时翻不到这条。点一下算写完">在写</button>
+            )}
             {facts.map((f, i) => <span className="w-medium" key={i}>{f}</span>)}
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
           </div>
@@ -84,6 +102,15 @@ function Entry({ e, onSaved }) {
           {imgs.length > 1 && (
             <div className="w-imgs">{imgs.map((src, i) => <img src={src} alt="" key={i} loading="lazy" />)}</div>
           )}
+          {!ro && (
+            <div className="draftrow">
+              <span>{e.draft ? '这条还在写' : '这条写完了'}</span>
+              <button className="draftflip" onClick={flipDraft}>
+                {e.draft ? '标成写完了' : '标成还在写'}
+              </button>
+              <i>{e.draft ? '写申请时它翻不到这条' : '写申请时它会拿这条当战绩用'}</i>
+            </div>
+          )}
           <EntryFields e={e} ro={ro} save={save} />
           <div className="bx-h">盒子 · 网站装不下的</div>
           {entries.length === 0 && <div className="bx-empty">还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。</div>}
@@ -91,6 +118,8 @@ function Entry({ e, onSaved }) {
             <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
           ))}
           <div className="add">+ 补一条 / 丢进材料</div>
+          {/* 这一条的抽屉。点开哪一条，就聊哪一条 —— 没有条目就没有对话。 */}
+          {!ro && <EntryChat entry={e} />}
         </div>
       )}
     </div>
@@ -117,21 +146,31 @@ function subGroups(items, sub, concerns) {
   return groups
 }
 
-function KindSection({ label, items, sub, concerns, onSaved }) {
+function KindSection({ label, items, sub, concerns, onSaved, openIds, onToggle, onAdd }) {
   // 只有一个子组时不写子标题——「策展」那一格底下再顶一行「策展项目」是重复的。
   const groups = sub ? subGroups(items, sub, concerns) : null
+  const one = (e) => (
+    <Entry e={e} key={e.id || e.title + e.sort}
+           open={openIds.has(e.id)} onToggle={onToggle} onSaved={onSaved} />
+  )
   return (
     <section className="kind">
-      <div className="kind-h">{label} · {items.length}</div>
+      <div className="kind-h">
+        {label} · {items.length}
+        {/* 在这之前档案页**没有任何一个「加一条」的入口**：pa_set_entry 只能改
+            已有的那条，Library 里那行「+ 补一条」是一段死文字。想往「工作坊」
+            那栏放一份新 proposal，只有开 SQL 一条路。 */}
+        {onAdd && <button className="kind-add" onClick={onAdd}>+ 加一条</button>}
+      </div>
       {groups ? (
         groups.map(([subLabel, g]) => (
           <div className="concern" key={subLabel}>
             {groups.length > 1 && <div className="cn-h">{subLabel}</div>}
-            <div className="works">{g.map((e) => <Entry e={e} onSaved={onSaved} key={e.id || e.title + e.sort} />)}</div>
+            <div className="works">{g.map(one)}</div>
           </div>
         ))
       ) : (
-        <div className="works">{items.map((e) => <Entry e={e} onSaved={onSaved} key={e.id || e.title + e.sort} />)}</div>
+        <div className="works">{items.map(one)}</div>
       )}
     </section>
   )
@@ -159,21 +198,21 @@ function buildSections(entries) {
     seen.add(k.key)
     if (!items?.length) continue
     if (k.key !== 'credit') {
-      secs.push({ key: k.key, label: k.label, items, sub: k.sub })
+      secs.push({ key: k.key, label: k.label, kind: k.key, items, sub: k.sub })
       continue
     }
     const placed = new Set()
     for (const g of CREDIT_GROUPS) {
       const items_ = items.filter((e) => g.types.includes(e.meta?.type))
       items_.forEach((e) => placed.add(e))
-      if (items_.length) secs.push({ key: `credit:${g.key}`, label: g.label, items: items_, sub: 'credit' })
+      if (items_.length) secs.push({ key: `credit:${g.key}`, label: g.label, kind: 'credit', items: items_, sub: 'credit' })
     }
     const rest = items.filter((e) => !placed.has(e))
-    if (rest.length) secs.push({ key: 'credit:rest', label: '其他战绩', items: rest, sub: 'credit' })
+    if (rest.length) secs.push({ key: 'credit:rest', label: '其他战绩', kind: 'credit', items: rest, sub: 'credit' })
   }
 
   for (const [kind, items] of byKind) {
-    if (!seen.has(kind)) secs.push({ key: kind, label: kind, items })
+    if (!seen.has(kind)) secs.push({ key: kind, label: kind, kind, items })
   }
   return secs
 }
@@ -185,6 +224,26 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
   // 选中的格可能因为库变了而消失（比如某类被清空）——退回「关于你」，别渲染空白。
   const cur = sections.find((s) => s.key === pick) || sections[0]
 
+  // 展开着哪几条。提到这一层，是因为「加一条」建完要把新那条自动展开。
+  const [openIds, setOpenIds] = useState(new Set())
+  const toggle = (id) => setOpenIds((cur_) => {
+    const next = new Set(cur_)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  // 加一条。新那条库里标着「在写」，建完自动展开，标题就地改。
+  // 「关于你」那一格没有这个按钮 —— 它是 profile，不是条目。
+  const add = cur.kind ? async () => {
+    const id = await addEntry(cur.kind, null)
+    setOpenIds((cur_) => new Set(cur_).add(id))
+    await onEntrySaved?.()
+  } : null
+
+  // 左栏那一格上「N 条在写」。这一条不能省：在写的东西 Fairwind 写申请时
+  // 翻不到，而你写完忘了点标的话，收不到任何提示。这个数字就是那个提示。
+  const draftsIn = (s) => (s.items || []).filter((e) => e.draft).length
+
   return (
     <div className="page">
       <div className="page-inner wide">
@@ -194,22 +253,27 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
         </header>
         <div className="lib-two">
           <nav className="lib-rail" aria-label="档案分类">
-            {sections.map((s) => (
-              <button
-                key={s.key}
-                className={'rail-b' + (s.key === cur.key ? ' on' : '')}
-                onClick={() => setPick(s.key)}
-                aria-current={s.key === cur.key ? 'true' : undefined}
-              >
-                <span className="rail-l">{s.label}</span>
-                {s.items && <span className="rail-n">{s.items.length}</span>}
-              </button>
-            ))}
+            {sections.map((s) => {
+              const d = draftsIn(s)
+              return (
+                <button
+                  key={s.key}
+                  className={'rail-b' + (s.key === cur.key ? ' on' : '')}
+                  onClick={() => setPick(s.key)}
+                  aria-current={s.key === cur.key ? 'true' : undefined}
+                >
+                  <span className="rail-l">{s.label}</span>
+                  {d > 0 && <span className="rail-d" title="写申请时翻不到这几条">{d} 在写</span>}
+                  {s.items && <span className="rail-n">{s.items.length}</span>}
+                </button>
+              )
+            })}
           </nav>
           <div className="lib-pane">
             {cur.about
               ? <Identity onSaved={onProfileSaved} />
-              : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns} onSaved={onEntrySaved} />}
+              : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns}
+                             onSaved={onEntrySaved} openIds={openIds} onToggle={toggle} onAdd={add} />}
           </div>
         </div>
       </div>

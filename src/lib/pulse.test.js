@@ -64,7 +64,7 @@ test('区名写错立刻抛错 —— 漏配不许静默', () => {
 })
 
 test('AREAS 就是前端认的那几区', () => {
-  assert.deepEqual(AREAS, ['board', 'thread', 'deliv'])
+  assert.deepEqual(AREAS, ['board', 'thread', 'deliv', 'tasks', 'pool'])
 })
 
 test('标签页看不见时连读都不读', async () => {

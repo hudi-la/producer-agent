@@ -16,7 +16,7 @@ import { isImage, IMG_CAP } from './files.js'
 import {
   buildPrompt, buildSystem, buildUser, promptParts,
   buildBriefPrompt, buildBriefSystem, buildBriefUser,
-  systemFor, SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
+  systemFor, entriesBlock, SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
   judgeSystemFor, JUDGE_RULE,
 } from './prompt.js'
 
@@ -82,7 +82,7 @@ function legacyFilesBlock(atts) {
   return lines
 }
 
-function legacyBuildPrompt({ p, msgs, entries, profile, kind, raw }, incoming, exceptId) {
+function legacyBuildPrompt({ p, msgs, entries, profile, kind, raw, state }, incoming, exceptId) {
   const fact = (k, v) => (v ? `${k}：${v}\n` : '')
   const lines = []
 
@@ -122,6 +122,14 @@ function legacyBuildPrompt({ p, msgs, entries, profile, kind, raw }, incoming, e
         : '')
     )
   }
+
+  // 2026-09-04（0123）：提醒栏那一行进 perLine。尺子跟着长——这是搬家之后
+  // 第二次改内容。fixture 里没有 state，量的是「没有」那句；有 state 的
+  // 那句单独在下面测。
+  lines.push('## 提醒栏现在这样说')
+  lines.push(state ? `${state.state}：${state.what || ''}` : '（没有这条线的事 —— 不等什么、不欠什么）')
+  lines.push('这是按规则算的。你有全卷宗；你觉得它不对，就按「拨提醒」那条规矩改它，不用顺着它说。')
+  lines.push('')
 
   const history = msgs.filter((m) => m.id !== exceptId)
   if (history.length) {
@@ -456,4 +464,58 @@ test('两个标记互不干扰，都在静态块里', () => {
   const fixed = buildSystem(pursuitCtx)[0]
   assert.ok(fixed.includes('[[LETTER]]'))
   assert.ok(fixed.includes('[[FORM]]'))
+})
+
+// ── 提醒栏那一行（0123）──────────────────────────────────────
+
+test('有 state 时 perLine 带着提醒栏那句，在动态块里，不在静态块里', () => {
+  const ctx = { ...pursuitCtx, state: { state: 'WAITING_REPLY', what: '等 Joy 回信', due_at: '2026-09-11T07:00:00+00:00', zone: 'stopped', followups: 2 } }
+  const { perLine, fixed } = promptParts(ctx, '刚说的这句', 'm4')
+  const 动 = perLine.join('\n'), 静 = fixed.join('\n')
+  assert.ok(动.includes('## 提醒栏现在这样说') && 动.includes('等 Joy 回信') && 动.includes('连发 3 封'), 动)
+  assert.ok(!静.includes('提醒栏现在这样说'))
+})
+
+test('拨提醒的规矩在静态块里，七种 move 都点了名', () => {
+  const sys = systemFor(profile)
+  assert.ok(sys.includes('[[STATE]]'))
+  assert.ok(sys.includes('[[MEMO]]'))
+  for (const m of ['resolved', 'wait', 'reschedule', 'park', 'needs_reply', 'meeting', 'done'])
+    assert.ok(sys.includes(`"${m}"`), m)
+})
+
+// ── 「在写」的条目（0127）─────────────────────────────────────
+//
+// 这个标只管一件事：**没写完的东西不许被当成战绩发出去**。所以外联这两条路
+// （对话 / 讲懂）看不见它。书桌那边是另一回事——他正在那儿写它，见 studio.test.js。
+
+test('在写的条目不进外联的信息库', () => {
+  const es = [
+    { kind: 'work', title: '写完的那件' },
+    { kind: 'work', title: '还在写的那件', draft: true },
+  ]
+  const out = entriesBlock(es).join('\n')
+  assert.ok(out.includes('写完的那件'))
+  assert.ok(!out.includes('还在写的那件'))
+})
+
+test('全是在写的，整块不出现——不留一个空标题在那儿', () => {
+  assert.deepEqual(entriesBlock([{ kind: 'work', title: 'x', draft: true }]), [])
+})
+
+test('反过来要得到在写的那几条：drafts:true', () => {
+  const es = [
+    { kind: 'offer', title: '写完的工作坊' },
+    { kind: 'offer', title: '在写的 proposal', draft: true },
+  ]
+  const out = entriesBlock(es, { drafts: true, title: '## 他还在写的' }).join('\n')
+  assert.ok(out.includes('## 他还在写的'))
+  assert.ok(out.includes('在写的 proposal'))
+  assert.ok(!out.includes('写完的工作坊'))
+})
+
+test('整条路走一遍：在写的既不进静态块，也不进讲懂', () => {
+  const ctx = { ...pursuitCtx, entries: [...pursuitCtx.entries, { kind: 'work', title: '半成品XYZ', draft: true }] }
+  assert.ok(!buildSystem(ctx)[0].includes('半成品XYZ'))
+  assert.ok(!buildBriefSystem(ctx)[0].includes('半成品XYZ'))
 })

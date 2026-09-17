@@ -17,9 +17,11 @@ import { EditRow } from './EditRow.jsx'
 const FIELDS = [
   // 发信身份不许对不上：**用错身份发出去的信连道歉都没处发**——
   // 对方看到一个陌生地址，而你在自己的已发送里找不到它。brain 那头会当场拒发。
-  { key: 'email', label: '邮箱', hint: 'Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。' },
-  { key: 'visa', label: '身份', hint: '例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。' },
-  { key: 'location', label: '常住', list: true, hint: '多个地方用「、」分开。' },
+  // veil = 展示模式下盖小花的私人字段。规则类（资助偏好/排除/关注）不盖：
+  // 它们讲的是机会怎么筛，正是演示要给人看的；名字/邮箱/身份/常住是你这个人。
+  { key: 'email', label: '邮箱', veil: true, hint: 'Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。' },
+  { key: 'visa', label: '身份', veil: true, hint: '例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。' },
+  { key: 'location', label: '常住', list: true, veil: true, hint: '多个地方用「、」分开。' },
   { key: 'career_stage', label: '阶段', hint: '例：emerging、mid-career。' },
   { key: 'funding_pref', label: '资助偏好', long: true },
   { key: 'exclude_rule', label: '排除规则', long: true, hint: '满足这条的机会不进主名单。写错了你会看不见一整类机会。' },
@@ -39,12 +41,12 @@ export default function Identity({ onSaved }) {
     <section className="kind identity">
       <div className="kind-h">关于你</div>
       <div className="idbox">
-        <EditRow label="名字" value={profile?.name}
+        <EditRow label="名字" value={profile?.name} veil
              onSave={(v) => after(() => saveProfile({ name: v }))} />
         <EditRow label="作品站" value={profile?.website}
              onSave={(v) => after(() => saveProfile({ website: v }))} />
         {FIELDS.map((f) => (
-          <EditRow key={f.key} label={f.label} value={d[f.key]} hint={f.hint} long={f.long} list={f.list}
+          <EditRow key={f.key} label={f.label} value={d[f.key]} hint={f.hint} long={f.long} list={f.list} veil={f.veil}
                onSave={(v) => after(() => saveProfile({ data: { [f.key]: v } }))} />
         ))}
       </div>

@@ -11,10 +11,13 @@
     "mail:classify": "node --env-file=.env mail/classify-run.js",
     "mail:merge": "node --env-file=.env mail/merge-run.js",
     "mail:cast": "node --env-file=.env mail/cast-run.js",
-    "db:login": "node --env-file=.env login.mjs"
+    "db:login": "node --env-file=.env login.mjs",
+    "mail:copied": "node --env-file=.env mail/copied-run.js",
+    "mail:refetch": "node --env-file=.env mail/refetch-run.js",
+    "import:xlsx": "node --env-file=.env import-xlsx.js"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.220",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.259",
     "@supabase/supabase-js": "^2.45.0",
     "exceljs": "^4.4.0",
     "googleapis": "^174.0.1",

@@ -5,20 +5,24 @@ import { dropFrom } from '../lib/rewind.js'
 import Md from './Md.jsx'
 import SayBubble from './Resay.jsx'
 import Pool from './Pool.jsx'
-import QueueNav from './QueueNav.jsx'
+import DeskToggle from './DeskToggle.jsx'
+import { useGrow } from '../lib/useGrow.js'
 import { MailList } from './Mail.jsx'
 import { isLetter, isExchange } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
+import StateMoveCard from './StateMoveCard.jsx'
+import MemoCard from './MemoCard.jsx'
 import { sendLetterNow } from '../lib/letters.js'
 import {
   upsertContact, claimThread, logMeet, checkin, markIntroThanked,
   fetchThreads, fetchContactDeliverables,
-  refreshContact, sayToContactStream, draftToGmail,
-} from '../lib/people.js'
+  refreshContact, sayToContactStream, draftToGmail, logNote } from '../lib/people.js'
 import { useLiveReply } from '../lib/useLiveReply.js'
+import Veil from './Veil.jsx'
+import { useVeiled } from '../lib/veil.js'
 
 // 名片 —— 人这一层的详情页。
 //
@@ -71,9 +75,13 @@ function Cell({ label, value, placeholder, onSave, type = 'text', multiline = fa
 
 export default function PersonFocus({
   person, onBack, onChanged, onOpenPursuit,
-  // 过卡：人也进队了（2026-08-21）。队列本来就是按「两种东西混在同一队里过」
-  // 设计的（queue.js 顶上那段），人这一半一直没接上，现在接上了。
-  queue = null, onQueuePrev, onQueueNext, onQueueDone,
+  // 两种装法：page 是桌上那格（整页三栏），drawer 是通讯录旁边划出来的抽屉
+  // （三栏叠成一栏）。跟机会线同一套规矩——线和人两套规矩就得教。
+  variant = 'page',
+  // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
+  onDesk = false, onToggleDesk,
+  // 脑子开没开（App 每轮问 /health）。没开 = 输入框直接记笔，不聊天（0125）。
+  brainUp = true,
 }) {
   const c = person
   const [msgs, setMsgs] = useState(null)
@@ -85,28 +93,13 @@ export default function PersonFocus({
   // 它正在打的那段字（还没落库），跟机会线那边同一套
   const { live, act, onEvent: onLive, reset: resetLive } = useLiveReply()
 
-  // 「记一笔」旁边那层说明：悬停一秒才出来。
-  //
-  // 一秒是故意的——手划过去不该弹东西，只有停下来看才算在问。
-  // 收起来留 240ms 缓冲：从按钮挪到说明层上，中间那几像素的空隙不该把它关掉。
-  // pinRef 是给下拉框用的：原生下拉展开时鼠标其实已经离开了这一层，
-  // 不按住就会选到一半自己关掉。
-  const [howto, setHowto] = useState(false)
-  const howtoT = useRef(0)
-  const pinRef = useRef(false)
-  const howtoIn = () => {
-    clearTimeout(howtoT.current)
-    if (!howto) howtoT.current = setTimeout(() => setHowto(true), 1000)
-  }
-  const howtoOut = () => {
-    clearTimeout(howtoT.current)
-    howtoT.current = setTimeout(() => { if (!pinRef.current) setHowto(false) }, 240)
-  }
-  useEffect(() => () => clearTimeout(howtoT.current), [])
   const [text, setText] = useState('')
   const [touching, setTouching] = useState(false)   // 「刚聊过」展开了输入
   const [touchText, setTouchText] = useState('')
   const taRef = useRef(null)
+  // 输入框按内容长高（往上长）。跟机会线那边同一份 —— 见 lib/useGrow.js。
+  // 这一段原来整个漏了：名片这边的框永远一行高，多打两行就得在框里滚。
+  useGrow(taRef, text)
   const [claim, setClaim] = useState('')
   const [onLine, setOnLine] = useState('')        // 这次接触也算在哪条线上
   const [note, setNote] = useState(null)      // 收信结果那句实话
@@ -177,6 +170,14 @@ export default function PersonFocus({
   const say = async (said) => {
     const t = (said ?? text).trim()
     if (!t || busy) return
+    // 脑子没开：这句直接记成一笔（不是聊天），脑子醒了由盲格子判（0125）
+    if (!brainUp) {
+      setBusy('talk'); if (said == null) setText('')
+      try { await logNote(c.id, t); await reload(); onChanged?.() }
+      catch (err) { alert('没记上：' + err.message); if (said == null) setText((cur) => cur || t) }
+      finally { setBusy(null) }
+      return
+    }
     setBusy('talk'); if (said == null) setText('')
     // run_id 不是给「终止」用的（这一栏没有终止按钮），是给「你把页面关了」用的：
     // 脑子那边靠它把没人等的那一次掐掉。
@@ -246,7 +247,6 @@ export default function PersonFocus({
     try { await logMeet(c.id, t.trim(), onLine || null); await reload(); onChanged?.(); after?.() }
     catch (e) { alert('没记上：' + e.message) } finally { setBusy(null) }
   }
-  const jot = () => logTouch(text, () => setText(''))
 
   // 「刚聊过」：**一定顺手写一句**。空打卡只留一个日期，
   // 而一个说不出内容的日期正是「上次碰」原来那么难用的原因。
@@ -288,22 +288,23 @@ export default function PersonFocus({
   const channels = (Array.isArray(c.channels) && c.channels.length)
     ? c.channels : (c.email ? [{ kind: 'email', value: c.email }] : [])
 
+  // 展示模式下 title 属性也不许挂名字——悬停一下气泡里就露了。
+  const veiled = useVeiled()
+
   return (
-    <div className="focus page">
+    <div className={'focus ' + variant}>
       {/* 必须包在 .focus-top 里：三栏的高度是 .focus 这个 flex 列分下来的，
           头部漏了这层，.focus-cols 就拿不到 flex:1，整个版面塌成一坨。 */}
       <div className="focus-top">
         <div className="ft-head">
-          <button className="back" onClick={onBack}>
-            <span aria-hidden="true">←</span><span className="t"> 全部联系人</span>
-          </button>
-          <h1 className="ft-title" title={c.name}>{c.name || '未具名联系人'}</h1>
+          {variant === 'drawer' ? (
+            <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+          ) : (
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span><span className="t"> 通讯录</span></button>
+          )}
+          <h1 className="ft-title" title={veiled ? undefined : c.name}><Veil>{c.name || '未具名联系人'}</Veil></h1>
+          {variant === 'drawer' && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
-        {/* 跟机会线抽屉同一份（QueueNav）——过卡时两种卡长一样，
-            不然你翻到人那张会以为自己掉出队列了。
-            **必须在 .ft-head 外面**：那里头 .ft-title 是 flex:1，会把它挤成零宽——
-            DOM 里在、屏幕上没有，正是最难发现的那种坏法（第一版就这么坏的）。 */}
-        <QueueNav inHead queue={queue} onPrev={onQueuePrev} onNext={onQueueNext} onDone={onQueueDone} />
       </div>
 
       <div className="focus-cols">
@@ -317,7 +318,7 @@ export default function PersonFocus({
             <div className="pf-k">机构</div>
             {(c.orgs?.length ? c.orgs : [null]).map((o, i) => o ? (
               <div key={i} className={'pf-v pf-hist' + (o.until ? ' past' : '')}>
-                {o.org}{o.role ? <span className="pf-note"> · {o.role}</span> : null}
+                <Veil>{o.org}</Veil>{o.role ? <span className="pf-note"> · {o.role}</span> : null}
                 {o.until && <span className="pf-past-tag">到 {o.until} 为止</span>}
                 {!o.until && o.since && <span className="pf-note"> · {o.since} 起</span>}
               </div>
@@ -330,7 +331,7 @@ export default function PersonFocus({
             <div className="pf-k">邮箱</div>
             {(c.emails?.length ? c.emails : [null]).map((e, i) => e ? (
               <div key={i} className={'pf-v pf-hist' + (e.until ? ' past' : '')}>
-                <span className="pf-mail">{e.email}</span>
+                <span className="pf-mail"><Veil>{e.email}</Veil></span>
                 {e.is_primary && !e.until && <span className="pf-now-tag">在用</span>}
                 {e.until && <span className="pf-past-tag">⛔ {e.until} 起停用</span>}
                 {e.note && <div className="pf-note">{e.note}</div>}
@@ -343,7 +344,7 @@ export default function PersonFocus({
             <div className="pf-chips">
               {channels.length
                 ? channels.map((x, i) => (
-                    <span key={i} className="pchip" title={x.value}>{CH[x.kind] || x.kind}</span>))
+                    <span key={i} className="pchip" title={veiled ? undefined : x.value}>{CH[x.kind] || x.kind}</span>))
                 : <span className="pf-empty">只有邮箱</span>}
             </div>
           </div>
@@ -353,7 +354,7 @@ export default function PersonFocus({
             <div className="pf-cell">
               <div className="pf-k">谁介绍的</div>
               <div className="pf-v">
-                {c.intro_by_name || '（库里那个人）'}
+                <Veil>{c.intro_by_name || '（库里那个人）'}</Veil>
                 {c.intro_thanked_at
                   ? <span className="pf-note"> · {md(c.intro_thanked_at)} 回谢过了</span>
                   : <button className="lnk pf-inline"
@@ -478,7 +479,7 @@ export default function PersonFocus({
                   return (
                     <div key={m.id} className={'msg' + (mine ? ' you' : isNote ? ' note' : ' producer')}>
                       <span className="who">
-                        {isNote ? '你记的一次接触' : mine ? '你' : 'Fairwind'}
+                        {isNote ? (m.kind === 'memo' ? '记住的一句' : '你记的一次接触') : mine ? '你' : 'Fairwind'}
                         <span className="viamail"> · {md(m.created_at)}</span>
                       </span>
                       {/* 库里存的是 markdown。不渲的话「**这一类事**」在页面上
@@ -512,6 +513,12 @@ export default function PersonFocus({
                           owner={{ contactId: c.id }} onAdopted={reload}
                         />
                       )}
+                      {m.meta?.state_move?.applied && (
+                        <StateMoveCard msgId={m.id} move={m.meta.state_move} onUndone={reload} />
+                      )}
+                      {m.meta?.memo?.applied && (
+                        <MemoCard msgId={m.id} memo={m.meta.memo} onUndone={async () => { await reload(); onChanged?.() }} />
+                      )}
                     </div>
                   )
                 })
@@ -536,9 +543,8 @@ export default function PersonFocus({
             </div>
           </div>
 
-          {/* 输入框和「记一笔」是一组，一起浮在底部。
-              「记一笔」处置的是**输入框里那句话**，不是对话里的某条——所以它得跟着
-              输入框走。原来它挂在时间线末尾，于是你打完字要抬头去够一个滚走了的按钮。 */}
+          {/* 一个框两种落法（0125）：脑子醒着 = 聊天，Fairwind 顺便判该记成什么；
+              脑子没开 = 直接记成一笔。「记一笔」按钮退场了。 */}
           <div className="composer-dock">
             {/* 输入框跟机会线那个一模一样：一行装不下自己长高、Enter 发送
                 Shift+Enter 换行。isComposing 那句不能删——中文输入法选词也敲
@@ -552,6 +558,7 @@ export default function PersonFocus({
                 disabled={busy === 'talk'}
                 placeholder={busy === 'talk'
                   ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
+                  : !brainUp ? '脑子没开：这句会直接记成一笔，不是聊天'
                   : '一起想点什么…… Fairwind 带着这个人的全部往来，你不用重讲'}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
@@ -571,49 +578,6 @@ export default function PersonFocus({
                 </button>
             </div>
 
-            {/* 回车 = 跟 Fairwind 商量；这一行 = 把同一句话记成一次真实来往。
-                同一个框两个去处，这个区别值得说清楚——但只值得说一次，所以原委
-                收进悬停一秒才出来的那层，平时这儿只有三个字。
-
-                下拉框跟着进悬浮层，没有删掉：它是**控件**不是说明。这次聊的常常
-                就是某条线的事，挂上去那条线的卷宗里也看得见（同时挂两边，不是搬
-                过去）。不让 AI 猜是哪条：他可能挂着三条，猜错了那段记忆就长在错
-                的项目上，而项目卡是你写申请时照着看的。 */}
-            <div className="jot-row"
-                 onMouseEnter={howtoIn} onMouseLeave={howtoOut}
-                 onFocusCapture={() => setHowto(true)}>
-              {/* 点完就把说明收掉：点击会让按钮拿到焦点，不收的话你刚记完
-                  它反而弹出来解释「记一笔是什么」——你显然已经知道了。 */}
-              <button className="lnk jot-go"
-                      onClick={() => { clearTimeout(howtoT.current); setHowto(false); jot() }}
-                      disabled={busy === 'talk' || !text.trim()}>记一笔</button>
-              {howto && (
-                <div className="jot-howto" role="tooltip"
-                     onMouseEnter={howtoIn} onMouseLeave={howtoOut}>
-                  <p>回车 = 跟 <b>Fairwind</b> 商量（这一栏只装商量，不算往来）。</p>
-                  <p>
-                    线下见了面、通了电话、微信聊了？写一句按 <b>记一笔</b>——
-                    它跟邮件一样是一次真实来往，进<b>左栏的往来</b>，并把「上次碰」记成今天。
-                  </p>
-                  {c.pursuits?.length > 0 && (
-                    <p className="jot-online">
-                      也算在
-                      <select className="pf-online" value={onLine}
-                              onMouseDown={() => { pinRef.current = true }}
-                              onBlur={() => { pinRef.current = false }}
-                              onChange={(e) => setOnLine(e.target.value)}>
-                        <option value="">（不挂线）</option>
-                        {c.pursuits.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-                      </select>
-                      上
-                    </p>
-                  )}
-                  <p>他在找什么、答应过什么这类<b>认识</b>，写进左栏的<b>关系记忆</b>——那儿是累积的。</p>
-                  {/* 按钮灰着却不说为什么，是最招人烦的一种沉默 */}
-                  {!text.trim() && <p className="jot-need">现在灰着，是因为下面还没写字。</p>}
-                </div>
-              )}
-            </div>
           </div>
         </section>
 

@@ -59,10 +59,14 @@ async function flush(rows, log) {
 
 /**
  * 补核：时间已过、还没核过标签的信（主要是预约发送 —— 入队时触发过
- * messageAdded，真发出那刻只是标签翻成 SENT，增量听不见）。
+ * messageAdded，真发出那刻只是标签翻成 SENT）。
  * 去 Gmail 拿一次标签，putHeaders 顺手写审计（0087）。发出去的信
  * 重新过 classify 会正常入行；被取消删掉的信 messages.get 回 404，
  * getMetadata 记成 gone，跳过 —— 它的审计由 0082 的全量核对兜。
+ *
+ * ⚠️ 这条兜底只扫**账本里已有的行**，它兜不住「从来没进过账本的信」。
+ * 2026-09-11 丢的那两封就是：草稿那刻被 classify 丢掉，发出那刻增量听不见，
+ * 于是账本里没有行、补核队列里也没有它。那个洞堵在 idsFromHistory，不在这儿。
  */
 export async function auditPass({ log = console.log } = {}) {
   const { data: ids, error } = await db().rpc('pa_unaudited_sent')

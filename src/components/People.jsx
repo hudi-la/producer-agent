@@ -1,6 +1,8 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import Strangers from './Strangers.jsx'
+import Groups from './Groups.jsx'
+import Veil from './Veil.jsx'
 import { goldLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
 
@@ -33,10 +35,12 @@ function channelsOf(c) {
 }
 
 export default function People({
-  contacts = [], orgs = [], strangers = [], onOpen, onOpenOrg, onAdded, fellBack = null,
-  // 带子上那几个开关的状态在 App 手里（跟项目争取那边同一个道理）
-  tab = 'all', addOpen = false, onCloseAdd,
+  contacts = [], orgs = [], strangers = [], groups = [], onOpen, onOpenOrg, onAdded, fellBack = null,
+  // 「新联系人」那一格开没开，在 App 手里（按钮在这一页头一行，跟看板同一个道理）
+  addOpen = false, onCloseAdd,
   picking = false, picked, onPick,
+  // 桌上有哪些（key 的集合）：名片角上挂「在工作区」
+  desk = new Set(),
   audit = false, states = null,
 }) {
   const [q, setQ] = useState('')
@@ -66,9 +70,8 @@ export default function People({
     return bag.filter(Boolean).some((s) => String(s).toLowerCase().includes(key))
   }
   const found = key ? entries.filter(hit) : null
-  // 分类镜头：全部 / 人 / 机构。**搜索之后再筛** —— 你搜「ASU」的时候
-  // 想看的是跟 ASU 有关的一切，不该被上一次点的那个标签悄悄砍掉一半。
-  const shown = (found || entries).filter((e) => tab === 'all' || e.kind === (tab === 'org' ? 'org' : 'person'))
+  // 「全部 / 人 / 机构」那组镜头 2026-09-02 撤了——不用。搜什么就看什么。
+  const shown = found || entries
 
 
   /** 现在挂着的机构（离开了的不在这儿显示，那是名片里的事）。 */
@@ -95,7 +98,9 @@ export default function People({
     // 机构还不能进批量（一摞里走的是 contact / pursuit 两种键），
     // 所以勾选态下它不摆勾选框也不接点击 —— 摆一个按不动的框比不摆更糟。
     const 能勾 = picking && Boolean(k)
-    const open = () => (能勾 ? onPick([k], !checked) : isOrg ? onOpenOrg?.(e.o) : onOpen?.(e.c))
+    // 事件往上传：⌘/Ctrl+点要开新标签，那是浏览器的规矩，得让 App 知道你按没按
+    const open = (ev) => (能勾 ? onPick([k], !checked)
+      : isOrg ? onOpenOrg?.(e.o, ev) : onOpen?.(e.c, ev))
 
     return (
       <div
@@ -105,7 +110,7 @@ export default function People({
         aria-checked={能勾 ? checked : undefined}
         tabIndex={0}
         onClick={open}
-        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open() } }}
+        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(ev) } }}
       >
         {/* 气泡：这个人现在卡在什么上。跟看板上那张卡同一套（同一份 v_pa_state）。 */}
         {audit && st && (
@@ -114,14 +119,18 @@ export default function People({
         {能勾 && <span className="pc-check" aria-hidden="true" />}
 
         <div className="pc-t">
-          {isOrg ? e.o.org : (e.c.name || '未具名联系人')}
+          <Veil>{isOrg ? e.o.org : (e.c.name || '未具名联系人')}</Veil>
           {isOrg && <span className="pchip org">机构</span>}
+          {/* 名片角上的记号：这张今天挑了。跟看板上那张卡同一套。 */}
+          {desk.has(isOrg ? qKey('org', e.o.org) : k) && <span className="pc-desk" aria-label="在展开的卡片区">在展开的卡片区</span>}
         </div>
 
         <div className="pc-p ghost">
-          {isOrg
-            ? (e.o.mailboxes?.[0]?.email || '没有共享信箱')
-            : (nowOrg(e.c) || '（没挂机构）')}
+          <Veil>
+            {isOrg
+              ? (e.o.mailboxes?.[0]?.email || '没有共享信箱')
+              : (nowOrg(e.c) || '（没挂机构）')}
+          </Veil>
         </div>
 
         {/* 关系 —— 这一句才是名片的正文 */}
@@ -149,14 +158,10 @@ export default function People({
   return (
     <div className="page">
       <div className="page-inner ppl-inner">
-        <header className="page-head">
-          <h1>人际管理</h1>
-          <p className="note">
-            你会写信的对象都在这儿：人、机构、机构的共享信箱。
-            该动的和在等的事<b>全部</b>在顶栏那个 🔔 里 —— 人的和机会线的一起排，
-            不再按「挂在哪张卡上」分成两处。
-          </p>
-        </header>
+        {/* 标题和那段说明撤了（2026-08-24 他拍的）：带子上已经写着「通讯录」，
+            页面再写一遍「人际管理」是同一件事说两次；那段说明讲的是
+            「该动的都在 🔔 里」——那是一次性的交代，不是每天都要读的东西。
+            这一页现在开门见山：搜索框，然后是人。 */}
 
         {/* 「该动的 / 等待」那两个区 2026-08-21 撤了，整个并进 🔔。
             当初分家是为了挡状态机还没做好时那一片假的「还需要回复」；
@@ -189,6 +194,8 @@ export default function People({
               <span className="sp" />
               <button className="lnk" onClick={() => onCloseAdd?.()}>收起</button>
             </div>
+            {/* 一伙人（0122）先于单个地址：一串信里十几个人，一下收完 */}
+            <Groups rows={groups} onDone={onAdded} />
             <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
           </section>
         )}

@@ -31,6 +31,7 @@
 
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from '@anthropic-ai/claude-agent-sdk'
 import { isImage, IMG_CAP } from './files.js'
+import { STATE_RULE, MEMO_RULE, stateBlock } from './stateMove.js'
 
 export { SYSTEM_PROMPT_DYNAMIC_BOUNDARY }
 
@@ -140,7 +141,11 @@ ${pick(voice, 'persona', DEFAULT_PERSONA)}
 
 ${pick(voice, 'letter_rule', LETTER_RULE)}
 
-${pick(voice, 'form_rule', FORM_RULE)}`
+${pick(voice, 'form_rule', FORM_RULE)}
+
+${STATE_RULE}
+
+${MEMO_RULE}`
 }
 
 // 判断那段小人格。跟 Fairwind 的人格无关：判「这封信要不要回」不需要知道
@@ -182,9 +187,19 @@ export function entryFacts(e) {
 
 // 「战绩信息库」那一段。chat 和 brief 两条路都用它——本来是两份一模一样的复制，
 // 漏改一份就是一条路瞎、另一条路不瞎，最难查。
-export function entriesBlock(entries) {
+//
+// ── 「在写」的那几条（0127）──────────────────────────────────
+// 默认只渲染写完的。没写完的东西不许被当成战绩发出去，而这两条路
+// （对话、讲懂）恰恰是写申请、判匹配时翻的弹药库。
+//
+// 传 { drafts: true } 反过来只要在写的那几条——档案里的书桌用这一路：
+// 他正是在那儿写它们的，藏起来他那份 proposal 就从陪他写的人眼前消失了。
+// 同一个渲染器两种用法，比照抄一份稳：改了格式两边一起改。
+export function entriesBlock(all, opts = {}) {
+  const want = !!opts.drafts
+  const entries = all.filter((e) => !!e.draft === want)
   if (!entries.length) return []
-  const lines = ['## Ta 的作品与履历（战绩信息库）']
+  const lines = [opts.title || '## Ta 的作品与履历（战绩信息库）']
   for (const e of entries) {
     // credit 的「个展 / 群展 / 驻地 / grant / 策展」在界面上是分组标题，prompt 里
     // 没有分组，所以要挂到 kind 标签上——不然它分不出这是个展还是群展。
@@ -299,7 +314,9 @@ const askBlock = (incoming) => [
 export function promptParts(ctx, incoming, exceptId) {
   return {
     fixed:   [...profileBlock(ctx.profile), ...entriesBlock(ctx.entries)],
-    perLine: [...filesBlock(ctx.raw?.attachments), ...ownerBlock(ctx)],
+    // 提醒栏那一行（0123）：每条线不同、一次会话内不变，所以在 perLine。
+    // 不是让它顺着提醒说 —— 是让它知道自己要改的是哪条。
+    perLine: [...filesBlock(ctx.raw?.attachments), ...ownerBlock(ctx), ...stateBlock(ctx.state)],
     talk:    [...historyBlock(ctx, exceptId), ...askBlock(incoming)],
   }
 }

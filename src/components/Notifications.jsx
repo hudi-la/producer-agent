@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { stateLine, whyLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
+import Veil from './Veil.jsx'
 
 // 顶栏那块通知面板。装的是**所有该动和在等的事** —— 机会线的和人的都在这儿。
 //
@@ -46,9 +47,15 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
         {/* 名字本身就是入口 —— 跟右边那颗「打开卡片」同一个去处，
             只是目标大、顺手。 */}
         <div className="nrow-h">
-          {能勾
-            ? <span className="nname as-text">{it.name || '（没名字）'}</span>
-            : <button className="nname" onClick={() => onOpen(it)}>{it.name || '（没名字）'}</button>}
+          {/* 人名过展示模式；机会线的标题不用——演示的正是这些机会（见 Veil.jsx） */}
+          {(() => {
+            const 名 = it.subject_kind === 'pursuit'
+              ? (it.name || '（没名字）')
+              : <Veil>{it.name || '（没名字）'}</Veil>
+            return 能勾
+              ? <span className="nname as-text">{名}</span>
+              : <button className="nname" onClick={() => onOpen(it)}>{名}</button>
+          })()}
         </div>
         <div className="nrow-w">{stateLine(it)}</div>
         {whyLine(it) && <div className="nrow-y">{whyLine(it)}</div>}
@@ -58,9 +65,10 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
           现在线和人都能勾，两者一致。 */}
       {!能勾 && (
       <div className="nrow-a">
-        {it.zone === 'due' && (
+        {it.zone !== 'waiting' && (
           /* 表单交了、微信里说了、当面聊了 —— 系统看不见邮箱外的事。
-             这一下是**记一笔**（进时间线，留痕迹），不是把提醒抹掉。 */
+             这一下是**记一笔**（进时间线，留痕迹），不是把提醒抹掉。
+             停了的（连发三封没回）也要有这个出口：换了法子、或决定收了。 */
           <button className="nbtn" title="已处理 —— 记一笔，留痕迹" aria-label="已处理"
                   onClick={() => onHandled(it)}>✓</button>
         )}

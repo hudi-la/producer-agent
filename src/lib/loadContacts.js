@@ -71,6 +71,25 @@ export async function loadContacts() {
     // 还不认识的地址 —— 加人的真入口。系统自己发现有陌生地址在跟你写信。
     const { data: strangers } = await supa.from('v_pa_unknown_senders').select('*')
 
+    // 0121 端出来的：被抄送在某条线上、但跟线上的人不同机构，或看不出是人还是信箱的
+    // 那些地址。它们自己一封信都没发过，所以 v_pa_unknown_senders 里没有；理由（谁在
+    // 哪条线抄送的）在判定表里，端出来时带着，名片一键就能加。
+    const { data: greet } = await supa.from('v_pa_greetable').select('*')
+    const seen = new Set((strangers || []).map((r) => String(r.email).toLowerCase()))
+    const copied = (greet || [])
+      .filter((r) => /抄送|也发给了|回信/.test(r.why || '') && !seen.has(String(r.email).toLowerCase()))
+      .map((r) => ({
+        email: r.email, 封数: 0, 他发来的: 0, 你发去的: 0, 第一次: null, 最近一次: null,
+        信头署名: r.name || null, 出现在哪些机会线: [],
+        why: r.why,
+        prefill: { kind: r.verdict === 'shared_box' ? 'shared_box' : 'person',
+                   name: r.name || '', org: r.org || '', notes: r.why || '' },
+      }))
+
+    // 一伙人（0122）：一串信里好几个人来回说话，其中还有人没进通讯录。
+    // 读不到（老库没这个口）就当没有，别把整页拖死。
+    const { data: groups } = await supa.rpc('pa_group_threads', { p_min_people: 5 })
+
     return {
       contacts: contacts.map((c) => ({
         ...c,
@@ -79,7 +98,8 @@ export async function loadContacts() {
         orgs: orgsOf[c.id] || (c.org ? [{ org: c.org, role: c.role }] : []),
       })),
       orgs: orgRows || [],
-      strangers: strangers || [],
+      strangers: [...copied, ...(strangers || [])],
+      groups: Array.isArray(groups) ? groups : [],
       source: 'live', reason: null, detail: null,
     }
   } catch (e) {

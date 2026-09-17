@@ -128,7 +128,48 @@ export async function getFull(gmail, id) {
 }
 
 /**
- * 增量：从 startHistoryId 往后有哪些新 message。
+ * 一批 history records → 这轮要去核一遍的 message id。纯函数，gmail.test.js 按着。
+ *
+ * ══ 为什么是「出现过就收」，不是「只收新来的」 ═══════════════════
+ *
+ * 原来这儿只收 messagesAdded，而且在请求上就写死 historyTypes:['messageAdded']。
+ * 那等于跟 Gmail 说「别的事都别告诉我」。**它漏掉了一整类真信。**
+ *
+ * 真事（2026-09-11 查出来的）：8/18 到 9/11 发出去 48 封，有 2 封在库里
+ * 根本不存在——9/10 给 Stacy＋David 的回信、9/11 回 Biayna 的信。两封都是
+ * 在 Gmail 里**先存成草稿、后来才按发送**的。这种信的一生是：
+ *
+ *   草稿诞生那刻  → messageAdded，但带着 DRAFT 标签，被 classify 丢掉（没发生的事不进账本）
+ *   真发出那一刻  → **只有 labelsAdded +SENT**，没有新信事件
+ *
+ * 于是三道门叠在一起：进不来（草稿被丢）、听不见（发出只翻标签）、补不到
+ * （auditPass 只扫账本里已有的行）。信在 Gmail 里好端端躺着，系统里不存在，
+ * 卡片上「上次碰」停在对方那封——看起来就像你没回过。
+ *
+ * 所以判据换成：**这轮 Gmail 说「这封动过」的，全部拿去核一遍标签。**
+ * 该不该入账由 classify 一处决定（它本来就是唯一的汇流点），这儿只负责
+ * 不要替它先把信扔掉。
+ *
+ * 裸 record（只有 messages、没有任何 messagesAdded/labelsAdded）也收——
+ * 那正是上面那封 9/10 的信在历史里唯一的形状。
+ *
+ * messagesDeleted 一样收：拿不到会 404，getMetadata 记一笔 gone 跳过，那是
+ * 空转；而发草稿时 Gmail 可能同时报一句「草稿没了」，排掉它就等于把刚
+ * 堵上的洞又挖开。**多拿一次是浪费，少拿一封是永远看不见。**
+ */
+export function idsFromHistory(records) {
+  const ids = new Set()
+  for (const h of records || []) {
+    for (const m of h?.messages || []) if (m?.id) ids.add(m.id)
+    for (const k of ['messagesAdded', 'messagesDeleted', 'labelsAdded', 'labelsRemoved']) {
+      for (const a of h?.[k] || []) if (a?.message?.id) ids.add(a.message.id)
+    }
+  }
+  return [...ids]
+}
+
+/**
+ * 增量：从 startHistoryId 往后，Gmail 说哪些 message 动过。
  *
  * 返回 { ids, historyId, tooOld }。tooOld = Gmail 说那个游标太老了
  * （它只留几天到几周）——这时候**必须**退回有界重列，不能静默当成没有新信。
@@ -140,14 +181,12 @@ export async function historySince(gmail, startHistoryId) {
   try {
     do {
       const { data } = await retry(
+        // historyTypes 不填 —— 填了就是让 Gmail 替我们先扔一批，见 idsFromHistory。
         () => gmail.users.history.list({
-          userId: 'me', startHistoryId, historyTypes: ['messageAdded'],
-          maxResults: 500, pageToken,
+          userId: 'me', startHistoryId, maxResults: 500, pageToken,
         }),
         'history.list')
-      for (const h of data.history || []) {
-        for (const a of h.messagesAdded || []) if (a.message?.id) ids.add(a.message.id)
-      }
+      for (const id of idsFromHistory(data.history)) ids.add(id)
       if (data.historyId) latest = String(data.historyId)
       pageToken = data.nextPageToken
     } while (pageToken)

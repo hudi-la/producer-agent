@@ -30,7 +30,9 @@
  * 不用「张数少就不算」那种判法：聚合源 11 张其实比模特经纪 7 张还多，
  * 数字分不开这两者 —— 分开它们的是「这批卡彼此像不像」。
  */
-const 是一摊里的 = (p) => Boolean(p?.task_id) && p?.source !== 'scout_aggregators'
+// 「scout_」开头的来源都是联网捞回来的各不相同的机会（聚合源那条、Open Call 那条），
+// 一律散着铺。判前缀不判具体值：再加一条 scout 任务不用回来改这儿。
+const 是一摊里的 = (p) => Boolean(p?.task_id) && !String(p?.source || '').startsWith('scout_')
 
 /** 给看板用：这张卡该不该跟同任务的折成一叠。跟上色是同一个判断。 */
 export const inBatch = 是一摊里的

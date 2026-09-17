@@ -26,6 +26,8 @@ import { incremental, auditPass } from './sync.js'
 import { classify } from './classify.js'
 import { carryPass } from './carry.js'
 import { attributePass } from './attribute.js'
+import { copiedPass } from './copied.js'
+import { groupNamesPass } from './groups.js'
 import { db } from './store.js'
 import { MailAuthError } from './auth.js'
 
@@ -70,9 +72,10 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
     if (sync.skipped) { out.note = sync.note }
     if (sync.rebuilt) out.rebuilt = true
 
-    // ①.5 补核：预约发送的信真发出那刻只是标签翻成 SENT（labelAdded），
-    // 增量只听 messageAdded 听不见 —— 每轮把「时间已过、没核过标签」的
-    // 拿一次标签写审计。队列平时是空的，一次 SQL 而已。
+    // ①.5 补核：预约发送的信真发出那刻只是标签翻成 SENT（labelAdded）——
+    // 每轮把「时间已过、没核过标签」的拿一次标签写审计。队列平时是空的，
+    // 一次 SQL 而已。（增量现在也收标签事件了，见 gmail.js 的 idsFromHistory；
+    // 这一条留着兜「事件早过去了、游标已经推过」的那些。）
     try { const a = await auditPass({ log: () => {} }); if (a.audited) out.audited = a.audited }
     catch (err) { console.warn('  ⚠️ 补核标签没走成：' + err.message) }
 
@@ -94,6 +97,35 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
     const link = await rpc('pa_link_replies')
     out.linked = Number(link?.linked || 0)
 
+    // ④.5 同机构的另一个信箱回到你的线里 → 自动登记 + 当场搬信（0115）。
+    // 真事：Descanso 的 programs@ 回了你发给 visitorcenter@ 的提案，
+    // 三封信堵在账本里，通知无声。规则级证据不劳他点头；
+    // 「人」不走这条 —— 名片该谁点头还是谁点头。
+    try {
+      const adopted = await rpc('pa_adopt_replying_mailboxes')
+      if (adopted?.length) {
+        log(`  ↳ 收编同机构信箱：${adopted.map((a) => a.email).join('、')}`)
+        const c2 = await carryPass({ touched: adopted.map((a) => a.email), log: () => {} })
+        out.carried += c2.added || 0
+      }
+    } catch (err) { console.warn('  ⚠️ 收编信箱没走成：' + err.message) }
+
+    // ④.6 抄送栏里的人、同机构回信的人 → 自动进通讯录、挂上线（0121）。
+    // 真事：Brooke 回信抄送了 Rachel，Lorna 抄送了 Meighan，Meighan 自己回信
+    // 还被休假自动回复连累判成「群发」—— 三个人系统里一个都没有。
+    // 同机构 + 有人名署名是规则级证据，不劳他点头；其余进「新联系人」面板。
+    try {
+      const cp = await copiedPass({ log: () => {} })
+      out.copied = (cp.adopted || []).length
+      out.carried += cp.carried || 0
+      if (cp.adopted?.length) log(`  ↳ 收进抄送的人：${cp.adopted.map((a) => `${a.name}（${a.title}）`).join('、')}`)
+      if (cp.greeted?.length) log(`  ↳ 端给你点头：${cp.greeted.map((g) => g.email).join('、')}`)
+    } catch (err) { console.warn('  ⚠️ 收抄送的人没走成：' + err.message) }
+
+    // ④.7 一伙人（0122）：只补老信的署名，收不收由他在「等你点头」里点。
+    try { await groupNamesPass({ log }) }
+    catch (err) { console.warn('  ⚠️ 一伙人补署名没走成：' + err.message) }
+
     // ⑤ 归属：只在真有孤儿来信时才问模型
     const attr = await attributePass({ apply: true, log: () => {} })
     out.attached = (attr.attached || []).length
@@ -104,8 +136,8 @@ export async function sweepMail({ log = console.log, classifyRounds = 2 } = {}) 
       note: out.added ? `收到 ${out.added} 封新信` : '没有新信',
     }
     const ms = Date.now() - t0
-    if (out.added || out.judged || out.carried || out.linked || out.attached) {
-      log(`  ↳ 邮件：新信 ${out.added}｜判地址 ${out.judged}｜进对话 ${out.carried}｜认亲 ${out.linked}｜归线 ${out.attached}（${(ms / 1000).toFixed(1)}s）`)
+    if (out.added || out.judged || out.carried || out.linked || out.attached || out.copied) {
+      log(`  ↳ 邮件：新信 ${out.added}｜判地址 ${out.judged}｜进对话 ${out.carried}｜认亲 ${out.linked}｜归线 ${out.attached}｜抄送的人 ${out.copied || 0}（${(ms / 1000).toFixed(1)}s）`)
     }
     return out
   } catch (err) {

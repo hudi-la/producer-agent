@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMessages, sendMessageStream, stopThinking, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
-import { useLiveReply } from '../lib/useLiveReply.js'
+import { fetchMessages, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
+import { useChat } from '../lib/useChat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
 import { md } from '../lib/when.js'
 import { saidThisTime, GIST_CAP } from '../lib/letter.js'
 import SayBubble from './Resay.jsx'
+import Veil from './Veil.jsx'
 
 import {
   fetchDeliverables, fetchAttachments, setFinal, syncMail,
@@ -17,9 +18,12 @@ import Deliverables from './Deliverables.jsx'
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
 import FormCard from './FormCard.jsx'
+import StateMoveCard from './StateMoveCard.jsx'
+import MemoCard from './MemoCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
-import QueueNav from './QueueNav.jsx'
+import DeskToggle from './DeskToggle.jsx'
+import { useGrow } from '../lib/useGrow.js'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
 import Md from './Md.jsx'
@@ -136,7 +140,7 @@ function Letter({ m }) {
     <div id={'msg-' + m.id} className={'arrival' + (进来的 ? ' in' : ' out')}>
       <div className="arr-top">
         <span className="arr-mark" aria-hidden="true">✉</span>
-        <b>{进来的 ? `${who} 来信` : who}</b>
+        <b>{进来的 ? <><Veil>{who}</Veil> 来信</> : who}</b>
         {只有摘要 && <span className="arr-tag">摘要 · 原文没存下来</span>}
         <span className="arr-when">{md(m.created_at)}</span>
       </div>
@@ -161,7 +165,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   if (m.role === 'note') {
     return (
       <div id={'msg-' + m.id} className="notecard">
-        <span className="ntag">{m.kind === 'decision' ? '决定' : '备注'}</span>
+        <span className="ntag">{m.kind === 'decision' ? '决定' : m.kind === 'memo' ? '记忆' : m.kind === 'meet' ? '见面' : '备注'}</span>
         <div className="md"><Md>{m.content}</Md></div>
       </div>
     )
@@ -199,7 +203,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   const bc = m.meta?.broadcast
   return (
     <div id={'msg-' + m.id} className={'msg' + (mine ? ' you' : external ? ' org' : ' producer')}>
-      <span className="who">{who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
+      <span className="who">{external ? <Veil>{who}</Veil> : who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
         {bc && <span className="viamail"> · 同时发给了 {bc.count} 条线</span>}
       </span>
       {/* 你自己说的那句能改了重说；别人的（它的回复、机构来信）不能——
@@ -225,6 +229,14 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
       {m.meta?.form && (
         <FormCard form={m.meta.form} owner={owner} onAdopted={onAdopted} />
       )}
+      {/* 它在聊天里改了提醒（0123）—— 出现的时候已经改完了，卡上只有【撤回】。
+          只画落上了的（applied）：没落上的，日志里有原因，界面不画一张骗人的卡。 */}
+      {m.meta?.state_move?.applied && (
+        <StateMoveCard msgId={m.id} move={m.meta.state_move} />
+      )}
+      {m.meta?.memo?.applied && (
+        <MemoCard msgId={m.id} memo={m.meta.memo} />
+      )}
     </div>
   )
 }
@@ -234,10 +246,10 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
 function MailAnchor({ m, onJump }) {
   const d = m.created_at ? new Date(m.created_at) : null
   const when = d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
-  const who = m.role === 'artist' ? '你发了一封' : `${m.meta?.from_name || '对方'}来信`
+  const mine = m.role === 'artist'
   return (
     <div id={'msg-' + m.id} className="mailanchor">
-      <b>{when}</b> {who}
+      <b>{when}</b> {mine ? '你发了一封' : <><Veil>{m.meta?.from_name || '对方'}</Veil>来信</>}
       <button className="lnk" onClick={() => onJump?.(m.id)}>看左栏 ↖</button>
     </div>
   )
@@ -265,25 +277,35 @@ function emptyText(stage) {
 
 // 两种装法，同一套内容：
 //   drawer —— 从右边划出来盖在看板上，看板还在旁边，可以一张接一张点过去
-//   page   —— 整页（?p=<id> 落地的、抽屉上按「整页」换成的都是这个，
-//              看板让位），留给你要长时间写东西的时候
+//   page   —— 整页。只在工作区里出现：桌上那格（?p=<id> 不带 d=1 落地的
+//              就是它），留给你要长时间写东西的时候
 // 现在两者装的东西一样，只差宽度。等作品链、文档、邮件单独成栏做出来，
 // 整页才会长出抽屉装不下的部分。
 export default function PursuitFocus({
   onOpenPerson,
-  pursuit: p, messages, variant = 'page', onBack, onExpand, onMove, onSetBall,
-  queue = null, onQueuePrev, onQueueNext, onQueueDone, onQueueLater,
+  pursuit: p, messages, variant = 'page', onBack, onMove, onSetBall,
+  // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
+  onDesk = false, onToggleDesk,
+  // 这张是怎么上桌的（queue.js 的 via）。只有 'update'（收信收出来的）要交代。
+  via = null,
+  // 脑子开没开（App 每轮问 /health）。没开 = 输入框直接记笔，不聊天（0125）。
+  brainUp = true,
 }) {
   const inDrawer = variant === 'drawer'
-  const [msgs, setMsgs] = useState(messages || [])
-  const [text, setText] = useState('')
-  const [thinking, setThinking] = useState(false)
-  // 它正在打的那段字（还没落库）。live 有内容就渲染成一个真气泡，
-  // 而不是三个点——你能一行一行看着它想。
-  const { live, act, onEvent: onLive, reset: resetLive } = useLiveReply()
-  const [err, setErr] = useState(null)
-  // 正在就地改的那一句。库里还什么都没动——见 Resay.jsx 顶上那段。
-  const [editId, setEditId] = useState(null)
+  // 说话那一整套（发、边想边出字、重说、终止）在 useChat 里，跟档案里那张
+  // 书桌共用同一份 —— 照抄两份的话，出错那几条路迟早只修好一边。
+  // 这一页多出来的东西（笔卡、信卡、邮件锚点、stalled、stoppedId）留在这儿。
+  const chat = useChat({
+    owner: p.id,
+    reload: () => fetchMessages(p.id),
+    rewind: rewindChat,
+    // 脑子没开：这句直接记成一笔（不是聊天），走浏览器直连；脑子醒了由盲格子判。
+    // 「记一笔」按钮 2026-09-11 退场了 —— 脑子醒着时说什么该记成什么由它判（0125）。
+    offline: { up: brainUp, note: (t) => addPursuitNote(p.id, t) },
+  })
+  const { msgs, setMsgs, text, setText, err, setErr, editId, setEditId, live, act, runIdRef } = chat
+  const thinking = chat.busy
+  // （正在就地改的那一句也在 chat 里。库里还什么都没动——见 Resay.jsx 顶上那段。）
   const [stage, setStageLocal] = useState(p.stage)
   // 球权本地先动，写库由 App 负责回滚。装的是「球在谁那边」这个答案本身，
   // 不是「你有没有手动改过」——后者不是你要看的东西。
@@ -306,31 +328,6 @@ export default function PursuitFocus({
   // 两样都删了：写 next_action 的那个消化环节早就不在了，留着就是一行
   // 永远不会更新的字。要不要重做那套是另一场讨论。
   // 见 docs/specs/2026-08-12-four-signals-design.md
-  // 「记一笔」旁边那层说明：悬停一秒才出来，跟人卡那边同一套（见 PersonFocus）。
-  const [howto, setHowto] = useState(false)
-  const howtoT = useRef(0)
-  const howtoIn = () => {
-    clearTimeout(howtoT.current)
-    if (!howto) howtoT.current = setTimeout(() => setHowto(true), 1000)
-  }
-  const howtoOut = () => {
-    clearTimeout(howtoT.current)
-    howtoT.current = setTimeout(() => setHowto(false), 240)
-  }
-  useEffect(() => () => clearTimeout(howtoT.current), [])
-
-  // 把输入框里那句话记成一次真实来往。商量不算往来，笔算——它进时间线，
-  // 线立刻变「脏」（0079 现算），「这条线在等什么」也靠它才知道你在邮箱外办了事。
-  const jot = async () => {
-    const t = text.trim()
-    if (!t || busy) return
-    try {
-      await addPursuitNote(p.id, t)
-      setText('')
-      const rows = await fetchMessages(p.id)
-      if (rows) setMsgs(rows)
-    } catch (e) { setErr('没记上：' + (e?.message || e)) }
-  }
 
   const endRef = useRef(null)
   const scrollRef = useRef(null)    // 对话那一栏本体，用来判断你是不是贴着底在看
@@ -340,7 +337,6 @@ export default function PursuitFocus({
   // 出字那一轮一秒好几帧，等于每秒被拽好几次。
   const stick = useRef(true)
   const taRef = useRef(null)        // 输入框本体，用来按内容撑高
-  const runIdRef = useRef(null)     // 正在跑的那一次，「终止」靠它找到对应的活
   // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
   const threeCol = !inDrawer
   const [deliv, setDeliv] = useState([])
@@ -406,15 +402,8 @@ export default function PursuitFocus({
     if (live && stick.current) endRef.current?.scrollIntoView({ block: 'end' })
   }, [live])
 
-  // 输入框按内容撑高。必须先归零再量 scrollHeight——不归零的话 scrollHeight
-  // 永远不小于当前高度，删字的时候框只会长不会缩。上限在 CSS 的 max-height，
-  // 到顶了 textarea 自己滚。
-  useEffect(() => {
-    const el = taRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }, [text])
+  // 输入框按内容长高（往上长）。跟名片那边同一份 —— 见 lib/useGrow.js。
+  useGrow(taRef, text)
 
   // 产出和附件。只有整页要，抽屉不拉——省一次往返。
   async function reloadDeliv() {
@@ -492,100 +481,22 @@ export default function PursuitFocus({
     })
   }), [p.id])
 
-  // said 是「重说」交过来的那句改完的话。不传就是输入框里那句。
-  // 两条路必须共用这一个函数：乐观插入、换掉临时条、失败时话还不还给你——
-  // 那三件事分两份写，迟早有一边漏掉，而漏掉的那边会静悄悄吞掉你打的字。
+  // 说一句。真正的那一套在 useChat 里；这儿只加这一页专有的两件事：
+  //   · 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底
+  //   · 终止了要把「这条就停在这儿」记下来，好让 stalled 那句话不冤枉它
   async function send(said) {
-    const t = (said ?? text).trim()
-    if (!t || busy) return
-    // 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底。
+    if (said == null && !brainUp) return chat.send(said)   // 记笔那条路不动滚动
     stick.current = true
-    if (said == null) setText('')
-    setErr(null)
-    setThinking(true)
-    // run_id 在这儿生成，跟着请求一起发过去——不能等回来再拿：
-    // /chat 是想完了才返回的，那时候早没得停了。
-    const runId = crypto.randomUUID()
-    runIdRef.current = runId
-    const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: t }
-    setMsgs((m) => [...m, tmp])
-    let landedMine = null
-    try {
-      const { mine, reply, aborted } = await sendMessageStream(p.id, t, undefined, runId, (e) => {
-        // 你那条一落库就回来了：拿真的换掉临时那条（临时的没有 id、没有时间）。
-        // 换早一点，3 秒轮询就不会跟它撞出两条一样的。
-        if (e.t === 'mine') {
-          landedMine = e.row
-          setMsgs((m) => m.map((x) => (x.id === tmp.id ? e.row : x)))
-        } else {
-          onLive(e)
-        }
-      })
-      // 终止了就只留你那条：它没写回复，reply 是 null。
-      const you = mine || landedMine
-      setMsgs((m) => [
-        ...m.filter((x) => x.id !== tmp.id && x.id !== you?.id),
-        ...(you ? [you] : []),
-        ...(reply ? [reply] : []),
-      ])
-      if (aborted && you) setStoppedId(you.id)
-    } catch (e) {
-      // 脑子是先存你的话、再去想的，所以失败有两种：
-      //   连不上 → 一个字都没存 → 把内容还回输入框，别让你白打
-      //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
-      const rows = await fetchMessages(p.id)
-      const landed = rows?.some((m) => m.role === 'artist' && m.content === t)
-      if (rows) setMsgs(rows)
-      else setMsgs((m) => m.filter((x) => x.id !== tmp.id))
-      if (!landed) {
-        setText((cur) => cur || t)   // 期间你要是又打了别的，就别覆盖
-        setErr(e.message + '（你的话还在框里，没丢）')
-      } else {
-        setErr(e.message + '（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）')
-      }
-    } finally {
-      setThinking(false)
-      resetLive()
-      runIdRef.current = null
-    }
+    const r = await chat.send(said)
+    if (r?.aborted && r.you) setStoppedId(r.you.id)
+    return r
   }
 
-  /**
-   * 重说：撤掉这句和它之后的对话，然后把改完的这句照常发出去。
-   *
-   * 顺序不能反。先撤再发的话，Fairwind 拿到的是干净的往来；先发再撤，
-   * 它已经带着那句错话想过一轮了——而那正是你按这个按钮要躲开的事。
-   *
-   * 撤失败就停在编辑态：话还在框里，错话摆在下面，你可以再按一次。
-   * （照 EditRow 那条规矩：存不上不退回原值，退了你刚写的就没了。）
-   */
-  async function resay(id, said) {
-    const t = said.trim()
-    if (!t || busy) return
-    setErr(null)
-    try {
-      await rewindChat(id)
-    } catch (e) {
-      setErr('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
-      return
-    }
-    setEditId(null)
-    setMsgs((cur) => dropFrom(cur, id))
-    await send(t)
-  }
+  const resay = chat.resay
 
-  // 终止：掐掉正在跑的那一次，不写回复。你说的那句留着——它是你说的话，不是它想的。
-  //
-  // 拿不到 run_id 也照样把界面解开：可能是脑子重启过、或者这条「在想」是上次
-  // 开着页面时留下的。那种情况下本来也没东西在跑，卡着输入框没有意义。
   async function stop() {
-    const rid = runIdRef.current
     if (lastMsg) setStoppedId(lastMsg.id)
-    setThinking(false)
-    // 打到一半的那段也一起收掉：它不会落库，留在屏幕上等于给你看一份不存在的回复。
-    resetLive()
-    runIdRef.current = null
-    if (rid) await stopThinking(rid)
+    await chat.stop()
   }
 
   // 哪些消息已经被搬进右栏当产出了（deliverables.source_msg 指着它）
@@ -596,7 +507,7 @@ export default function PursuitFocus({
   // 「这次发生了什么」：更新最新信息把这张卡送进队，先交代它动了什么再让你过。
   // 内容全部从库里读（最新的信、作废行、它提的那句）——队列只存 id 和 via，
   // 不背内容：背了的那份不会跟着库变，迟早说谎。
-  const viaUpdate = queue?.via === 'update'
+  const viaUpdate = via === 'update'
   const lastMail = viaUpdate ? [...msgs].reverse().find((m) => m.kind === 'email') : null
   const proposal = null
   const mailWhen = (m) => {
@@ -676,8 +587,8 @@ export default function PursuitFocus({
       </div>
 
       {err && <div className="composer-err">{err}</div>}
-      {/* 跟人卡同一套：输入框和「记一笔」是一组。.composer-dock 是定位锚 ——
-          jot-howto 的绝对定位落在它身上（styles.css 1280 行那段注释）。 */}
+      {/* 一个框两种落法（0125）：脑子醒着 = 聊天，Fairwind 顺便判该记成什么；
+          脑子没开 = 直接记成一笔。「记一笔」按钮退场了。 */}
       <div className="composer-dock">
       <div className="composer">
         {/* textarea 而不是 input：一行装不下就自己长高（上限在 CSS 的 max-height，
@@ -690,7 +601,9 @@ export default function PursuitFocus({
           rows={1}
           value={text}
           disabled={busy}
-          placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）' : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
+          placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
+            : !brainUp ? '脑子没开：这句会直接记成一笔，不是聊天'
+            : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
@@ -710,26 +623,6 @@ export default function PursuitFocus({
           </button>
         )}
       </div>
-      <div className="jot-row"
-           onMouseEnter={howtoIn} onMouseLeave={howtoOut}
-           onFocusCapture={() => setHowto(true)}>
-        {/* 点完就把说明收掉：点击会让按钮拿到焦点，不收的话你刚记完
-            它反而弹出来解释「记一笔是什么」——你显然已经知道了。 */}
-        <button className="lnk jot-go"
-                onClick={() => { clearTimeout(howtoT.current); setHowto(false); jot() }}
-                disabled={busy || !text.trim()}>记一笔</button>
-        {howto && (
-          <div className="jot-howto" role="tooltip"
-               onMouseEnter={howtoIn} onMouseLeave={howtoOut}>
-            <p>回车 = 跟 <b>Fairwind</b> 商量（商量只是商量，不算往来）。</p>
-            <p>
-              电话里说定了、表单交出去了、线下见了面？写一句按 <b>记一笔</b>——
-              它跟邮件一样是一次真实来往，进时间线，Fairwind 会据此重判这条线。
-              「这条线在等什么」也靠它才知道你在邮箱外把事办了。
-            </p>
-          </div>
-        )}
-      </div>
       </div>
     </>
   )
@@ -739,12 +632,6 @@ export default function PursuitFocus({
       {/* 标题在顶条里，跟着一起钉住——你往下读对话时，「这是哪条线」不该滚走。
           整页一行放得下就一行，放不下截断；抽屉窄，最多两行。 */}
       <div className="focus-top">
-        {/* 队头。翻页什么都不改——翻回来那张原样在那儿，所以 ‹ › 旁边
-            没有任何「已处理」的标记，只有位置。
-            两个出口也在这排——原来在抽屉底部，跟输入框叠在一起被盖住了；
-            而且「过没过完这张」跟「在队里第几张」本来就是同一件事的两半。 */}
-        {/* 措辞和行为都在 QueueNav 里 —— 人的卡片用的是同一份 */}
-        <QueueNav queue={queue} onPrev={onQueuePrev} onNext={onQueueNext} onDone={onQueueDone} />
 
         {/* 你为什么在队里。
             一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
@@ -753,10 +640,10 @@ export default function PursuitFocus({
             **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
             effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
             跟两个出口挪上来是同一个理由。 */}
-        {queue && viaUpdate && lastMail && (
+        {viaUpdate && lastMail && (
           <div className="qwhat">
             {lastMail && (
-              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : (lastMail.meta?.from_name || '对方')}
+              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : <Veil>{lastMail.meta?.from_name || '对方'}</Veil>}
                 <button className="lnk" onClick={() => jumpTo(lastMail.id)}>看最近这封 →</button>
               </span>
             )}
@@ -770,16 +657,11 @@ export default function PursuitFocus({
           {inDrawer ? (
             <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
           ) : (
-            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 全部机会线</button>
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 看板</button>
           )}
           <h1 className="ft-title" title={p.title}>{p.title}</h1>
-          {/* ↗ 是「去别处」的意思，这个按钮已经不去别处了——就在这一页摊开，
-              所以换成 →。图标撒的谎跟文案撒的谎一样算数。 */}
-          {inDrawer && (
-            <button className="expand" onClick={() => onExpand?.(p)} title="整页摊开（看板让位）">
-              整页 <span aria-hidden="true">→</span>
-            </button>
-          )}
+          {/* 「整页 →」退役了。整页只在工作区里有，去工作区的路是这颗开关 + 顶栏那个字。 */}
+          {inDrawer && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
         <div className="ft-ctl">
         {/* 截止跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关 */}

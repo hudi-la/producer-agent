@@ -104,6 +104,15 @@ export function isBulk(h = {}, fromEmail = '') {
   return MACHINE_LOCAL.test(local)
 }
 
+/** 一串拆好的地址 → { 地址: 署名 }。只收有署名的；同一地址第一个署名算数。 */
+export function namesOf(list) {
+  const out = {}
+  for (const a of list || []) {
+    if (a?.email && a.name && !(a.email in out)) out[a.email] = a.name
+  }
+  return out
+}
+
 /** 把「我的地址」规整成一个小写 Set。传数组、Set、单个字符串都认。 */
 export function mineSet(mine) {
   const xs = mine instanceof Set ? [...mine] : Array.isArray(mine) ? mine : [mine]
@@ -171,6 +180,9 @@ export function classify(msg, mine) {
 
   const to = parseAddrList(h['to'])
   const cc = parseAddrList(h['cc'])
+  // 署名跟地址一起存。抄送栏里的人以前只留了地址——那个人以后要靠署名才能
+  // 认成人（0121）。没署名的不出现在这张表里：不编名字。
+  const names = namesOf([from, ...to, ...cc])
 
   // internalDate 优先：那是 Gmail 自己记的收发时间，毫秒 epoch，不会被
   // 发件方伪造，也不受时区写法影响。Date 头只是兜底。
@@ -200,6 +212,7 @@ export function classify(msg, mine) {
     from_name: from.name,
     to_emails: to.map((a) => a.email),
     cc_emails: cc.map((a) => a.email),
+    names,
     subject: h['subject'] ? h['subject'].trim() || null : null,
     sent_at: sent.toISOString(),
     counterpart_email: counterpart,

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { toUrl, fromUrl, tabUrl } from './route.js'
+import { toUrl, fromUrl } from './route.js'
 
 const P = '/'
 const V = { home: { name: 'home' } }
@@ -19,10 +19,10 @@ test('认不出的主区一律忽略，不猜', () => {
   assert.equal(fromUrl('?a=nonsense').area, null)
 })
 
-test('名片：写得出也读得回', () => {
-  const u = toUrl('people', { name: 'person', person: { id: 'abc' } }, P)
-  assert.equal(u, '/?a=people&c=abc')
-  assert.deepEqual(fromUrl('?a=people&c=abc').card, { kind: 'contact', id: 'abc' })
+test('名片抽屉：写得出也读得回', () => {
+  const u = toUrl('people', { name: 'person', person: { id: 'abc' }, mode: 'drawer' }, P)
+  assert.equal(u, '/?a=people&c=abc&d=1')
+  assert.deepEqual(fromUrl('?a=people&c=abc&d=1'), { area: 'people', card: { kind: 'contact', id: 'abc', drawer: true } })
 })
 
 test('机构名带空格也扛得住 —— 编码解码一趟回来还是原样', () => {
@@ -31,13 +31,17 @@ test('机构名带空格也扛得住 —— 编码解码一趟回来还是原样
   assert.equal(fromUrl(u.slice(u.indexOf('?'))).card.id, org)
 })
 
-test('机会线分整页和抽屉 —— 刷新回来还是原来那一档', () => {
-  const page = toUrl('pursue', { name: 'pursuit', pursuit: { id: 'p1' }, mode: 'page' }, P)
-  const draw = toUrl('pursue', { name: 'pursuit', pursuit: { id: 'p1' }, mode: 'drawer' }, P)
-  assert.equal(page, '/?p=p1')
-  assert.equal(draw, '/?p=p1&d=1')
-  assert.equal(fromUrl('?p=p1').card.drawer, false)
-  assert.equal(fromUrl('?p=p1&d=1').card.drawer, true)
+test('带 d=1 是某个区旁边的抽屉；不带就是桌上那张，主区一律 desk', () => {
+  assert.equal(toUrl('desk', { name: 'pursuit', pursuit: { id: 'p1' } }, P), '/?p=p1')
+  assert.equal(toUrl('pursue', { name: 'pursuit', pursuit: { id: 'p1' }, mode: 'drawer' }, P), '/?p=p1&d=1')
+  assert.deepEqual(fromUrl('?p=p1'), { area: 'desk', card: { kind: 'pursuit', id: 'p1', drawer: false } })
+  assert.deepEqual(fromUrl('?a=people&p=p1'), { area: 'desk', card: { kind: 'pursuit', id: 'p1', drawer: false } })
+  assert.equal(fromUrl('?p=p1&d=1').area, null)   // 没写 a → 默认 pursue
+})
+
+test('空桌也有地址', () => {
+  assert.equal(toUrl('desk', { name: 'home' }, P), '/?a=desk')
+  assert.equal(fromUrl('?a=desk').area, 'desk')
 })
 
 // 同时出现时不去猜哪个更「对」—— 那种行为会随实现顺序变，查起来要命
@@ -56,13 +60,13 @@ test('什么都没有就是首页', () => {
 // 往返一趟必须还是同一个地方，否则「你刚才在做的事」就没了。
 test('转一圈回来还是同一个地方', () => {
   const cases = [
-    ['pursue', V.home],
-    ['people', V.home],
-    ['profile', V.home],
-    ['people', { name: 'person', person: { id: 'c1' } }],
-    ['people', { name: 'org', org: { org: 'CultureHub' } }],
-    ['pursue', { name: 'pursuit', pursuit: { id: 'p1' }, mode: 'page' }],
+    ['pursue', V.home], ['people', V.home], ['profile', V.home], ['desk', V.home],
+    ['people', { name: 'person', person: { id: 'c1' }, mode: 'drawer' }],
+    ['people', { name: 'org', org: { org: 'CultureHub' }, mode: 'drawer' }],
     ['pursue', { name: 'pursuit', pursuit: { id: 'p1' }, mode: 'drawer' }],
+    ['desk', { name: 'pursuit', pursuit: { id: 'p1' } }],
+    ['desk', { name: 'person', person: { id: 'c1' } }],
+    ['desk', { name: 'org', org: { org: 'ZKM' } }],
   ]
   for (const [area, view] of cases) {
     const u = toUrl(area, view, P)
@@ -71,23 +75,4 @@ test('转一圈回来还是同一个地方', () => {
     if (view.name === 'home') assert.equal(back.card, null, `不该有卡：${u}`)
     else assert.ok(back.card, `卡丢了：${u}`)
   }
-})
-
-// ── 新标签页的地址 ──────────────────────────────────────────────
-// 这两条是为一个真 bug 写的回归测试：抽屉打开一条线时地址是 ?p=xxx&d=1，
-// 「整页」按钮拿当前地址复制一份再设 p，于是 d=1 跟着过去——
-// 新标签页打开的还是抽屉，用户看到的是「整页按钮不灵了」。
-
-test('整页链接不许带 d=1 —— 带了就还是抽屉', () => {
-  const u = tabUrl('p', 'p1', P)
-  assert.equal(u, '/?p=p1')
-  assert.equal(fromUrl(u.slice(u.indexOf('?'))).card.drawer, false)
-})
-
-test('开一张新卡不许捎上别的参数', () => {
-  const u = tabUrl('c', 'c2', P)
-  assert.equal(u, '/?c=c2')
-  const back = fromUrl(u.slice(u.indexOf('?')))
-  assert.equal(back.card.kind, 'contact')
-  assert.equal(back.area, null)          // 上一个 ?a= 也不该跟过来
 })

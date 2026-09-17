@@ -1,79 +1,173 @@
-// scout 的骨架/血肉分家(2026-08-25,④)。
-//
-// 单人版的 scout 是一份 markdown:Hu Di 的画像、他的项目 ID、写死的 SQL,
-// 由他个人的定时任务执行。多租户的推导(A 卷)说:骨架(扫描流程、合法性
-// 检查、去重、上限、输出协议)进代码;血肉(画像、方向、信息源)从**这个
-// 学员自己的档案**现读。
-//
-// 这里钉两条性质:
-//   1. prompt 里的画像来自传入的 profile——换个学员,画像跟着换
-//   2. prompt 里**没有任何 Hu Di 的血肉**:没有他的签证、他的母题、
-//      他的项目 ID,也没有 SQL(写库走 RPC,不走模型手写 SQL)
-import { test } from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildScoutPrompt, parseCards, DEFAULT_SOURCES, SCOUT_SYSTEM } from './scout.js'
+import {
+  tail, fullPrompt, parseCards, pick, pickable, report3,
+  checkPrompt, parseChecks, checkCapOf, reachCapOf, cardCapOf,
+  CARDS_MARK, CHECKS_MARK,
+} from './scout.js'
 
-const 学员 = {
-  name: 'Mira Test',
-  website: 'https://mira.test/',
-  data: {
-    visa: '加拿大公民,无美国工作权',
-    location: ['Toronto'],
-    career_stage: 'mid-career',
-    funding_pref: '只要带钱的',
-    exclude_rule: '要交报名费的一律不看',
-    watch_rule: '双年展哪怕没开放也留着',
-  },
+const ctx = {
+  today: '2026-09-07',
+  tz: 'America/Los_Angeles',
+  existing: [{ title: 'MacDowell', org: 'MacDowell', url: 'https://www.macdowell.org/apply' }],
 }
 
-const 素材 = {
-  profile: 学员,
-  concerns: ['纤维与身体'],
-  worksDigest: '『线的重量』(纤维装置)·『皮肤备忘录』(行为)',
-  sources: ['https://example.org/calls'],
-  existingTitles: ['已有的那条线'],
-  cap: 5,
-}
-
-test('画像来自这个学员:他的规则一条不少', () => {
-  const p = buildScoutPrompt(素材)
-  for (const 必须有 of ['Mira Test', '加拿大公民', 'Toronto', '只要带钱的',
-                        '要交报名费的一律不看', '双年展哪怕没开放也留着',
-                        '纤维与身体', '线的重量', 'https://example.org/calls',
-                        '已有的那条线', '[[CARDS]]']) {
-    assert.ok(p.includes(必须有), `prompt 里少了:${必须有}`)
-  }
+// ── 三个上限 ──────────────────────────────────────────────────
+test('三个上限各管各的，配错了退回默认', () => {
+  const t = { config: { check_per_round: 30, reach_per_round: 4, card_cap: 20 } }
+  assert.equal(checkCapOf(t), 30)
+  assert.equal(reachCapOf(t), 4)
+  assert.equal(cardCapOf(t), 20)
+  assert.equal(checkCapOf({ config: {} }), 20)
+  assert.equal(reachCapOf({ config: { reach_per_round: 'x' } }), 8)
+  assert.equal(cardCapOf({}), 12)
 })
 
-test('没有任何 Hu Di 的血肉,也没有 SQL', () => {
-  const p = buildScoutPrompt(素材) + SCOUT_SYSTEM
-  for (const 不许有 of ['HuDi', 'Hu Di', 'hudi', 'O-1', '微缩', '装置为主',
-                        'jjgvvtrsnoqnoigukobi', 'insert into', 'producer.',
-                        'supabase', 'Supabase']) {
-    assert.ok(!p.includes(不许有), `prompt 里混进了单人版血肉:${不许有}`)
-  }
+// ── 第一步 · 复查 ─────────────────────────────────────────────
+test('复查的话里带 id、带表里记的日期、要求一条都不许少', () => {
+  const p = checkPrompt([
+    { id: 'a1', title: 'Pioneer Works 驻留', org: 'Pioneer Works', deadline: '2026年7月13日', deadline_at: '2026-07-13', url: null },
+    { id: 'b2', title: 'Transmediale', opens_at: '2026-08-01' },
+  ], ctx)
+  assert.match(p, /id=a1/)
+  assert.match(p, /id=b2/)
+  assert.match(p, /2026-07-13/)
+  assert.match(p, /一个都不许跳过/)
+  assert.match(p, /一条都不能少/)
+  assert.match(p, /自己搜官网/)      // 没链接的那条要说清楚
 })
 
-test('档案没填规则也能跑:空格子不渲染成 undefined', () => {
-  const p = buildScoutPrompt({ ...素材, profile: { name: null, data: {} }, concerns: [], worksDigest: '', existingTitles: [] })
-  assert.ok(!p.includes('undefined'))
-  assert.ok(!p.includes('null'))
-  assert.ok(p.includes('[[CARDS]]'))
+test('解析复查：坏日期变 null，认不出的状态退回 unknown', () => {
+  const out = parseChecks(`查完了。
+${CHECKS_MARK} {"checks":[{"id":"a1","status":"open","deadline":"July 13, 2027","deadline_at":"2027-07-13","note":"2027 轮已开"},{"id":"b2","status":"closed","deadline_at":"spring 2027","opens_at":"2026-10-01"},{"id":"c3","status":"???"}]}`)
+  assert.equal(out.length, 3)
+  assert.equal(out[0].status, 'open')
+  assert.equal(out[0].deadline_at, '2027-07-13')
+  assert.equal(out[1].deadline_at, null)
+  assert.equal(out[1].opens_at, '2026-10-01')
+  assert.equal(out[2].status, 'unknown')
 })
 
-test('sources 空着用产品默认的那几个聚合站', () => {
-  const p = buildScoutPrompt({ ...素材, sources: [] })
-  for (const s of DEFAULT_SOURCES) assert.ok(p.includes(s))
+test('复查没按格式说话 → null，不许当成「都没变」', () => {
+  assert.equal(parseChecks('我查了一圈，没什么变化。'), null)
+  assert.equal(parseChecks(`${CHECKS_MARK} {"checks":`), null)
 })
 
-test('parseCards:认最后一行 [[CARDS]],坏 JSON 给空,不炸', () => {
-  const good = '这周看了一圈。\n[[CARDS]] {"cards":[{"title":"某驻地","kind":"驻地","match_stars":3,"eligible":true}]}'
-  const cards = parseCards(good)
-  assert.equal(cards.length, 1)
-  assert.equal(cards[0].title, '某驻地')
-  assert.deepEqual(parseCards('没有标记'), [])
-  assert.deepEqual(parseCards('[[CARDS]] {坏掉的'), [])
-  assert.deepEqual(parseCards('[[CARDS]] {"cards": "不是数组"}'), [])
-  // 没 title 的丢掉
-  assert.deepEqual(parseCards('[[CARDS]] {"cards":[{"kind":"驻地"}]}'), [])
+// ── 第二步 · 找新的 ───────────────────────────────────────────
+test('尾巴带今天、带表里已有的；落点是表所以不设条数上限', () => {
+  const p = fullPrompt({ prompt: '你是 HuDi 的助理。' }, ctx)
+  assert.ok(p.startsWith('你是 HuDi 的助理。'))
+  assert.match(p, /2026-09-07/)
+  assert.match(p, /MacDowell · MacDowell/)
+  assert.match(p, /\[\[CARDS\]\]/)
+  assert.match(p, /不设条数上限/)
+  assert.ok(!/最多 5 个/.test(p))          // 老的那条上限撤了
+  assert.match(p, /当前没开放的也报/)
+  assert.match(p, /eligible=false 的（限美国公民 \/ 绿卡 \/ 需当地工作权）\*\*照报\*\*/)
+})
+
+test('解析信封：坏日期变 null、星级只认 2/3、eligible 默认 true、status 只认三档', () => {
+  const text = `扫了 Colossal 和 TransArtists。
+${CARDS_MARK} {"cards":[{"title":"Eyebeam 2027","org":"Eyebeam","deadline":"spring 2027","deadline_at":"spring 2027","match_stars":3,"status":"open","url":"https://eyebeam.org/apply/"},{"title":"Vanity Prize","match_stars":5,"eligible":false,"status":"什么"}],"skipped":[{"title":"Art Show Intl","why":"报名费 $80，奖项含糊"}]}`
+  const out = parseCards(text)
+  assert.equal(out.cards.length, 2)
+  assert.equal(out.cards[0].deadline_at, null)
+  assert.equal(out.cards[0].deadline, 'spring 2027')
+  assert.equal(out.cards[0].status, 'open')
+  assert.equal(out.cards[0].eligible, true)
+  assert.equal(out.cards[1].match_stars, null)
+  assert.equal(out.cards[1].eligible, false)
+  assert.equal(out.cards[1].status, 'unknown')
+  assert.equal(out.skipped[0].why, '报名费 $80，奖项含糊')
+  assert.equal(out.said, '扫了 Colossal 和 TransArtists。')
+})
+
+test('没信封、坏 JSON、cards 不是数组 → null（不能当成「没找到」）', () => {
+  assert.equal(parseCards('这周什么都没有。'), null)
+  assert.equal(parseCards(`${CARDS_MARK} {"cards": [`), null)
+  assert.equal(parseCards(`${CARDS_MARK} {"cards": "none"}`), null)
+})
+
+test('空信封是合法的：两个空数组', () => {
+  const out = parseCards(`没合适的。\n${CARDS_MARK} {"cards":[],"skipped":[]}`)
+  assert.deepEqual(out.cards, [])
+  assert.deepEqual(out.skipped, [])
+})
+
+test('去重：标题忽略大小写、链接忽略末尾斜杠、同一轮报两遍只算一次；默认不截断', () => {
+  const cards = [
+    { title: 'macdowell ', url: null, match_stars: 3 },
+    { title: 'Something New', url: 'https://www.macdowell.org/apply/', match_stars: 2 },
+    { title: 'Fresh One', url: 'https://a.org', match_stars: 2 },
+    { title: 'fresh one', url: 'https://b.org', match_stars: 3 },
+    { title: 'Another', url: 'https://c.org', match_stars: 3 },
+  ]
+  const { take, dup, over } = pick(cards, ctx.existing)
+  assert.deepEqual(dup.map((c) => c.title), ['macdowell ', 'Something New', 'fresh one'])
+  assert.deepEqual(take.map((c) => c.title), ['Another', 'Fresh One'])   // 星多的在前
+  assert.deepEqual(over, [])                                            // 默认没有上限
+})
+
+// ── 第三步 · 挑 ───────────────────────────────────────────────
+test('门槛不是名额：够格的全造，★★★ 遇上 longshot 才拦下', () => {
+  const rows = [
+    { title: '三星 · 够得着', fit_stars: 3, reach: 'realistic' },
+    { title: '三星 · 有点悬', fit_stars: 3, reach: 'stretch' },
+    { title: '三星 · 没查到', fit_stars: 3, reach: null },
+    { title: '三星 · 多半白投', fit_stars: 3, reach: 'longshot' },
+    { title: '二星 · 够得着', fit_stars: 2, reach: 'realistic' },
+    { title: '二星 · 有点悬', fit_stars: 2, reach: 'stretch' },
+    { title: '一星', fit_stars: 1, reach: 'realistic' },
+  ]
+  const { take, hold, over } = pickable(rows, 12)
+  assert.deepEqual(take.map((r) => r.title),
+    ['三星 · 够得着', '三星 · 没查到', '三星 · 有点悬', '二星 · 够得着'])
+  assert.deepEqual(hold.map((r) => r.title), ['三星 · 多半白投', '二星 · 有点悬', '一星'])
+  assert.deepEqual(over, [])
+})
+
+test('往届名单没查到 → 存疑不降级，★★★ 照造卡', () => {
+  const { take } = pickable([{ title: 'X', fit_stars: 3, reach: 'unknown' }], 12)
+  assert.equal(take.length, 1)
+})
+
+test('安全阀只防跑飞，被它拦下的要能报出来', () => {
+  const rows = Array.from({ length: 5 }, (_, i) => ({ title: 'O' + i, fit_stars: 3, reach: 'realistic' }))
+  const { take, over } = pickable(rows, 3)
+  assert.equal(take.length, 3)
+  assert.equal(over.length, 2)
+})
+
+// ── 战报 ──────────────────────────────────────────────────────
+test('战报三步各说一句；没轮到的、被安全阀拦下的、没到门槛的都得说出来', () => {
+  const r = report3({
+    today: '2026-09-07',
+    checked: [{ title: 'a' }, { title: 'b' }, { title: 'c' }],
+    opened: [{ title: 'Pioneer Works' }],
+    closedNow: [{ title: 'Web Residency' }],
+    leftToCheck: 47,
+    found: [{ title: 'NOIS//E' }],
+    dupFound: [{ title: 'MacDowell' }],
+    skipped: [{ title: 'Art Show Intl', why: '报名费 $80' }],
+    judged: [{ title: 'Pioneer Works', label: '够得着', why: '往届有刚出校门的' }],
+    made: [{ title: 'Pioneer Works' }],
+    overCap: [{ title: 'X' }],
+    held: [{ title: 'Y' }],
+    cardCap: 1,
+  })
+  assert.match(r, /复查 3 行：1 个开了（Pioneer Works），1 个关了，1 个没变；还有 47 行没轮到/)
+  assert.match(r, /找到 1 个新的进表：NOIS\/\/E/)
+  assert.match(r, /表里已有、跳过 1 个：MacDowell/)
+  assert.match(r, /查了没收 1 个：Art Show Intl（报名费 \$80）/)
+  assert.match(r, /判了 1 个够不够得着：Pioneer Works → 够得着（往届有刚出校门的）/)
+  assert.match(r, /造了 1 张卡：Pioneer Works/)
+  assert.match(r, /还有 1 个够格但这轮没造（一轮最多 1 张）：X/)
+  assert.match(r, /开着但没到造卡门槛的 1 个.*：Y/)
+})
+
+test('什么都没发生的一轮也要说清楚，不许空着', () => {
+  const r = report3({ today: '2026-09-07' })
+  assert.match(r, /复查：这轮没有该查的行/)
+  assert.match(r, /找新的：这轮没有新的/)
+  assert.match(r, /这轮没有够格造卡的/)
 })

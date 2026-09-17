@@ -46,6 +46,22 @@ test('深浅分四档，门槛是固定的', () => {
   assert.equal(levelOf(999), 4)
 })
 
+// 日历要装得下「还没办的」，所以范围能往后伸。往后那几格必须自报 future ——
+// 画成实心就等于说「这事办了」，那是最坏的一种谎。
+test('往后伸的那几天带 future 标，今天不算', () => {
+  const w = weeksOf(new Map([['2026-08-28', 2]]), 14, T('2026-08-22'), 7)
+  const cells = w.flat().filter(Boolean)
+  assert.equal(cells.at(-1).day, '2026-08-29')
+  assert.equal(cells.find((c) => c.day === '2026-08-22').future, false)
+  assert.equal(cells.find((c) => c.day === '2026-08-23').future, true)
+  assert.equal(cells.find((c) => c.day === '2026-08-28').n, 2)
+})
+
+test('不往后伸的时候，一天都不多出来', () => {
+  const days = weeksOf(new Map(), 14, T('2026-08-22')).flat().filter(Boolean)
+  assert.equal(days.at(-1).day, '2026-08-22')
+})
+
 test('月份标只在换月那一列出现一次', () => {
   const marks = monthMarks(weeksOf(new Map(), 60, T('2026-08-22')))
   const got = marks.filter(Boolean)
