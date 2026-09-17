@@ -44,6 +44,8 @@ import { makeDb, requireUser } from './dbauth.js'
 // 本机模式(2026-09-16):前端借这几条路碰库、碰文件、问「我是谁」;云端模式下它什么都不做
 import { fileURLToPath } from 'node:url'
 import { handleLocalRoute } from './local/routes.js'
+// 模块是能力开关(设计稿 D5):关着的模块,路由 404、定时器不起、Gmail 工具不进白名单。云端永远全开
+import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
 import { initStore } from './mail/store.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 定时造卡那一轮的纯函数：拼提示词、解析信封、去重、判门槛、写战报。scout.test.js 按着。
@@ -81,7 +83,7 @@ const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 // 连库双模(dbauth.js):SERVICE_ROLE 在就走个人版老路;不在就走学员路
 // (anon key + 登录会话)——那个身份被行级权限管着,brain 只看得见这个
 // 学员自己的行,机器上不存在能读别人数据的钥匙(0118 起)。
-let db, DB_MODE, LOCAL_MODE = null
+let db, DB_MODE, LOCAL_MODE = null, MODS = { profile: true, pursuits: true, mail: true, canToggle: false }
 // 连库放进一个函数、在 main() 里 await:这个文件不能有顶层 await——
 // 打包成字节码时是 CJS,CJS 没有顶层 await(packaging/SPIKE.md 第 3 条)。
 async function connect() {
@@ -102,6 +104,7 @@ async function connect() {
     console.log(`· 本机库:${LOCAL_MODE.dataDir}${r.settings.ready ? '' : '(还没初始化,等页面上填)'}`)
   }
   initStore(db)
+  MODS = loadModules({ dataDir: LOCAL_MODE?.dataDir, mode: DB_MODE })
 }
 
 // ── 上下文：Fairwind 开工前先想起这条线的一切 ──────────────────────────
@@ -1901,6 +1904,20 @@ const server = http.createServer(async (req, res) => {
   // 本机模式的那几条路(/me /setup /db/* /files/* 和静态 dist/)。云端模式 LOCAL_MODE 是 null,一律跳过
   if (LOCAL_MODE && await handleLocalRoute(req, res, { db, mode: DB_MODE, ...LOCAL_MODE })) return
 
+  // 模块开关:读、写(写完定时器当场跟着变)、门
+  if (req.method === 'GET' && req.url === '/modules') return send(res, 200, MODS)
+  if (req.method === 'POST' && req.url === '/modules') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', () => {
+      try { MODS = setModules({ dataDir: LOCAL_MODE?.dataDir, mode: DB_MODE }, JSON.parse(raw || '{}')); applyTimers(); send(res, 200, MODS) }
+      catch (e) { send(res, 400, { error: e.message }) }
+    })
+    return
+  }
+  const mod = moduleOf(req.url)
+  if (!isEnabled(MODS, mod)) return send(res, 404, { error: 'module off', module: mod })
+
   if (req.method === 'GET' && req.url === '/health') {
     // 邮件那一轮的状态跟着 /health 走：界面每 8 秒本来就在问它，
     // 不用再多开一个口，也不会出现「界面以为在收、其实早停了」。
@@ -2229,39 +2246,54 @@ async function main() {
   server.listen(PORT, () => {
   console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
   console.log(`   放行来源：${ORIGIN}`)
-  console.log(`   后台先读：每 ${Math.round(SWEEP_MS / 1000)} 秒扫一次「新机会」`)
   console.log(process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
-  sweepBriefs()
-  setInterval(sweepBriefs, SWEEP_MS)
-
-  // 邮件那一轮。**它是这个系统里唯一会去 Gmail 拿信的东西**——
-  // 在这之前收信完全靠人记得按按钮，于是 8/11 那批信在库外躺了七小时。
-  // 判错还能查，没去拿是查不出来的：界面上「没有新信」和「根本没收」
-  // 长得一模一样。
-  //
-  // 五分钟一轮：新信几乎不花钱（纯 HTTP + 纯 SQL），只有真冒出新地址
-  // 或者真有孤儿来信时才动模型。
-  const mailLoop = async () => {
-    try {
-      const { sweepMail } = await import('./mail/loop.js')
-      await sweepMail()
-      // 新事实先过转移表（一格一问，state 按事件顺序推进）……
-      await tagPass()
-      // ……再把脏了的判掉。**不等你打开通知栏** —— 见 judgePass 上面那段。
-      await judgePass()
-      // 最后看谁到点了 —— 起草、发问，都只在这一刻发生
-      await timerPass()
-    } catch (err) { console.error('  ✗ 邮件循环起不来：' + err.message) }
-  }
-  setTimeout(mailLoop, 5000)          // 起来 5 秒后先跑一轮，别让你等五分钟
-  setInterval(mailLoop, MAIL_MS)
-
-  // 定时造卡。到点的任务（或你按了「现在跑一次」的）每 30 秒查一次。
-  // 脑子没开的那段时间到点的，开了立刻补跑——next_run_at 已过就算到点。
-  setTimeout(scoutPass, 8000)
-  setInterval(scoutPass, SCOUT_MS)
-  console.log(`   造卡任务：每 ${Math.round(SCOUT_MS / 1000)} 秒看一眼谁到点了`)
-  console.log(`   邮件：每 ${Math.round(MAIL_MS / 60000)} 分钟收一次新信（这是唯一会去 Gmail 拿信的地方）`)
+  applyTimers()
   })
+}
+
+// ── 后台三个循环,按模块开关起停 ─────────────────────────────────
+//
+// 邮件那一轮。**它是这个系统里唯一会去 Gmail 拿信的东西**——
+// 在这之前收信完全靠人记得按按钮，于是 8/11 那批信在库外躺了七小时。
+// 判错还能查，没去拿是查不出来的：界面上「没有新信」和「根本没收」
+// 长得一模一样。
+//
+// 五分钟一轮：新信几乎不花钱（纯 HTTP + 纯 SQL），只有真冒出新地址
+// 或者真有孤儿来信时才动模型。
+const mailLoop = async () => {
+  try {
+    const { sweepMail } = await import('./mail/loop.js')
+    await sweepMail()
+    // 新事实先过转移表（一格一问，state 按事件顺序推进）……
+    await tagPass()
+    // ……再把脏了的判掉。**不等你打开通知栏** —— 见 judgePass 上面那段。
+    await judgePass()
+    // 最后看谁到点了 —— 起草、发问，都只在这一刻发生
+    await timerPass()
+  } catch (err) { console.error('  ✗ 邮件循环起不来：' + err.message) }
+}
+
+// 定时造卡。到点的任务（或你按了「现在跑一次」的）每 30 秒查一次。
+// 脑子没开的那段时间到点的，开了立刻补跑——next_run_at 已过就算到点。
+//
+// 哪个循环该跑由模块开关定:关着的不起;开关改了(POST /modules)当场起停,不用重启。
+// 云端模式三个永远开着——功能只增不减。
+const timers = {}
+function applyTimers() {
+  const want = { sweepBriefs: isEnabled(MODS, 'pursuits'), scoutPass: isEnabled(MODS, 'pursuits'), mailLoop: isEnabled(MODS, 'mail') }
+  const every = { sweepBriefs: SWEEP_MS, scoutPass: SCOUT_MS, mailLoop: MAIL_MS }
+  const first = { sweepBriefs: 0, scoutPass: 8000, mailLoop: 5000 }     // 起来 5 秒先收一轮信,别让你等五分钟
+  const fns = { sweepBriefs, scoutPass, mailLoop }
+  const said = { sweepBriefs: `后台先读：每 ${Math.round(SWEEP_MS / 1000)} 秒扫一次「新机会」`,
+                 scoutPass: `造卡任务：每 ${Math.round(SCOUT_MS / 1000)} 秒看一眼谁到点了`,
+                 mailLoop: `邮件：每 ${Math.round(MAIL_MS / 60000)} 分钟收一次新信（这是唯一会去 Gmail 拿信的地方）` }
+  for (const k of Object.keys(want)) {
+    if (want[k] && !timers[k]) {
+      const kick = setTimeout(fns[k], first[k])
+      timers[k] = { iv: setInterval(fns[k], every[k]), kick }
+      console.log(`   ⏱ ${said[k]}`)
+    }
+    if (!want[k] && timers[k]) { clearInterval(timers[k].iv); clearTimeout(timers[k].kick); delete timers[k]; console.log(`   ⏱ ${k} 关了（模块关着）`) }
+  }
 }
 main()
