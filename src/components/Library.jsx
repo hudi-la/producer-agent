@@ -72,7 +72,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
     <div className={'work' + (active ? ' active' : '')}>
       {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
           输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
-          点空白处仍然展开/收起；键盘走右边那个真按钮。 */}
+          点空白处仍然开/关编辑；键盘走右边那个真按钮（编辑 / 完成）。 */}
       <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
@@ -94,9 +94,20 @@ function Entry({ e, open, active, onToggle, onSaved }) {
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
           </div>
         </div>
-        <button className={'chev' + (open ? ' open' : '')} aria-expanded={open}
-                aria-label={open ? '收起' : '展开'}
-                onClick={(ev) => { ev.stopPropagation(); toggle() }}>›</button>
+        {/* 以前这儿是 › / ⌄ —— 那个符号说的是「底下还有详情没展开」。可折叠着的时候
+            文案本来就全摆着，打开之后多出来的是字段、盒子、和右边的对话：那是**改这一条**，
+            不是看详情。所以按钮直说：编辑 / 完成。 */}
+        <button type="button" className={'edtg' + (open ? ' on' : '')} aria-pressed={open}
+                title={open ? '改完了，收起字段和右边的对话' : '改这一条：打开字段、盒子，右边开这一条的对话'}
+                onClick={(ev) => { ev.stopPropagation(); toggle() }}>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+               strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {open
+              ? <path d="M20 6 9 17l-5-5" />
+              : <><path d="M12 20h9" /><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" /></>}
+          </svg>
+          {open ? '完成' : '编辑'}
+        </button>
       </div>
       {open && (
         <div className="box">

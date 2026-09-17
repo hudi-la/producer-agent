@@ -614,7 +614,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .works { display: flex; flex-direction: column; gap: 8px; }
 .work { border: 1px solid var(--line); border-radius: 11px; background: var(--paper-2); box-shadow: var(--shadow); overflow: hidden; }
 /* 以前是 <button>，现在是 div —— 标题和描述要能就地双击编辑，套在按钮里不行。
-   点空白处照旧展开/收起；键盘走右边那个真按钮（.chev）。 */
+   点空白处照旧开/关编辑；键盘走右边那个真按钮（.edtg 编辑 / 完成）。 */
 .work-hd { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 12px 13px; }
 .work-hd:hover { background: color-mix(in srgb, var(--paper-2) 70%, var(--paper-3)); }
 .work-main { flex: 1; min-width: 0; }
@@ -631,6 +631,16 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .chev { color: var(--ink-3); font-size: 20px; line-height: 1; transition: transform .18s; margin-top: 2px;
   background: none; border: 0; padding: 0 2px; cursor: pointer; font-family: inherit; }
 .chev.open { transform: rotate(90deg); }
+/* 档案条目右上角那颗「编辑 / 完成」。长得跟机会卡上「展开」那颗（.desktg）一家：
+   胶囊、图标 + 两个字，打开时换强调色不换位——位置一动你就找不到它了。 */
+.edtg { display: inline-flex; align-items: center; gap: 5px; flex: none; margin-top: 1px;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
+  background: transparent; border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 3px 10px 3px 8px; cursor: pointer; transition: color .14s, border-color .14s, background .14s; }
+.edtg:hover { color: var(--ink); border-color: var(--accent); }
+.edtg.on { color: var(--accent); background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.edtg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .box { border-top: 1px dashed var(--line); padding: 13px 13px 14px; display: grid; gap: 8px; }
 .bx-h { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
 .bx-empty { font-size: 12px; color: var(--ink-3); line-height: 1.55; }
