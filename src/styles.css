@@ -1858,3 +1858,10 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .jd-table td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .jd-table tr.changed td { background: color-mix(in srgb, var(--wait) 12%, transparent); }
 .jd-tag small { color: var(--ink-3); }
+
+/* ── 账号块里的备份/版本两行;顶栏有新版本的小点 ─────────────── */
+.la-sub { margin-top: 8px; padding-top: 10px; border-top: 1px dashed var(--line); display: grid; gap: 6px; }
+.la-sub-h { font-size: 13px; font-weight: 500; display: flex; gap: 10px; align-items: baseline; }
+.la-sub-h small { font-weight: 400; color: var(--ink-2); font-size: 12px; }
+.la-path { flex: 1; min-width: 200px; font: inherit; font-size: 12.5px; color: var(--ink); background: var(--paper); border: 1px solid var(--line-2, var(--ink-3)); border-radius: 6px; padding: 5px 8px; }
+.upd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #a83a2e); display: inline-block; margin-right: 4px; align-self: center; }

@@ -2,11 +2,11 @@
 //
 // 这是设计稿(2026-09-16)6.4 规矩 2 的唯一例外:这里能碰裸 SQL,因为它就是把
 // supabase/migrations 原样喂给 PGlite 的那只手。别的地方一律走 pa_* / v_pa_*。
-import { PGlite } from '@electric-sql/pglite'
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { migrationOrder } from '../../scripts/migration-order.mjs'
+import { openWithRestore } from './backup.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 // 开发时在仓库的 supabase/migrations;打包后迁移文件在字节码旁边的 migrations/
@@ -15,8 +15,10 @@ export const MIGRATIONS_DIR = existsSync(join(HERE, '..', '..', 'supabase', 'mig
   : join(HERE, 'migrations')
 
 /** 打开(或新建)<dataDir>/db,跑前言。前言幂等,每次开都跑。 */
-export async function openLocalDb(dataDir) {
-  const pg = new PGlite(join(dataDir, 'db'))
+export async function openLocalDb(dataDir, { log = () => {} } = {}) {
+  // 有 restore.tar.gz 就先换库(backup.js):现在的 db/ 改名留着,不删
+  const { pg, restored, kept } = await openWithRestore(dataDir)
+  if (restored) log(`  · 从备份恢复了库;原来的留在 ${kept}`)
   await pg.exec(readFileSync(join(HERE, 'preamble.sql'), 'utf8'))
   return pg
 }

@@ -43,7 +43,8 @@ import { modelFor, GOOD, CHEAP } from './models.js'
 import { makeDb, requireUser } from './dbauth.js'
 // 本机模式(2026-09-16):前端借这几条路碰库、碰文件、问「我是谁」;云端模式下它什么都不做
 import { fileURLToPath } from 'node:url'
-import { handleLocalRoute, exportEnv } from './local/routes.js'
+import { handleLocalRoute, exportEnv, lastUpdateCheck, refreshUpdateCheck } from './local/routes.js'
+import { backupNow } from './local/backup.js'
 // 模块是能力开关(设计稿 D5):关着的模块,路由 404、定时器不起、Gmail 工具不进白名单。云端永远全开
 import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
 import { VERSION } from './version.js'
@@ -113,6 +114,17 @@ async function connect() {
       if (cand && fsExists(cand) && !fsExists(pathJoin(jdir, 'README.md'))) { copyFileSync(cand, pathJoin(jdir, 'README.md')); break }
     }
     useJudgmentsDir(jdir, { log: (m) => console.log(m) })
+    // 检查更新:起来 20 秒后查一次,之后每小时(结果挂在 /health 上,界面自己看)。执行靠人点。
+    setTimeout(() => refreshUpdateCheck({ force: true }).catch(() => {}), 20_000)
+    setInterval(() => refreshUpdateCheck({ force: true }).catch(() => {}), 3600_000)
+    // 备份:选了目录才备;起来 1 分钟一次,之后每天一次。跟模块无关
+    const dailyBackup = async () => {
+      const dir = LOCAL_MODE.settings?.backupDir
+      if (!dir) return
+      try { const f = await backupNow(LOCAL_MODE.pg, dir); console.log(`  · 备份好了:${f}`) } catch (e) { console.warn('  ⚠️ 备份没成:' + e.message) }
+    }
+    setTimeout(dailyBackup, 60_000)
+    setInterval(dailyBackup, 24 * 3600_000)
     console.log(`· 本机库:${LOCAL_MODE.dataDir}${r.settings.ready ? '' : '(还没初始化,等页面上填)'}`)
   }
   initStore(db)
@@ -1980,7 +1992,7 @@ const server = http.createServer(async (req, res) => {
     const { lastSweep } = await import('./mail/loop.js')
     // scout = 定时造卡那一轮。面板靠它说「脑子没开 · 到点不会跑」。
     // version:更新那一步拿它跟发布位比;mode/modules:界面按它画,少一次 /modules
-    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, mode: DB_MODE, modules: MODS, mail: lastSweep(), scout: scoutState() })
+    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, mode: DB_MODE, modules: MODS, update: lastUpdateCheck(), mail: lastSweep(), scout: scoutState() })
   }
 
   if (req.method === 'POST' && req.url === '/chat') {

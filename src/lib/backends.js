@@ -49,7 +49,7 @@ export async function checkBrain() {
     const body = await res.json().catch(() => ({}))
     // mail = 邮件那一轮的状态。**收信只发生在脑子里**，所以脑子没开
     // 就等于没人在收信——这件事必须让界面说出来，不能静默。
-    return { up: true, stale: body.build !== BRAIN_BUILD, mail: body.mail || null }
+    return { up: true, stale: body.build !== BRAIN_BUILD, mail: body.mail || null, version: body.version || null, update: body.update || null }
   } catch (_) {
     return { up: false, stale: false, mail: null }
   }

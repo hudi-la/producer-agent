@@ -119,6 +119,60 @@ function LocalAccount() {
         <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? '存着…' : '保存'}</button>
         {note && <span className={'la-note' + (note.startsWith('没存上') ? ' bad' : '')}>{note}</span>}
       </div>
+      <BackupRow backupDir={cur.backupDir} />
+      <UpdateRow />
     </form>
+  )
+}
+
+// 备份那一行:最近一次 + 现在备份 + 从备份恢复(下次打开生效)
+function BackupRow({ backupDir }) {
+  const [list, setList] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [pathIn, setPathIn] = useState('')
+  const load = () => supa.backup.list().then(setList)
+  useEffect(() => { load() }, [backupDir])
+  const now = async () => { setBusy(true); setMsg(''); const r = await supa.backup.now(); setBusy(false); setMsg(r.ok ? '备好了:' + r.file.split('/').pop() : '没备成:' + r.error); load() }
+  const restore = async () => {
+    if (!pathIn.trim()) return
+    if (!confirm('用这份备份换掉现在的库?现在的库会改名留着,不删。关掉再打开 Fairwind 才生效。')) return
+    const r = await supa.backup.restore(pathIn.trim()); setMsg(r.ok ? '排好了:关掉再打开就是恢复后的' : '没排上:' + r.error)
+  }
+  const last = list?.files?.[0]
+  return (
+    <div className="la-sub">
+      <div className="la-sub-h">备份<small>{backupDir ? (last ? '最近一次 ' + last.name.replace('fairwind-', '').replace('.tar.gz', '') : '还没备过') : '上面先选一个备份目录'}</small></div>
+      <div className="la-acts">
+        <button type="button" className="b" disabled={busy || !backupDir} onClick={now}>{busy ? '在备…' : '现在备份'}</button>
+        <input className="la-path" placeholder="从备份恢复:贴一份 .tar.gz 的路径" value={pathIn} onChange={(e) => setPathIn(e.target.value)} />
+        <button type="button" className="b" disabled={!pathIn.trim()} onClick={restore}>恢复…</button>
+      </div>
+      {msg && <span className={'la-note' + (msg.startsWith('没') ? ' bad' : '')}>{msg}</span>}
+    </div>
+  )
+}
+
+// 更新那一行:版本、检查、有新版就一颗「更新」
+function UpdateRow() {
+  const [info, setInfo] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { supa.update.check().then(setInfo) }, [])
+  const check = async () => { setBusy(true); setInfo(await supa.update.check(true)); setBusy(false) }
+  const apply = async () => {
+    setBusy(true); setMsg('')
+    const r = await supa.update.apply(); setBusy(false)
+    setMsg(r.ok ? `装好了 ${r.version}:关掉再打开就是新版` : '没更成:' + r.error)
+  }
+  return (
+    <div className="la-sub">
+      <div className="la-sub-h">版本<small>{info?.current || ''}{info?.canUpdate ? ` · 有新版本 ${info.latest}${info.note ? ':' + info.note : ''}` : info?.error ? ` · ${info.error}` : info ? ' · 已是最新' : ''}</small></div>
+      <div className="la-acts">
+        <button type="button" className="b" disabled={busy} onClick={check}>{busy ? '在看…' : '检查更新'}</button>
+        {info?.canUpdate && <button type="button" className="b primary" disabled={busy} onClick={apply}>更新到 {info.latest}</button>}
+        {msg && <span className={'la-note' + (msg.startsWith('没') ? ' bad' : '')}>{msg}</span>}
+      </div>
+    </div>
   )
 }

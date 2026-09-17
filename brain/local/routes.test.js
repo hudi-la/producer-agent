@@ -75,3 +75,23 @@ test('GET /health 不是静态文件,不接——留给 server.js 自己的路�
 test('不是本地模式:/db/* 不处理', async () => {
   const r = res(); assert.equal(await handleLocalRoute(req('POST', '/db/rpc/x', {}), r, { ...ctx, mode: 'service' }), false)
 })
+
+test('备份路由:没选目录 → 说清;选了 → 备出文件、列表能看到;恢复排上标记', async () => {
+  const { mkdtempSync: mk, existsSync: ex } = await import('node:fs'); const { tmpdir: td } = await import('node:os'); const { join: jn } = await import('node:path')
+  const a = res(); await handleLocalRoute(req('POST', '/backup/now', {}), a, ctx); assert.equal(a.code, 400); assert.match(a.json().error, /备份目录/)
+  const bdir = mk(jn(td(), 'fw-rb-'))
+  await handleLocalRoute(req('POST', '/settings', { backupDir: bdir }), res(), ctx)
+  const b = res(); await handleLocalRoute(req('POST', '/backup/now', {}), b, ctx); assert.equal(b.json().ok, true); assert.ok(ex(b.json().file))
+  const l = res(); await handleLocalRoute(req('GET', '/backup/list'), l, ctx); assert.equal(l.json().files.length, 1)
+  const r = res(); await handleLocalRoute(req('POST', '/backup/restore', { path: b.json().file }), r, ctx); assert.equal(r.json().restart, true); assert.ok(ex(jn(dir, 'restore.tar.gz')))
+  const bad = res(); await handleLocalRoute(req('POST', '/backup/restore', { path: '/nope.tar.gz' }), bad, ctx); assert.equal(bad.code, 400)
+})
+
+test('更新路由:没配发布位 → check 说原因、apply 400;配了假发布位 → check 认新版', async () => {
+  const c0 = res(); await handleLocalRoute(req('GET', '/update/check?force'), c0, ctx); assert.equal(c0.json().canUpdate, false); assert.match(c0.json().error, /发布位/)
+  const a0 = res(); await handleLocalRoute(req('POST', '/update/apply', {}), a0, ctx); assert.equal(a0.code, 400)
+  process.env.FAIRWIND_RELEASE_URL = 'http://fake/latest.json'
+  const fetchImpl = async (u) => ({ ok: true, status: 200, json: async () => ({ version: '9.9.9', note: 'x', platforms: { [`${process.platform === 'darwin' ? 'mac' : 'win'}-${process.arch}`]: { url: '/Fairwind-9.9.9.zip', sha256: 'a' } } }) })
+  const c1 = res(); await handleLocalRoute(req('GET', '/update/check?force'), c1, { ...ctx, fetchImpl }); assert.equal(c1.json().canUpdate, true); assert.equal(c1.json().latest, '9.9.9')
+  delete process.env.FAIRWIND_RELEASE_URL
+})

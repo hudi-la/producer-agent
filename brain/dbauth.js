@@ -52,7 +52,7 @@ export async function makeDb() {
   }
   if (dataDir) {
     const settings = loadSettings(dataDir)
-    const pg = await openLocalDb(dataDir)
+    const pg = await openLocalDb(dataDir, { log: (s) => console.log(s) })
     await applyMigrations(pg, { fresh: true, log: (s) => console.log(s) })
     await setLocalUid(pg, settings.uid)
     if (settings.email) await registerLocalUser(pg, { id: settings.uid, email: settings.email })

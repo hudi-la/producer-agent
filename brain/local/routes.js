@@ -5,6 +5,21 @@ import { normalize, resolve, extname } from 'node:path'
 import { saveSettings } from './settings.js'
 import { registerLocalUser } from './migrate.js'
 import { setJudgmentsEnabled } from '../judgments.js'
+import { backupNow, listBackups, scheduleRestore } from './backup.js'
+import { checkUpdate, applyUpdate } from './update.js'
+import { VERSION } from '../version.js'
+
+// 发布位:打包时 define 进来;env 能盖(验收用 file://)。没配 = 检查更新会明说「没配发布位」
+// eslint-disable-next-line no-undef
+const RELEASE_URL = () => process.env.FAIRWIND_RELEASE_URL || (typeof __FAIRWIND_RELEASE_URL__ !== 'undefined' ? __FAIRWIND_RELEASE_URL__ : '')
+let UPDATE = { at: 0, result: null }
+/** 最近一次检查更新的结果(/health 带着走)。 */
+export function lastUpdateCheck() { return UPDATE.result }
+export async function refreshUpdateCheck({ force = false, fetchImpl } = {}) {
+  if (!force && Date.now() - UPDATE.at < 3600_000 && UPDATE.result) return UPDATE.result
+  UPDATE = { at: Date.now(), result: await checkUpdate({ current: VERSION, latestUrl: RELEASE_URL(), ...(fetchImpl ? { fetchImpl } : {}) }) }
+  return UPDATE.result
+}
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.map': 'application/json' }
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)) }
@@ -62,6 +77,36 @@ export async function handleLocalRoute(req, res, ctx) {
   }
 
   if (req.method === 'GET' && p === '/settings') { json(res, 200, publicSettings(ctx.settings)); return true }
+
+  // ── 备份 ──
+  if (req.method === 'GET' && p === '/backup/list') { json(res, 200, { dir: ctx.settings.backupDir || '', files: listBackups(ctx.settings.backupDir) }); return true }
+  if (req.method === 'POST' && p === '/backup/now') {
+    try { const file = await backupNow(ctx.pg, ctx.settings.backupDir); json(res, 200, { ok: true, file }) }
+    catch (e) { json(res, 400, { ok: false, error: e.message }) }
+    return true
+  }
+  if (req.method === 'POST' && p === '/backup/restore') {
+    const body = await readJson(req)
+    try { const marker = scheduleRestore(dataDir, body.path); json(res, 200, { ok: true, marker, restart: true }) }
+    catch (e) { json(res, 400, { ok: false, error: e.message }) }
+    return true
+  }
+
+  // ── 更新:检查自动(启动 + 每小时),执行靠人点 ──
+  if (req.method === 'GET' && p === '/update/check') {
+    json(res, 200, await refreshUpdateCheck({ force: url.searchParams.has('force'), fetchImpl: ctx.fetchImpl })); return true
+  }
+  if (req.method === 'POST' && p === '/update/apply') {
+    const info = await refreshUpdateCheck({ fetchImpl: ctx.fetchImpl })
+    if (!info?.canUpdate) { json(res, 400, { ok: false, error: info?.error || '没有新版本' }); return true }
+    try {
+      let backup = null
+      if (ctx.settings.backupDir) backup = await backupNow(ctx.pg, ctx.settings.backupDir)   // 更新前先备一份
+      const r = await applyUpdate({ appRoot: process.env.FAIRWIND_APP_ROOT, version: info.latest, url: info.url, sha256: info.sha256, fetchImpl: ctx.fetchImpl, log: (s) => console.log(s) })
+      json(res, 200, { ok: true, ...r, backup, restart: true })
+    } catch (e) { json(res, 500, { ok: false, error: e.message }) }
+    return true
+  }
 
   if (req.method === 'POST' && p.startsWith('/db/rpc/')) {
     const name = p.slice('/db/rpc/'.length)

@@ -61,6 +61,15 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
     setup: (body) => post('/setup', body),
     /** 「关于你」底下的账号那块用:读到的永远没有 key 本身,只有「设了没有」和末四位 */
     judgments: { preview: (limit = 20) => post('/judgments/preview', { limit }) },
+    backup: {
+      async list() { try { const r = await fetchImpl(`${base}/backup/list`); return await r.json() } catch (e) { return { dir: '', files: [] } } },
+      now: () => post('/backup/now', {}),
+      restore: (path) => post('/backup/restore', { path }),
+    },
+    update: {
+      async check(force = false) { try { const r = await fetchImpl(`${base}/update/check${force ? '?force' : ''}`); return await r.json() } catch (e) { return { canUpdate: false, error: e.message } } },
+      apply: () => post('/update/apply', {}),
+    },
     settings: {
       async get() { try { const r = await fetchImpl(`${base}/settings`); return await r.json() } catch (e) { return null } },
       set: (patch) => post('/settings', patch),

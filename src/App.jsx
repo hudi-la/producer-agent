@@ -756,6 +756,7 @@ export default function App() {
             页面上的名字、邮箱全换成小花；再点一下摘掉。
             开着的时候这颗按钮自己也得盖——你的名字同样是私人信息，
             而且它正好当场演示了「盖住」长什么样。 */}
+        {brain?.update?.canUpdate && <span className="upd-dot" title={`有新版本 ${brain.update.latest}:去「我的档案 → 关于你」底下更新`} />}
         <button className={'veilbtn' + (veiled ? ' on' : '')} onClick={toggleVeil}
                 title={veiled ? '展示模式开着：私人信息都盖着小花。点一下摘掉。'
                               : '展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。'}>
