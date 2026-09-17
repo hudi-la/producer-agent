@@ -116,8 +116,8 @@ export async function handleLocalRoute(req, res, ctx) {
 
   if (req.method === 'POST' && p === '/db/from') {
     const q = await readJson(req)
-    let b = db.from(q.view).select(q.select || '*')
-    for (const [op, col, v] of q.filters || []) b = op === 'in' ? b.in(col, v) : b.eq(col, v)
+    let b = db.from(q.view).select(q.select || '*', q.count ? { count: q.count, head: Boolean(q.head) } : {})
+    for (const [op, col, v] of q.filters || []) b = op === 'in' ? b.in(col, v) : op === 'is' ? b.is(col, v) : op === 'or' ? b.or(col) : b.eq(col, v)
     for (const o of q.order || []) b = b.order(o.col, { ascending: o.ascending !== false })
     if (q.limit != null) b = b.limit(q.limit)
     if (q.single === 'maybe') b = b.maybeSingle()

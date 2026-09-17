@@ -11,7 +11,7 @@ test('from 链序列化成一个 POST /db/from', async () => {
   const c = brainClient('http://b', fakeFetch({ data: [{ id: 1 }], error: null }))
   const r = await c.from('v_pa_entries').select('id, title').eq('kind', 'work').in('id', ['a']).order('title', { ascending: false }).limit(5)
   assert.equal(calls[0].url, 'http://b/db/from')
-  assert.deepEqual(JSON.parse(calls[0].init.body), { view: 'v_pa_entries', select: 'id, title', filters: [['eq', 'kind', 'work'], ['in', 'id', ['a']]], order: [{ col: 'title', ascending: false }], limit: 5, single: null })
+  assert.deepEqual(JSON.parse(calls[0].init.body), { view: 'v_pa_entries', select: 'id, title', filters: [['eq', 'kind', 'work'], ['in', 'id', ['a']]], order: [{ col: 'title', ascending: false }], limit: 5, single: null, count: null, head: false })
   assert.deepEqual(r, { data: [{ id: 1 }], error: null })
 })
 
@@ -52,4 +52,13 @@ test('settings:get 走 GET /settings,set 走 POST', async () => {
   const c = brainClient('http://b', fakeFetch({ email: 'e', apiKeySet: true, apiKeyHint: 'sk-ant-…1234' }))
   const g = await c.settings.get(); assert.equal(g.apiKeyHint, 'sk-ant-…1234'); assert.equal(calls[0].url, 'http://b/settings')
   await c.settings.set({ model: 'x' }); assert.equal(calls[1].init.method, 'POST'); assert.deepEqual(JSON.parse(calls[1].init.body), { model: 'x' })
+})
+
+test('from:is / or / count+head 也序列化', async () => {
+  calls.length = 0
+  const c = brainClient('http://b', fakeFetch({ data: null, error: null, count: 3 }))
+  const r = await c.from('v_pa_unknown_senders').select('*', { count: 'exact', head: true }).is('x', null).or('a.ilike.%q%')
+  const body = JSON.parse(calls[0].init.body)
+  assert.equal(body.count, 'exact'); assert.equal(body.head, true); assert.deepEqual(body.filters, [['is', 'x', null], ['or', 'a.ilike.%q%', null]])
+  assert.equal(r.count, 3)
 })

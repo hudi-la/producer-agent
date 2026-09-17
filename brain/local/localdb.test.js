@@ -83,3 +83,12 @@ test('storage:key 不许跳出 files 目录', async () => {
 test('auth.getUser 返回本机那个人', async () => {
   assert.deepEqual(await db.auth.getUser(), { data: { user: { id: UID, email: 'a@b.c' } }, error: null })
 })
+
+test('from:is(null) / or(ilike) / count+head', async () => {
+  const q = db.from('v_pa_entries').select('id').is('kind', null).or('title.ilike.%a%,body.ilike.%a%')
+  assert.equal(q.toSQL().text, 'select id from public.v_pa_entries where kind is null and (title ilike $1 or body ilike $2)')
+  assert.deepEqual(q.toSQL().values, ['%a%', '%a%'])
+  const r = await db.from('v_pa_profile').select('*', { count: 'exact', head: true })
+  assert.equal(r.error, null); assert.equal(r.data, null); assert.equal(r.count, 1)
+  const bad = await db.from('v_pa_profile').select('*').or('x.gt.1'); assert.match(bad.error.message, /看不懂/)
+})

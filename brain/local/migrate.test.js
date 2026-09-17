@@ -47,6 +47,10 @@ test('注册本机用户:触发器造出 profile 和 voice 行,owner 盖上 uid'
   const p = await pg.query('select owner from producer.profile where owner = $1', [UID])
   const v = await pg.query('select owner from producer.voice where owner = $1', [UID])
   assert.equal(p.rows.length, 1); assert.equal(v.rows.length, 1)
+  // 出厂的 scout 任务:有提示词(带 {{画像}} 占位符,没有任何人名)、有排期
+  const task = await pg.query("select prompt, run_every, run_weekday, run_hour, next_run_at from producer.tasks where owner = $1 and type = 'scout_aggregators'", [UID])
+  assert.equal(task.rows.length, 1); assert.ok(task.rows[0].prompt.includes('{{画像}}')); assert.ok(!task.rows[0].prompt.includes('HuDi'))
+  assert.equal(task.rows[0].run_every, 'week'); assert.ok(task.rows[0].next_run_at)
   await pg.close(); rmSync(dir, { recursive: true, force: true })
 })
 

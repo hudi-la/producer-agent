@@ -119,9 +119,38 @@ ${CARDS_MARK} {"cards":[{"title":"机会名称","kind":"驻地|grant|奖|群展|
 - eligible=false 的（限美国公民 / 绿卡 / 需当地工作权）**照报**，我们会标成资格搁置留着。`
 }
 
-/** 整段提示词：任务自己那段 + 脑子补的尾巴。 */
+// ── 画像从档案来(2026-09-17)────────────────────────────────
+// 学员出厂的那条任务(0143)提示词里不写任何人的名字,画像那段是一个占位符 {{画像}},
+// 跑的时候换成「我的档案」里的东西:身份、常住、阶段、资助偏好、排除/关注规则、母题、作品。
+// 他自己那条提示词里画像是手写的、没有占位符——原样不动。
+export const PROFILE_SLOT = '{{画像}}'
+
+const line = (k, v) => {
+  if (v == null) return null
+  const t = Array.isArray(v) ? v.filter(Boolean).join(' / ') : String(v).trim()
+  return t ? `- ${k}:${t}` : null
+}
+
+/** 档案 → 画像那一段。什么都没填时明说,别让模型替 ta 假设。 */
+export function profileBlock({ profile, concerns = [], works = [] } = {}) {
+  const d = profile?.data || {}
+  const rows = [
+    line('名字', profile?.name), line('作品站', profile?.website),
+    line('身份/签证', d.visa), line('常住', d.location), line('阶段', d.career_stage),
+    line('资助偏好', d.funding_pref),
+    line('【排除规则】满足的照报,但 eligible=false', d.exclude_rule),
+    line('【关注规则】满足的哪怕没开放也报,status 填 closed、opens_at 填预计开放日', d.watch_rule),
+    line('母题', concerns),
+    line('作品', works.map((w) => `『${w.title}』${w.medium ? `(${w.medium})` : ''}`)),
+  ].filter(Boolean)
+  return rows.length ? rows.join('\n')
+    : '(档案还没填——只报「明确对所有人开放、无资格限制」的机会,notes 注明「档案未填,粗筛」)'
+}
+
+/** 整段提示词：任务自己那段（{{画像}} 换成档案）+ 脑子补的尾巴。 */
 export function fullPrompt(task, ctx) {
-  return `${String(task.prompt || '').trim()}\n\n${tail(ctx)}`
+  const body = String(task.prompt || '').trim().split(PROFILE_SLOT).join(profileBlock(ctx))
+  return `${body}\n\n${tail(ctx)}`
 }
 
 /** 从回复末尾解析 [[CARDS]]。解析不出返回 null（「没按格式报」≠「没找到」）。 */

@@ -3,8 +3,7 @@ import assert from 'node:assert/strict'
 import {
   tail, fullPrompt, parseCards, pick, pickable, report3,
   checkPrompt, parseChecks, checkCapOf, reachCapOf, cardCapOf,
-  CARDS_MARK, CHECKS_MARK,
-} from './scout.js'
+  CARDS_MARK, CHECKS_MARK, profileBlock } from './scout.js'
 
 const ctx = {
   today: '2026-09-07',
@@ -170,4 +169,14 @@ test('什么都没发生的一轮也要说清楚，不许空着', () => {
   assert.match(r, /复查：这轮没有该查的行/)
   assert.match(r, /找新的：这轮没有新的/)
   assert.match(r, /这轮没有够格造卡的/)
+})
+
+test('{{画像}} 换成档案;没占位符的提示词一个字不动;档案空着明说', () => {
+  const ctx = { today: '2026-09-17', tz: 'America/Los_Angeles', existing: [],
+    profile: { name: 'A', website: 'a.com', data: { visa: 'O-1', location: ['LA', 'SF'], exclude_rule: '限公民' } }, concerns: ['被看见'], works: [{ title: '作品一', medium: '装置' }] }
+  const out = fullPrompt({ prompt: '你是助理。\n\n== 画像 ==\n{{画像}}\n\n== 来源 ==\n- x' }, ctx)
+  assert.match(out, /- 名字:A/); assert.match(out, /- 常住:LA \/ SF/); assert.match(out, /排除规则.*限公民/); assert.match(out, /『作品一』\(装置\)/)
+  assert.ok(!out.includes('{{画像}}'))
+  const same = fullPrompt({ prompt: '手写画像,没占位符' }, ctx); assert.ok(same.startsWith('手写画像,没占位符\n\n== 今天是'))
+  assert.match(profileBlock({ profile: null }), /档案还没填/)
 })

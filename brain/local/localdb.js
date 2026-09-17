@@ -57,7 +57,11 @@ function pickOverload(cands, given) {
 
 class FromBuilder {
   constructor(pg, view) { this.pg = pg; this.view = view; this.cols = '*'; this.filters = []; this.orders = []; this.lim = null; this.single = false; this.err = null }
-  select(cols = '*') { if (!COLS.test(cols)) this.err = `列名只许字母数字下划线逗号空格:${cols}`; else this.cols = cols; return this }
+  select(cols = '*', { count = null, head = false } = {}) { if (!COLS.test(cols)) this.err = `列名只许字母数字下划线逗号空格:${cols}`; else this.cols = cols; this.count = count; this.head = head; return this }
+  // .is(col, null) → is null;别的值当 = 用
+  is(col, v) { if (!IDENT.test(col)) this.err = `列名不合法:${col}`; this.filters.push({ op: v === null ? 'isnull' : 'eq', col, v }); return this }
+  // .or('a.ilike.%x%,b.ilike.%x%'):PostgREST 的写法,今天只用到 ilike/eq
+  or(expr) { const parts = []; for (const seg of String(expr).split(',')) { const m = seg.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\.(ilike|eq)\.(.*)$/); if (!m) { this.err = `or 里看不懂:${seg}`; return this } parts.push({ col: m[1], op: m[2], v: m[3] }) } this.filters.push({ op: 'or', parts }); return this }
   eq(col, v) { if (!IDENT.test(col)) this.err = `列名不合法:${col}`; this.filters.push({ op: 'eq', col, v }); return this }
   in(col, arr) { if (!IDENT.test(col)) this.err = `列名不合法:${col}`; this.filters.push({ op: 'in', col, v: arr }); return this }
   order(col, { ascending = true } = {}) { if (!IDENT.test(col)) this.err = `列名不合法:${col}`; this.orders.push({ col, ascending }); return this }
@@ -65,8 +69,12 @@ class FromBuilder {
   maybeSingle() { this.single = true; return this }
   toSQL() {
     const values = []
-    const where = this.filters.map((f) => { values.push(f.v); return f.op === 'eq' ? `${f.col} = $${values.length}` : `${f.col} = any($${values.length})` })
-    let text = `select ${this.cols} from public.${this.view}`
+    const where = this.filters.map((f) => {
+      if (f.op === 'isnull') return `${f.col} is null`
+      if (f.op === 'or') return '(' + f.parts.map((p) => { values.push(p.v); return `${p.col} ${p.op === 'ilike' ? 'ilike' : '='} $${values.length}` }).join(' or ') + ')'
+      values.push(f.v); return f.op === 'eq' ? `${f.col} = $${values.length}` : `${f.col} = any($${values.length})`
+    })
+    let text = this.head && this.count ? `select count(*)::int as n from public.${this.view}` : `select ${this.cols} from public.${this.view}`
     if (where.length) text += ` where ${where.join(' and ')}`
     if (this.orders.length) text += ` order by ${this.orders.map((o) => `${o.col} ${o.ascending ? 'asc' : 'desc'}`).join(', ')}`
     if (this.lim != null) text += ` limit ${this.lim}`
@@ -78,6 +86,7 @@ class FromBuilder {
     try {
       const { text, values } = this.toSQL()
       const { rows } = await this.pg.query(text, values)
+      if (this.head && this.count) return { data: null, error: null, count: rows[0]?.n ?? 0 }   // supabase 的 count 在顶层
       return ok(this.single ? (rows[0] ?? null) : rows)
     } catch (e) { return bad(e.message) }
   }

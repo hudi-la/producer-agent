@@ -12,8 +12,10 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
   }
 
   class From {
-    constructor(view) { this.q = { view, select: '*', filters: [], order: [], limit: null, single: null } }
-    select(cols = '*') { this.q.select = cols; return this }
+    constructor(view) { this.q = { view, select: '*', filters: [], order: [], limit: null, single: null, count: null, head: false } }
+    select(cols = '*', { count = null, head = false } = {}) { this.q.select = cols; this.q.count = count; this.q.head = head; return this }
+    is(col, v) { this.q.filters.push(['is', col, v]); return this }
+    or(expr) { this.q.filters.push(['or', expr, null]); return this }
     eq(col, v) { this.q.filters.push(['eq', col, v]); return this }
     in(col, arr) { this.q.filters.push(['in', col, arr]); return this }
     order(col, { ascending = true } = {}) { this.q.order.push({ col, ascending }); return this }

@@ -1805,10 +1805,16 @@ async function runScoutTask(t) {
   const { data: cardTitles } = await db.rpc('pa_pursuit_titles')
   const existing = [...(poolTitles || []), ...(cardTitles || [])]
 
+  // 画像给 {{画像}} 占位符用(0143 学员出厂那条);他自己那条没占位符,这几样白读一次,不碍事
+  const { data: metas } = await db.from('v_pa_meta').select('concerns').limit(1)
+  const { data: workRows } = await db.from('v_pa_entries').select('title, medium, kind').eq('kind', 'work').limit(30)
+  const concerns = metas?.[0]?.concerns || []
+  const works = workRows || []
+
   R.found = []; R.dupFound = []; R.skipped = []
   try {
     const { text, usage } = await think(
-      fullPrompt(t, { today, tz, existing }), READ_TOOLS, systemFor(profile), null, null, null, 80)
+      fullPrompt(t, { today, tz, existing, profile, concerns, works }), READ_TOOLS, systemFor(profile), null, null, null, 80)
     console.log(`  ↳ 找新的：${usage.turns} 轮 / ${(usage.ms / 1000).toFixed(1)}s`)
     const parsed = parseCards(text)
     if (!parsed) {
