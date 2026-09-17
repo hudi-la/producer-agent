@@ -1790,3 +1790,14 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .op-empty { padding: 34px 10px; text-align: center; font-size: 12.5px; color: var(--ink-3); font-family: var(--serif); }
 @media (prefers-reduced-motion: reduce) { .opmodal { transition: none; } }
 .op-c-w.past { color: var(--wait); }   /* 截止日已经过了：那个日子不该看着像还有效 */
+
+/* ── 首次启动页（本机模式，AuthGate 在还没填邮箱和 key 时进这儿）────── */
+.first-run { min-height: 100vh; display: grid; place-items: center; padding: 2rem; background: var(--paper); }
+.first-run form { width: min(34rem, 100%); display: grid; gap: 1rem; }
+.first-run h1 { font-family: var(--serif); font-size: 26px; font-weight: 600; margin: 0; }
+.first-run label { display: grid; gap: .3rem; font-weight: 500; font-size: 13px; }
+.first-run small { font-weight: 400; color: var(--ink-2); }
+.first-run input { font: inherit; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line-2, var(--ink-3)); border-radius: 6px; padding: 8px 10px; }
+.first-run button { font: inherit; font-weight: 600; cursor: pointer; color: var(--paper); background: var(--ink); border: none; border-radius: 7px; padding: 9px 12px; justify-self: start; }
+.first-run button:disabled { opacity: .5; cursor: default; }
+.first-run-err { margin: 0; font-size: 12.5px; color: var(--bad, #a44); }
