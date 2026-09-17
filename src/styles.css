@@ -464,10 +464,15 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .page-head .note b { color: var(--ink-2); font-weight: 600; }
 .page-head .note .bx { color: var(--accent); }
 
-/* 档案页：左边一列格名，右边一次开一格。
-   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。 */
+/* 档案页：左边一列格名，中间一次开一格，右边摊开那一条的对话。
+   .wide 只给这一页——720px 是给单栏长文定的，两栏塞不下。
+   .widest 是加了对话那一栏之后的：要的就是原文和商量在同一屏上对着看。 */
 .page-inner.wide { max-width: 1040px; }
+.page-inner.widest { max-width: min(1720px, 96vw); }
 .lib-two { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 30px; margin-top: 26px; align-items: start; }
+.lib-three { display: grid; grid-template-columns: 196px minmax(0, 1fr) minmax(380px, 30%);
+  gap: 26px; margin-top: 26px; align-items: start; }
+.lib-side { position: sticky; top: 0; height: calc(100vh - 210px); min-height: 400px; }
 .lib-rail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; }
 .rail-b { display: flex; align-items: center; gap: 10px; width: 100%; font: inherit; font-size: 13px; text-align: left;
   padding: 8px 11px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-3);
@@ -503,34 +508,38 @@ body.resizing .drawer-grip::before { opacity: .75; }
   border: 1px solid var(--line-2); background: transparent; color: var(--ink-3); transition: all .14s; }
 .draftflip:hover { color: var(--ink); border-color: var(--ink-3); }
 
-/* ── 条目里那个抽屉（0127）────────────────────────────────────
+/* ── 右边那一栏：摊开那一条的对话（0127）──────────────────────
    它写的每个字都是稿子，进不了档案 —— 所以这儿比机会线那边干净得多：
    没有信卡、没有表卡、没有状态卡，因为它没有那些能力。 */
-.echat { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
-.echat-hd { font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--ink-3); font-weight: 600; margin-bottom: 12px; }
-.echat-hd i { display: block; margin-top: 6px; font-style: normal; font-size: 11.5px;
+.echat { display: flex; flex-direction: column; height: 100%;
+  border: 1px solid var(--line-2); border-radius: 14px; background: var(--paper-2); overflow: hidden; }
+.echat-hd { padding: 13px 16px 11px; border-bottom: 1px solid var(--line);
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; }
+.echat-hd i { display: block; margin-top: 5px; font-style: normal; font-size: 11.5px;
   letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--ink-3); line-height: 1.6; }
-.echat-thread { display: flex; flex-direction: column; gap: 16px; margin-bottom: 14px;
-  max-height: 520px; overflow-y: auto; }
-.echat-err { margin-bottom: 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
-.echat-composer { display: flex; align-items: flex-end; gap: 9px; }
+.echat-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 16px;
+  display: flex; flex-direction: column; gap: 16px; }
+.echat-err { margin: 0 16px 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
+.echat-composer { display: flex; align-items: flex-end; gap: 9px; padding: 11px 12px;
+  border-top: 1px solid var(--line); background: var(--paper); }
 .echat-composer textarea { flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 1.6;
   resize: none; max-height: 180px; border: 1px solid var(--line-2); border-radius: 12px;
-  padding: 9px 12px; background: var(--paper); color: var(--ink); }
+  padding: 9px 12px; background: var(--paper-2); color: var(--ink); }
 .echat-composer textarea:focus { outline: none; border-color: var(--accent); }
 .echat-composer button { font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 10px;
   border: none; cursor: pointer; background: var(--ink); color: var(--paper); }
 .echat-composer button:disabled { opacity: .35; cursor: default; }
 .echat-composer button.stop { background: var(--ink-3); }
 
-@media (max-width: 860px) {
-  .page-inner.wide { max-width: 720px; }
-  .lib-two { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .lib-rail { position: static; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
-  .rail-b { width: auto; flex: none; border-color: var(--line); }
-  .rail-l { flex: none; white-space: nowrap; }
-}
+/* 一条都没展开时。说清楚该怎么办，不画一个空框在那儿。 */
+.echat-idle { height: 100%; display: flex; flex-direction: column; justify-content: center;
+  padding: 20px 22px; border: 1px dashed var(--line-2); border-radius: 14px;
+  font-size: 12.5px; color: var(--ink-3); line-height: 1.7; }
+
+/* 右边聊的是哪一条，左边那条要认得出来。只加一道竖线，不改底色——
+   底色一变，这一栏里哪条展开着就看不清了。 */
+.work.active { box-shadow: inset 3px 0 0 var(--accent); }
 
 /* 还没做的页面：说清楚将来是什么，别假装这儿有东西 */
 .soon { margin-top: 26px; border: 1px dashed var(--line-2); border-radius: 14px; padding: 20px 22px 18px; }

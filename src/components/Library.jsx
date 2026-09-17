@@ -51,7 +51,7 @@ function EntryFields({ e, ro, save }) {
 // 展开状态住在 Library 里，不住在这儿 —— 「加一条」建完要把新那条自动展开，
 // 而那个动作发生在 Library。行为一个字没变：还是点空白展开、点 › 展开，
 // 还是可以同时开好几条。
-function Entry({ e, open, onToggle, onSaved }) {
+function Entry({ e, open, active, onToggle, onSaved }) {
   const entries = boxEntries(e.box)
   const facts = subInfo(e)
   const imgs = e.images || []
@@ -68,7 +68,7 @@ function Entry({ e, open, onToggle, onSaved }) {
   }
 
   return (
-    <div className="work">
+    <div className={'work' + (active ? ' active' : '')}>
       {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
           输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
           点空白处仍然展开/收起；键盘走右边那个真按钮。 */}
@@ -118,8 +118,6 @@ function Entry({ e, open, onToggle, onSaved }) {
             <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
           ))}
           <div className="add">+ 补一条 / 丢进材料</div>
-          {/* 这一条的抽屉。点开哪一条，就聊哪一条 —— 没有条目就没有对话。 */}
-          {!ro && <EntryChat entry={e} />}
         </div>
       )}
     </div>
@@ -146,12 +144,13 @@ function subGroups(items, sub, concerns) {
   return groups
 }
 
-function KindSection({ label, items, sub, concerns, onSaved, openIds, onToggle, onAdd }) {
+function KindSection({ label, items, sub, concerns, onSaved, openIds, activeId, onToggle, onAdd }) {
   // 只有一个子组时不写子标题——「策展」那一格底下再顶一行「策展项目」是重复的。
   const groups = sub ? subGroups(items, sub, concerns) : null
   const one = (e) => (
     <Entry e={e} key={e.id || e.title + e.sort}
-           open={openIds.has(e.id)} onToggle={onToggle} onSaved={onSaved} />
+           open={openIds.has(e.id)} active={e.id === activeId}
+           onToggle={onToggle} onSaved={onSaved} />
   )
   return (
     <section className="kind">
@@ -224,19 +223,35 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
   // 选中的格可能因为库变了而消失（比如某类被清空）——退回「关于你」，别渲染空白。
   const cur = sections.find((s) => s.key === pick) || sections[0]
 
-  // 展开着哪几条。提到这一层，是因为「加一条」建完要把新那条自动展开。
+  // 展开着哪几条，以及**右边正在聊哪一条**。
+  //
+  // 右边跟着你最后点开的那条走。不新造「选中」这个动作要你学：展开 = 那条
+  // 摆到右边，收起 = 退回另一条还开着的（都关了就空着）。
   const [openIds, setOpenIds] = useState(new Set())
+  const [activeId, setActiveId] = useState(null)
   const toggle = (id) => setOpenIds((cur_) => {
     const next = new Set(cur_)
-    next.has(id) ? next.delete(id) : next.add(id)
+    if (next.has(id)) {
+      next.delete(id)
+      // 关掉的正是右边那条：退回另一条还开着的，别把对话留在一条看不见的东西上
+      setActiveId((a) => (a === id ? [...next][next.size - 1] ?? null : a))
+    } else {
+      next.add(id)
+      setActiveId(id)
+    }
     return next
   })
+
+  // 右边摊的那一条。它可能因为库变了而消失（换了栏、被删了）——那就空着，
+  // 别拿一个不存在的 id 去拉对话。
+  const active = entries.find((e) => e.id === activeId && e.id) || null
 
   // 加一条。新那条库里标着「在写」，建完自动展开，标题就地改。
   // 「关于你」那一格没有这个按钮 —— 它是 profile，不是条目。
   const add = cur.kind ? async () => {
     const id = await addEntry(cur.kind, null)
     setOpenIds((cur_) => new Set(cur_).add(id))
+    setActiveId(id)
     await onEntrySaved?.()
   } : null
 
@@ -246,12 +261,12 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
 
   return (
     <div className="page">
-      <div className="page-inner wide">
+      <div className="page-inner widest">
         <header className="page-head">
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
-        <div className="lib-two">
+        <div className="lib-three">
           <nav className="lib-rail" aria-label="档案分类">
             {sections.map((s) => {
               const d = draftsIn(s)
@@ -273,7 +288,16 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
             {cur.about
               ? <Identity onSaved={onProfileSaved} />
               : <KindSection label={cur.label} items={cur.items} sub={cur.sub} concerns={concerns}
-                             onSaved={onEntrySaved} openIds={openIds} onToggle={toggle} onAdd={add} />}
+                             onSaved={onEntrySaved} openIds={openIds} activeId={activeId}
+                             onToggle={toggle} onAdd={add} />}
+          </div>
+          {/* 右边那一栏：跟左边摊开的那一条对着看。对话仍然是**一条一个**，
+              只是从条目里搬到了旁边 —— 这样改描述时，原文和商量在同一屏上。 */}
+          <div className="lib-side">
+            {active
+              ? <EntryChat entry={active} key={active.id} />
+              : <div className="echat-idle">点开左边任意一条，这儿就是那一条的对话。<br />
+                  没有条目就没有对话 —— 想从零起一份，先在上面「+ 加一条」。</div>}
           </div>
         </div>
       </div>
