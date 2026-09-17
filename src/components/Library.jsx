@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
@@ -6,6 +6,7 @@ import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
 import { addEntry, setEntryDraft } from '../lib/studio.js'
 import EntryChat from './EntryChat.jsx'
+import DrawerGrip from './DrawerGrip.jsx'
 
 // 「我的档案」——原来是右边划出来的抽屉，现在是一级页面。
 // 这里是 Fairwind 判断匹配、写「为什么是我」、填申请字段的全部弹药，
@@ -216,7 +217,7 @@ function buildSections(entries) {
   return secs
 }
 
-export default function Library({ entries, concerns, onProfileSaved, onEntrySaved }) {
+export default function Library({ entries, concerns, onProfileSaved, onEntrySaved, onDrawerChange }) {
   const profile = useProfile()
   const sections = buildSections(entries)
   const [pick, setPick] = useState('about')
@@ -246,6 +247,11 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
   // 别拿一个不存在的 id 去拉对话。
   const active = entries.find((e) => e.id === activeId && e.id) || null
 
+  // 告诉外面抽屉开着没有：顶栏要让位（跟机会卡的抽屉同一套 .wrap.drawered）。
+  // 离开这一页时关掉 —— 不然去了看板，顶栏还让着一个不存在的抽屉。
+  useEffect(() => { onDrawerChange?.(!!active) }, [active, onDrawerChange])
+  useEffect(() => () => onDrawerChange?.(false), [onDrawerChange])
+
   // 加一条。新那条库里标着「在写」，建完自动展开，标题就地改。
   // 「关于你」那一格没有这个按钮 —— 它是 profile，不是条目。
   const add = cur.kind ? async () => {
@@ -261,12 +267,12 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
 
   return (
     <div className="page">
-      <div className="page-inner widest">
+      <div className={'page-inner widest' + (active ? ' drawered' : '')}>
         <header className="page-head">
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
-        <div className={'lib-three' + (active ? ' open' : '')}>
+        <div className="lib-two">
           <nav className="lib-rail" aria-label="档案分类">
             {sections.map((s) => {
               const d = draftsIn(s)
@@ -291,15 +297,18 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
                              onSaved={onEntrySaved} openIds={openIds} activeId={activeId}
                              onToggle={toggle} onAdd={add} />}
           </div>
-          {/* 右边那个抽屉。**平时不在**：一条都没摊开时整块不渲染，中栏自己铺满。
-              摊开哪一条它才划出来，聊的就是那一条 —— 原文和商量在同一屏上对着看。 */}
-          {active && (
-            <div className="lib-side">
-              <EntryChat entry={active} key={active.id} onClose={() => toggle(active.id)} />
-            </div>
-          )}
         </div>
       </div>
+      {/* 右边那个抽屉 —— **跟机会卡片的是同一个**：同一个 .drawer 外壳，
+          从窗口顶贴到底，左沿能拉宽，不跟着页面滚。
+          平时不在：一条都没摊开时整块不渲染。摊开哪一条它才划出来，聊的就是那一条。
+          页面自己往左让出抽屉那么宽，所以原文不会被盖住，左右对着看。 */}
+      {active && (
+        <aside className="drawer" aria-label={`一起写《${active.title || '未命名'}》`}>
+          <DrawerGrip />
+          <EntryChat entry={active} key={active.id} onClose={() => toggle(active.id)} />
+        </aside>
+      )}
     </div>
   )
 }

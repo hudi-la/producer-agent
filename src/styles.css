@@ -470,15 +470,11 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .page-inner.wide { max-width: 1040px; }
 .page-inner.widest { max-width: min(1720px, 96vw); }
 .lib-two { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 30px; margin-top: 26px; align-items: start; }
-/* 抽屉平时不在：没摊开任何一条时就是两栏，中栏自己铺满。
-   摊开哪一条，第三栏才长出来 —— grid-template-columns 一换，中栏让出位置，
-   抽屉从右边划进来（下面 .echat 的 slide-in）。 */
-.lib-three { display: grid; grid-template-columns: 196px minmax(0, 1fr);
-  gap: 26px; margin-top: 26px; align-items: start;
-  transition: grid-template-columns .22s cubic-bezier(.22,.61,.36,1); }
-.lib-three.open { grid-template-columns: 196px minmax(0, 1fr) minmax(380px, 30%); }
-.lib-side { position: sticky; top: 0; height: calc(100vh - 210px); min-height: 400px;
-  overflow: hidden; }
+/* 摊开一条，右边那个抽屉（跟机会卡是同一个 .drawer）从窗口右沿划出来。
+   页面自己往左让出抽屉那么宽 —— 不让的话原文被盖住，就没法左右对着看了。
+   吃的是同一个 --drawer-w：你拉宽抽屉，这边让出的地方跟着变。 */
+.page-inner.widest.drawered { max-width: none; margin-right: 0;
+  padding-right: calc(var(--drawer-w) + 26px); }
 .lib-rail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; }
 .rail-b { display: flex; align-items: center; gap: 10px; width: 100%; font: inherit; font-size: 13px; text-align: left;
   padding: 8px 11px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-3);
@@ -517,23 +513,21 @@ body.resizing .drawer-grip::before { opacity: .75; }
 /* ── 右边那一栏：摊开那一条的对话（0127）──────────────────────
    它写的每个字都是稿子，进不了档案 —— 所以这儿比机会线那边干净得多：
    没有信卡、没有表卡、没有状态卡，因为它没有那些能力。 */
-.echat { display: flex; flex-direction: column; height: 100%;
-  border: 1px solid var(--line-2); border-radius: 14px; background: var(--paper-2); overflow: hidden;
-  animation: echat-in .22s cubic-bezier(.22,.61,.36,1); }
-@keyframes echat-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
-.echat-hd { position: relative; padding: 13px 34px 11px 16px; border-bottom: 1px solid var(--line);
+.echat { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%;
+  background: var(--paper); }
+.echat-hd { position: relative; padding: 18px 44px 14px 20px; border-bottom: 1px solid var(--line);
   font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-3); font-weight: 600; }
-.echat-x { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; line-height: 1;
+.echat-x { position: absolute; top: 14px; right: 14px; width: 24px; height: 24px; line-height: 1;
   font: inherit; font-size: 17px; border: none; border-radius: 7px; background: transparent;
   color: var(--ink-3); cursor: pointer; transition: color .14s, background .14s; }
 .echat-x:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .echat-hd i { display: block; margin-top: 5px; font-style: normal; font-size: 11.5px;
   letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--ink-3); line-height: 1.6; }
-.echat-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 16px;
+.echat-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px;
   display: flex; flex-direction: column; gap: 16px; }
 .echat-err { margin: 0 16px 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
-.echat-composer { display: flex; align-items: flex-end; gap: 9px; padding: 11px 12px;
+.echat-composer { display: flex; align-items: flex-end; gap: 9px; padding: 12px 16px 16px;
   border-top: 1px solid var(--line); background: var(--paper); }
 .echat-composer textarea { flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 1.6;
   resize: none; max-height: 180px; border: 1px solid var(--line-2); border-radius: 12px;
