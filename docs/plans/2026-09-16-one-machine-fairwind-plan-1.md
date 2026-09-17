@@ -1001,7 +1001,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { openLocalDb, applyMigrations, setLocalUid } from './migrate.js'
 import { makeLocalDb } from './localdb.js'
-import { loadSettings } from './settings.js'
+import { saveSettings } from './settings.js'
 import { handleLocalRoute } from './routes.js'
 
 const UID = '11111111-1111-4111-8111-111111111111'
@@ -1012,7 +1012,7 @@ const res = () => { const r = { code: 0, headers: {}, chunks: [] }; r.writeHead 
 before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'fw-routes-'))
   pg = await openLocalDb(dir); await applyMigrations(pg, { fresh: true }); await setLocalUid(pg, UID)
-  const settings = { ...loadSettings(dir), uid: UID }
+  const settings = saveSettings(dir, { uid: UID })   // settings.json 里的 uid 要跟 set_config 的一致
   const db = await makeLocalDb({ pg, dataDir: dir, user: { id: UID, email: '' } })
   mkdirSync(join(dir, 'dist')); writeFileSync(join(dir, 'dist', 'index.html'), '<h1>hi</h1>')
   ctx = { db, pg, mode: 'local', dataDir: dir, settings, distDir: join(dir, 'dist'), onSetup: async () => {} }
