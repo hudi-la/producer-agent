@@ -66,7 +66,7 @@ Gmail 只存草稿、不发信；①b（agent 退出邮箱）仍暂缓。
 - **D1** 数据零托管。作者唯一 host 的东西是发布位（免费）。
 - **D2** 一套迁移文件，三种执行者：云端 service（作者个人版）、云端 user（8/24 的多租户版）、本地 PGlite（学员）。不为本地单开一套 schema。
 - **D3** 数据访问只走 `pa_*` 函数和 `v_pa_*` 视图。今天 91 处调用 0 处裸表，以后也必须是 0。
-- **D4** 前端不直连库，一律经 brain。brain 在本地模式下直接服务前端构建产物。
+- **D4** 本地模式下前端不直连库，一律经 brain；brain 直接服务前端构建产物。作者自己的云端模式照旧直连。
 - **D5** 模块 = 能力开关，不是 schema 分区：**表全建，能力分装**。三个模块按 A←B←C 单向依赖。
 - **D6** scout 和机会池随机会线模块在本机跑，各找各的，烧各自的 key。
 - **D7** 判据分两层：骨架（转移表结构、字段、走向）在代码里、不许改；口味由学员在 `judgments/` 目录里用文档写，拼进提示词。
@@ -192,7 +192,7 @@ brain 新增的四条路由：`POST /db/rpc/:name`、`POST /db/from`、`GET|POST
 1. **只走 `pa_*` 和 `v_pa_*`。** 本地库让写 SQL 变得很方便——这是最容易破的一条。隔离测试按目录扫 `brain/` 和 `src/`，
    出现 `db.query(` / `sql\`` 之类直连即红。
 2. **迁移文件是 schema 的唯一真相，本地云端共用同一批。** 本地前言（5.2）是唯一的例外，且不碰 `producer` schema。
-3. **前端不直连库。** `backends.js` 是唯一建客户端的地方；`VITE_DB_MODE=local` 时不允许 import `@supabase/supabase-js`
+3. **本地模式下前端不直连库。** `backends.js` 是唯一建客户端的地方；`VITE_DB_MODE=local` 时不允许 import `@supabase/supabase-js`
    之外的东西碰网络。
 
 ## 七、模块
@@ -442,7 +442,7 @@ mac `~/Library/Application Support/Fairwind/`，win `%APPDATA%\Fairwind\`。更�
    · 冲突 7 个文件：server.js、App.jsx、scout.js、scout.test.js、prompt.test.js、TasksPanel.jsx、styles.css
    · 迁移重号一把改到位：ORDER.md 那十支 + 主线的两支 0124 + 本分支 0116–0122 → 0128–0134
    · 之后 db-reset --wipe 在 dev 库上全绿，隔离测试全绿
-① 验证：esbuild → bytenode → 自带 node 跑起 brain，PGlite 开库跑一支迁移，SDK query() 答一句
+① 验证：esbuild → bytenode → 自带 node 跑起 brain；PGlite 上前言（create role、auth schema）能跑、开库跑一支迁移；SDK query() 答一句
    （这是地基；不成就换打包形状，其余不动）
 ② 壳：前言 + 本地迁移记账 + localdb 适配 + dbauth 第三模 + brain 服务 dist + 前端 brainClient + 首次启动页
 ③ 模块门控 + modules.json + 设置页开关（默认只开 A）      ← 到这里就是「第一个安装包：档案层」
