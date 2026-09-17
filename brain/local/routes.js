@@ -1,7 +1,7 @@
 // brain/local/routes.js —— 本机模式下 brain 多出来的几条路:前端借它碰库、碰文件、问「我是谁」,
 // 以及首次启动的 /setup。云端模式下这个文件什么都不做(前端直连 Supabase)。
 import { readFileSync, existsSync, statSync } from 'node:fs'
-import { join, normalize, resolve, extname } from 'node:path'
+import { normalize, resolve, extname } from 'node:path'
 import { saveSettings } from './settings.js'
 import { registerLocalUser } from './migrate.js'
 
@@ -70,13 +70,15 @@ export async function handleLocalRoute(req, res, ctx) {
     }
   }
 
-  // 静态:dist/ 里的文件;找不到的路径回 index.html(前端自己按 ?a= 路由)
+  // 静态:dist/ 里真有的文件才出;/ 回 index.html。别的路径不接——交给 server.js 自己的路由
+  // (前端按 ?a= 路由,路径永远是 /,所以不需要"找不到就回 index"那种兜底;
+  //  有了那种兜底,/health 这种 brain 自己的 GET 会被静态页吃掉——2026-09-16 冒烟时撞到的)。
   if (req.method === 'GET' && distDir && existsSync(distDir)) {
     const rel = p === '/' ? 'index.html' : normalize(p).replace(/^\/+/, '')
-    let f = resolve(distDir, rel)
-    if (!f.startsWith(resolve(distDir))) return false
-    if (!existsSync(f) || statSync(f).isDirectory()) f = join(distDir, 'index.html')
-    res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); return true
+    const f = resolve(distDir, rel)
+    if (f.startsWith(resolve(distDir)) && existsSync(f) && !statSync(f).isDirectory()) {
+      res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); return true
+    }
   }
   return false
 }

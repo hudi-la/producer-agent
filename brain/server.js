@@ -41,6 +41,10 @@ import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor } from './judge.js'
 import { modelFor, GOOD, CHEAP } from './models.js'
 import { makeDb, requireUser } from './dbauth.js'
+// 本机模式(2026-09-16):前端借这几条路碰库、碰文件、问「我是谁」;云端模式下它什么都不做
+import { fileURLToPath } from 'node:url'
+import { handleLocalRoute } from './local/routes.js'
+import { initStore } from './mail/store.js'
 import { directive as timerDirective, timerKey } from './timer.js'
 // 定时造卡那一轮的纯函数：拼提示词、解析信封、去重、判门槛、写战报。scout.test.js 按着。
 import {
@@ -77,16 +81,27 @@ const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 // 连库双模(dbauth.js):SERVICE_ROLE 在就走个人版老路;不在就走学员路
 // (anon key + 登录会话)——那个身份被行级权限管着,brain 只看得见这个
 // 学员自己的行,机器上不存在能读别人数据的钥匙(0118 起)。
-let db, DB_MODE
-try {
-  ;({ db, mode: DB_MODE } = makeDb())
+let db, DB_MODE, LOCAL_MODE = null
+// 连库放进一个函数、在 main() 里 await:这个文件不能有顶层 await——
+// 打包成字节码时是 CJS,CJS 没有顶层 await(packaging/SPIKE.md 第 3 条)。
+async function connect() {
+  const r = await makeDb()
+  db = r.db; DB_MODE = r.mode
   if (DB_MODE === 'user') {
     const u = await requireUser(db)
     console.log(`· 以 ${u.email} 的身份连库(行级权限生效)`)
   }
-} catch (err) {
-  console.error('\n✗ ' + err.message + '\n')
-  process.exit(1)
+  if (DB_MODE === 'local') {
+    LOCAL_MODE = {
+      pg: r.pg, settings: r.settings, dataDir: process.env.FAIRWIND_DATA_DIR,
+      // 前端构建产物:开发时是仓库的 dist/,打包后是字节码旁边的 dist/
+      distDir: process.env.FAIRWIND_DIST_DIR || fileURLToPath(new URL('../dist/', import.meta.url)),
+      onSetup: async (settings) => { LOCAL_MODE.settings = settings },
+    }
+    if (r.settings.apiKey) process.env.ANTHROPIC_API_KEY = r.settings.apiKey
+    console.log(`· 本机库:${LOCAL_MODE.dataDir}${r.settings.ready ? '' : '(还没初始化,等页面上填)'}`)
+  }
+  initStore(db)
 }
 
 // ── 上下文：Fairwind 开工前先想起这条线的一切 ──────────────────────────
@@ -1883,6 +1898,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
+  // 本机模式的那几条路(/me /setup /db/* /files/* 和静态 dist/)。云端模式 LOCAL_MODE 是 null,一律跳过
+  if (LOCAL_MODE && await handleLocalRoute(req, res, { db, mode: DB_MODE, ...LOCAL_MODE })) return
+
   if (req.method === 'GET' && req.url === '/health') {
     // 邮件那一轮的状态跟着 /health 走：界面每 8 秒本来就在问它，
     // 不用再多开一个口，也不会出现「界面以为在收、其实早停了」。
@@ -2206,11 +2224,13 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: 'not found' })
 })
 
-server.listen(PORT, () => {
+async function main() {
+  try { await connect() } catch (err) { console.error('\n✗ ' + err.message + '\n'); process.exit(1) }
+  server.listen(PORT, () => {
   console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
   console.log(`   放行来源：${ORIGIN}`)
   console.log(`   后台先读：每 ${Math.round(SWEEP_MS / 1000)} 秒扫一次「新机会」`)
-  console.log(`   计费：走你的 Claude 订阅用量（没用 API key）\n`)
+  console.log(process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
   sweepBriefs()
   setInterval(sweepBriefs, SWEEP_MS)
 
@@ -2242,4 +2262,6 @@ server.listen(PORT, () => {
   setInterval(scoutPass, SCOUT_MS)
   console.log(`   造卡任务：每 ${Math.round(SCOUT_MS / 1000)} 秒看一眼谁到点了`)
   console.log(`   邮件：每 ${Math.round(MAIL_MS / 60000)} 分钟收一次新信（这是唯一会去 Gmail 拿信的地方）`)
-})
+  })
+}
+main()

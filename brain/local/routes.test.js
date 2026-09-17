@@ -59,6 +59,10 @@ test('GET / 从 dist 出', async () => {
   const r = res(); assert.equal(await handleLocalRoute(req('GET', '/'), r, ctx), true); assert.equal(r.text(), '<h1>hi</h1>')
 })
 
+test('GET /health 不是静态文件,不接——留给 server.js 自己的路由', async () => {
+  const r = res(); assert.equal(await handleLocalRoute(req('GET', '/health'), r, ctx), false)
+})
+
 test('不是本地模式:/db/* 不处理', async () => {
   const r = res(); assert.equal(await handleLocalRoute(req('POST', '/db/rpc/x', {}), r, { ...ctx, mode: 'service' }), false)
 })

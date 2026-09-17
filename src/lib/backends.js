@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { brainClient } from './brainClient.js'
 
 // 两个后端在哪、通不通。
 //
@@ -11,13 +12,17 @@ import { createClient } from '@supabase/supabase-js'
 // 兜住之后 supa 是 null，跟「没填 .env.local」同一条路，测试里正好当没连库使。
 const env = import.meta.env || {}
 
-const url = env.VITE_SUPABASE_URL
-const anon = env.VITE_SUPABASE_ANON_KEY
+// 本机模式(VITE_DB_MODE=local,2026-09-16):前端和 brain 同源,supa 是打到 brain 的客户端,
+// 同一个表面;云端模式:今天的样子,一个字不变。DB_MODE 只有这一处在算。
+export const DB_MODE = env.VITE_DB_MODE === 'local' ? 'local'
+  : (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY ? 'cloud' : 'none')
 
-export const supa = url && anon ? createClient(url, anon) : null
+export const BRAIN = env.VITE_BRAIN_URL
+  || (DB_MODE === 'local' && typeof location !== 'undefined' ? location.origin : 'http://localhost:8788')
+
+export const supa = DB_MODE === 'local' ? brainClient(BRAIN)
+  : DB_MODE === 'cloud' ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY) : null
 export const DB_CONFIGURED = !!supa
-
-export const BRAIN = env.VITE_BRAIN_URL || 'http://localhost:8788'
 
 /** 退回种子数据的原因。null = 没退，看到的是真数据。 */
 export const FELL_BACK = {

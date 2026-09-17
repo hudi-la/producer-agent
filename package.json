@@ -10,7 +10,9 @@
     "setup": "node scripts/setup.mjs",
     "fairwind": "node scripts/fairwind.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "local": "node scripts/local.mjs",
+    "build:local": "VITE_DB_MODE=local vite build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
