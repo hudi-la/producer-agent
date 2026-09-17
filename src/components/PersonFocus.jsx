@@ -8,6 +8,7 @@ import Pool from './Pool.jsx'
 import DeskToggle from './DeskToggle.jsx'
 import { useGrow } from '../lib/useGrow.js'
 import { MailList } from './Mail.jsx'
+import { useModules } from '../lib/ModulesContext.jsx'
 import { isLetter, isExchange } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
@@ -87,6 +88,7 @@ export default function PersonFocus({
   const [msgs, setMsgs] = useState(null)
   const [threads, setThreads] = useState([])
   const [dels, setDels] = useState([])
+  const mods = useModules()
   const [busy, setBusy] = useState(null)      // 'sync' | 'talk' | 'gmail' | null
   // 正在就地改的那一句。库里还什么都没动——见 Resay.jsx 顶上那段。
   const [editId, setEditId] = useState(null)
@@ -418,10 +420,10 @@ export default function PersonFocus({
           <div className="pf-sect">
             <div className="pf-sect-h">
               <span>往来</span>
-              <button className="lnk" onClick={doSync} disabled={busy === 'sync'}
+              {mods.mail && <button className="lnk" onClick={doSync} disabled={busy === 'sync'}
                       title="去 Gmail 拉这个人所有地址下的往来">
                 {busy === 'sync' ? '收信中…' : '收信'}
-              </button>
+              </button>}
             </div>
             {note && <div className={'pf-syncnote' + (note.startsWith('收信失败') ? ' bad' : '')}>{note}</div>}
 
@@ -439,7 +441,7 @@ export default function PersonFocus({
                     : <p className="empty">当面聊了、通了电话、微信说了——在中栏记一条，它会长在这儿。</p>}
                 </Pool>
 
-                <div className="pf-field">
+                {mods.mail && <div className="pf-field">
                   <input placeholder="贴 Gmail thread id" value={claim}
                          onChange={(e) => setClaim(e.target.value)} />
                   <button className="lnk" disabled={!claim.trim()}
@@ -447,7 +449,7 @@ export default function PersonFocus({
                             try { await claimThread(c.id, claim.trim()); setClaim(''); await reload() }
                             catch (e) { alert('没认上：' + e.message) }
                           }}>认领</button>
-                </div>
+                </div>}
                 <div className="pf-note">认领了 {threads.length} 条 thread</div>
               </>
             )}
@@ -611,12 +613,12 @@ export default function PersonFocus({
                 ? <div className="pf-note warn">按下去信就出去了，撤不回来。</div>
                 : d.meta?.to && <div className="pf-note">发出后当场记进左栏往来，这份就不在这儿了。</div>}
               {/* 退路：要加附件的信走这条 */}
-              <button className="lnk" disabled={busy || !d.body?.trim()}
+              {mods.mail && <button className="lnk" disabled={busy || !d.body?.trim()}
                       onClick={() => toGmail(d.id)}
                       title="要加附件的信走这条：放进草稿箱，去 Gmail 挂上附件再发">
                 {busy === 'gmail' ? '正在放……'
                   : d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进草稿箱（要加附件时）'}
-              </button>
+              </button>}
             </div>
           ))}
         </aside>

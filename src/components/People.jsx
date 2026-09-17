@@ -1,6 +1,7 @@
 import { md, day } from '../lib/when.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import Strangers from './Strangers.jsx'
+import { useModules } from '../lib/ModulesContext.jsx'
 import Groups from './Groups.jsx'
 import Veil from './Veil.jsx'
 import { goldLine } from '../lib/stateText.js'
@@ -43,6 +44,7 @@ export default function People({
   desk = new Set(),
   audit = false, states = null,
 }) {
+  const mods = useModules()
   const [q, setQ] = useState('')
 
   // 通讯录装的是**你会写信的对象**，不是只装人。机构和它的共享信箱也在里面。
@@ -196,7 +198,7 @@ export default function People({
             </div>
             {/* 一伙人（0122）先于单个地址：一串信里十几个人，一下收完 */}
             <Groups rows={groups} onDone={onAdded} />
-            <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />
+            {mods.mail && <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />}
           </section>
         )}
 

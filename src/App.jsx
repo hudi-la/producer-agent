@@ -37,6 +37,10 @@ import Notifications from './components/Notifications.jsx'
 import Timeline from './components/Timeline.jsx'
 import { VeilContext, loadVeiled, saveVeiled } from './lib/veil.js'
 import { Flower } from './components/Veil.jsx'
+// 模块开关(2026-09-16):关着的模块,它的主区、顶栏件、邮件界面都不出现。云端永远全开
+import { useModules } from './lib/ModulesContext.jsx'
+import { allowedAreas } from './lib/modules.js'
+import ModulesPanel from './components/ModulesPanel.jsx'
 
 // 顶栏一级：头一个是**桌面**（工作区——今天摊在桌上的活），后面四个是**架子**
 // （东西住的地方，你去找到一个拿到桌上来做）。桌子满、架子安静，本来就是两种东西。
@@ -74,6 +78,9 @@ export default function App() {
   // 桌上（工作区）看哪张不归它管，由 queue.at 说了算。
   const [view, setView] = useState({ name: 'home' })
   const [area, setArea] = useState('pursue')
+  const mods = useModules()
+  // 落在关着的区(比如刷新时 URL 带 ?a=people 而机会线关着)→ 回我的档案
+  useEffect(() => { if (!allowedAreas(mods).includes(area)) setArea('profile') }, [mods.pursuits, area])
   const [tasksOpen, setTasksOpen] = useState(false)
   // 机会池 = 他那张 Excel。开着才拉 —— 82 行带 notes，不该跟着看板每次刷。
   const [poolOpen, setPoolOpen] = useState(false)
@@ -705,7 +712,7 @@ export default function App() {
       <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label="主区">
-          {AREAS.map(([key, label]) => (
+          {AREAS.filter(([key]) => allowedAreas(mods).includes(key)).map(([key, label]) => (
             <button
               key={key}
               ref={key === 'desk' ? deskBtnRef : undefined}
@@ -724,8 +731,8 @@ export default function App() {
             🔔 的数字**只数该动的**（2026-08-20 他拍的）：等待和没归线的在面板里
             各自带着数，但不上角标 —— 角标是「现在有几件事等你动」，
             不是「系统里躺着多少条」。 */}
-        <MailState state={brain?.mail} />
-        <button className="bellbtn" onClick={openBell} aria-label="该动的">
+        {mods.mail && <MailState state={brain?.mail} />}
+        {mods.pursuits && <button className="bellbtn" onClick={openBell} aria-label="该动的">
           {/* Lucide 的 bell，跟读书 app（阅读陪伴）同一套手写内联 SVG 的规格：
               24 视口、stroke=currentColor、1.75、圆头圆角，不引库。 */}
           <svg className="bellic" viewBox="0 0 24 24" width="17" height="17" fill="none"
@@ -736,7 +743,7 @@ export default function App() {
           </svg>{(notes?.due?.length || 0) > 0 && (
             <span className="belln">{notes.due.length}</span>
           )}
-        </button>
+        </button>}
         {/* 右上角你的名字 = 展示模式的开关。给客户看屏幕之前点一下，
             页面上的名字、邮箱全换成小花；再点一下摘掉。
             开着的时候这颗按钮自己也得盖——你的名字同样是私人信息，
@@ -750,7 +757,7 @@ export default function App() {
 
       {/* 批量操作开着时，面板里的条目也是勾选目标 —— 勾的是同一摞 picked：
           看板按阶段摆，面板按到点没到点摆，同一批卡换个取景框勾。 */}
-      {bellOpen && (
+      {mods.pursuits && bellOpen && (
         <Notifications
           data={notes} mail={brain?.mail} judging={judging} onJudgeMore={judgeMore}
           picking={picking} picked={picked} onPick={pick}
@@ -784,7 +791,7 @@ export default function App() {
         brainDown={brain ? !brain.up : false}
         brainStale={brain ? brain.stale : false}
         batchFailed={sayFailed}
-        mail={brain?.mail}
+        mail={mods.mail ? brain?.mail : null}
       />
 
       {/* ── 工作区底下那一排：桌上开着的窗口 ──
@@ -861,9 +868,12 @@ export default function App() {
           />
         </>
       ) : area === 'profile' ? (
-        <Library entries={lib.entries} concerns={lib.concerns}
-                 onProfileSaved={() => loadProfile().then(setProfile)}
-                 onEntrySaved={() => loadLibrary().then(setLib)} />
+        <>
+          <Library entries={lib.entries} concerns={lib.concerns}
+                   onProfileSaved={() => loadProfile().then(setProfile)}
+                   onEntrySaved={() => loadLibrary().then(setLib)} />
+          <ModulesPanel />
+        </>
       ) : area === 'ledger' ? (
         <Timeline
           /* 待办从这儿来：跟 🔔 同一份 v_pa_state，不另查一遍 */

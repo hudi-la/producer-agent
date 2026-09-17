@@ -5,6 +5,7 @@ import { sendLetterNow } from '../lib/letters.js'
 import { setAnswer } from '../lib/forms.js'
 // 这封信到底发给谁——名单从信头账本算，你自己勾。
 import Recipients from './Recipients.jsx'
+import { useModules } from '../lib/ModulesContext.jsx'
 
 // 右栏：交付。
 //
@@ -171,6 +172,7 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
   const [busy, setBusy] = useState(null)
   // 两段确认的第二段：按第一下只是「上膛」，第二下才真发。
   const [armed, setArmed] = useState(false)
+  const mods = useModules()
   const isMail = d.kind === 'email'
   // 收件人是一份名单（0071）。老产出里存的是单个字符串，两种都认——
   // 不认的话，改之前收进产出的那几封信一封都发不出去。
@@ -222,7 +224,7 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
       {/* 名单摆在按钮上面，逐个可勾。**看不全就不敢发**——2026-08-18 那次
           Huntington 的信要回给两个人，界面上只有一个地址，于是那封信只能
           切回 Gmail 手动 reply all。 */}
-      <Recipients d={d} onChanged={onChanged} onErr={onErr} />
+      {mods.mail && <Recipients d={d} onChanged={onChanged} onErr={onErr} />}
     <div className="dv-acts">
       {/* 收件人明摆在按钮上，不许藏在折叠里——**发错人是这条路上唯一
           撤不回来的错**。别的都能补：改错字能再发一封，主题不好看下次注意；
@@ -241,10 +243,10 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
               : `发给 ${whoSay}${cc.length ? `（含抄送 ${cc.length}）` : ''} · 发出后当场记进左栏往来`
           }</span>}
       {/* 退路：要加附件（作品集 PDF）的信走这条——放进草稿箱，去 Gmail 挂上附件再发。 */}
-      <button className="b" disabled={!allOk || busy} onClick={() => go('draft')}
+      {mods.mail && <button className="b" disabled={!allOk || busy} onClick={() => go('draft')}
         title="要加附件的信走这条：放进草稿箱，去 Gmail 挂上附件再发">
         {busy === 'draft' ? '正在放……' : d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进草稿箱'}
-      </button>
+      </button>}
     </div>
     </>
   )
