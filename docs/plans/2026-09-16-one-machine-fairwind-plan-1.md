@@ -10,6 +10,18 @@
 
 **Spec:** `docs/specs/2026-09-16-one-machine-fairwind-design.md`（本计划只覆盖第十八节的 ⓪①②③；④⑤⑥ 另起一份）
 
+## 2026-09-16 完成情况
+
+Task 1–12 全部做完，`npm test` 573 全绿，无头浏览器验收（首次启动 → 只有我的档案 → 开关开出机会线/邮件 → 刷新还在）12 条全过。
+施工中改了设计稿两处（5.2 前言补 storage 桩；5.4 本机会话切成 authenticated，RLS 跟云端一样生效）。
+
+**没做完、等人的**：Task 2 Step 4 的 dev 库从零重建 + 隔离测试——dev 项目 `jsmdnzkoxudzppaczwsl` 免费档闲置已暂停，
+唤醒被拦，要他在 Supabase 后台点 Restore（或允许我做）。从零建库这件事先由 PGlite 那条测试证明了（126 支全绿）。
+
+**顺手发现、留给下一份计划**：学员出厂的 scout 任务（0141 注册礼包里那条）没有 `prompt`，主线的 scout 靠 `prompt` 跑——
+机会线模块要给它一份不含作者内容的默认提示词。`brain/files.js` 和 `brain/mail/auth.js` 各有一处对外部包的动态 `import()`，
+打包前要改静态（SPIKE.md 第 2 条）。
+
 ## Global Constraints
 
 - 数据访问只走 `pa_*` 函数和 `v_pa_*` 视图；`brain/` 和 `src/` 里不许出现裸 SQL、裸表（设计稿 6.4 规矩 1）。**唯一例外**：`brain/local/` 目录（前言、迁移记账、适配层本身）。
