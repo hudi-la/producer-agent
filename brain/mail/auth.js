@@ -33,13 +33,18 @@
 // 警告页，点「高级 → 继续」就过去了）。详见 README。
 
 import fs from 'node:fs'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { google } from 'googleapis'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const TOKENS = path.join(HERE, '..', '.mail-tokens.json')
+// 本机模式(FAIRWIND_DATA_DIR)下 token 住在数据目录——应用目录更新时整个换掉,不能放东西。
+// 个人版没设那个 env,还是原来的位置,一个字不变。
+const TOKENS = process.env.FAIRWIND_DATA_DIR
+  ? path.join(process.env.FAIRWIND_DATA_DIR, 'gmail', 'tokens.json')
+  : path.join(HERE, '..', '.mail-tokens.json')
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -103,6 +108,7 @@ function readTokens() {
 
 function writeTokens(t) {
   // 0600：这是一把能读你全部邮件的钥匙，别让同机器上别的用户看见。
+  fs.mkdirSync(path.dirname(TOKENS), { recursive: true })
   fs.writeFileSync(TOKENS, JSON.stringify(t, null, 2), { mode: 0o600 })
 }
 
@@ -175,7 +181,6 @@ export async function authorize() {
   console.log('  点「高级」→「继续前往」。）\n')
 
   // 尽量替你打开
-  const { spawn } = await import('node:child_process')
   const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open'
   try { spawn(opener, [url], { stdio: 'ignore', detached: true }).unref() } catch (_) {}
 

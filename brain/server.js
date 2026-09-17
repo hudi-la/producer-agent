@@ -46,6 +46,7 @@ import { fileURLToPath } from 'node:url'
 import { handleLocalRoute, exportEnv } from './local/routes.js'
 // 模块是能力开关(设计稿 D5):关着的模块,路由 404、定时器不起、Gmail 工具不进白名单。云端永远全开
 import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
+import { VERSION } from './version.js'
 // 学员自己的判据文档(<数据目录>/judgments/*.md),拼进每一格的收尾之前;判不出来回退出厂判据
 import { useJudgmentsDir, judgeWithFallback, hasJudgments } from './judgments.js'
 import { copyFileSync, existsSync as fsExists, mkdirSync as fsMkdir } from 'node:fs'
@@ -1978,7 +1979,8 @@ const server = http.createServer(async (req, res) => {
     // 不用再多开一个口，也不会出现「界面以为在收、其实早停了」。
     const { lastSweep } = await import('./mail/loop.js')
     // scout = 定时造卡那一轮。面板靠它说「脑子没开 · 到点不会跑」。
-    return send(res, 200, { ok: true, build: BRAIN_BUILD, mail: lastSweep(), scout: scoutState() })
+    // version:更新那一步拿它跟发布位比;mode/modules:界面按它画,少一次 /modules
+    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, mode: DB_MODE, modules: MODS, mail: lastSweep(), scout: scoutState() })
   }
 
   if (req.method === 'POST' && req.url === '/chat') {

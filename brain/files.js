@@ -17,6 +17,7 @@
 // 它会被当成内容，然后被引用进一封真的信里。
 
 import ExcelJS from 'exceljs'
+import { extractText, getDocumentProxy } from 'unpdf'
 
 // 一次最多给出去多少字。不是省钱，是省注意力——一份 200 页的 PDF 全量倒进
 // 上下文，那条线后面的每一轮都要重付一次，而且它会淹掉真正相关的那几段。
@@ -91,9 +92,8 @@ export function imageBudget(cap = IMG_CAP) {
 }
 
 async function fromPdf(buf) {
-  // 动态 import：unpdf 会把 pdfjs 一起拉起来，几百毫秒。没人开 PDF 的那些
-  // 请求不该为它付这个启动成本。
-  const { extractText, getDocumentProxy } = await import('unpdf')
+  // 2026-09-16 改成静态 import:打包成字节码后没有动态 import 的回调(packaging/SPIKE.md 第 2 条)。
+  // unpdf 会把 pdfjs 一起拉起来,几百毫秒——现在付在启动时,不付在第一次开 PDF 时。
   const doc = await getDocumentProxy(new Uint8Array(buf))
   const { text, totalPages } = await extractText(doc, { mergePages: true })
   const body = (Array.isArray(text) ? text.join('\n\n') : text || '').trim()
