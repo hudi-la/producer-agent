@@ -142,7 +142,7 @@ function BackupRow({ backupDir }) {
   const last = list?.files?.[0]
   return (
     <div className="la-sub">
-      <div className="la-sub-h">备份<small>{backupDir ? (last ? '最近一次 ' + last.name.replace('fairwind-', '').replace('.tar.gz', '') : '还没备过') : '上面先选一个备份目录'}</small></div>
+      <div className="la-sub-h">备份<small>{backupDir ? (last ? '最近一次 ' + last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') : '还没备过') : '上面先选一个备份目录'}</small></div>
       <div className="la-acts">
         <button type="button" className="b" disabled={busy || !backupDir} onClick={now}>{busy ? '在备…' : '现在备份'}</button>
         <input className="la-path" placeholder="从备份恢复:贴一份 .tar.gz 的路径" value={pathIn} onChange={(e) => setPathIn(e.target.value)} />

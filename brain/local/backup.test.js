@@ -31,10 +31,10 @@ test('备份 → 排恢复 → 重开:数据一样,原来的库改名留着', as
 
 test('只留最近 14 份', () => {
   const bdir = tmp('fw-bkdir-')
-  for (let i = 1; i <= 17; i++) writeFileSync(join(bdir, `fairwind-2026-09-${String(i).padStart(2, '0')}-0800.tar.gz`), 'x')
+  for (let i = 1; i <= 17; i++) writeFileSync(join(bdir, `fairwind-2026-09-${String(i).padStart(2, '0')}-080000.tar.gz`), 'x')
   writeFileSync(join(bdir, 'notes.txt'), '别动我')
   const left = prune(bdir)
-  assert.equal(left.length, KEEP); assert.equal(left[0].name, 'fairwind-2026-09-17-0800.tar.gz')
+  assert.equal(left.length, KEEP); assert.equal(left[0].name, 'fairwind-2026-09-17-080000.tar.gz')
   assert.equal(readdirSync(bdir).filter((f) => f.endsWith('.tar.gz')).length, KEEP)
   assert.ok(existsSync(join(bdir, 'notes.txt')), '不是备份的文件不碰')
   rmSync(bdir, { recursive: true, force: true })

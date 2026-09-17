@@ -9,11 +9,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSy
 import { join, basename } from 'node:path'
 
 export const KEEP = 14
-const NAME = /^fairwind-\d{4}-\d{2}-\d{2}-\d{4}\.tar\.gz$/
+const NAME = /^fairwind-\d{4}-\d{2}-\d{2}-\d{6}\.tar\.gz$/   // 到秒:更新前那份和手点的可能同一分钟
 
 const stamp = (d = new Date()) => {
   const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
 }
 
 /** 现在备份一份到 dir。返回文件路径。 */
