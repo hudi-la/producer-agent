@@ -3,6 +3,9 @@
 // 不给 --org 就当成人；给了就当成机构共享信箱。
 import { adoptPerson, adoptOrgMailbox } from './adopt.js'
 import { db } from './store.js'
+import { makeDb as __makeDb } from '../dbauth.js'
+import { initStore as __initStore } from './store.js'
+__initStore((await __makeDb()).db)   // makeDb 是异步的(本机模式要开库);CLI 脚本自己接一次
 
 const email = process.argv[2]
 if (!email?.includes('@')) { console.error('用法：adopt-run.js <email> [--org "机构名"] [--name "人名"]'); process.exit(1) }

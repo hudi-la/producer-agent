@@ -54,9 +54,8 @@ grant execute on function public.pa_scout_cards(uuid, jsonb) to authenticated, s
 
 -- 任务的 config(信息源住这儿)进读面。列只能追加在最后:
 -- create or replace view 不许改老列的位置。
-create or replace view public.v_pa_tasks as
-  select id, name, type, enabled, schedule, last_result, last_run_at, sort, config
-    from producer.tasks;
+-- 2026-09-16 合并后:主线 0125 的 v_pa_tasks 已经带 config(和排期列),不再重定义——
+-- create or replace 会砍掉那些列。下面只重申 invoker 和权限。
 
 -- create or replace 不保证保留视图选项,invoker 这一下必须重申——
 -- 掉了它,视图就以定义者身份跑,行级权限被静默绕过。

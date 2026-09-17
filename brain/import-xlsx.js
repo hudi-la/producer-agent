@@ -11,6 +11,9 @@
 
 import ExcelJS from 'exceljs'
 import { createClient } from '@supabase/supabase-js'
+import { makeDb as __makeDb } from './dbauth.js'
+import { initStore as __initStore } from './mail/store.js'
+__initStore((await __makeDb()).db)   // makeDb 是异步的(本机模式要开库);CLI 脚本自己接一次
 
 const DEFAULT_FILE = '/Users/dihu/Desktop/applicaitons/opportunity/HuDi_Opportunities.xlsx'
 

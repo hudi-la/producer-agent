@@ -28,9 +28,13 @@ create or replace view public.v_pa_meta as
 
 grant select on public.v_pa_meta to anon, authenticated, service_role;
 
-create or replace view public.v_pa_tasks as
-  select id, name, type, enabled, schedule, last_result, last_run_at, sort
-    from producer.tasks;
+-- 2026-09-16 合并后:主线 0125 已经建了带排期列的 v_pa_tasks,这儿只补「还没有」的情况
+-- (create or replace 不许砍列——从零建库时 0125 先跑,这一段应该是空转)。
+do $$ begin
+  if not exists (select 1 from pg_views where schemaname = 'public' and viewname = 'v_pa_tasks') then
+    execute 'create view public.v_pa_tasks as select id, name, type, enabled, schedule, last_result, last_run_at, sort from producer.tasks';
+  end if;
+end $$;
 
 grant select on public.v_pa_tasks to anon, authenticated, service_role;
 

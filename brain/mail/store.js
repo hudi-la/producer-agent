@@ -6,11 +6,13 @@ import { makeDb } from '../dbauth.js'
 
 let _db = null
 export function db() {
-  if (_db) return _db
-  // 双模见 dbauth.js:个人版走 SERVICE_ROLE,学员走 anon + 登录会话(受行级权限管)
-  _db = makeDb().db
+  // makeDb 变成异步之后(本机模式要开库),这儿不再懒建——server.js 起来时
+  // initStore 一次;CLI 脚本(mail/*-run.js、replay.js)各自开头也 initStore。
+  if (!_db) throw new Error('store.db() 在 initStore() 之前被调了')
   return _db
 }
+/** 把 server.js 建好的那个客户端交进来。三模见 dbauth.js。 */
+export function initStore(dbHandle) { _db = dbHandle }
 
 const call = async (fn, args) => {
   const { data, error } = await db().rpc(fn, args)

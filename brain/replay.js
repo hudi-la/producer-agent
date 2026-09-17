@@ -22,6 +22,9 @@ import { eventOf, parseTag, cellFor } from './judge.js'
 // import 会占端口）。2026-08-24 语气那刀把它搬进了 prompt.js（纯函数，随便 import），
 // 「改一处要改两处」从此不存在。
 import { JUDGE_RULE as JUDGE_SYSTEM } from './prompt.js'
+import { makeDb as __makeDb } from './dbauth.js'
+import { initStore as __initStore } from './mail/store.js'
+__initStore((await __makeDb()).db)   // makeDb 是异步的(本机模式要开库);CLI 脚本自己接一次
 
 async function think1(prompt) {
   const out = []

@@ -22,3 +22,17 @@ create table if not exists producer_meta.applied (
   filename   text primary key,
   applied_at timestamptz not null default now()
 );
+-- Supabase Storage 的两张表(0044 建桶、挂策略要用)。本地附件不走它们——
+-- 字节落在 <数据目录>/files/(localdb.js)。这两张只是让那支迁移能过。
+create schema if not exists storage;
+create table if not exists storage.buckets (
+  id              text primary key,
+  name            text,
+  public          boolean default false,
+  file_size_limit bigint
+);
+create table if not exists storage.objects (
+  id        uuid primary key default gen_random_uuid(),
+  bucket_id text,
+  name      text
+);

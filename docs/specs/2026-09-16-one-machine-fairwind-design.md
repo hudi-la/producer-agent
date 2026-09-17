@@ -87,7 +87,7 @@ Gmail 只存草稿、不发信；①b（agent 退出邮箱）仍暂缓。
 |---|---|---|---|---|
 | 云端 service | 作者个人版（今天） | 绕过 | null（无主行） | `jjgvvtrs…` 生产库 |
 | 云端 user | 8/24 多租户版；将来第二步 | 生效 | Supabase Auth 的 uuid | 作者托管的库 |
-| **本地 PGlite** | **学员（这次）** | 超级用户，不生效 | 本机固定的一个 uuid | `<数据目录>/db/` |
+| **本地 PGlite** | **学员（这次）** | 生效（会话切成 `authenticated`） | 本机固定的一个 uuid | `<数据目录>/db/` |
 
 三者跑的是**同一批** `supabase/migrations/*.sql`，顺序由 `scripts/migration-order.mjs` 定（不是文件名字典序），
 全新库跳过一次性数据修复（那个脚本里的 `数据修复` 集合）。这三条已在 8/24 做好，本次不动。
@@ -106,17 +106,23 @@ create function auth.uid() returns uuid language sql stable
 ```
 
 `fairwind.uid` 由 brain 在每个连接上 `set`，值是 `settings.json` 里生成一次的 uuid。
+前言还建两张空的 `storage.buckets` / `storage.objects`——0044 建桶、挂策略要用；本地附件不走它们。
+迁移里引用的 Supabase 专属对象只有这几样（2026-09-16 实测：`storage.*` 五处、`auth.uid()` 八处、`auth.users` 三处）。
 
 ### 5.3 本地「注册」
 
 装机时往 `auth.users` 插一行（本机 uuid + 学员填的邮箱）。0118 的 `handle_new_user` 触发器
 照常跑，造出这个人的 `profile` 和 `voice` 行。**注册流程零改动**，云端和本地走的是同一个触发器。
 
-### 5.4 RLS 在本地
+### 5.4 RLS 在本地：同一道门，一个人
 
-PGlite 的连接是超级用户，policy 不生效——本地只有一个人，不需要门。但 `owner default auth.uid()`
-照样把每一行盖上本机 uuid。将来搬云（十三节）时，把这个 uuid 映射成 Supabase Auth 的 uuid 即可，
-不用回头补 owner。
+PGlite 的会话是超级用户。开完库、跑完迁移之后 brain 切成 `authenticated`（`set role`），
+从此行级权限跟云端一样生效：definer/invoker、grant、policy 全部照旧。本机模式不是"没有门"，
+是"同一道门，只有一个人"——RLS 的 bug 在本机就会暴露，不用等上云。
+迁移和注册（写 `auth.users`）回超级用户做，做完切回来（`migrate.js` 的 `asSuperuser`）。
+`owner default auth.uid()` 把每一行盖上本机 uuid；将来搬云（十三节）时把它映射成 Supabase Auth 的 uuid 即可。
+（2026-09-16 施工时改的：原稿写的是"超级用户、policy 不生效"，实测 0135 的种子 voice 行是无主的，
+不开门它会混进 `v_pa_voice`；开门之后跟云端一模一样。）
 
 ### 5.5 迁移记账
 

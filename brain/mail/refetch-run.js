@@ -1,6 +1,9 @@
 // `npm run mail:refetch <message id> [id...]` 的入口。
 import { refetch, settle } from './refetch.js'
 import { MailAuthError } from './auth.js'
+import { makeDb as __makeDb } from '../dbauth.js'
+import { initStore as __initStore } from './store.js'
+__initStore((await __makeDb()).db)   // makeDb 是异步的(本机模式要开库);CLI 脚本自己接一次
 
 const ids = process.argv.slice(2).filter(Boolean)
 if (!ids.length) {
