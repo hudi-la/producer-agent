@@ -4,9 +4,12 @@ import { fetchStudioThread, rewindStudio } from '../lib/studio.js'
 import SayBubble from './Resay.jsx'
 import Md from './Md.jsx'
 
-// 右边那一栏：左边摊开哪一条，这儿就是那一条的对话。**一条一个**，
-// 各记各的，永久累积。放在旁边而不是塞进条目里，是为了改描述时
-// 原文和商量在同一屏上对着看。
+// 右边那个抽屉：左边摊开哪一条，这儿就是那一条的对话。**一条一个**，
+// 各记各的，永久累积。
+//
+// 平时不在 —— 一条都没摊开时 Library 整块不渲染它，中栏自己铺满。
+// 摊开才划出来。放在旁边而不是塞进条目里，是为了改描述时原文和商量
+// 在同一屏上对着看。
 //
 // 说话那一整套（发、边想边出字、重说、终止）走 useChat —— 跟机会线那页
 // 用的是同一份实现，不是照抄的第二份。这儿只剩渲染。
@@ -15,7 +18,7 @@ import Md from './Md.jsx'
 // 进不进档案是你自己选中、复制、在上面那一格里改。所以这儿没有信卡、
 // 没有表卡、没有状态卡 —— 它没有那些能力。
 
-export default function EntryChat({ entry }) {
+export default function EntryChat({ entry, onClose }) {
   const chat = useChat({
     owner: { kind: 'studio', id: entry.id },
     reload: () => fetchStudioThread(entry.id),
@@ -39,6 +42,9 @@ export default function EntryChat({ entry }) {
   return (
     <div className="echat">
       <div className="echat-hd">
+        {/* × 把这一条收起来 —— 抽屉和「这条摊着没摊着」是同一件事，
+            两个开关各管一半的话，你会关掉抽屉却不知道怎么让它回来。 */}
+        {onClose && <button className="echat-x" onClick={onClose} aria-label="收起这一条">×</button>}
         一起写《{entry.title || '未命名'}》
         <i>它带着你整个档案，但这次只说这一条。
           写出来的字进不了档案——你自己复制到左边那一格里。</i>

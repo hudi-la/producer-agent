@@ -266,7 +266,7 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
           <h1>我的档案</h1>
           <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
         </header>
-        <div className="lib-three">
+        <div className={'lib-three' + (active ? ' open' : '')}>
           <nav className="lib-rail" aria-label="档案分类">
             {sections.map((s) => {
               const d = draftsIn(s)
@@ -291,14 +291,13 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
                              onSaved={onEntrySaved} openIds={openIds} activeId={activeId}
                              onToggle={toggle} onAdd={add} />}
           </div>
-          {/* 右边那一栏：跟左边摊开的那一条对着看。对话仍然是**一条一个**，
-              只是从条目里搬到了旁边 —— 这样改描述时，原文和商量在同一屏上。 */}
-          <div className="lib-side">
-            {active
-              ? <EntryChat entry={active} key={active.id} />
-              : <div className="echat-idle">点开左边任意一条，这儿就是那一条的对话。<br />
-                  没有条目就没有对话 —— 想从零起一份，先在上面「+ 加一条」。</div>}
-          </div>
+          {/* 右边那个抽屉。**平时不在**：一条都没摊开时整块不渲染，中栏自己铺满。
+              摊开哪一条它才划出来，聊的就是那一条 —— 原文和商量在同一屏上对着看。 */}
+          {active && (
+            <div className="lib-side">
+              <EntryChat entry={active} key={active.id} onClose={() => toggle(active.id)} />
+            </div>
+          )}
         </div>
       </div>
     </div>
