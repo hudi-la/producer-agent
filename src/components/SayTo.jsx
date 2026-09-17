@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
+import { useGrow } from '../lib/useGrow.js'
 
 // 对选中的 N 条线说同一句话。
 //
@@ -8,6 +9,8 @@ import React, { useState } from 'react'
 export default function SayTo({ n, onSend, onCancel }) {
   const [text, setText] = useState('')
   const t = text.trim()
+  const ta = useRef(null)
+  useGrow(ta, text)
 
   return (
     <>
@@ -17,6 +20,7 @@ export default function SayTo({ n, onSend, onCancel }) {
         {/* 说清楚它会怎么落地——这句话会写进每条线的对话，是不可撤销的记录 */}
         <p className="sayto-s">同一句话分别说给每条线，各答各的（它们的料不一样）。这句会记进每条线的对话，标明是群发。</p>
         <textarea
+          ref={ta}
           className="sayto-in"
           value={text}
           autoFocus

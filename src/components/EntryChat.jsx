@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { useChat } from '../lib/useChat.js'
+import { useGrow } from '../lib/useGrow.js'
 import { fetchStudioThread, rewindStudio } from '../lib/studio.js'
 import SayBubble from './Resay.jsx'
 import Md from './Md.jsx'
@@ -26,6 +27,8 @@ export default function EntryChat({ entry, onClose }) {
   })
   const { msgs, setMsgs, text, setText, busy, err, setErr, editId, setEditId, live, act } = chat
   const endRef = useRef(null)
+  const taRef = useRef(null)
+  useGrow(taRef, text)
 
   useEffect(() => {
     let alive = true
@@ -96,6 +99,7 @@ export default function EntryChat({ entry, onClose }) {
         {/* isComposing 那句不能删——中文输入法选词时也会敲 Enter，
             不挡的话你选个词就把半句话发出去了。 */}
         <textarea
+          ref={taRef}
           rows={1}
           value={text}
           disabled={busy}
