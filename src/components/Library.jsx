@@ -72,13 +72,13 @@ function Entry({ e, open, active, onToggle, onSaved }) {
     <div className={'work' + (active ? ' active' : '')}>
       {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
           输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
-          点空白处仍然开/关编辑；键盘走右边那个真按钮（编辑 / 完成）。 */}
+          点空白处仍然摊开/合上；键盘走右边那个真按钮（一起写 / 合上）。 */}
       <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
           <InlineText value={e.title} cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
           <InlineText value={e.body} cls="w-d" long ro={ro}
-                      placeholder={open ? '双击写点描述' : null}
+                      placeholder={open ? '双击这儿写描述' : null}
                       onSave={(v) => save({ body: v })} />
           <div className="w-foot">
             <span className={'boxchip' + (entries.length ? ' filled' : '')}>
@@ -94,19 +94,24 @@ function Entry({ e, open, active, onToggle, onSaved }) {
             {e.source === 'website' && <span className="src-tag">读自网站</span>}
           </div>
         </div>
-        {/* 以前这儿是 › / ⌄ —— 那个符号说的是「底下还有详情没展开」。可折叠着的时候
-            文案本来就全摆着，打开之后多出来的是字段、盒子、和右边的对话：那是**改这一条**，
-            不是看详情。所以按钮直说：编辑 / 完成。 */}
+        {/* 这颗按钮**不管改字**。改字是双击那一段（InlineText），折叠着也能改，
+            改完那一格自己有「确定 / 取消」—— 两套东西，各管各的。
+            它管的是「把这一条摊开来干活」：在写/写完的开关、字段、盒子，
+            外加右边那条对话。
+            名字为此换过两次：先是 › （说的是「底下还有详情」，可折叠着文案就全摆着），
+            后来叫「编辑」（那是双击在干的事，屏幕上于是有两个「编辑」各管一半）。
+            现在直说它打开的那件事。 */}
         <button type="button" className={'edtg' + (open ? ' on' : '')} aria-pressed={open}
-                title={open ? '改完了，收起字段和右边的对话' : '改这一条：打开字段、盒子，右边开这一条的对话'}
+                title={open ? '合上字段、盒子和右边的对话（改好的字早存下了，这儿不管存）'
+                            : '摊开这一条：字段、盒子，右边开这一条的对话。改标题和描述直接双击，不用先按这儿'}
                 onClick={(ev) => { ev.stopPropagation(); toggle() }}>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
                strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {open
-              ? <path d="M20 6 9 17l-5-5" />
-              : <><path d="M12 20h9" /><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" /></>}
+              ? <path d="m18 15-6-6-6 6" />
+              : <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" /></>}
           </svg>
-          {open ? '完成' : '编辑'}
+          {open ? '合上' : '一起写'}
         </button>
       </div>
       {open && (

@@ -644,7 +644,8 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .chev { color: var(--ink-3); font-size: 20px; line-height: 1; transition: transform .18s; margin-top: 2px;
   background: none; border: 0; padding: 0 2px; cursor: pointer; font-family: inherit; }
 .chev.open { transform: rotate(90deg); }
-/* 档案条目右上角那颗「编辑 / 完成」。长得跟机会卡上「展开」那颗（.desktg）一家：
+/* 档案条目右上角那颗「一起写 / 合上」。它不管改字（改字是双击那一段）——
+   它摊开的是字段、盒子和右边那条对话。长得跟机会卡上「展开」那颗（.desktg）一家：
    胶囊、图标 + 两个字，打开时换强调色不换位——位置一动你就找不到它了。 */
 .edtg { display: inline-flex; align-items: center; gap: 5px; flex: none; margin-top: 1px;
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
