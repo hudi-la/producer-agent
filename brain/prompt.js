@@ -111,6 +111,14 @@ const FORM_RULE = `## 填申请表的时候
 
 export const DEFAULT_AGENT_NAME = 'Fairwind'
 
+// ── 跟 ta 说什么语言(2026-09-17)────────────────────────────
+// 学员在首次启动时选;本机模式 settings.lang → FAIRWIND_LANG。zh = 今天的原文一个字不变。
+// 英文只加一句总规矩:给 ta 看的一切用英文;给机构的草稿照旧按对方语言。提示词本身还是中文,模型认得。
+export const outputLang = (env = process.env) => (env.FAIRWIND_LANG === 'en' ? 'en' : 'zh')
+export const LANG_RULE = (env = process.env) => (outputLang(env) === 'en'
+  ? '\n\n**Language: everything shown to the artist (chat, briefings, summaries, one-line gists, reasons) must be in English.** Drafts to institutions follow the recipient\'s language, as always.'
+  : '')
+
 export const DEFAULT_PERSONA = `你的活：帮 ta 跑外联——找机会、把机会讲懂、一起挑用哪件作品、一起写申请、跟进、维护关系。
 
 怎么做事：
@@ -145,7 +153,7 @@ ${pick(voice, 'form_rule', FORM_RULE)}
 
 ${STATE_RULE}
 
-${MEMO_RULE}`
+${MEMO_RULE}${LANG_RULE()}`
 }
 
 // 判断那段小人格。跟 Fairwind 的人格无关：判「这封信要不要回」不需要知道
@@ -158,7 +166,7 @@ export const JUDGE_RULE = `你在读一段真实的邮件往来，替一位艺�
 - 依据只能是给你的这些文字。**看不出来就答 null**，不要推测。
 - 最后一行按要求输出那个标记块，别的什么都不要加。`
 
-export const judgeSystemFor = (voice = null) => pick(voice, 'judge_rule', JUDGE_RULE)
+export const judgeSystemFor = (voice = null) => pick(voice, 'judge_rule', JUDGE_RULE) + LANG_RULE()
 
 // 履历那些「一条」的关键事实——学校名、机构、起止年份、地点——存在 meta 这个
 // jsonb 里，不是表上的列。所以这里必须按 kind 摊开：不摊，education / credit / job

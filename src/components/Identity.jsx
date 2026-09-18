@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { t } from '../i18n/index.js'
 import { saveProfile, useProfile } from '../lib/profile.js'
 import { supa } from '../lib/backends.js'
 import { EditRow } from './EditRow.jsx'
@@ -20,13 +21,13 @@ const FIELDS = [
   // 对方看到一个陌生地址，而你在自己的已发送里找不到它。brain 那头会当场拒发。
   // veil = 展示模式下盖小花的私人字段。规则类（资助偏好/排除/关注）不盖：
   // 它们讲的是机会怎么筛，正是演示要给人看的；名字/邮箱/身份/常住是你这个人。
-  { key: 'email', label: '邮箱', veil: true, hint: 'Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。' },
-  { key: 'visa', label: '身份', veil: true, hint: '例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。' },
-  { key: 'location', label: '常住', list: true, veil: true, hint: '多个地方用「、」分开。' },
-  { key: 'career_stage', label: '阶段', hint: '例：emerging、mid-career。' },
-  { key: 'funding_pref', label: '资助偏好', long: true },
-  { key: 'exclude_rule', label: '排除规则', long: true, hint: '满足这条的机会不进主名单。写错了你会看不见一整类机会。' },
-  { key: 'watch_rule', label: '关注规则', long: true, hint: '够不着但值得盯的，按这条留下来。' },
+  { key: 'email', label: t('邮箱'), veil: true, hint: t('Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。') },
+  { key: 'visa', label: t('身份'), veil: true, hint: t('例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。') },
+  { key: 'location', label: t('常住'), list: true, veil: true, hint: t('多个地方用「、」分开。') },
+  { key: 'career_stage', label: t('阶段'), hint: t('例：emerging、mid-career。') },
+  { key: 'funding_pref', label: t('资助偏好'), long: true },
+  { key: 'exclude_rule', label: t('排除规则'), long: true, hint: t('满足这条的机会不进主名单。写错了你会看不见一整类机会。') },
+  { key: 'watch_rule', label: t('关注规则'), long: true, hint: t('够不着但值得盯的，按这条留下来。') },
 ]
 
 // 那个 Row 搬去了 EditRow.jsx —— 档案页的条目要用同一套手感（见那个文件顶上的说明）。
@@ -40,11 +41,11 @@ export default function Identity({ onSaved }) {
 
   return (
     <section className="kind identity">
-      <div className="kind-h">关于你</div>
+      <div className="kind-h">{t('关于你')}</div>
       <div className="idbox">
-        <EditRow label="名字" value={profile?.name} veil
+        <EditRow label={t('名字')} value={profile?.name} veil
              onSave={(v) => after(() => saveProfile({ name: v }))} />
-        <EditRow label="作品站" value={profile?.website}
+        <EditRow label={t('作品站')} value={profile?.website}
              onSave={(v) => after(() => saveProfile({ website: v }))} />
         {FIELDS.map((f) => (
           <EditRow key={f.key} label={f.label} value={d[f.key]} hint={f.hint} long={f.long} list={f.list} veil={f.veil}
@@ -52,7 +53,7 @@ export default function Identity({ onSaved }) {
         ))}
       </div>
       <div className="idnote">
-        改完 Fairwind 下一次开口就用新的——它读的就是这里，没有第二份。
+        {t('改完 Fairwind 下一次开口就用新的——它读的就是这里，没有第二份。')}
       </div>
       <AccountRow />
     </section>
@@ -73,8 +74,8 @@ function AccountRow() {
   if (!supa || !email) return null
   return (
     <div className="idnote acct">
-      登录身份:{email}
-      <button type="button" className="acct-out" onClick={() => supa.auth.signOut()}>登出</button>
+      {t('登录身份:')}{email}
+      <button type="button" className="acct-out" onClick={() => supa.auth.signOut()}>{t('登出')}</button>
     </div>
   )
 }
@@ -83,19 +84,20 @@ function AccountRow() {
 // 这儿的输入框空着 = 不动原来的,填了 = 换掉。改完当场生效,brain 不用重启。
 function LocalAccount() {
   const [cur, setCur] = useState(null)
-  const [form, setForm] = useState({ email: '', apiKey: '', model: '', modelCheap: '', backupDir: '' })
+  const [form, setForm] = useState({ email: '', apiKey: '', model: '', modelCheap: '', backupDir: '', lang: 'zh' })
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
-  const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, apiKey: '' })) } })
+  const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, lang: s.lang || 'zh', apiKey: '' })) } })
   useEffect(() => { load() }, [])
   if (!cur) return null
-  const dirty = form.apiKey || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir
+  const dirty = form.apiKey || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir || form.lang !== (cur.lang || 'zh')
   const save = async (e) => {
     e.preventDefault(); setBusy(true); setNote('')
     const r = await supa.settings.set(form)
     setBusy(false)
-    if (r?.error) return setNote('没存上:' + r.error.message)
-    setNote('存好了,下一次开口就用新的'); await load()
+    if (r?.error) return setNote(t('没存上:') + r.error.message)
+    if (form.lang !== (cur.lang || 'zh')) { location.reload(); return }   // 换语言:整页按新语言重来
+    setNote(t('存好了,下一次开口就用新的')); await load()
   }
   const F = ({ k, label, hint, type = 'text', placeholder }) => (
     <label className="la-row">
@@ -107,17 +109,20 @@ function LocalAccount() {
   )
   return (
     <form className="local-account" onSubmit={save}>
-      <div className="kind-h la-h">账号<small>都在你这台机器上,不上传</small></div>
-      <F k="email" label="邮箱" type="email" hint="只用来在这台机器上认出你" />
+      <div className="kind-h la-h">{t('账号')}<small>{t('都在你这台机器上,不上传')}</small></div>
+      <label className="la-row"><span className="la-k">{t('语言')}</span>
+        <select value={form.lang} onChange={(e) => setForm((f) => ({ ...f, lang: e.target.value }))}><option value="zh">中文</option><option value="en">English</option></select>
+        <small>{t('换语言后刷新页面生效')}</small></label>
+      <F k="email" label={t('邮箱')} type="email" hint={t('只用来在这台机器上认出你')} />
       <F k="apiKey" label="API key" type="password"
-         placeholder={cur.apiKeySet ? `已设置 · ${cur.apiKeyHint}(要换就填新的)` : '还没设——填一个 sk-ant- 开头的'}
-         hint="模型的钱走你自己的 key。空着 = 不动原来的" />
-      <F k="model" label="好档模型" placeholder="空 = 默认" hint="聊天、写信、讲懂用这档" />
-      <F k="modelCheap" label="便宜档模型" placeholder="空 = 默认" hint="判断、收信那些小活用这档" />
-      <F k="backupDir" label="备份目录" placeholder="/Users/你/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" hint="选一个在 iCloud Drive 或 Google Drive 里的" />
+         placeholder={cur.apiKeySet ? t('已设置 · {hint}(要换就填新的)', { hint: cur.apiKeyHint }) : t('还没设——填一个 sk-ant- 开头的')}
+         hint={t('模型的钱走你自己的 key。空着 = 不动原来的')} />
+      <F k="model" label={t('好档模型')} placeholder={t('空 = 默认')} hint={t('聊天、写信、讲懂用这档')} />
+      <F k="modelCheap" label={t('便宜档模型')} placeholder={t('空 = 默认')} hint={t('判断、收信那些小活用这档')} />
+      <F k="backupDir" label={t('备份目录')} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" hint={t('选一个在 iCloud Drive 或 Google Drive 里的')} />
       <div className="la-acts">
-        <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? '存着…' : '保存'}</button>
-        {note && <span className={'la-note' + (note.startsWith('没存上') ? ' bad' : '')}>{note}</span>}
+        <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? t('存着…') : t('保存')}</button>
+        {note && <span className={'la-note' + (note.startsWith(t('没存上:')) ? ' bad' : '')}>{note}</span>}
       </div>
       <BackupRow backupDir={cur.backupDir} />
       <UpdateRow />
@@ -133,22 +138,22 @@ function BackupRow({ backupDir }) {
   const [pathIn, setPathIn] = useState('')
   const load = () => supa.backup.list().then(setList)
   useEffect(() => { load() }, [backupDir])
-  const now = async () => { setBusy(true); setMsg(''); const r = await supa.backup.now(); setBusy(false); setMsg(r.ok ? '备好了:' + r.file.split('/').pop() : '没备成:' + r.error); load() }
+  const now = async () => { setBusy(true); setMsg(''); const r = await supa.backup.now(); setBusy(false); setMsg(r.ok ? t('备好了:{f}', { f: r.file.split('/').pop() }) : t('没备成:') + r.error); load() }
   const restore = async () => {
     if (!pathIn.trim()) return
-    if (!confirm('用这份备份换掉现在的库?现在的库会改名留着,不删。关掉再打开 Fairwind 才生效。')) return
-    const r = await supa.backup.restore(pathIn.trim()); setMsg(r.ok ? '排好了:关掉再打开就是恢复后的' : '没排上:' + r.error)
+    if (!confirm(t('用这份备份换掉现在的库?现在的库会改名留着,不删。关掉再打开 Fairwind 才生效。'))) return
+    const r = await supa.backup.restore(pathIn.trim()); setMsg(r.ok ? t('排好了:关掉再打开就是恢复后的') : t('没排上:') + r.error)
   }
   const last = list?.files?.[0]
   return (
     <div className="la-sub">
-      <div className="la-sub-h">备份<small>{backupDir ? (last ? '最近一次 ' + last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') : '还没备过') : '上面先选一个备份目录'}</small></div>
+      <div className="la-sub-h">{t('备份')}<small>{backupDir ? (last ? t('最近一次 {when}', { when: last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') }) : t('还没备过')) : t('上面先选一个备份目录')}</small></div>
       <div className="la-acts">
-        <button type="button" className="b" disabled={busy || !backupDir} onClick={now}>{busy ? '在备…' : '现在备份'}</button>
-        <input className="la-path" placeholder="从备份恢复:贴一份 .tar.gz 的路径" value={pathIn} onChange={(e) => setPathIn(e.target.value)} />
-        <button type="button" className="b" disabled={!pathIn.trim()} onClick={restore}>恢复…</button>
+        <button type="button" className="b" disabled={busy || !backupDir} onClick={now}>{busy ? t('在备…') : t('现在备份')}</button>
+        <input className="la-path" placeholder={t('从备份恢复:贴一份 .tar.gz 的路径')} value={pathIn} onChange={(e) => setPathIn(e.target.value)} />
+        <button type="button" className="b" disabled={!pathIn.trim()} onClick={restore}>{t('恢复…')}</button>
       </div>
-      {msg && <span className={'la-note' + (msg.startsWith('没') ? ' bad' : '')}>{msg}</span>}
+      {msg && <span className={'la-note' + (/^(没|Backup failed|Couldn)/.test(msg) ? ' bad' : '')}>{msg}</span>}
     </div>
   )
 }
@@ -163,15 +168,15 @@ function UpdateRow() {
   const apply = async () => {
     setBusy(true); setMsg('')
     const r = await supa.update.apply(); setBusy(false)
-    setMsg(r.ok ? `装好了 ${r.version}:关掉再打开就是新版` : '没更成:' + r.error)
+    setMsg(r.ok ? t('装好了 {v}:关掉再打开就是新版', { v: r.version }) : t('没更成:') + r.error)
   }
   return (
     <div className="la-sub">
-      <div className="la-sub-h">版本<small>{info?.current || ''}{info?.canUpdate ? ` · 有新版本 ${info.latest}${info.note ? ':' + info.note : ''}` : info?.error ? ` · ${info.error}` : info ? ' · 已是最新' : ''}</small></div>
+      <div className="la-sub-h">{t('版本')}<small>{info?.current || ''}{info?.canUpdate ? t(' · 有新版本 {v}', { v: info.latest }) + (info.note ? ':' + info.note : '') : info?.error ? ` · ${info.error}` : info ? t(' · 已是最新') : ''}</small></div>
       <div className="la-acts">
-        <button type="button" className="b" disabled={busy} onClick={check}>{busy ? '在看…' : '检查更新'}</button>
-        {info?.canUpdate && <button type="button" className="b primary" disabled={busy} onClick={apply}>更新到 {info.latest}</button>}
-        {msg && <span className={'la-note' + (msg.startsWith('没') ? ' bad' : '')}>{msg}</span>}
+        <button type="button" className="b" disabled={busy} onClick={check}>{busy ? t('在看…') : t('检查更新')}</button>
+        {info?.canUpdate && <button type="button" className="b primary" disabled={busy} onClick={apply}>{t('更新到 {v}', { v: info.latest })}</button>}
+        {msg && <span className={'la-note' + (/^(没|Update failed)/.test(msg) ? ' bad' : '')}>{msg}</span>}
       </div>
     </div>
   )

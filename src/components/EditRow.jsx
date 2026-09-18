@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { t } from '../i18n/index.js'
 import { useVeiled } from '../lib/veil.js'
 import { useGrow } from '../lib/useGrow.js'
 import { Flower } from './Veil.jsx'
@@ -54,12 +55,12 @@ function Actions({ d }) {
   return (
     <div className="ed-act">
       <button className="ed-ok" onMouseDown={(e) => e.preventDefault()} onClick={d.commit} disabled={d.saving}>
-        {d.saving ? '存……' : '确定'}
+        {d.saving ? t('存……') : t('确定')}
       </button>
       <button className="ed-no" onMouseDown={(e) => e.preventDefault()} onClick={d.cancel} disabled={d.saving}>
-        取消
+        {t('取消')}
       </button>
-      {d.err && <span className="ed-err">没存上：{d.err}</span>}
+      {d.err && <span className="ed-err">{t('没存上：')}{d.err}</span>}
     </div>
   )
 }
@@ -98,7 +99,7 @@ export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
       <div className="idrow">
         <div className="idk">{label}</div>
         <div className="idv">
-          <div className="idval ro"><span className="veil" title="展示模式盖住了"><Flower /></span></div>
+          <div className="idval ro"><span className="veil" title={t('展示模式盖住了')}><Flower /></span></div>
           {hint && <div className="idhint">{hint}</div>}
         </div>
       </div>
@@ -121,8 +122,8 @@ export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
         ) : (
           <div className={'idval' + (empty ? ' empty' : '') + (ro ? ' ro' : '')}
                onDoubleClick={ro ? undefined : d.start}
-               title={ro ? undefined : '双击改'}>
-            {empty ? (ro ? '—' : '双击填一下') : asText(value, list)}
+               title={ro ? undefined : t('双击改')}>
+            {empty ? (ro ? '—' : t('双击填一下')) : asText(value, list)}
           </div>
         )}
         {hint && <div className="idhint">{hint}</div>}
@@ -170,7 +171,7 @@ export function InlineText({ value, cls, long, ro, placeholder, onSave }) {
       className={cls + (empty ? ' inl-empty' : '') + (ro ? '' : ' inl-can')}
       onClick={ro ? undefined : stop}
       onDoubleClick={ro ? undefined : (e) => { stop(e); d.start() }}
-      title={ro ? undefined : '双击改'}
+      title={ro ? undefined : t('双击改')}
     >
       {empty ? placeholder : asText(value)}
     </div>

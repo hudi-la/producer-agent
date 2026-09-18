@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { t } from '../i18n/index.js'
 import { useChat } from '../lib/useChat.js'
 import { useGrow } from '../lib/useGrow.js'
 import { fetchStudioThread, rewindStudio } from '../lib/studio.js'
@@ -47,24 +48,24 @@ export default function EntryChat({ entry, onClose }) {
       <div className="echat-hd">
         {/* × 把这一条收起来 —— 抽屉和「这条摊着没摊着」是同一件事，
             两个开关各管一半的话，你会关掉抽屉却不知道怎么让它回来。 */}
-        {onClose && <button className="echat-x" onClick={onClose} aria-label="收起这一条">×</button>}
-        一起写《{entry.title || '未命名'}》
-        <i>它带着你整个档案，但这次只说这一条。
-          写出来的字进不了档案——你自己复制到左边那一格里。</i>
+        {onClose && <button className="echat-x" onClick={onClose} aria-label={t('收起这一条')}>×</button>}
+        {t('一起写《{title}》', { title: entry.title || t('未命名') })}
+        <i>{t('它带着你整个档案，但这次只说这一条。')}
+          {t('写出来的字进不了档案——你自己复制到左边那一格里。')}</i>
       </div>
 
       <div className="echat-thread">
         {msgs.length === 0 && !busy && (
           <div className="empty-thread">
-            这段描述哪儿不准？想把它写成什么样？<br />
-            它说的每段话都是稿子，你挑要的那段复制到左边。
+            {t('这段描述哪儿不准？想把它写成什么样？')}<br />
+            {t('它说的每段话都是稿子，你挑要的那段复制到左边。')}
           </div>
         )}
         {msgs.map((m, i) => {
           const mine = m.role === 'artist'
           return (
             <div id={'msg-' + m.id} key={m.id || i} className={'msg' + (mine ? ' you' : ' producer')}>
-              <span className="who">{mine ? '你' : 'Fairwind'}</span>
+              <span className="who">{mine ? t('你') : 'Fairwind'}</span>
               {mine ? (
                 <SayBubble
                   m={m} msgs={msgs} editing={editId === m.id}
@@ -103,8 +104,8 @@ export default function EntryChat({ entry, onClose }) {
           rows={1}
           value={text}
           disabled={busy}
-          placeholder={busy ? '在想……（想完会自动出现，你不用守着）'
-            : '这段描述哪儿不准？想把它写成什么样？'}
+          placeholder={busy ? t('在想……（想完会自动出现，你不用守着）')
+            : t('这段描述哪儿不准？想把它写成什么样？')}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
@@ -113,9 +114,9 @@ export default function EntryChat({ entry, onClose }) {
           }}
         />
         {busy ? (
-          <button className="stop" onClick={chat.stop}>停</button>
+          <button className="stop" onClick={chat.stop}>{t('停')}</button>
         ) : (
-          <button onClick={() => chat.send()} disabled={!text.trim()}>说</button>
+          <button onClick={() => chat.send()} disabled={!text.trim()}>{t('说')}</button>
         )}
       </div>
     </div>

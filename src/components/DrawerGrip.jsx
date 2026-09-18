@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { t } from '../i18n/index.js'
 
 // 抽屉左沿那条可以拉的边。
 //
@@ -77,7 +78,7 @@ export default function DrawerGrip() {
       className="drawer-grip"
       role="separator"
       aria-orientation="vertical"
-      aria-label="拉这里改抽屉宽度（双击回到默认）"
+      aria-label={t('拉这里改抽屉宽度（双击回到默认）')}
       tabIndex={0}
       onPointerDown={start}
       onPointerMove={move}

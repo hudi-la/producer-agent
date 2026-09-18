@@ -28,7 +28,7 @@ after(async () => { await pg.close(); rmSync(dir, { recursive: true, force: true
 
 test('/me:未初始化 → ready:false', async () => {
   const r = res(); assert.equal(await handleLocalRoute(req('GET', '/me'), r, ctx), true)
-  assert.deepEqual(r.json(), { mode: 'local', ready: false, user: null })
+  assert.deepEqual(r.json(), { mode: 'local', ready: false, lang: 'zh', user: null })
 })
 
 test('/setup 写 settings、注册用户,之后 /me ready:true', async () => {

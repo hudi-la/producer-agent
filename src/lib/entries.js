@@ -1,4 +1,5 @@
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 import { EDITABLE } from '../data/schema.js'
 
 // 档案里那 60 条 —— 在页面上改。
@@ -36,8 +37,8 @@ export function patchFor(kind, key, value) {
  *   saveEntry({ id, ...patchFor(...) }) 改一格事实
  */
 export async function saveEntry({ id, title = null, body = null, medium = null, year = null, meta = null }) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
-  if (!id) throw new Error('这条没有 id，存不了')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
+  if (!id) throw new Error(t('这条没有 id，存不了'))
   const { error } = await supa.rpc('pa_set_entry', {
     p_id: id, p_title: title, p_body: body, p_medium: medium, p_year: year, p_meta: meta,
   })

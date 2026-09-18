@@ -11,6 +11,8 @@
 Task 1–7 全部做完，`npm test` 588 全绿，干净目录全流程验收 11 条全过（记录在 `packaging/ACCEPTANCE.md`）。
 第一个包 `packaging/out/Fairwind-0.1.0-mac-arm64.zip`（177MB，gitignore）。真发一版要做的一次性动作见 ACCEPTANCE.md 末尾。
 
+9/17 追加：学员出厂 scout 任务的默认提示词（0143）；本机适配层补 is/or/count+head；中英文切换（设计稿二十节），第一个包露面的那一层全覆盖，验收 10 条全过。
+
 ## Global Constraints
 
 计划（一）的全部约束照旧。另加：

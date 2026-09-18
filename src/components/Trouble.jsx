@@ -1,4 +1,5 @@
 import React from 'react'
+import { t } from '../i18n/index.js'
 import { FELL_BACK } from '../lib/backends.js'
 
 // 出事了才说话。
@@ -15,11 +16,11 @@ import { FELL_BACK } from '../lib/backends.js'
 
 const DANGER = {
   [FELL_BACK.NO_CONFIG]: {
-    title: '没连数据库 —— 现在看到的全是示例假数据',
-    fix: '检查 .env.local 里的 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY',
+    title: t('没连数据库 —— 现在看到的全是示例假数据'),
+    fix: t('检查 .env.local 里的 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY'),
   },
   [FELL_BACK.QUERY_FAILED]: {
-    title: '数据库连不上 —— 现在看到的全是示例假数据',
+    title: t('数据库连不上 —— 现在看到的全是示例假数据'),
     fix: null,   // 用库返回的原话，比我编的准
   },
 }
@@ -28,8 +29,8 @@ const DANGER = {
 // 还什么都没有——每个新账号的第一眼就是它。数据是真的(真的空),不飘红。
 // 但留一句给「本来有数据却看见空」的人:那种空是事故,别当成正常。
 const FRESH = {
-  title: '这里还是空的',
-  fix: '新账号从「我的档案」把自己填进去开始。要是你确定原来有数据,现在却是空的——那不正常,先核对登录的账号对不对。',
+  title: t('这里还是空的'),
+  fix: t('新账号从「我的档案」把自己填进去开始。要是你确定原来有数据,现在却是空的——那不正常,先核对登录的账号对不对。'),
 }
 
 export default function Trouble({ fellBack, detail, brainDown, brainStale, batchFailed, mail }) {
@@ -78,9 +79,9 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
         <div className="tr-row warn">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
-            <b>Fairwind 的脑子没开</b>
+            <b>{t('Fairwind 的脑子没开')}</b>
             <span className="tr-fix">
-              新机会的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。
+              {t('新机会的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。')}
               另开一个终端跑 <code>npm run brain</code>
             </span>
           </span>
@@ -92,9 +93,9 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
         <div className="tr-row warn">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
-            <b>脑子跑的是旧代码</b>
+            <b>{t('脑子跑的是旧代码')}</b>
             <span className="tr-fix">
-              它开着，但启动之后代码又改过——新加的行为不会生效，而且看不出来。
+              {t('它开着，但启动之后代码又改过——新加的行为不会生效，而且看不出来。')}
               到跑 brain 的那个终端按 Ctrl-C，再 <code>npm run brain</code>
             </span>
           </span>
@@ -107,10 +108,10 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
         <div className="tr-row warn">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
-            <b>有 {batchFailed} 条线这轮没跑成</b>
+            <b>{t('有 {n} 条线这轮没跑成', { n: batchFailed })}</b>
             <span className="tr-fix">
-              信没丢、话也没记错——它们只是这轮没轮到。brain 的终端里有每条的报错，
-              再跑一次会重试（要群发的话就再勾一次）。
+              {t('信没丢、话也没记错——它们只是这轮没轮到。brain 的终端里有每条的报错，')}
+              {t('再跑一次会重试（要群发的话就再勾一次）。')}
             </span>
           </span>
         </div>

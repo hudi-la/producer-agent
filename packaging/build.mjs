@@ -38,6 +38,7 @@ cpSync(resolve(ROOT, 'dist'), join(APP, 'dist'), { recursive: true })
 say('brain → 字节码')
 await buildBrain('brain/server.js', 'brain', { outDir: APP, define: { __FAIRWIND_RELEASE_URL__: JSON.stringify(release.latestUrl || '') } })
 copyFileSync(resolve(ROOT, 'packaging/data/judgments-README.md'), join(APP, 'judgments-README.md'))
+copyFileSync(resolve(ROOT, 'packaging/data/judgments-README.en.md'), join(APP, 'judgments-README.en.md'))
 
 say('迁移(只带新装要跑的那批)')
 mkdirSync(join(APP, 'migrations'))

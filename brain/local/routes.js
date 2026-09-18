@@ -30,7 +30,7 @@ const readJson = async (req) => { const b = await readAll(req); return b.length 
 export function publicSettings(s) {
   const k = s.apiKey || ''
   return { email: s.email || '', model: s.model || '', modelCheap: s.modelCheap || '', backupDir: s.backupDir || '',
-           judgmentsEnabled: s.judgmentsEnabled !== false,
+           judgmentsEnabled: s.judgmentsEnabled !== false, lang: s.lang === 'en' ? 'en' : 'zh',
            ready: Boolean(s.ready), apiKeySet: Boolean(k), apiKeyHint: k ? `${k.slice(0, 7)}…${k.slice(-4)}` : '' }
 }
 
@@ -40,6 +40,7 @@ export function exportEnv(s) {
   process.env.BRAIN_MODEL = s.model || ''
   process.env.BRAIN_MODEL_CHEAP = s.modelCheap || ''
   setJudgmentsEnabled(s.judgmentsEnabled !== false)
+  process.env.FAIRWIND_LANG = s.lang === 'en' ? 'en' : 'zh'   // brain 的提示词按它决定跟 ta 说哪种语言
 }
 
 /**
@@ -54,7 +55,7 @@ export async function handleLocalRoute(req, res, ctx) {
 
   if (req.method === 'GET' && p === '/me') {
     const s = ctx.settings
-    json(res, 200, { mode: 'local', ready: Boolean(s.ready), user: s.ready ? { id: s.uid, email: s.email } : null })
+    json(res, 200, { mode: 'local', ready: Boolean(s.ready), lang: s.lang === 'en' ? 'en' : 'zh', user: s.ready ? { id: s.uid, email: s.email } : null })
     return true
   }
 
@@ -66,6 +67,7 @@ export async function handleLocalRoute(req, res, ctx) {
     for (const k of ['email', 'model', 'modelCheap', 'backupDir']) if (typeof body[k] === 'string') patch[k] = body[k].trim()
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) patch.apiKey = body.apiKey.trim()   // 空着 = 不动原来的
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
+    if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang
     const s = saveSettings(dataDir, patch)
     ctx.settings = s
     if (s.email) await registerLocalUser(ctx.pg, { id: s.uid, email: s.email })

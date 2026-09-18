@@ -92,6 +92,15 @@ const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 let db, DB_MODE, LOCAL_MODE = null, MODS = { profile: true, pursuits: true, mail: true, canToggle: false }
 // 连库放进一个函数、在 main() 里 await:这个文件不能有顶层 await——
 // 打包成字节码时是 CJS,CJS 没有顶层 await(packaging/SPIKE.md 第 3 条)。
+// 判据目录里的 README 按语言放一份;已经有了(他自己改过的)就不动
+function placeJudgmentsReadme(jdir, lang) {
+  if (fsExists(pathJoin(jdir, 'README.md'))) return
+  const rd = lang === 'en' ? 'judgments-README.en.md' : 'judgments-README.md'
+  for (const cand of [process.env.FAIRWIND_JUDGMENTS_README, fileURLToPath(new URL(`./${rd}`, import.meta.url)), fileURLToPath(new URL(`../packaging/data/${rd}`, import.meta.url))]) {
+    if (cand && fsExists(cand)) { copyFileSync(cand, pathJoin(jdir, 'README.md')); return }
+  }
+}
+
 async function connect() {
   const r = await makeDb()
   db = r.db; DB_MODE = r.mode
@@ -104,15 +113,13 @@ async function connect() {
       pg: r.pg, settings: r.settings, dataDir: process.env.FAIRWIND_DATA_DIR,
       // 前端构建产物:开发时是仓库的 dist/,打包后是字节码旁边的 dist/
       distDir: process.env.FAIRWIND_DIST_DIR || fileURLToPath(new URL('../dist/', import.meta.url)),
-      onSetup: async (settings) => { LOCAL_MODE.settings = settings },
+      onSetup: async (settings) => { LOCAL_MODE.settings = settings; placeJudgmentsReadme(pathJoin(LOCAL_MODE.dataDir, 'judgments'), settings.lang) },
     }
     exportEnv(r.settings)   // key 和两档模型:settings.json 是学员机器上唯一的一份,不用 .env
     // 判据文档目录。README 由安装包带着,第一次开库放进去(已有就不动——那是他自己改过的)
     const jdir = pathJoin(LOCAL_MODE.dataDir, 'judgments')
     fsMkdir(jdir, { recursive: true })
-    for (const cand of [process.env.FAIRWIND_JUDGMENTS_README, fileURLToPath(new URL('./judgments-README.md', import.meta.url)), fileURLToPath(new URL('../packaging/data/judgments-README.md', import.meta.url))]) {
-      if (cand && fsExists(cand) && !fsExists(pathJoin(jdir, 'README.md'))) { copyFileSync(cand, pathJoin(jdir, 'README.md')); break }
-    }
+    if (r.settings.ready) placeJudgmentsReadme(jdir, r.settings.lang)   // 还没初始化就等 /setup 选完语言再放
     useJudgmentsDir(jdir, { log: (m) => console.log(m) })
     // 检查更新:起来 20 秒后查一次,之后每小时(结果挂在 /health 上,界面自己看)。执行靠人点。
     setTimeout(() => refreshUpdateCheck({ force: true }).catch(() => {}), 20_000)

@@ -52,7 +52,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       },
     },
     auth: {
-      async getSession() { const m = await whoami(); return { data: { session: sessionOf(m), local: true }, error: null } },
+      async getSession() { const m = await whoami(); return { data: { session: sessionOf(m), local: true, lang: m.lang || 'zh' }, error: null } },
       async getUser() { const m = await whoami(); return { data: { user: m.user }, error: null } },
       onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } } },
       async signOut() { return { error: null } },

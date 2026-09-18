@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { t } from '../i18n/index.js'
 import { supa, DB_CONFIGURED } from './backends.js'
 
 // 「我的档案」——关于你自己的事实。
@@ -32,7 +33,7 @@ export async function loadProfile() {
  *                     所以 location 这种数组传新的就是换掉，不会拼接。
  */
 export async function saveProfile({ name = null, website = null, data = null } = {}) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_set_profile', {
     p_name: name, p_website: website, p_data: data,
   })
@@ -50,7 +51,7 @@ export const useProfile = () => useContext(ProfileContext)
  */
 export function heldLabel(profile) {
   const visa = profile?.data?.visa
-  return visa ? `${visa} · 资格搁置` : '资格搁置'
+  return visa ? t('{visa} · 资格搁置', { visa }) : t('资格搁置')
 }
 
 /** 给 Fairwind 拼上下文用：把档案里会影响判断的事实摊成几行人话。 */

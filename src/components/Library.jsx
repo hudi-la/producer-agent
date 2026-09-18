@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { t } from '../i18n/index.js'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
@@ -19,7 +20,7 @@ import DrawerGrip from './DrawerGrip.jsx'
 // 60 条一条没少，你始终知道它在哪、有几条。
 
 const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
-const BOX_LABELS = { why_now: '为什么是现在', reach_out: '想触达', hidden_links: '隐线', materials: '材料', note: '备注' }
+const BOX_LABELS = { why_now: t('为什么是现在'), reach_out: t('想触达'), hidden_links: t('隐线'), materials: t('材料'), note: t('备注') }
 
 const boxEntries = (box) => Object.entries(box || {}).filter(([, v]) => v != null && v !== '')
 
@@ -34,14 +35,14 @@ function EntryFields({ e, ro, save }) {
   if (!fields.length && !ro) return null
   return (
     <div className="efields">
-      <div className="bx-h">这条的字段</div>
+      <div className="bx-h">{t('这条的字段')}</div>
       {ro && (
         <div className="bx-empty">
-          现在看到的是示范数据（没连上库），改不了。连上 Supabase 之后这些字段就能直接改。
+          {t('现在看到的是示范数据（没连上库），改不了。连上 Supabase 之后这些字段就能直接改。')}
         </div>
       )}
       {fields.map((f) => (
-        <EditRow key={f.key} label={f.label} hint={f.hint} ro={ro}
+        <EditRow key={f.key} label={t(f.label)} hint={f.hint && t(f.hint)} ro={ro}
                  value={f.col ? e[f.key] : e.meta?.[f.key]}
                  onSave={(v) => save(patchFor(e.kind, f.key, v))} />
       ))}
@@ -78,27 +79,27 @@ function Entry({ e, open, active, onToggle, onSaved }) {
         <div className="work-main">
           <InlineText value={e.title} cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
           <InlineText value={e.body} cls="w-d" long ro={ro}
-                      placeholder={open ? '双击写点描述' : null}
+                      placeholder={open ? t('双击写点描述') : null}
                       onSave={(v) => save({ body: v })} />
           <div className="w-foot">
             <span className={'boxchip' + (entries.length ? ' filled' : '')}>
-              {entries.length ? `盒子 · 已补 ${entries.length} 条` : '盒子 · 空'}
+              {entries.length ? t('盒子 · 已补 {n} 条', { n: entries.length }) : t('盒子 · 空')}
             </span>
             {/* 只有「在写」才挂标。写完的是常态，61 条各顶一个「写完了」全是噪音。
                 要把一条标成在写，在展开后那块里切（见下面 EntryFields 上面那一行）。 */}
             {e.draft && (
               <button className="draftchip on" onClick={flipDraft} disabled={ro}
-                      title="写申请时翻不到这条。点一下算写完">在写</button>
+                      title={t('写申请时翻不到这条。点一下算写完')}>{t('在写')}</button>
             )}
             {facts.map((f, i) => <span className="w-medium" key={i}>{f}</span>)}
-            {e.source === 'website' && <span className="src-tag">读自网站</span>}
+            {e.source === 'website' && <span className="src-tag">{t('读自网站')}</span>}
           </div>
         </div>
         {/* 以前这儿是 › / ⌄ —— 那个符号说的是「底下还有详情没展开」。可折叠着的时候
             文案本来就全摆着，打开之后多出来的是字段、盒子、和右边的对话：那是**改这一条**，
             不是看详情。所以按钮直说：编辑 / 完成。 */}
         <button type="button" className={'edtg' + (open ? ' on' : '')} aria-pressed={open}
-                title={open ? '改完了，收起字段和右边的对话' : '改这一条：打开字段、盒子，右边开这一条的对话'}
+                title={open ? t('改完了，收起字段和右边的对话') : t('改这一条：打开字段、盒子，右边开这一条的对话')}
                 onClick={(ev) => { ev.stopPropagation(); toggle() }}>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
                strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -106,7 +107,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
               ? <path d="M20 6 9 17l-5-5" />
               : <><path d="M12 20h9" /><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" /></>}
           </svg>
-          {open ? '完成' : '编辑'}
+          {open ? t('完成') : t('编辑')}
         </button>
       </div>
       {open && (
@@ -116,20 +117,20 @@ function Entry({ e, open, active, onToggle, onSaved }) {
           )}
           {!ro && (
             <div className="draftrow">
-              <span>{e.draft ? '这条还在写' : '这条写完了'}</span>
+              <span>{e.draft ? t('这条还在写') : t('这条写完了')}</span>
               <button className="draftflip" onClick={flipDraft}>
-                {e.draft ? '标成写完了' : '标成还在写'}
+                {e.draft ? t('标成写完了') : t('标成还在写')}
               </button>
-              <i>{e.draft ? '写申请时它翻不到这条' : '写申请时它会拿这条当战绩用'}</i>
+              <i>{e.draft ? t('写申请时它翻不到这条') : t('写申请时它会拿这条当战绩用')}</i>
             </div>
           )}
           <EntryFields e={e} ro={ro} save={save} />
-          <div className="bx-h">盒子 · 网站装不下的</div>
-          {entries.length === 0 && <div className="bx-empty">还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。</div>}
+          <div className="bx-h">{t('盒子 · 网站装不下的')}</div>
+          {entries.length === 0 && <div className="bx-empty">{t('还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。')}</div>}
           {entries.map(([k, v]) => (
             <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
           ))}
-          <div className="add">+ 补一条 / 丢进材料</div>
+          <div className="add">{t('+ 补一条 / 丢进材料')}</div>
         </div>
       )}
     </div>
@@ -142,7 +143,7 @@ function subGroups(items, sub, concerns) {
   const order = sub === 'concern' ? CONCERN_ORDER : CREDIT_ORDER
   const labelOf = sub === 'concern'
     ? (k) => concerns?.[k] || k
-    : (k) => CREDIT_LABEL[k] || k
+    : (k) => t(CREDIT_LABEL[k] || k)
   const groups = []
   const seen = new Set()
   for (const k of order) {
@@ -171,7 +172,7 @@ function KindSection({ label, items, sub, concerns, onSaved, openIds, activeId, 
         {/* 在这之前档案页**没有任何一个「加一条」的入口**：pa_set_entry 只能改
             已有的那条，Library 里那行「+ 补一条」是一段死文字。想往「工作坊」
             那栏放一份新 proposal，只有开 SQL 一条路。 */}
-        {onAdd && <button className="kind-add" onClick={onAdd}>+ 加一条</button>}
+        {onAdd && <button className="kind-add" onClick={onAdd}>{t('+ 加一条')}</button>}
       </div>
       {groups ? (
         groups.map(([subLabel, g]) => (
@@ -201,7 +202,7 @@ function buildSections(entries) {
     byKind.get(e.kind).push(e)
   }
 
-  const secs = [{ key: 'about', label: '关于你', about: true }]
+  const secs = [{ key: 'about', label: t('关于你'), about: true }]
   const seen = new Set()
 
   for (const k of KINDS) {
@@ -209,17 +210,17 @@ function buildSections(entries) {
     seen.add(k.key)
     if (!items?.length) continue
     if (k.key !== 'credit') {
-      secs.push({ key: k.key, label: k.label, kind: k.key, items, sub: k.sub })
+      secs.push({ key: k.key, label: t(k.label), kind: k.key, items, sub: k.sub })
       continue
     }
     const placed = new Set()
     for (const g of CREDIT_GROUPS) {
       const items_ = items.filter((e) => g.types.includes(e.meta?.type))
       items_.forEach((e) => placed.add(e))
-      if (items_.length) secs.push({ key: `credit:${g.key}`, label: g.label, kind: 'credit', items: items_, sub: 'credit' })
+      if (items_.length) secs.push({ key: `credit:${g.key}`, label: t(g.label), kind: 'credit', items: items_, sub: 'credit' })
     }
     const rest = items.filter((e) => !placed.has(e))
-    if (rest.length) secs.push({ key: 'credit:rest', label: '其他战绩', kind: 'credit', items: rest, sub: 'credit' })
+    if (rest.length) secs.push({ key: 'credit:rest', label: t('其他战绩'), kind: 'credit', items: rest, sub: 'credit' })
   }
 
   for (const [kind, items] of byKind) {
@@ -280,11 +281,11 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
     <div className="page">
       <div className={'page-inner widest' + (active ? ' drawered' : '')}>
         <header className="page-head">
-          <h1>我的档案</h1>
-          <p className="note">Fairwind 懂你的一切，都收在这里 · {entries.length} 条。作品读自 <b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || '你的作品站'}</b>；工作、教育、战绩、自述一条条补进来。每条下面的<span className="bx">盒子</span>，放"网站装不下"的私密外联层。</p>
+          <h1>{t('我的档案')}</h1>
+          <p className="note">{t('Fairwind 懂你的一切，都收在这里 · {n} 条。作品读自 ', { n: entries.length })}<b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || t('你的作品站')}</b>{t('；工作、教育、战绩、自述一条条补进来。每条下面的')}<span className="bx">{t('盒子')}</span>{t('，放"网站装不下"的私密外联层。')}</p>
         </header>
         <div className="lib-two">
-          <nav className="lib-rail" aria-label="档案分类">
+          <nav className="lib-rail" aria-label={t('档案分类')}>
             {sections.map((s) => {
               const d = draftsIn(s)
               return (
@@ -295,7 +296,7 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
                   aria-current={s.key === cur.key ? 'true' : undefined}
                 >
                   <span className="rail-l">{s.label}</span>
-                  {d > 0 && <span className="rail-d" title="写申请时翻不到这几条">{d} 在写</span>}
+                  {d > 0 && <span className="rail-d" title={t('写申请时翻不到这几条')}>{t('{d} 在写', { d })}</span>}
                   {s.items && <span className="rail-n">{s.items.length}</span>}
                 </button>
               )
@@ -315,7 +316,7 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
           平时不在：一条都没摊开时整块不渲染。摊开哪一条它才划出来，聊的就是那一条。
           页面自己往左让出抽屉那么宽，所以原文不会被盖住，左右对着看。 */}
       {active && (
-        <aside className="drawer" aria-label={`一起写《${active.title || '未命名'}》`}>
+        <aside className="drawer" aria-label={t('一起写《{title}》', { title: active.title || t('未命名') })}>
           <DrawerGrip />
           <EntryChat entry={active} key={active.id} onClose={() => toggle(active.id)} />
         </aside>

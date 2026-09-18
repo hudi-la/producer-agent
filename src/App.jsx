@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { t } from './i18n/index.js'
 import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
@@ -48,16 +49,16 @@ import ModulesPanel from './components/ModulesPanel.jsx'
 // 架子的分法：有 proposal 压力的都进项目争取（冷外联也算——它产出的仍是机会线）；
 // 无 proposal 压力的关系进人际管理；关于你自己的事实进我的档案。
 const AREAS = [
-  ['desk', '展开的卡片'],   // 稿子里叫「工作区」，界面上他要这四个字（2026-09-03）
-  ['pursue', '项目争取'],
-  ['people', '人际管理'],
-  ['profile', '我的档案'],
+  ['desk', t('展开的卡片')],   // 稿子里叫「工作区」，界面上他要这四个字（2026-09-03）
+  ['pursue', t('项目争取')],
+  ['people', t('人际管理')],
+  ['profile', t('我的档案')],
   // 办完的事有自己的一页（2026-08-20）：心安做成 pull 不做成 push ——
   // 「它自己发现办到了」在这儿一行行躺着，不来敲你。
   // key 仍叫 ledger：改 key 等于作废地址栏白名单和你存过的链接，
   // 而这只是换个名字。2026-08-23 从「流水」改叫「时间线」——
   // 里头分成日历（你动的手）和流水（不是你动的手）两半。
-  ['ledger', '时间线'],
+  ['ledger', t('时间线')],
 ]
 
 // 页面隔多久重新问一次「现在是什么样」。跟 brain 那一轮同拍（server.js 的
@@ -532,11 +533,11 @@ export default function App() {
       what = cur.pursuit.title
     } else if (cur.name === 'person') {
       // 展示模式下浏览器标签也不许挂人名——页面盖了、标签栏露着等于没盖。
-      what = veiled ? '联系人' : cur.person.name || '未具名联系人'
+      what = veiled ? t('联系人') : cur.person.name || t('未具名联系人')
     } else if (cur.name === 'org') {
-      what = veiled ? '机构' : cur.org.org
+      what = veiled ? t('机构') : cur.org.org
     } else {
-      what = area === 'desk' ? '展开的卡片' : area === 'people' ? 'PR' : area === 'profile' ? '我的档案' : area === 'ledger' ? '时间线' : 'Producer'
+      what = area === 'desk' ? t('展开的卡片') : area === 'people' ? 'PR' : area === 'profile' ? t('我的档案') : area === 'ledger' ? t('时间线') : 'Producer'
     }
     document.title = 'Fairwind · ' + what
   }, [area, queue, pl, ct, veiled])
@@ -567,7 +568,7 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKey)
   }, [tasksOpen, poolOpen, view, picking])
 
-  if (!lib || !pl || !tk) return <div className="wrap"><div className="loading">载入中……</div></div>
+  if (!lib || !pl || !tk) return <div className="wrap"><div className="loading">{t('载入中……')}</div></div>
 
   // 哪个 loader 先出的问题就报哪个——机会线优先，那是主战场。
   const fellBack = pl.reason || lib.reason || tk.reason || null
@@ -608,7 +609,7 @@ export default function App() {
       await setStage(id, stage)
     } catch (e) {
       setPl({ ...pl, pursuits: prev })
-      alert('移动没保存：' + e.message)
+      alert(t('移动没保存：') + e.message)
     }
   }
 
@@ -624,7 +625,7 @@ export default function App() {
       await setJot(p.id, jot)
     } catch (e) {
       setPl({ ...pl, pursuits: prev })
-      alert('这一笔没记上：' + e.message + '\n\n你写的是：' + jot)
+      alert(t('这一笔没记上：') + e.message + t('\n\n你写的是：') + jot)
     }
   }
 
@@ -638,7 +639,7 @@ export default function App() {
       await setBall(id, ball)
     } catch (e) {
       setPl({ ...pl, pursuits: prev })
-      alert('球权没保存：' + e.message)
+      alert(t('球权没保存：') + e.message)
     }
   }
 
@@ -719,7 +720,7 @@ export default function App() {
     <div className={'wrap' + (yielding ? ' drawered' : '')}>
       <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
-        <nav className="areas" aria-label="主区">
+        <nav className="areas" aria-label={t('主区')}>
           {AREAS.filter(([key]) => allowedAreas(mods).includes(key)).map(([key, label]) => (
             <button
               key={key}
@@ -740,7 +741,7 @@ export default function App() {
             各自带着数，但不上角标 —— 角标是「现在有几件事等你动」，
             不是「系统里躺着多少条」。 */}
         {mods.mail && <MailState state={brain?.mail} />}
-        {mods.pursuits && <button className="bellbtn" onClick={openBell} aria-label="该动的">
+        {mods.pursuits && <button className="bellbtn" onClick={openBell} aria-label={t('该动的')}>
           {/* Lucide 的 bell，跟读书 app（阅读陪伴）同一套手写内联 SVG 的规格：
               24 视口、stroke=currentColor、1.75、圆头圆角，不引库。 */}
           <svg className="bellic" viewBox="0 0 24 24" width="17" height="17" fill="none"
@@ -756,11 +757,11 @@ export default function App() {
             页面上的名字、邮箱全换成小花；再点一下摘掉。
             开着的时候这颗按钮自己也得盖——你的名字同样是私人信息，
             而且它正好当场演示了「盖住」长什么样。 */}
-        {brain?.update?.canUpdate && <span className="upd-dot" title={`有新版本 ${brain.update.latest}:去「我的档案 → 关于你」底下更新`} />}
+        {brain?.update?.canUpdate && <span className="upd-dot" title={t('有新版本 {v}:去「我的档案 → 关于你」底下更新', { v: brain.update.latest })} />}
         <button className={'veilbtn' + (veiled ? ' on' : '')} onClick={toggleVeil}
-                title={veiled ? '展示模式开着：私人信息都盖着小花。点一下摘掉。'
-                              : '展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。'}>
-          {veiled ? <><Flower size={14} /><span>展示中</span></> : (profile?.name || '我')}
+                title={veiled ? t('展示模式开着：私人信息都盖着小花。点一下摘掉。')
+                              : t('展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。')}>
+          {veiled ? <><Flower size={14} /><span>{t('展示中')}</span></> : (profile?.name || t('我'))}
         </button>
       </header>
 
@@ -816,8 +817,8 @@ export default function App() {
       {area === 'desk' ? (
         (() => {
           const cur = deskView(queue, deskData)
-          if (!queue.items.length) return <div className="desk-empty">没有展开的卡片。去看板或通讯录挑，抽屉头上按「展开」。</div>
-          if (cur.name === 'home') return <div className="desk-empty">这一格对应的东西找不到了——库里没有它。关掉它就行。</div>
+          if (!queue.items.length) return <div className="desk-empty">{t('没有展开的卡片。去看板或通讯录挑，抽屉头上按「展开」。')}</div>
+          if (cur.name === 'home') return <div className="desk-empty">{t('这一格对应的东西找不到了——库里没有它。关掉它就行。')}</div>
           if (cur.name === 'pursuit') return (
             <PursuitFocus brainUp={brain ? brain.up : true}
               // key：换一条线就换一个实例。不加的话 React 复用同一个，thinking / text /
@@ -851,7 +852,7 @@ export default function App() {
                    onStart={() => setPicking(true)} onCancel={cancelPick}
                    onSay={() => setSayOpen(true)} onPickAll={pickAll}>
             <button className="wbtn" onClick={() => setAddOpen(true)}>
-              ＋ 新联系人{ct?.groups?.length ? ` · ${ct.groups.length} 伙人等着收` : ''}
+              {t('＋ 新联系人')}{ct?.groups?.length ? t(' · {n} 伙人等着收', { n: ct.groups.length }) : ''}
             </button>
           </PickBar>
           <People
@@ -908,9 +909,9 @@ export default function App() {
                    onStart={() => setPicking(true)} onCancel={cancelPick}
                    onSay={() => setSayOpen(true)} onPickAll={pickAll}>
             <button className="wbtn" onClick={() => setPoolOpen(true)}>
-              机会池{pool?.rows?.length ? ` · ${pool.rows.length}` : ''}
+              {t('机会池')}{pool?.rows?.length ? ` · ${pool.rows.length}` : ''}
             </button>
-            <button className="wbtn" onClick={() => setTasksOpen(true)}>造卡任务</button>
+            <button className="wbtn" onClick={() => setTasksOpen(true)}>{t('造卡任务')}</button>
           </PickBar>
           {/* 原来这儿有条「今天需要你的」横幅，只认「一起写」那一列。撤了：
               「今天该做什么」不该由某一列决定。以后要做这种提示，得有自己的依据，
@@ -923,7 +924,7 @@ export default function App() {
           {/* 气泡视图开着时，一颗悬浮的关闭钮 —— 你是从 🔔 里进来的，
               但收起不该非得再打开 🔔 */}
           {audit && (
-            <button className="audit-off" onClick={() => setAudit(false)}>收起气泡</button>
+            <button className="audit-off" onClick={() => setAudit(false)}>{t('收起气泡')}</button>
           )}
         </>
       )}
@@ -933,7 +934,7 @@ export default function App() {
           aside 而不是 dialog——它不挡着你操作，就是旁边多开的一块地方。
           头上那颗「展开」是开关：按了人留在原地，三处翻面。 */}
       {drawered && (
-        <aside className="drawer" aria-label={view.name === 'pursuit' ? view.pursuit.title : view.name === 'person' ? '名片' : view.org.org}>
+        <aside className="drawer" aria-label={view.name === 'pursuit' ? view.pursuit.title : view.name === 'person' ? t('名片') : view.org.org}>
           {/* 左沿那条可以拉的边 —— 33vw 是个猜的数，屏幕不一样合适的宽度也不一样 */}
           <DrawerGrip />
           {view.name === 'pursuit' ? (
@@ -946,13 +947,13 @@ export default function App() {
             <PersonFocus brainUp={brain ? brain.up : true} key={view.person.id} variant="drawer" person={openedPerson}
               onBack={closeDrawer} onChanged={reloadContacts}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('contact', view.person.id, el, veiled ? '联系人' : openedPerson.name)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('contact', view.person.id, el, veiled ? t('联系人') : openedPerson.name)} />
           ) : (
             <OrgFocus key={view.org.org} variant="drawer" org={ct?.orgs?.find((o) => o.org === view.org.org) || view.org}
               onBack={closeDrawer}
               onOpenPerson={(id) => { const c = ct?.contacts?.find((x) => x.id === id); if (c) openPerson(c) }}
               onOpenPursuit={(id) => { const p = pl.pursuits.find((x) => x.id === id); if (p) { setArea('pursue'); openPursuit(p) } }}
-              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('org', view.org.org, el, veiled ? '机构' : view.org.org)} />
+              onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('org', view.org.org, el, veiled ? t('机构') : view.org.org)} />
           )}
         </aside>
       )}
