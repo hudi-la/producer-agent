@@ -72,3 +72,15 @@ export async function addEntry(kind, title) {
   if (error) throw new Error(error.message)
   return data
 }
+
+/**
+ * 往盒子里补一条 / 改一条。key 是那一条叫什么（为什么是现在 / 隐线 / …）。
+ *
+ * **合并，不替换**：只补一条不该把别的抹掉。删不掉键，只能把值清空——
+ * 空值界面上本来就不显示，看得见的效果就是没了。
+ */
+export async function setEntryBox(id, key, value) {
+  needDb()
+  const { error } = await supa.rpc('pa_set_entry_box', { p_id: id, p_key: key, p_value: value })
+  if (error) throw new Error(error.message)
+}

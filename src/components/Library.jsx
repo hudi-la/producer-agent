@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
+import { useGrow } from '../lib/useGrow.js'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
-import { addEntry, setEntryDraft } from '../lib/studio.js'
+import { addEntry, setEntryDraft, setEntryBox } from '../lib/studio.js'
 import EntryChat from './EntryChat.jsx'
 import DrawerGrip from './DrawerGrip.jsx'
 
@@ -22,6 +23,58 @@ const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
 const BOX_LABELS = { why_now: '为什么是现在', reach_out: '想触达', hidden_links: '隐线', materials: '材料', note: '备注' }
 
 const boxEntries = (box) => Object.entries(box || {}).filter(([, v]) => v != null && v !== '')
+
+// 盒子里能补的那几样。写在这儿是**提示**不是限制：库里现有的键五花八门
+// （guardrail、two_lists、proven_first_email……都是他自己起的名），
+// 写死一份清单就等于把那些键判成非法。所以只做候选，想叫什么都行。
+const BOX_HINTS = ['为什么是现在', '想触达', '隐线', '材料', '备注']
+
+/**
+ * 盒子里补一条。名字 + 内容两格，都填了才给存。
+ *
+ * 为什么名字是自由文本：见 BOX_HINTS 上面那段。
+ */
+function BoxAdd({ onAdd }) {
+  const [on, setOn] = useState(false)
+  const [k, setK] = useState('')
+  const [v, setV] = useState('')
+  const [err, setErr] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const ta = useRef(null)
+  useGrow(ta, v, on)
+
+  const close = () => { setOn(false); setK(''); setV(''); setErr(null) }
+  const commit = async () => {
+    if (!k.trim() || !v.trim()) return
+    setSaving(true); setErr(null)
+    try { await onAdd(k.trim(), v.trim()); close() }
+    catch (e) { setErr(e.message) }        // 存不上就留在框里，你打的字还在
+    setSaving(false)
+  }
+
+  if (!on) return <button className="add" onClick={() => setOn(true)}>+ 补一条</button>
+
+  return (
+    <div className="boxadd">
+      <input className="idin boxadd-k" value={k} autoFocus placeholder="叫什么（为什么是现在 / 隐线 / …）"
+             list="box-hints" onChange={(e) => setK(e.target.value)}
+             onKeyDown={(e) => { if (e.key === 'Escape') close() }} />
+      <datalist id="box-hints">{BOX_HINTS.map((h) => <option value={h} key={h} />)}</datalist>
+      <textarea ref={ta} className="idin" rows={2} value={v} placeholder="写什么"
+                onChange={(e) => setV(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { e.preventDefault(); close() }
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit() }
+                }} />
+      <div className="ed-act">
+        <button className="ed-ok" onMouseDown={(ev) => ev.preventDefault()} onClick={commit}
+                disabled={saving || !k.trim() || !v.trim()}>{saving ? '存……' : '确定'}</button>
+        <button className="ed-no" onMouseDown={(ev) => ev.preventDefault()} onClick={close} disabled={saving}>取消</button>
+        {err && <span className="ed-err">没存上：{err}</span>}
+      </div>
+    </div>
+  )
+}
 
 /**
  * 展开后那块「这条的字段」—— 这一类特有的那几条事实（媒介 / 机构 / 年份 / 地点）。
@@ -58,6 +111,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
   const imgs = e.images || []
   const ro = !canEdit(e)
   const save = async (patch) => { await saveEntry({ id: e.id, ...patch }); await onSaved?.() }
+  const saveBox = async (k, v) => { await setEntryBox(e.id, k, v); await onSaved?.() }
   const toggle = () => onToggle(e.id)
   // 「在写」：外面写申请时翻不到这条，档案页和书桌上照常看得见。
   // 点一下就切——这是他自己的判断，不该有第二道确认。
@@ -72,7 +126,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
     <div className={'work' + (active ? ' active' : '')}>
       {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
           输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
-          点空白处仍然摊开/合上；键盘走右边那个真按钮（一起写 / 合上）。 */}
+          点空白处仍然展开/收起；键盘走右边那个真按钮（展开 / 收起）。 */}
       <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
@@ -98,12 +152,13 @@ function Entry({ e, open, active, onToggle, onSaved }) {
             改完那一格自己有「确定 / 取消」—— 两套东西，各管各的。
             它管的是「把这一条摊开来干活」：在写/写完的开关、字段、盒子，
             外加右边那条对话。
-            名字为此换过两次：先是 › （说的是「底下还有详情」，可折叠着文案就全摆着），
-            后来叫「编辑」（那是双击在干的事，屏幕上于是有两个「编辑」各管一半）。
-            现在直说它打开的那件事。 */}
+            名字换过三回：› （光一个箭头，说的是「底下还有详情」）、「编辑」
+            （那是双击在干的事，屏幕上于是有两个「编辑」各管一半）、「一起写」
+            （把右边那条对话说成了主角，可它主要就是展开）。现在就叫展开，
+            但写成字不留一个光箭头——箭头不说它展开的是什么。 */}
         <button type="button" className={'edtg' + (open ? ' on' : '')} aria-pressed={open}
-                title={open ? '合上字段、盒子和右边的对话（改好的字早存下了，这儿不管存）'
-                            : '摊开这一条：字段、盒子，右边开这一条的对话。改标题和描述直接双击，不用先按这儿'}
+                title={open ? '收起字段、盒子和右边的对话（改好的字早存下了，这儿不管存）'
+                            : '展开这一条：字段、盒子，右边开这一条的对话。里面的字都是双击改'}
                 onClick={(ev) => { ev.stopPropagation(); toggle() }}>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
                strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -111,7 +166,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
               ? <path d="m18 15-6-6-6 6" />
               : <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" /></>}
           </svg>
-          {open ? '合上' : '一起写'}
+          {open ? '收起' : '展开'}
         </button>
       </div>
       {open && (
@@ -130,11 +185,14 @@ function Entry({ e, open, active, onToggle, onSaved }) {
           )}
           <EntryFields e={e} ro={ro} save={save} />
           <div className="bx-h">盒子 · 网站装不下的</div>
-          {entries.length === 0 && <div className="bx-empty">还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。</div>}
+          {entries.length === 0 && <div className="bx-empty">还没补东西。为什么是现在 / 想触达谁 / 隐线 / 验证过的开场……都往这丢。</div>}
+          {/* 盒子里的每一条现在也能改了。在这之前它们是摆着的纯文字，
+              而库里连一支写盒子的入口都没有 —— 只能开 SQL。 */}
           {entries.map(([k, v]) => (
-            <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
+            <EditRow key={k} label={BOX_LABELS[k] || k} long ro={ro} value={String(v)}
+                     onSave={(nv) => saveBox(k, nv)} />
           ))}
-          <div className="add">+ 补一条 / 丢进材料</div>
+          {!ro && <BoxAdd onAdd={saveBox} />}
         </div>
       )}
     </div>
