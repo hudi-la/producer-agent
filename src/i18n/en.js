@@ -34,7 +34,7 @@ export default {
   // ── 关于你的字段 ──
   '邮箱': 'Email', 'Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。': 'Fairwind sends from this address. It must be the Gmail you authorized; otherwise sending is refused.',
   '身份': 'Status', '例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。': 'e.g. O-1, green card, citizen. Fairwind uses it to judge eligibility.',
-  '常住': 'Based in', '多个地方用「、」分开。': 'Separate several places with "、".', '阶段': 'Career stage', '例：emerging、mid-career。': 'e.g. emerging, mid-career.',
+  '常住': 'Based in', '多个地方用「、」分开。': 'Separate several places with commas.', '阶段': 'Career stage', '例：emerging、mid-career。': 'e.g. emerging, mid-career.',
   '资助偏好': 'Funding preference', '排除规则': 'Exclusion rule', '满足这条的机会不进主名单。写错了你会看不见一整类机会。': "Opportunities matching this never reach the main list. Get it wrong and a whole category disappears.",
   '关注规则': 'Watch rule', '够不着但值得盯的，按这条留下来。': 'Out of reach but worth watching — kept by this rule.',
   '名字': 'Name', '作品站': 'Website', '改完 Fairwind 下一次开口就用新的——它读的就是这里，没有第二份。': 'Fairwind uses the new values next time it speaks — this is the only copy.',
