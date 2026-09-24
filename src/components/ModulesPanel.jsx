@@ -5,8 +5,8 @@ import { t, getLang } from '../i18n/index.js'
 
 const ROWS = [
   ['profile', t('我的档案'), t('你是谁、作品与履历、语气、书桌。关不掉。')],
-  ['pursuits', t('机会线'), t('看板、人、时间线、写信稿、找机会。')],
-  ['mail', t('邮件'), t('连 Gmail，信自动归线归人。要先开机会线。')],
+  ['pursuits', t('机会线'), t('项目争取的看板、写信稿、找机会。')],
+  ['mail', t('邮件'), t('连 Gmail，信自动归线归人；人际管理、时间线、展开的卡片跟它一起开。要先开机会线。')],
 ]
 
 export default function ModulesPanel() {

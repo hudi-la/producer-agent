@@ -72,7 +72,7 @@ export default {
   '写好了…': 'Saving…', '开始': 'Start', '邮箱和 API key 都要填': 'Email and API key are both required',
   // ── 模块开关 ──
   '装了哪些': 'What\'s installed', '你是谁、作品与履历、语气、书桌。关不掉。': 'Who you are, works and CV, voice, desk. Always on.',
-  '机会线': 'Pursuits', '看板、人、时间线、写信稿、找机会。': 'Board, people, timeline, letter drafts, scouting.', '邮件': 'Mail', '连 Gmail，信自动归线归人。要先开机会线。': 'Connect Gmail; mail is filed to pursuits and people. Needs Pursuits first.',
+  '机会线': 'Pursuits', '项目争取的看板、写信稿、找机会。': 'The pursuits board, letter drafts, scouting.', '邮件': 'Mail', '连 Gmail，信自动归线归人；人际管理、时间线、展开的卡片跟它一起开。要先开机会线。': 'Connect Gmail; mail is filed to pursuits and people. People, Timeline and Open cards come with it. Needs Pursuits first.',
   '这两个模块的界面暂时还是中文的。': 'The interface of these two modules is still in Chinese for now.',
   // ── 我的判据 ──
   '我的判据': 'My judgment rules', 'Fairwind 每次判断都读这些;骨架在程序里,口味在你这儿': 'Fairwind reads these on every judgment; the skeleton is in the program, the taste is yours',

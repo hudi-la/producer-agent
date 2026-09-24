@@ -14,7 +14,12 @@ export async function postModules(patch, fetchImpl = (...a) => globalThis.fetch(
   return r.json()
 }
 
-/** 给定开关,哪些主区能进。档案永远在;其余四个都是机会线模块的。 */
+/** 给定开关,哪些主区能进。档案和设置永远在;机会线只带「项目争取」;
+ *  人际管理、时间线、展开的卡片跟邮件一起开——没有信,人是空的,时间线也没东西转(2026-09-24 他定的)。 */
 export function allowedAreas(mods) {
-  return (mods?.pursuits ? ['desk', 'pursue', 'people', 'ledger'] : []).concat(['profile', 'settings'])
+  const out = []
+  if (mods?.mail) out.push('desk')
+  if (mods?.pursuits) out.push('pursue')
+  if (mods?.mail) out.push('people', 'ledger')
+  return out.concat(['profile', 'settings'])
 }
