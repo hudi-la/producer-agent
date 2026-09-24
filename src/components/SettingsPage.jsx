@@ -7,11 +7,14 @@ import Judgments from './Judgments.jsx'
 
 export default function SettingsPage() {
   return (
-    <section className="settings-page">
-      <header className="lib-head"><h1>{t('设置')}</h1></header>
-      <ModulesPanel />
-      <Judgments />
-      <LocalAccount />
+    // 外层 .page 是各区共用的滚动层(.wrap 固定高度不滚);里层限宽
+    <section className="page settings-page">
+      <div className="settings-inner">
+        <header className="lib-head"><h1>{t('设置')}</h1></header>
+        <ModulesPanel />
+        <Judgments />
+        <LocalAccount />
+      </div>
     </section>
   )
 }
