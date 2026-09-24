@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "有新版本时设置按钮上直接写「新版本 x.y.z」,不再是一颗看不懂的点"
+  "note": "出厂「每周找机会」提示词换成通用一段(不带任何具体来源),中英文各一份按所选语言给;学员包的前端不再带示范数据"
 }

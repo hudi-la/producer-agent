@@ -4,6 +4,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
 import { saveSettings } from './settings.js'
 import { registerLocalUser } from './migrate.js'
+import { localizeSeedTask } from '../scoutDefault.js'
 import { setJudgmentsEnabled, readJudgmentFiles, writeJudgmentFile } from '../judgments.js'
 import { backupNow, listBackups, scheduleRestore } from './backup.js'
 import { checkUpdate, applyUpdate } from './update.js'
@@ -137,6 +138,7 @@ export async function handleLocalRoute(req, res, ctx) {
     const s = saveSettings(dataDir, patch)
     ctx.settings = s
     if (s.email) await registerLocalUser(ctx.pg, { id: s.uid, email: s.email })
+    try { await localizeSeedTask(ctx.pg, s.uid, s.lang) } catch (e) { console.warn('  出厂任务换语言没成:' + e.message) }   // 出厂那条找机会任务按语言给;改过的不动
     exportEnv(s)
     db.setUser?.({ id: s.uid, email: s.email })
     await ctx.onSetup?.(s)

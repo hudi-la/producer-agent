@@ -21,6 +21,7 @@ import { engineOf, providerConfig, PROVIDERS } from './engine/index.js'
 import { runAgent } from './engine/openaiCompat.js'
 // 给 Claude Code / GPT 桌面版开的门:档案那几个工具做成 MCP(brain/mcp.js)
 import { handleMcp } from './mcp.js'
+import { localizeSeedTask } from './scoutDefault.js'
 import { z } from 'zod'
 import { read, slice, imageBudget, IMG_CAP } from './files.js'
 // 拼 prompt 的活儿全在 prompt.js —— 纯函数，所以有 prompt.test.js 按着。
@@ -122,6 +123,8 @@ async function connect() {
       onSetup: async (settings) => { LOCAL_MODE.settings = settings; placeJudgmentsReadme(pathJoin(LOCAL_MODE.dataDir, 'judgments'), settings.lang) },
     }
     exportEnv(r.settings)   // key 和两档模型:settings.json 是学员机器上唯一的一份,不用 .env
+    // 出厂那条找机会任务按当前语言给(还是原样的才换;0147 之前装的、带老默认的也在这儿换掉)
+    try { await localizeSeedTask(r.pg, r.settings.uid, r.settings.lang) } catch (e) { console.warn('  出厂任务换语言没成:' + e.message) }
     // 判据文档目录。README 由安装包带着,第一次开库放进去(已有就不动——那是他自己改过的)
     const jdir = pathJoin(LOCAL_MODE.dataDir, 'judgments')
     fsMkdir(jdir, { recursive: true })

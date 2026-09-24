@@ -152,3 +152,12 @@ test('/mcp/targets:codex 写 toml(已有内容保留、重写不重复);gemini �
   const bad = res(); await handleLocalRoute(req('POST', '/mcp/targets', { target: 'chatgpt' }), bad, ctx); assert.equal(bad.code, 400)
   delete process.env.FAIRWIND_CODEX_CONFIG; delete process.env.FAIRWIND_GEMINI_CONFIG; delete process.env.BRAIN_PORT
 })
+
+test('/setup 选了英文 → 出厂那条找机会任务换成英文;再选中文换回来', async () => {
+  const { SCOUT_DEFAULT } = await import('../scoutDefault.js')
+  const get = async () => (await ctx.pg.query("select prompt from producer.tasks where owner = $1 and type = 'scout_aggregators'", [ctx.settings.uid])).rows[0]?.prompt
+  let w = res(); await handleLocalRoute(req('POST', '/setup', { email: 'seed@example.com', lang: 'en', provider: 'claude-key', apiKey: 'sk-ant-x' }), w, ctx); assert.equal(w.code, 200, w.text())
+  assert.equal(await get(), SCOUT_DEFAULT.en)
+  w = res(); await handleLocalRoute(req('POST', '/settings', { lang: 'zh' }), w, ctx); assert.equal(w.code, 200)
+  assert.equal(await get(), SCOUT_DEFAULT.zh)
+})
