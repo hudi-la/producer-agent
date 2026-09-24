@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "第一个包：我的档案那一层。First package: the profile layer."
+  "note": "模型来源四选一（Claude key / Claude 订阅 / GPT / Gemini）、中英文、Logo、双击修好"
 }
