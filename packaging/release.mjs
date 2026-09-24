@@ -5,7 +5,7 @@
 // 要用自带的 node(字节码由它编)。zip 走 curl 传(gh 传大文件常断还留半截)。
 // 学员那边不用做任何事:程序每小时看一眼 latest.json,看见新版本就在顶栏亮点。
 import { execFileSync, execSync } from 'node:child_process'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -22,42 +22,44 @@ for (const f of ['package.json', 'brain/package.json']) { const p = JSON.parse(r
 const rel = JSON.parse(readFileSync(resolve(ROOT, 'packaging/release.json'), 'utf8')); if (note) rel.note = note
 writeFileSync(resolve(ROOT, 'packaging/release.json'), JSON.stringify(rel, null, 2) + '\n')
 
-say('打包')
+say('打包(mac-arm64)')
 run(`"${process.execPath}" packaging/build.mjs`)
-const zip = resolve(ROOT, `packaging/out/Fairwind-${version}-mac-arm64.zip`)
-if (!existsSync(zip)) { console.error('没打出 zip'); process.exit(1) }
+// Intel 版:packaging/runtime/node-darwin-x64 在的话,借 Rosetta 用它再出一份(字节码和 SDK 二进制都按 x64 来)
+const X64 = resolve(ROOT, 'packaging/runtime/node-darwin-x64/bin/node')
+if (existsSync(X64)) { say('打包(mac-x64,Rosetta)'); run(`arch -x86_64 "${X64}" packaging/build.mjs`) }
+else console.warn('  没有 packaging/runtime/node-darwin-x64,这版不出 Intel 包(照 SPIKE.md 下载一份就有)')
+const zips = ['mac-arm64', ...(existsSync(X64) ? ['mac-x64'] : [])].map((p) => resolve(ROOT, `packaging/out/Fairwind-${version}-${p}.zip`))
+for (const z of zips) if (!existsSync(z)) { console.error('没打出 ' + z); process.exit(1) }
 
 say('提交版本号')
 run(`git add package.json brain/package.json packaging/release.json && (git commit -q -m "v${version}${note ? '：' + note : ''}" || true) && git tag -f v${version}`)   // 重跑时没改动也别炸
 
 say(`Release v${version}`)
+// 先建成**预发布**:「最新」在 zip 全传上之前仍指向上一版,学员那边不会撞到没有包的版本(9/24 撞过一次)
 const exists = (() => { try { sh(`gh release view v${version} --repo ${REPO}`); return true } catch { return false } })()
-if (!exists) run(`gh release create v${version} --repo ${REPO} --title "Fairwind ${version}" --notes ${JSON.stringify((note || '') + '\n\n装机 / Install:\n    curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download/install.sh | sh')} packaging/out/latest.json packaging/install.sh`)
-else run(`gh release upload v${version} --repo ${REPO} --clobber packaging/out/latest.json packaging/install.sh`)
+if (!exists) run(`gh release create v${version} --repo ${REPO} --prerelease --title "Fairwind ${version}" --notes ${JSON.stringify((note || '') + '\n\n装机 / Install:\n    curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download/install.sh | sh')} packaging/install.sh`)
+else run(`gh release edit v${version} --repo ${REPO} --prerelease`)
 const relId = sh(`gh api repos/${REPO}/releases/tags/v${version} --jq .id`)
 const token = sh('gh auth token')
-// zip 用 node 自己的 fetch 传:本机 curl(LibreSSL)传 178MB 老报 bad record mac;node 那套(OpenSSL)稳得多
-const zipName = `Fairwind-${version}-mac-arm64.zip`
-const buf = readFileSync(zip)
-let up = false
-for (let i = 1; i <= 4 && !up; i++) {
-  for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name | endswith(".zip")) | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`)
-  try {
-    const r = await fetch(`https://uploads.github.com/repos/${REPO}/releases/${relId}/assets?name=${encodeURIComponent(zipName)}`, { method: 'POST', headers: { authorization: `token ${token}`, 'content-type': 'application/zip', 'content-length': String(buf.length) }, body: buf, duplex: 'half' })
-    console.log(`  传 zip 第 ${i} 次:HTTP ${r.status}`)
-    up = r.status === 201
-    if (!up) console.log('  ' + (await r.text()).slice(0, 200))
-  } catch (e) { console.log(`  传 zip 第 ${i} 次:${e.cause?.code || e.message}`) }
-  if (!up) await new Promise((r) => setTimeout(r, 8000))
+const sizeOf = (name) => sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name == "${name}") | .size'`)
+const dropAsset = (name) => { for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name == "${name}") | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`) }
+// 每个 zip:先 gh(Go 的 http),不行换 node 的 fetch;本机对大文件的 TLS 时好时坏,两条路轮着来
+for (const zip of zips) {
+  const zipName = zip.split('/').pop(); const want = String(statSync(zip).size)
+  if (sizeOf(zipName) === want) { console.log(`  ${zipName} 已经在`); continue }
+  let up = false
+  for (let i = 1; i <= 8 && !up; i++) {
+    dropAsset(zipName)
+    if (i % 2 === 1) { try { run(`gh release upload v${version} --repo ${REPO} --clobber "${zip}"`) } catch {} }
+    else { try { const r = await fetch(`https://uploads.github.com/repos/${REPO}/releases/${relId}/assets?name=${encodeURIComponent(zipName)}`, { method: 'POST', headers: { authorization: `token ${token}`, 'content-type': 'application/zip', 'content-length': want }, body: readFileSync(zip), duplex: 'half' }); await r.text() } catch (e) { console.log('  ' + (e.cause?.code || e.message)) } }
+    up = sizeOf(zipName) === want
+    console.log(`  ${zipName} 第 ${i} 次:${up ? '成' : '没成'}`)
+    if (!up) await new Promise((r) => setTimeout(r, 15000))
+  }
+  if (!up) { console.error(`${zipName} 传不上去,网络的事。版本留在预发布,再跑一次这条命令接着传`); process.exit(1) }
 }
-// node 那条路老是 EPIPE / bad record MAC 时换 gh(Go 的 http)再试几次——9/24 实测 node 连败 18 次,gh 第二次就过
-for (let i = 1; i <= 6 && !up; i++) {
-  for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name | endswith(".zip")) | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`)
-  try { run(`gh release upload v${version} --repo ${REPO} --clobber "${zip}"`); const size = sh(`gh api repos/${REPO}/releases/tags/v${version} --jq '.assets[] | select(.name | endswith(".zip")) | .size'`); up = String(buf.length) === size; console.log(`  gh 传 zip 第 ${i} 次:${up ? '成' : '尺寸不对 ' + size}`) }
-  catch (e) { console.log(`  gh 传 zip 第 ${i} 次:没成`) }
-  if (!up) await new Promise((r) => setTimeout(r, 15000))
-}
-if (!up) { console.error('zip 传不上去,网络的事,再跑一次'); process.exit(1) }
+run(`gh release upload v${version} --repo ${REPO} --clobber packaging/out/latest.json packaging/install.sh`)
+run(`gh release edit v${version} --repo ${REPO} --prerelease=false`)
 say('校验')
 const assets = sh(`gh release view v${version} --repo ${REPO} --json assets -q '.assets[] | .name + " " + (.size|tostring)'`)
 console.log(assets)

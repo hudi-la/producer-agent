@@ -29,7 +29,9 @@ if (resolve(process.execPath) !== resolve(NODE_BIN)) {
 }
 
 say(`Fairwind ${version} · ${PLATFORM} · node ${process.version}`)
-rmSync(OUT, { recursive: true, force: true }); mkdirSync(APP, { recursive: true })
+// 只清这一平台的产物和别的版本的 zip:同版本另一平台的 zip 和 latest.json 留着(一台机器先出 arm64 再借 Rosetta 出 x64)
+rmSync(APP, { recursive: true, force: true }); rmSync(join(OUT, 'stage'), { recursive: true, force: true }); mkdirSync(APP, { recursive: true })
+for (const f of (existsSync(OUT) ? readdirSync(OUT) : [])) if (f.endsWith('.zip') && !f.startsWith(`Fairwind-${version}-`)) rmSync(join(OUT, f), { force: true })
 
 say('前端(VITE_DB_MODE=local)')
 sh('npx', ['vite', 'build'], { cwd: ROOT, env: { ...process.env, VITE_DB_MODE: 'local' } })
@@ -51,11 +53,16 @@ say('依赖(只装运行时的)')
 const stage = join(OUT, 'stage'); mkdirSync(stage, { recursive: true })
 copyFileSync(resolve(ROOT, 'brain/package.json'), join(stage, 'package.json'))
 copyFileSync(resolve(ROOT, 'brain/package-lock.json'), join(stage, 'package-lock.json'))
-sh('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--silent'], { cwd: stage })
+// npm 用自带的那个 node 跑,不用系统 npm:@anthropic-ai/claude-agent-sdk 的平台二进制按跑 npm 的进程的 os/cpu 选——
+// 在 Apple 芯片上借 Rosetta 出 Intel 包时,系统 npm 会装成 arm64 那份,学员机器上起不来
+const npmCli = join(RUNTIME, 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')
+sh(process.execPath, [npmCli, 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--silent'], { cwd: stage })
 cpSync(join(stage, 'node_modules'), join(APP, 'node_modules'), { recursive: true })
 // SDK 的平台二进制走 postinstall 下载?——npm ci --ignore-scripts 会跳过;它其实是可选依赖里的文件,ci 会装。核一下:
 const sdkBin = readdirSync(join(APP, 'node_modules/@anthropic-ai')).filter((d) => d.startsWith('claude-agent-sdk-'))
 if (!sdkBin.length) console.warn('⚠️ 没找到 SDK 的平台二进制包(@anthropic-ai/claude-agent-sdk-<平台>),学员机器上 brain 起不来模型')
+else if (!sdkBin.some((d) => d.includes(process.arch))) { console.error(`✗ SDK 平台二进制是 ${sdkBin.join(',')},跟目标 ${PLATFORM} 不符`); process.exit(1) }
+else console.log('  SDK 平台二进制:' + sdkBin.join(','))
 rmSync(stage, { recursive: true, force: true })
 
 say('自带 node + 启动器')
@@ -71,8 +78,10 @@ if (process.platform === 'darwin') sh('ditto', ['-c', '-k', '--keepParent', APP,
 else sh('zip', ['-qr', join(OUT, zipName), 'Fairwind'], { cwd: OUT })
 const sha256 = createHash('sha256').update(readFileSync(join(OUT, zipName))).digest('hex')
 const size = statSync(join(OUT, zipName)).size
+let prev = {}
+try { const j = JSON.parse(readFileSync(join(OUT, 'latest.json'), 'utf8')); if (j.version === version) prev = j.platforms || {} } catch {}
 writeFileSync(join(OUT, 'latest.json'), JSON.stringify({
   version, note: release.note || '', publishedAt: new Date().toISOString().slice(0, 10),
-  platforms: { [PLATFORM]: { url: `${(release.downloadBase || '').replace(/\/$/, '')}/${zipName}`, sha256, size } },
+  platforms: { ...prev, [PLATFORM]: { url: `${(release.downloadBase || '').replace(/\/$/, '')}/${zipName}`, sha256, size } },
 }, null, 2))
 console.log(`\n✓ ${join(OUT, zipName)}  ${(size / 1e6).toFixed(0)} MB\n✓ ${join(OUT, 'latest.json')}\n`)
