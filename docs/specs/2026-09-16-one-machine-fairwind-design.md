@@ -492,6 +492,16 @@ mac `~/Library/Application Support/Fairwind/`，win `%APPDATA%\Fairwind\`。更�
 - brain：`FAIRWIND_LANG` → `prompt.js` 的 `LANG_RULE()`：en 时在 system 末尾加一句"给 ta 看的一切用英文；给机构的草稿照旧按对方语言"；判据、scout 报法同理。提示词本身仍是中文，模型认得。判据 README 有英文版，按语言放。
 - 守门：`src/i18n/i18n.test.js` 扫源码里每个 `t('…')` 的键，缺英文就红——合并主线之后跑一遍就知道新长的字翻了没有。
 
+## 二十一、模型来源（2026-09-24 加）
+
+他的要求：GPT / Gemini 的 API key 也得能用（GPT 不追求订阅）。
+
+- `settings.provider`：`claude-key` / `claude-subscription`（Claude Code 登录令牌，`claude setup-token`）/ `openai` / `gemini`。各家 key 分开存，永不回显；env 里只留选中那家的凭据。
+- **两套引擎，同一个 `think()`**：Claude 走 Agent SDK（原路一个字不变）；GPT / Gemini 走 `brain/engine/openaiCompat.js`——OpenAI 兼容的 chat/completions + 手写的工具循环（流式、tool_calls、图片、重试、maxTurns），产出跟 SDK 同形状。Gemini 用它自己的 OpenAI 兼容端点。
+- **工具定义一次**（`brain/engine/tools.js` 的 `defineTool`）：Claude 那边转成 SDK 的 MCP server，别的引擎转成 function 定义。SDK 自带的 WebSearch / WebFetch 在别的引擎上是我们的平替：DuckDuckGo HTML 结果页（不要 key，脆）+ 网页转文字（分段）。claude.ai 的 Gmail 连接器工具别的引擎没有——邮件模块那几处仍是 Claude 专属。
+- 默认模型名写死在 `engine/index.js` 一处（gpt-5 / gpt-5-mini、gemini-2.5-pro / gemini-2.5-flash），账号块两档能改；`OPENAI_BASE_URL` / `GEMINI_BASE_URL` 可覆盖（验收用假服务）。
+- 验过：假 OpenAI 服务端到端（选 GPT → 书桌聊天 → 要 WebFetch → 回话落库）。**真 key 没验**——他有 key 时点一次就知道；判据格式（[[TAG]] 等）是纯文本协议，模型无关，但换模型判断口味会变。
+
 ## 名词表
 
 | 名字 | 是什么 |
