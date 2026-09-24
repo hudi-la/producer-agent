@@ -6,7 +6,9 @@ import { t, setLang } from '../i18n/index.js'
 import ProviderPicker from './ProviderPicker.jsx'
 
 export default function FirstRun({ onDone }) {
-  const [lang, setLangState] = useState('zh')
+  // 默认跟浏览器的语言走(mac 就是系统语言);想换点右上角那两颗
+  const guess = typeof navigator !== 'undefined' && /^zh/i.test(navigator.language || '') ? 'zh' : 'en'
+  const [lang, setLangState] = useState(() => { setLang(guess); return guess })
   const [email, setEmail] = useState('')
   const [provider, setProvider] = useState('claude-key')
   const [keys, setKeys] = useState({ apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })
