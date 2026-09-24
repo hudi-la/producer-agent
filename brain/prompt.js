@@ -184,13 +184,23 @@ export function entryFacts(e) {
   const m = e.meta || {}
   const keep = (xs) => xs.filter((x) => x && x !== '（待补）')
   const period = keep([m.start, m.end]).join(' – ')
+  const KNOWN = { education: ['school', 'year', 'location'], job: ['org', 'start', 'end', 'location'], credit: ['org', 'year', 'location', 'type'], statement: ['scope'], work: ['concern'] }
+  let facts
   switch (e.kind) {
-    case 'education': return keep([m.school, m.year, m.location])
-    case 'job':       return keep([m.org, period, m.location])
-    case 'credit':    return keep([m.org, m.year, m.location])
-    case 'statement': return keep([m.scope])
-    default:          return []                // work / skill / offer 的事实在真列上
+    case 'education': facts = keep([m.school, m.year, m.location]); break
+    case 'job':       facts = keep([m.org, period, m.location]); break
+    case 'credit':    facts = keep([m.org, m.year, m.location]); break
+    case 'statement': facts = keep([m.scope]); break
+    default:          facts = []               // work / skill / offer 的事实在真列上
   }
+  // 已知之外的键(AI 工具或自定义类目写的)按「键:值」带上——每个人维护的东西不一样,
+  // 写进去的模型就得看见(2026-09-24)。对象/数组压成一行 JSON。
+  const known = new Set(KNOWN[e.kind] || [])
+  for (const [k, v] of Object.entries(m)) {
+    if (known.has(k) || v == null || v === '' || v === '（待补）') continue
+    facts.push(`${k}:${typeof v === 'string' ? v : JSON.stringify(v)}`)
+  }
+  return facts
 }
 
 // 「战绩信息库」那一段。chat 和 brief 两条路都用它——本来是两份一模一样的复制，

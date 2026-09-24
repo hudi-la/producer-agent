@@ -38,7 +38,7 @@ export function setModules({ dataDir, mode }, patch) {
 // /chat 三条归 profile:书桌(档案里的一条)和机会线共用这条路,主人在 body 里——
 // 关了 pursuits 前端就不会拿机会线来聊,所以路由层只要保证书桌能聊。
 const ROUTE_MODULE = [
-  ['/health', 'core'], ['/mcp', 'core'], ['/me', 'core'], ['/setup', 'core'], ['/modules', 'core'], ['/db/', 'core'], ['/files/', 'core'],
+  ['/health', 'core'], ['/mcp', 'core'], ['/mcp-guide', 'core'], ['/me', 'core'], ['/setup', 'core'], ['/modules', 'core'], ['/db/', 'core'], ['/files/', 'core'],
   ['/chat', 'profile'], ['/judgments/', 'profile'],   // 判据文档是人的东西,机会线关着也能看、能开关
   ['/mail/', 'mail'], ['/gmail-draft', 'mail'], ['/sync', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/', 'mail'], ['/letters/', 'mail'],
 ]

@@ -17,7 +17,7 @@ before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'fw-mcp-'))
   pg = await openLocalDb(dir); await applyMigrations(pg, { fresh: true }); await setLocalUid(pg, UID); await registerLocalUser(pg, { id: UID, email: 'a@b.c' }); await assumeUser(pg)
   const db = await makeLocalDb({ pg, dataDir: dir, user: { id: UID, email: 'a@b.c' } })
-  srv = http.createServer((req, res) => handleMcp(req, res, { db, version: '9.9.9', dataDir: dir, modules: { profile: true } }))
+  srv = http.createServer((req, res) => handleMcp(req, res, { db, version: '9.9.9', dataDir: dir, modules: { profile: true, pursuits: true }, previewJudgments: async ({ limit }) => ({ rows: [], n: 0, changed: 0, limit }) }))
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok)); port = srv.address().port
   client = new Client({ name: 'test', version: '1' })
   await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)))
@@ -26,9 +26,9 @@ after(async () => { await client.close().catch(() => {}); srv.close(); await pg.
 
 const call = async (name, args = {}) => { const r = await client.callTool({ name, arguments: args }); const t = r.content?.[0]?.text || ''; return { r, t, j: (() => { try { return JSON.parse(t) } catch { return null } })() } }
 
-test('列工具:六个,名字都带 fairwind_', async () => {
+test('列工具:档案六个 + 机会卡四个 + 判据三个', async () => {
   const { tools } = await client.listTools()
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['fairwind_entries_list', 'fairwind_entry_add', 'fairwind_entry_set', 'fairwind_info', 'fairwind_profile_get', 'fairwind_profile_set'])
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['fairwind_entries_list', 'fairwind_entry_add', 'fairwind_entry_set', 'fairwind_info', 'fairwind_judgments_list', 'fairwind_judgments_preview', 'fairwind_judgments_write', 'fairwind_profile_get', 'fairwind_profile_set', 'fairwind_pursuit_add', 'fairwind_pursuit_note', 'fairwind_pursuit_set', 'fairwind_pursuits_list'])
 })
 
 test('info 说版本和判据目录;profile 改了读得回', async () => {
@@ -44,4 +44,28 @@ test('加一条作品带图 → 列出来 → 改标题和草稿 → 再列', as
   await call('fairwind_entry_set', { id: a.j.id, title: '回声（改）', draft: true })
   l = await call('fairwind_entries_list'); assert.equal(l.j[0].title, '回声（改）'); assert.equal(l.j[0].draft, true)
   const bad = await call('fairwind_entry_set', { id: '00000000-0000-4000-8000-000000000000', title: 'x' }); assert.equal(bad.r.isError, true)
+})
+
+test('自定义类目:kind 随便起,meta 随便放,列出来原样', async () => {
+  const a = await call('fairwind_entry_add', { kind: '驻地日志', title: '2025 秋 · 某某驻地', meta: { 待了多久: '六周', 做了什么: '两件新作' } })
+  assert.equal(a.j.ok, true)
+  const l = await call('fairwind_entries_list', { kind: '驻地日志' }); assert.equal(l.j.length, 1); assert.equal(l.j[0].meta.待了多久, '六周')
+})
+
+test('机会卡:加 → 列 → 挪阶段/写小记 → 记一笔', async () => {
+  const a = await call('fairwind_pursuit_add', { title: 'Some Open Call 2026', kind: '开放征集', org: 'X Center', deadline: 'Oct 1, 2026', deadline_at: '2026-10-01', url: 'https://x.org/call', match_stars: 3, why: '装置对味' })
+  assert.equal(a.j.ok, true, a.t)
+  let l = await call('fairwind_pursuits_list'); assert.equal(l.j.length, 1); assert.equal(l.j[0].stage, 'pending'); assert.equal(l.j[0].deadline_at, '2026-10-01')
+  const id = l.j[0].id
+  const s = await call('fairwind_pursuit_set', { id, stage: 'matching', jot: '先看往届' }); assert.equal(s.j.ok, true, s.t)
+  l = await call('fairwind_pursuits_list', { stage: 'matching' }); assert.equal(l.j.length, 1); assert.equal(l.j[0].jot, '先看往届')
+  const n = await call('fairwind_pursuit_note', { id, text: '给策展人打了电话', kind: 'note' }); assert.equal(n.j.ok, true, n.t)
+})
+
+test('判据:写 → 读回;不许的文件名拒;lint 点名;preview 通到 brain', async () => {
+  const w = await call('fairwind_judgments_write', { file: '对方来信.md', content: '投递类我等 30 天\n删掉 gist' })
+  assert.equal(w.j.ok, true); assert.equal(w.j.lints.length, 1)
+  const l = await call('fairwind_judgments_list'); assert.match(l.j.files['对方来信.md'], /30 天/); assert.equal(l.j.files['手记.md'], '')
+  const bad = await call('fairwind_judgments_write', { file: '../settings.json', content: 'x' }); assert.equal(bad.r.isError, true)
+  const p = await call('fairwind_judgments_preview', { limit: 3 }); assert.equal(p.j.limit, 3)
 })

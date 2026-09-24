@@ -44,7 +44,8 @@ export function subInfo(entry) {
     case 'education': return clean([m.school, m.year, m.location])
     case 'credit': return clean([m.org, m.year, m.location]) // type 已是子分组标题，不重复
     case 'statement': return clean([{ artist: 'Artist Statement', 'bio-short': '一句话', 'bio-long': '长 Bio', research: '读博方向' }[m.scope] || m.scope])
-    default: return []
+    // 自定义类目:meta 里前三个键的值当副标题——结构是各人自己的,这儿不猜键名
+    default: return clean(Object.values(m).filter((v) => typeof v === 'string').slice(0, 3))
   }
 }
 

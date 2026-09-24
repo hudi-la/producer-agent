@@ -5,6 +5,10 @@
 // 恢复 = 把文件放到 <数据目录>/restore.tar.gz,下次启动 openLocalDb 看见它就换库
 // (现在的库先改名留着,不删——「绝不丢信息」)。
 import { PGlite } from '@electric-sql/pglite'
+
+// date 列(oid 1082)原样给 'YYYY-MM-DD':PGlite 默认转成 Date 再变成带时间的 ISO,跟 PostgREST 不一样,
+// 前端按 slice(0,10) 用的地方会错一天(时区)。timestamptz 保持默认(ISO 串)。
+export const PG_OPTS = { parsers: { 1082: (v) => v } }
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, unlinkSync, renameSync, copyFileSync } from 'node:fs'
 import { join, basename } from 'node:path'
 
@@ -59,12 +63,12 @@ export const RESTORE_FILE = (dataDir) => join(dataDir, 'restore.tar.gz')
 export async function openWithRestore(dataDir) {
   const dbDir = join(dataDir, 'db')
   const marker = RESTORE_FILE(dataDir)
-  if (!existsSync(marker)) return { pg: new PGlite(dbDir), restored: false }
+  if (!existsSync(marker)) return { pg: new PGlite(dbDir, PG_OPTS), restored: false }
   const bytes = readFileSync(marker)
   let kept = null
   if (existsSync(dbDir)) { kept = `${dbDir}.bak-${stamp()}`; renameSync(dbDir, kept) }
   try {
-    const pg = new PGlite(dbDir, { loadDataDir: new Blob([bytes]) })
+    const pg = new PGlite(dbDir, { ...PG_OPTS, loadDataDir: new Blob([bytes]) })
     await pg.waitReady
     unlinkSync(marker)
     return { pg, restored: true, kept }

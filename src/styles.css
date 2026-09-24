@@ -1898,3 +1898,11 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 
 .jd-path { user-select: all; }
 .settings-page .judgments { margin-top: 0; }
+
+.jd-files { display: flex; gap: 6px; flex-wrap: wrap; }
+.jd-file { font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-2, var(--ink-3)); background: transparent; color: var(--ink-2); cursor: pointer; }
+.jd-file.has { color: var(--ink); border-color: var(--ink-3); }
+.jd-file.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.jd-file small { opacity: .7; }
+.jd-editor { display: grid; gap: 8px; }
+.jd-editor textarea { font: inherit; font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--paper); border: 1px solid var(--line-2, var(--ink-3)); border-radius: 8px; padding: 10px 12px; resize: vertical; }

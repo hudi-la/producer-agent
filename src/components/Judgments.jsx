@@ -10,6 +10,14 @@ export default function Judgments() {
   const [s, setS] = useState(null)
   const [busy, setBusy] = useState(false)
   const [out, setOut] = useState(null)
+  const [files, setFiles] = useState(null)      // { 文件名: 内容 }
+  const [editing, setEditing] = useState(null)  // 正在改哪个文件
+  const [draft, setDraft] = useState('')
+  const [saveMsg, setSaveMsg] = useState('')
+  const loadFiles = () => supa.judgments.files().then((r) => setFiles(r.files || {}))
+  useEffect(() => { loadFiles() }, [])
+  const openFile = (f) => { setEditing(f); setDraft(files?.[f] || ''); setSaveMsg('') }
+  const saveFile = async () => { const r = await supa.judgments.write(editing, draft); setSaveMsg(r.ok ? (r.lints?.length ? t('存好了；但这几句不生效：') + r.lints.join('；') : t('存好了，下一次判断就用新的')) : t('没存上:') + r.error); await loadFiles() }
   const load = () => supa.settings.get().then(setS)
   useEffect(() => { load() }, [])
   if (!s) return null
@@ -31,6 +39,25 @@ export default function Judgments() {
         <span className="sp" />
         <button type="button" className="b" disabled={busy} onClick={preview}>{busy ? t('在判…') : t('看看会怎么变')}</button>
       </div>
+      {files && (
+        <div className="jd-files">
+          {Object.keys(files).map((f) => (
+            <button key={f} type="button" className={'jd-file' + (editing === f ? ' on' : '') + (files[f]?.trim() ? ' has' : '')} onClick={() => openFile(f)}>
+              {f.replace(/\.md$/, '')}{files[f]?.trim() ? '' : <small> · {t('空')}</small>}
+            </button>
+          ))}
+        </div>
+      )}
+      {editing && (
+        <div className="jd-editor">
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={6} placeholder={t('像跟熟这行的助手交代一样写几句。比如：投递类我等 30 天再问；拿不准宁可提醒我。')} />
+          <div className="la-acts">
+            <button type="button" className="b primary" onClick={saveFile}>{t('保存')}</button>
+            <button type="button" className="b" onClick={() => setEditing(null)}>{t('收起')}</button>
+            {saveMsg && <span className={'la-note' + (saveMsg.startsWith(t('没存上:')) ? ' bad' : '')}>{saveMsg}</span>}
+          </div>
+        </div>
+      )}
       {out && (out.error
         ? <div className="la-note bad">{t('没跑成:')}{out.error}</div>
         : out.n === 0

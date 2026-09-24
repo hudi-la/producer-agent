@@ -31,7 +31,11 @@ const boxEntries = (box) => Object.entries(box || {}).filter(([, v]) => v != nul
  * 上一版把它俩也放进这块，于是看的是上面那行、改的是下面这块，得对着两处看。
  */
 function EntryFields({ e, ro, save }) {
-  const fields = EDITABLE[e.kind] || []
+  // 已知类目有自己的标签和顺序;meta 里多出来的键(AI 工具或别的类目写进来的)按键名原样显示——
+  // 每个人的结构不一样,写了什么就看得见什么(2026-09-24)
+  const known = EDITABLE[e.kind] || []
+  const extra = Object.keys(e.meta || {}).filter((k) => !known.some((f) => f.key === k) && !(e.kind === 'credit' && k === 'type') && !(e.kind === 'work' && k === 'concern'))
+  const fields = [...known, ...extra.map((k) => ({ key: k, label: k, extra: true }))]
   if (!fields.length && !ro) return null
   return (
     <div className="efields">
@@ -44,7 +48,7 @@ function EntryFields({ e, ro, save }) {
       {fields.map((f) => (
         <EditRow key={f.key} label={t(f.label)} hint={f.hint && t(f.hint)} ro={ro}
                  value={f.col ? e[f.key] : e.meta?.[f.key]}
-                 onSave={(v) => save(patchFor(e.kind, f.key, v))} />
+                 onSave={(v) => save(f.extra ? { meta: { [f.key]: v } } : patchFor(e.kind, f.key, v))} />
       ))}
     </div>
   )

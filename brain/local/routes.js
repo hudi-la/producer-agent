@@ -4,7 +4,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
 import { saveSettings } from './settings.js'
 import { registerLocalUser } from './migrate.js'
-import { setJudgmentsEnabled } from '../judgments.js'
+import { setJudgmentsEnabled, readJudgmentFiles, writeJudgmentFile } from '../judgments.js'
 import { backupNow, listBackups, scheduleRestore } from './backup.js'
 import { checkUpdate, applyUpdate } from './update.js'
 import { VERSION } from '../version.js'
@@ -92,6 +92,15 @@ export async function handleLocalRoute(req, res, ctx) {
   if (req.method === 'GET' && p === '/settings') { json(res, 200, { ...publicSettings(ctx.settings), dataDir, judgmentsDir: `${dataDir}/judgments` }); return true }
   // 更新之后旧进程还在跑,启动器会看见版本对不上,叫它退场再起新的。只听本机,别人叫不动
   if (req.method === 'POST' && p === '/quit') { json(res, 200, { ok: true, bye: true }); setTimeout(() => (ctx.exit || process.exit)(0), 200); return true }
+
+  // ── 判据文档:页面上直接改(不想开终端的人也能用;MCP 那条路写的是同几个文件)──
+  if (req.method === 'GET' && p === '/judgments/files') { json(res, 200, { dir: `${dataDir}/judgments`, files: readJudgmentFiles(`${dataDir}/judgments`) }); return true }
+  if (req.method === 'POST' && p === '/judgments/files') {
+    const body = await readJson(req)
+    try { const lints = writeJudgmentFile(`${dataDir}/judgments`, body.file, body.content); json(res, 200, { ok: true, lints }) }
+    catch (e) { json(res, 400, { ok: false, error: e.message }) }
+    return true
+  }
 
   // ── 备份 ──
   if (req.method === 'GET' && p === '/backup/list') { json(res, 200, { dir: ctx.settings.backupDir || '', files: listBackups(ctx.settings.backupDir) }); return true }

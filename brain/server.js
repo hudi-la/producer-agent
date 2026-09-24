@@ -56,7 +56,7 @@ import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
 import { VERSION } from './version.js'
 // 学员自己的判据文档(<数据目录>/judgments/*.md),拼进每一格的收尾之前;判不出来回退出厂判据
 import { useJudgmentsDir, judgeWithFallback, hasJudgments } from './judgments.js'
-import { copyFileSync, existsSync as fsExists, mkdirSync as fsMkdir } from 'node:fs'
+import { copyFileSync, existsSync as fsExists, mkdirSync as fsMkdir, readFileSync } from 'node:fs'
 import { join as pathJoin } from 'node:path'
 import { initStore } from './mail/store.js'
 import { directive as timerDirective, timerKey } from './timer.js'
@@ -2006,11 +2006,18 @@ const server = http.createServer(async (req, res) => {
     })
     return
   }
+  // 说明书:怎么接、能做什么、试试这几句。文件随包(打包时拷到字节码旁边),开发时在 packaging/data
+  if (req.method === 'GET' && req.url === '/mcp-guide') {
+    for (const cand of [fileURLToPath(new URL('./MCP-guide.md', import.meta.url)), fileURLToPath(new URL('../packaging/data/MCP-guide.md', import.meta.url))]) {
+      if (fsExists(cand)) { res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' }); return res.end(readFileSync(cand)) }
+    }
+    return send(res, 404, { error: '说明书不在' })
+  }
   // MCP:只认回环地址来的连接——这扇门能写档案,不能开给局域网
   if (req.url === '/mcp' || req.url.startsWith('/mcp?')) {
     const ip = req.socket.remoteAddress || ''
     if (!/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(ip)) return send(res, 403, { error: 'MCP 只听本机' })
-    return handleMcp(req, res, { db, version: VERSION, dataDir: LOCAL_MODE?.dataDir || null, modules: MODS }).catch((e) => { console.error('  ✗ MCP:' + e.message); if (!res.headersSent) send(res, 500, { error: e.message }) })
+    return handleMcp(req, res, { db, version: VERSION, dataDir: LOCAL_MODE?.dataDir || null, modules: MODS, previewJudgments }).catch((e) => { console.error('  ✗ MCP:' + e.message); if (!res.headersSent) send(res, 500, { error: e.message }) })
   }
   const mod = moduleOf(req.url)
   if (!isEnabled(MODS, mod)) return send(res, 404, { error: 'module off', module: mod })

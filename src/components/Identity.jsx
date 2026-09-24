@@ -144,6 +144,7 @@ function McpRow() {
       <div className="la-acts">
         <code className="la-cmd">{cmd}</code>
         <button type="button" className="b" onClick={copy}>{copied ? t('复制好了') : t('复制')}</button>
+        <a className="b" href={`${location.origin}/mcp-guide`} target="_blank" rel="noreferrer">{t('说明书')}</a>
       </div>
       <small className="la-hint">{t('在终端里粘这一行；GPT 桌面版在它的连接器设置里填这个地址：')}<code>{url}</code></small>
     </div>

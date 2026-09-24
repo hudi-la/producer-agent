@@ -62,8 +62,10 @@ export default {
   '邮箱和登录令牌都要填': 'Email and login token are both required',
   '在更新…': 'Updating…',
   '接给 Claude Code': 'Connect Claude Code', '让 Claude Code（或 GPT 桌面版）能读写你的档案——比如"读我的网站，把作品填进来"': 'Let Claude Code (or the ChatGPT desktop app) read and write your profile — e.g. "read my website and fill in my works"',
-  '复制': 'Copy', '复制好了': 'Copied', '在终端里粘这一行；GPT 桌面版在它的连接器设置里填这个地址：': 'Paste this line in Terminal; for the ChatGPT desktop app, add this URL in its connector settings: ',
+  '说明书': 'Guide', '复制': 'Copy', '复制好了': 'Copied', '在终端里粘这一行；GPT 桌面版在它的连接器设置里填这个地址：': 'Paste this line in Terminal; for the ChatGPT desktop app, add this URL in its connector settings: ',
   '设置': 'Settings', '系统设置': 'Settings', '有新版本 {v}:去「设置」里更新': 'Version {v} is out: update in Settings',
+  '空': 'empty', '收起': 'Close', '存好了；但这几句不生效：': 'Saved; but these lines have no effect: ', '存好了，下一次判断就用新的': 'Saved. The next judgment uses it.',
+  '像跟熟这行的助手交代一样写几句。比如：投递类我等 30 天再问；拿不准宁可提醒我。': 'A few sentences, as if briefing an assistant who knows the field. E.g. wait 30 days before asking about submissions; when unsure, remind me.',
   '语言': 'Language', '换语言后刷新页面生效': 'takes effect after reloading the page',
   // ── 首次启动 ──
   '第一次打开': 'First time here', '三样东西。都在你自己这台机器上，不上传。': 'Three things. They stay on this machine and are never uploaded.',

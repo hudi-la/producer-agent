@@ -119,3 +119,10 @@ test('/quit:答一声再退场(退场用注入的 exit,测试里不真退)', asy
   assert.deepEqual(r.json(), { ok: true, bye: true })
   await new Promise((ok) => setTimeout(ok, 300)); assert.equal(code, 0)
 })
+
+test('/judgments/files:读五个(空串)→ 写一个 → 读回;坏文件名 400', async () => {
+  const g = res(); await handleLocalRoute(req('GET', '/judgments/files'), g, ctx); assert.deepEqual(Object.keys(g.json().files).length, 5)
+  const w = res(); await handleLocalRoute(req('POST', '/judgments/files', { file: '手记.md', content: '交了表就等 20 天' }), w, ctx); assert.equal(w.json().ok, true)
+  const g2 = res(); await handleLocalRoute(req('GET', '/judgments/files'), g2, ctx); assert.equal(g2.json().files['手记.md'], '交了表就等 20 天')
+  const bad = res(); await handleLocalRoute(req('POST', '/judgments/files', { file: 'x.md', content: '' }), bad, ctx); assert.equal(bad.code, 400)
+})

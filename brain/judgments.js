@@ -5,7 +5,7 @@
 // <数据目录>/judgments/*.md 里写,拼到那一格提示词的**收尾之前**——字段规格必须是最后一段。
 //
 // 文件名用中文,一格一个;「全部.md」每一格都带上。没有的文件 = 空。
-import { readFileSync, readdirSync, existsSync, watch } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, watch, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const FILES = {
@@ -93,4 +93,18 @@ export async function judgeWithFallback(run, parse, { log = () => {}, what = '' 
   log(`  ⚠️ ${what}:带着判据文档没判出来(${Object.keys(DOCS).map((k) => k === '*' ? '全部.md' : k).join('、')}),用出厂判据再判一次`)
   tag = await withoutJudgments(async () => parse(await run()))
   return { tag, fellBack: true }
+}
+
+/** 五个文件的内容(没有的是空串)。页面的判据编辑器和 MCP 都用它。 */
+export function readJudgmentFiles(dir) {
+  const out = {}
+  for (const f of Object.keys(FILES)) { const p = join(dir, f); out[f] = existsSync(p) ? readFileSync(p, 'utf8') : '' }
+  return out
+}
+/** 整个换掉一个文件。只认那五个名字。返回 lint。 */
+export function writeJudgmentFile(dir, file, content) {
+  if (!(file in FILES)) throw new Error(`只能写这几个文件:${Object.keys(FILES).join('、')}`)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, file), String(content ?? ''))
+  return lintJudgments(file, String(content ?? ''))
 }
