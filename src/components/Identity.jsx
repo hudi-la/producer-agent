@@ -140,13 +140,13 @@ function McpRow() {
   const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
   return (
     <div className="la-sub">
-      <div className="la-sub-h">{t('接给 Claude Code')}<small>{t('让 Claude Code（或 GPT 桌面版）能读写你的档案——比如"读我的网站，把作品填进来"')}</small></div>
+      <div className="la-sub-h">{t('接给 Claude Code')}<small>{t('让 Claude Code（或 Claude 桌面版）能读写你的档案——比如"读我的网站，把作品填进来"')}</small></div>
       <div className="la-acts">
         <code className="la-cmd">{cmd}</code>
         <button type="button" className="b" onClick={copy}>{copied ? t('复制好了') : t('复制')}</button>
         <a className="b" href={`${location.origin}/mcp-guide`} target="_blank" rel="noreferrer">{t('说明书')}</a>
       </div>
-      <small className="la-hint">{t('在终端里粘这一行；GPT 桌面版在它的连接器设置里填这个地址：')}<code>{url}</code></small>
+      <small className="la-hint">{t('在终端里粘这一行；Claude 桌面版和别的工具怎么接，看说明书。地址：')}<code>{url}</code></small>
     </div>
   )
 }

@@ -1,9 +1,9 @@
 # 让你自己的 AI 工具读写 Fairwind · Let your own AI tool read and write Fairwind
 
-Fairwind 开了一扇门（MCP）。Claude Code、ChatGPT 桌面版，或任何认 MCP 的工具，连上之后就能替你：读你的作品集网站往档案里填、把一个 open call 做成机会卡、按你的口味改判据。
+Fairwind 开了一扇门（MCP）。Claude Code、Claude 桌面版，或任何认 MCP 的工具，连上之后就能替你：读你的作品集网站往档案里填、把一个 open call 做成机会卡、按你的口味改判据。
 **结构是你的**：档案的类目和字段不定死——你维护什么、多细，你和你的 AI 商量。
 
-Fairwind exposes an MCP server. Claude Code, the ChatGPT desktop app, or any MCP-capable tool can connect and, on your behalf, fill your profile from your website, turn an open call into a pursuit card, or rewrite your judgment rules in your own words.
+Fairwind exposes an MCP server. Claude Code, the Claude desktop app, or any MCP-capable tool can connect and, on your behalf, fill your profile from your website, turn an open call into a pursuit card, or rewrite your judgment rules in your own words.
 **The structure is yours**: categories and fields are not fixed — what you maintain, and how detailed, is between you and your AI.
 
 ## 接上 · Connect
@@ -15,9 +15,18 @@ The URL is under Settings → Connect Claude Code. It looks like this (the port 
 http://localhost:8788/mcp
 ```
 
-- **Claude Code**：终端里粘 `claude mcp add --transport http fairwind http://localhost:8788/mcp`，之后每次打开 Claude Code 都带着。
-- **ChatGPT 桌面版**：设置 → 连接器（Connectors）→ 加一个自定义 MCP，填同一个地址。
-- **别的工具**：凡是支持 Streamable HTTP 的 MCP 客户端都行，填同一个地址。
+- **Claude Code**（推荐）：终端里粘 `claude mcp add --transport http fairwind http://localhost:8788/mcp`，之后每次打开 Claude Code 都带着。
+- **Claude 桌面版**：它自己连不到本机地址，要加一个桥。编辑 `~/Library/Application Support/Claude/claude_desktop_config.json`：
+  ```json
+  { "mcpServers": { "fairwind": { "command": "npx", "args": ["-y", "mcp-remote", "http://localhost:8788/mcp"] } } }
+  ```
+  重启 Claude 桌面版。
+- **ChatGPT 桌面版**：它的连接器只认公网地址，连不到本机——现在走不通。
+- **别的工具**：凡是支持 Streamable HTTP 的 MCP 客户端都行，填同一个地址；只认 stdio 的用上面那个 `mcp-remote` 桥。
+
+- **Claude Code** (recommended): paste `claude mcp add --transport http fairwind http://localhost:8788/mcp` in Terminal.
+- **Claude desktop app**: it can't reach localhost directly; add the `mcp-remote` bridge shown above to `claude_desktop_config.json` and restart.
+- **ChatGPT desktop**: its connectors require a public URL, so this doesn't work yet.
 
 只认本机连接；Fairwind 得开着。
 
