@@ -3,7 +3,6 @@
 import { t } from '../i18n/index.js'
 import ModulesPanel from './ModulesPanel.jsx'
 import { LocalAccount } from './Identity.jsx'
-import Judgments from './Judgments.jsx'
 
 export default function SettingsPage() {
   return (
@@ -12,7 +11,6 @@ export default function SettingsPage() {
       <div className="settings-inner">
         <header className="lib-head"><h1>{t('设置')}</h1></header>
         <ModulesPanel />
-        <Judgments />
         <LocalAccount />
       </div>
     </section>

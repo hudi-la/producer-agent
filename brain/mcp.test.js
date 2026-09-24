@@ -17,7 +17,7 @@ before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'fw-mcp-'))
   pg = await openLocalDb(dir); await applyMigrations(pg, { fresh: true }); await setLocalUid(pg, UID); await registerLocalUser(pg, { id: UID, email: 'a@b.c' }); await assumeUser(pg)
   const db = await makeLocalDb({ pg, dataDir: dir, user: { id: UID, email: 'a@b.c' } })
-  srv = http.createServer((req, res) => handleMcp(req, res, { db, version: '9.9.9', dataDir: dir, modules: { profile: true, pursuits: true }, previewJudgments: async ({ limit }) => ({ rows: [], n: 0, changed: 0, limit }) }))
+  srv = http.createServer((req, res) => handleMcp(req, res, { db, version: '9.9.9', dataDir: dir, modules: { profile: true, pursuits: true, mail: true }, previewJudgments: async ({ limit }) => ({ rows: [], n: 0, changed: 0, limit }) }))
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok)); port = srv.address().port
   client = new Client({ name: 'test', version: '1' })
   await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)))

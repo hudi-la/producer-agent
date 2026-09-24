@@ -90,13 +90,12 @@ export function LocalAccount() {
   const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, lang: s.lang || 'zh', provider: s.provider || 'claude-key', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })) } })
   useEffect(() => { load() }, [])
   if (!cur) return null
-  const dirty = form.apiKey || form.oauthToken || form.openaiKey || form.geminiKey || form.provider !== (cur.provider || 'claude-key') || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir || form.lang !== (cur.lang || 'zh')
+  const dirty = form.apiKey || form.oauthToken || form.openaiKey || form.geminiKey || form.provider !== (cur.provider || 'claude-key') || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir 
   const save = async (e) => {
     e.preventDefault(); setBusy(true); setNote('')
     const r = await supa.settings.set(form)
     setBusy(false)
     if (r?.error) return setNote(t('没存上:') + r.error.message)
-    if (form.lang !== (cur.lang || 'zh')) { location.reload(); return }   // 换语言:整页按新语言重来
     setNote(t('存好了,下一次开口就用新的')); await load()
   }
   const F = ({ k, label, hint, type = 'text', placeholder }) => (
@@ -111,8 +110,9 @@ export function LocalAccount() {
     <form className="local-account" onSubmit={save}>
       <div className="kind-h la-h">{t('账号')}<small>{t('都在你这台机器上,不上传')}</small></div>
       <label className="la-row"><span className="la-k">{t('语言')}</span>
-        <select value={form.lang} onChange={(e) => setForm((f) => ({ ...f, lang: e.target.value }))}><option value="zh">中文</option><option value="en">English</option></select>
-        <small>{t('换语言后刷新页面生效')}</small></label>
+        {/* 选完当场存、整页按新语言重开——之前要先点保存,提示又说"刷新生效",他刷新了当然没变 */}
+        <select value={form.lang} onChange={async (e) => { const lang = e.target.value; setForm((f) => ({ ...f, lang })); await supa.settings.set({ lang }); location.reload() }}><option value="zh">中文</option><option value="en">English</option></select>
+        <small>{t('选完页面会按新语言重开')}</small></label>
       <F k="email" label={t('邮箱')} type="email" hint={t('只用来在这台机器上认出你')} />
       <div className="la-row"><span className="la-k">{t('模型来源')}</span>
         <ProviderPicker compact value={form.provider} onChange={(v) => setForm((f) => ({ ...f, provider: v }))}

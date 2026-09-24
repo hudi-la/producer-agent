@@ -131,6 +131,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
   // ── 判据:学员的口味文档(<数据目录>/judgments/*.md)。骨架在程序里改不了,口味在这几个文件里 ──
   const JFILES = Object.keys(JUDGMENT_FILES)
   const jdir = dataDir ? join(dataDir, 'judgments') : null
+  if (modules?.mail) {
   server.registerTool('fairwind_judgments_list', {
     title: '读判据文档',
     description: `Fairwind 每次判断(要不要回、等多久、约了什么时候)前先读这些文件。五个文件名固定:${JFILES.join('、')}(全部.md 每次都带;其余按事件)。内容自由写,像跟熟这行的助手交代。返回每个文件的内容;README 里有写法说明。`,
@@ -159,6 +160,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
     description: '拿最近判过的 N 件事,用现在的判据文档再判一遍(只判不写),把原来的结论和现在的并排给你。每件事一次模型调用,别一次要太多。',
     inputSchema: { limit: z.number().int().min(1).max(40).optional() },
   }, async ({ limit }) => { try { return text(await previewJudgments({ limit: limit || 10 })) } catch (e) { return fail(e) } })
+  }
 
   return server
 }

@@ -31,7 +31,7 @@ http://localhost:8788/mcp
 | `fairwind_entry_add` / `_set` | 加一条 / 改一条：`kind`、`title`、`body`、`medium`、`year`、`meta`（任意键值）、`images`（图片链接）、`site_path`、`draft` |
 | `fairwind_pursuits_list` | 看板上的机会卡（机会线模块开着才有） |
 | `fairwind_pursuit_add` / `_set` / `_note` | 加一张卡 / 改链接截止阶段小记 / 记一笔手记 |
-| `fairwind_judgments_list` / `_write` | 读、写五个判据文件 |
+| `fairwind_judgments_list` / `_write` | 读、写五个判据文件（邮件模块开着才有） |
 | `fairwind_judgments_preview` | 拿最近判过的几件事用新判据再判一遍，并排看差别 |
 
 ### 档案的类目 · Kinds

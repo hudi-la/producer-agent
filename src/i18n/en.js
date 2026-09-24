@@ -66,7 +66,7 @@ export default {
   '设置': 'Settings', '系统设置': 'Settings', '有新版本 {v}:去「设置」里更新': 'Version {v} is out: update in Settings',
   '空': 'empty', '收起': 'Close', '存好了；但这几句不生效：': 'Saved; but these lines have no effect: ', '存好了，下一次判断就用新的': 'Saved. The next judgment uses it.',
   '像跟熟这行的助手交代一样写几句。比如：投递类我等 30 天再问；拿不准宁可提醒我。': 'A few sentences, as if briefing an assistant who knows the field. E.g. wait 30 days before asking about submissions; when unsure, remind me.',
-  '语言': 'Language', '换语言后刷新页面生效': 'takes effect after reloading the page',
+  '语言': 'Language', '选完页面会按新语言重开': 'the page reopens in the new language right away',
   // ── 首次启动 ──
   '第一次打开': 'First time here', '三样东西。都在你自己这台机器上，不上传。': 'Three things. They stay on this machine and are never uploaded.',
   '你的邮箱': 'Your email', '模型的钱走你自己的 key。去 console.anthropic.com 建一个（sk-ant- 开头）': 'Model usage is billed to your own key. Create one at console.anthropic.com (starts with sk-ant-)',
