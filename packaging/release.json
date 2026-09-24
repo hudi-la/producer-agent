@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "更新后自动换掉旧进程；首次启动页也能更新；GPT / Gemini 可选"
+  "note": "Claude Code / GPT 桌面版能直接读写你的档案（MCP）；语言默认跟系统走"
 }
