@@ -7,7 +7,7 @@
 # 拦未签名的应用;curl 和本机脚本创建的文件没有这个标记,双击就开。以后应用自己下载的更新也没有。
 set -e
 
-RELEASE="${FAIRWIND_RELEASE_URL:-https://github.com/hudi-creates/fairwind-releases/releases/latest/download}"
+RELEASE="${FAIRWIND_RELEASE_URL:-https://github.com/hudi-la/fairwind-releases/releases/latest/download}"
 ROOT="$HOME/Applications/Fairwind"
 APPB="$HOME/Applications/Fairwind.app"
 

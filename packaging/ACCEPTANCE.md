@@ -21,10 +21,10 @@
 
 ## 怎么真的发一版
 
-1. 建一个**公开、只放发布物**的 GitHub 仓库（比如 `hudi-creates/fairwind-releases`），Release 里放 zip + `latest.json` + `install.sh`。
-2. `packaging/release.json` 填 `latestUrl`（`https://github.com/<你>/fairwind-releases/releases/latest/download/latest.json`）和 `downloadBase`（同前缀）。
+1. 建一个**公开、只放发布物**的 GitHub 仓库（比如 `hudi-la/fairwind-releases`），Release 里放 zip + `latest.json` + `install.sh`。
+2. `packaging/release.json` 填 `latestUrl`（`https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json`）和 `downloadBase`（同前缀）。
 3. `packaging/runtime/node-darwin-arm64/bin/node packaging/build.mjs` → `packaging/out/` 里的 zip 和 latest.json 传上去。
-4. 学员粘：`curl -fsSL https://github.com/<你>/fairwind-releases/releases/latest/download/install.sh | sh`
+4. 学员粘：`curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download/install.sh | sh`
 5. 以后发新版：改 `package.json` 的 version → 重打 → 传上去。学员那边「检查更新」自己看见。
 
 ## 双击安装(问过,2026-09-17)
