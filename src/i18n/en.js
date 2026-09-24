@@ -60,6 +60,7 @@ export default {
   '去 aistudio.google.com/apikey 建一个（AIza 开头）。联网查走 DuckDuckGo，不用另配': 'Create one at aistudio.google.com/apikey (starts with AIza). Web search goes through DuckDuckGo, nothing else to set up',
   'Claude Code 的登录令牌': 'Claude Code login token', '走你的 Claude 订阅（Pro / Max）。在终端里跑一次 claude setup-token，把打出来的那一串粘到这儿': 'Uses your Claude subscription (Pro / Max). Run `claude setup-token` once in Terminal and paste the token here',
   '邮箱和登录令牌都要填': 'Email and login token are both required',
+  '在更新…': 'Updating…',
   '语言': 'Language', '换语言后刷新页面生效': 'takes effect after reloading the page',
   // ── 首次启动 ──
   '第一次打开': 'First time here', '三样东西。都在你自己这台机器上，不上传。': 'Three things. They stay on this machine and are never uploaded.',
