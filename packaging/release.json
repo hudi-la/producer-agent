@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "公开版不再出现盖住信息的小花"
+  "note": "接口开全：Claude Code / GPT 桌面版能读写档案、机会卡、判据；类目和字段不定死；设置里能直接改判据；附说明书"
 }
