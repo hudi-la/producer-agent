@@ -1883,3 +1883,5 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .prov small { font-weight: 400; color: var(--ink-2); }
 .prov.compact label { font-weight: 400; }
 .prov.compact input[type=password] { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line-2, var(--ink-3)); border-radius: 6px; padding: 6px 9px; }
+.prov-opt input[type=radio] { position: absolute; opacity: 0; width: 0; height: 0; }   /* 药丸本身就是选中态，圆点多余 */
+.prov-opt { position: relative; }
