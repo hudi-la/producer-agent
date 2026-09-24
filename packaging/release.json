@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "盒子做实了:文本能补能改(双击);「丢进材料」真能丢文件——存在本机 files/box/,清单记在盒子里,Fairwind 看得到文件名;英文界面新建条目不再显示中文（未命名）"
+  "note": "有新版本时设置按钮上直接写「新版本 x.y.z」,不再是一颗看不懂的点"
 }
