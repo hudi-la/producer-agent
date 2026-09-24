@@ -54,6 +54,9 @@ export default {
   '排好了:关掉再打开就是恢复后的': 'Scheduled: quit and reopen to see the restored data', '没排上:': "Couldn't schedule: ",
   '版本': 'Version', ' · 有新版本 {v}': ' · version {v} available', ' · 已是最新': ' · up to date', '在看…': 'Checking…', '检查更新': 'Check for updates', '更新到 {v}': 'Update to {v}',
   '装好了 {v}:关掉再打开就是新版': 'Installed {v}: quit and reopen to use it', '没更成:': "Update failed: ",
+  '模型来源': 'Model source', 'Claude 订阅': 'Claude subscription', '暂不支持': 'not yet', '暂不支持：Fairwind 目前只会跟 Claude 说话': 'Not supported yet: Fairwind currently only talks to Claude',
+  'Claude Code 的登录令牌': 'Claude Code login token', '走你的 Claude 订阅（Pro / Max）。在终端里跑一次 claude setup-token，把打出来的那一串粘到这儿': 'Uses your Claude subscription (Pro / Max). Run `claude setup-token` once in Terminal and paste the token here',
+  '邮箱和登录令牌都要填': 'Email and login token are both required',
   '语言': 'Language', '换语言后刷新页面生效': 'takes effect after reloading the page',
   // ── 首次启动 ──
   '第一次打开': 'First time here', '三样东西。都在你自己这台机器上，不上传。': 'Three things. They stay on this machine and are never uploaded.',

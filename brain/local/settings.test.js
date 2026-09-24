@@ -23,3 +23,12 @@ test('save 合并、ready 由 email+apiKey 决定、uid 不变', () => {
   assert.equal(c.ready, true); assert.equal(c.uid, a.uid); assert.equal(c.email, 'a@b.c')
   rmSync(dir, { recursive: true, force: true })
 })
+
+test('模型来源:订阅路 ready 看令牌不看 key;不认的来源退回 claude-key', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fw-settings-'))
+  let s = saveSettings(dir, { email: 'a@b.c', provider: 'claude-subscription' })
+  assert.equal(s.ready, false)
+  s = saveSettings(dir, { oauthToken: 'sk-ant-oat01-xxx' }); assert.equal(s.ready, true)
+  s = saveSettings(dir, { provider: 'gpt' }); assert.equal(s.provider, 'claude-key'); assert.equal(s.ready, false)
+  rmSync(dir, { recursive: true, force: true })
+})

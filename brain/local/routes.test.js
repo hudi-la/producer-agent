@@ -95,3 +95,12 @@ test('更新路由:没配发布位 → check 说原因、apply 400;配了假发�
   const c1 = res(); await handleLocalRoute(req('GET', '/update/check?force'), c1, { ...ctx, fetchImpl }); assert.equal(c1.json().canUpdate, true); assert.equal(c1.json().latest, '9.9.9')
   delete process.env.FAIRWIND_RELEASE_URL
 })
+
+test('/settings:切到订阅路 → env 里只剩 CLAUDE_CODE_OAUTH_TOKEN;切回 key → 只剩 ANTHROPIC_API_KEY;令牌不回显', async () => {
+  const a = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-subscription', oauthToken: 'sk-ant-oat01-abcdefgh-9999' }), a, ctx)
+  assert.equal(a.json().provider, 'claude-subscription'); assert.equal(a.json().oauthTokenSet, true); assert.equal(a.json().oauthTokenHint, 'sk-ant-oat01…9999')
+  assert.equal(JSON.stringify(a.json()).includes('abcdefgh'), false)
+  assert.equal(process.env.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat01-abcdefgh-9999'); assert.equal(process.env.ANTHROPIC_API_KEY, undefined)
+  const b = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-key' }), b, ctx)
+  assert.equal(process.env.CLAUDE_CODE_OAUTH_TOKEN, undefined); assert.ok(process.env.ANTHROPIC_API_KEY)
+})

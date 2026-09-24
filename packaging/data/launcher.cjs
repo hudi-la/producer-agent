@@ -33,7 +33,9 @@ process.on('uncaughtException', (e) => { say('✗ ' + (e && e.stack || e)); proc
 async function main() {
   const want = Number(process.env.BRAIN_PORT || 8788)
   let chosen = null
-  for (let port = want; port < want + 10; port++) {
+  // 8789 留给 Gmail 授权的本机回调口(brain/mail/auth.js),别拿它当 brain 的口
+  for (let port = want; port < want + 12; port++) {
+    if (port === 8789) continue
     const h = await health(port)
     if (h && h.mode === 'local' && h.version) { say('已经在跑(' + port + ', ' + h.version + '),只开页面'); openBrowser('http://localhost:' + port); return process.exit(0) }
     if (h) { say(port + ' 上是别的 Fairwind/brain(' + (h.mode || '?') + '),换下一个'); continue }

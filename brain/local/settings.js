@@ -4,12 +4,15 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 const FILE = (dir) => join(dir, 'settings.json')
-const withReady = (s) => ({ ...s, ready: Boolean(s.email && s.apiKey) })
+// 模型来源:claude-key(自己的 API key)| claude-subscription(Claude Code 的登录令牌,走订阅)。
+// GPT / Gemini 这套程序跑不了(brain 是 Claude Agent SDK),界面上灰着写明,这里不认。
+const withReady = (s) => ({ ...s, provider: s.provider === 'claude-subscription' ? 'claude-subscription' : 'claude-key',
+  ready: Boolean(s.email && (s.provider === 'claude-subscription' ? s.oauthToken : s.apiKey)) })
 
 export function loadSettings(dataDir) {
   mkdirSync(dataDir, { recursive: true })
   if (!existsSync(FILE(dataDir))) {
-    const fresh = { uid: randomUUID(), email: '', apiKey: '', model: '', modelCheap: '', backupDir: '', judgmentsEnabled: true, lang: 'zh' }
+    const fresh = { uid: randomUUID(), email: '', apiKey: '', model: '', modelCheap: '', backupDir: '', judgmentsEnabled: true, lang: 'zh', provider: 'claude-key', oauthToken: '' }
     writeFileSync(FILE(dataDir), JSON.stringify(fresh, null, 2))
     return withReady(fresh)
   }
