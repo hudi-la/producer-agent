@@ -58,3 +58,16 @@ export async function addEntry(kind, title) {
   if (error) throw new Error(error.message)
   return data
 }
+
+/** 盒子里补/改一条文本(为什么是现在 / 隐线 / 备注……)。键是自由文本。 */
+export async function setEntryBox(id, key, value) {
+  needDb()
+  const { error } = await supa.rpc('pa_set_entry_box', { p_id: id, p_key: key, p_value: value })
+  if (error) throw new Error(error.message)
+}
+/** 盒子里一格放 json(现在只有 files 那份清单用)。传 null = 删掉这一格。 */
+export async function setEntryBoxJson(id, key, value) {
+  needDb()
+  const { error } = await supa.rpc('pa_set_entry_box_json', { p_id: id, p_key: key, p_value: value })
+  if (error) throw new Error(error.message)
+}

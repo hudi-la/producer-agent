@@ -55,7 +55,7 @@ function legacyEntriesBlock(entries) {
     const box = Object.entries(e.box || {}).filter(([, v]) => v != null && String(v).trim() !== '')
     if (box.length) {
       lines.push('  盒子（私密外联层，是给你的作战情报，不是对外文案——写「为什么是我」、判断怎么开口时用）：')
-      for (const [k, v] of box) lines.push(`  · ${k}：${v}`)
+      for (const [k, v] of box) lines.push(`  · ${k}：${k === 'files' && Array.isArray(v) ? v.map((f) => f?.name || f).join('、') + '（文件在本机，只有名字）' : v}`)
     }
   }
   lines.push('')
@@ -518,4 +518,12 @@ test('整条路走一遍：在写的既不进静态块，也不进讲懂', () =>
   const ctx = { ...pursuitCtx, entries: [...pursuitCtx.entries, { kind: 'work', title: '半成品XYZ', draft: true }] }
   assert.ok(!buildSystem(ctx)[0].includes('半成品XYZ'))
   assert.ok(!buildBriefSystem(ctx)[0].includes('半成品XYZ'))
+})
+
+test('盒子里的 files 那格在 prompt 里是文件名,不是 [object Object]', () => {
+  const lines = entriesBlock([{ kind: 'work', title: '回声', box: { 隐线: '导师的朋友', files: [{ name: 'old-proposal.pdf', key: 'box/x/1-old-proposal.pdf' }, { name: 'hi-res.jpg', key: 'box/x/2-hi-res.jpg' }] } }])
+  const s = lines.join('\n')
+  assert.match(s, /隐线：导师的朋友/)
+  assert.match(s, /files：old-proposal\.pdf、hi-res\.jpg（文件在本机，只有名字）/)
+  assert.doesNotMatch(s, /object Object/)
 })

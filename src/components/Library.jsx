@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { t } from '../i18n/index.js'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
-import { addEntry, setEntryDraft } from '../lib/studio.js'
+import { addEntry, setEntryDraft, setEntryBox, setEntryBoxJson } from '../lib/studio.js'
+import { useGrow } from '../lib/useGrow.js'
+import { supa } from '../lib/backends.js'
 import { DB_MODE } from '../lib/backends.js'
 import EntryChat from './EntryChat.jsx'
 import DrawerGrip from './DrawerGrip.jsx'
@@ -23,7 +25,106 @@ import DrawerGrip from './DrawerGrip.jsx'
 const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
 const BOX_LABELS = { why_now: t('为什么是现在'), reach_out: t('想触达'), hidden_links: t('隐线'), materials: t('材料'), note: t('备注') }
 
-const boxEntries = (box) => Object.entries(box || {}).filter(([, v]) => v != null && v !== '')
+// 盒子里的文本格。files 那一格是文件清单,另画(见 BoxFiles)
+const boxEntries = (box) => Object.entries(box || {}).filter(([k, v]) => k !== 'files' && v != null && v !== '')
+const BOX_HINTS = ['为什么是现在', '想触达', '隐线', '材料', '备注']
+
+/**
+ * 盒子里补一条。名字 + 内容两格,都填了才给存。名字是自由文本,BOX_HINTS 只是提示
+ * (作者分支 2026-09-18 的做法,搬过来;库函数 pa_set_entry_box 同一支)。
+ */
+function BoxAdd({ onAdd }) {
+  const [on, setOn] = useState(false)
+  const [k, setK] = useState('')
+  const [v, setV] = useState('')
+  const [err, setErr] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const ta = useRef(null)
+  useGrow(ta, v, on)
+  const close = () => { setOn(false); setK(''); setV(''); setErr(null) }
+  const commit = async () => {
+    if (!k.trim() || !v.trim()) return
+    setSaving(true); setErr(null)
+    try { await onAdd(k.trim(), v.trim()); close() } catch (e) { setErr(e.message) }
+    setSaving(false)
+  }
+  if (!on) return <button type="button" className="add" onClick={() => setOn(true)}>{t('+ 补一条')}</button>
+  return (
+    <div className="boxadd">
+      <input className="idin boxadd-k" value={k} autoFocus placeholder={t('叫什么（为什么是现在 / 隐线 / …）')} list="box-hints"
+             onChange={(e) => setK(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') close() }} />
+      <datalist id="box-hints">{BOX_HINTS.map((h) => <option value={t(h)} key={h} />)}</datalist>
+      <textarea ref={ta} className="idin" rows={2} value={v} placeholder={t('写什么')} onChange={(e) => setV(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); close() } if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit() } }} />
+      <div className="ed-act">
+        <button type="button" className="ed-ok" onMouseDown={(ev) => ev.preventDefault()} onClick={commit} disabled={saving || !k.trim() || !v.trim()}>{saving ? t('存……') : t('确定')}</button>
+        <button type="button" className="ed-no" onMouseDown={(ev) => ev.preventDefault()} onClick={close} disabled={saving}>{t('取消')}</button>
+        {err && <span className="ed-err">{t('没存上：')}{err}</span>}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 盒子里的文件:高清图、旧申请稿、PDF……本体进 storage(本机模式 = <数据目录>/files/box/<条目id>/),
+ * 清单记在 box.files。Fairwind 拼档案时看得到文件名(不读内容)。
+ */
+const BOX_BUCKET = 'pursuit-files'
+function BoxFiles({ entry, onSaved }) {
+  const files = Array.isArray(entry.box?.files) ? entry.box.files : []
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const inp = useRef(null)
+  const add = async (list) => {
+    if (!list?.length) return
+    setBusy(true); setErr(null)
+    try {
+      const next = [...files]
+      for (const f of list) {
+        const key = `box/${entry.id}/${Date.now()}-${f.name.replace(/[^\w.\-\u4e00-\u9fff]+/g, '_')}`
+        const r = await supa.storage.from(BOX_BUCKET).upload(key, f, { contentType: f.type || 'application/octet-stream' })
+        if (r.error) throw new Error(r.error.message || String(r.error))
+        next.push({ name: f.name, key, size: f.size, type: f.type || '', at: new Date().toISOString() })
+      }
+      await setEntryBoxJson(entry.id, 'files', next)
+      await onSaved?.()
+    } catch (e) { setErr(e.message) }
+    setBusy(false); if (inp.current) inp.current.value = ''
+  }
+  const remove = async (f) => {
+    if (!confirm(t('删掉「{name}」？文件本体一起删。', { name: f.name }))) return
+    setBusy(true); setErr(null)
+    try {
+      await supa.storage.from(BOX_BUCKET).remove([f.key]).catch(() => {})
+      const next = files.filter((x) => x.key !== f.key)
+      await setEntryBoxJson(entry.id, 'files', next.length ? next : null)
+      await onSaved?.()
+    } catch (e) { setErr(e.message) }
+    setBusy(false)
+  }
+  return (
+    <div className="boxfiles">
+      {files.map((f) => (
+        <div className="field boxfile" key={f.key}>
+          <FileLink f={f} />
+          <small>{f.size ? (f.size > 1048576 ? (f.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(f.size / 1024)) + ' KB') : ''}</small>
+          <button type="button" className="ed-no" disabled={busy} onClick={() => remove(f)} title={t('删掉这个文件')}>×</button>
+        </div>
+      ))}
+      <label className={'add boxfile-add' + (busy ? ' busy' : '')}>
+        <input ref={inp} type="file" multiple hidden disabled={busy} onChange={(ev) => add([...ev.target.files])} />
+        {busy ? t('传……') : t('+ 丢进材料（文件）')}
+      </label>
+      <small className="bx-hint">{t('高清图、旧申请稿、PDF……存在你这台机器上。Fairwind 看得到文件名，不读内容。')}</small>
+      {err && <span className="ed-err">{t('没存上：')}{err}</span>}
+    </div>
+  )
+}
+function FileLink({ f }) {
+  const [url, setUrl] = useState(null)
+  useEffect(() => { let on = true; supa.storage.from(BOX_BUCKET).createSignedUrl(f.key, 3600).then((r) => { if (on && r?.data?.signedUrl) setUrl(r.data.signedUrl) }).catch(() => {}); return () => { on = false } }, [f.key])
+  return url ? <a className="v" href={url} target="_blank" rel="noreferrer">{f.name}</a> : <span className="v">{f.name}</span>
+}
 
 /**
  * 展开后那块「这条的字段」—— 这一类特有的那几条事实（媒介 / 机构 / 年份 / 地点）。
@@ -73,6 +174,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
     await setEntryDraft(e.id, !e.draft)
     await onSaved?.()
   }
+  const saveBox = async (k, v) => { await setEntryBox(e.id, k, v); await onSaved?.() }
 
   return (
     <div className={'work' + (active ? ' active' : '')}>
@@ -88,8 +190,8 @@ function Entry({ e, open, active, onToggle, onSaved }) {
                       placeholder={open ? t('双击写点描述') : null}
                       onSave={(v) => save({ body: v })} />
           <div className="w-foot">
-            <span className={'boxchip' + (entries.length ? ' filled' : '')}>
-              {entries.length ? t('盒子 · 已补 {n} 条', { n: entries.length }) : t('盒子 · 空')}
+            <span className={'boxchip' + ((entries.length + (e.box?.files?.length || 0)) ? ' filled' : '')}>
+              {(entries.length + (e.box?.files?.length || 0)) ? t('盒子 · 已补 {n} 条', { n: entries.length + (e.box?.files?.length || 0) }) : t('盒子 · 空')}
             </span>
             {/* 只有「在写」才挂标。写完的是常态，61 条各顶一个「写完了」全是噪音。
                 要把一条标成在写，在展开后那块里切（见下面 EntryFields 上面那一行）。 */}
@@ -132,11 +234,13 @@ function Entry({ e, open, active, onToggle, onSaved }) {
           )}
           <EntryFields e={e} ro={ro} save={save} />
           <div className="bx-h">{t('盒子 · 网站装不下的')}</div>
-          {entries.length === 0 && <div className="bx-empty">{t('还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。')}</div>}
+          {entries.length === 0 && !(e.box?.files?.length) && <div className="bx-empty">{t('还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。')}</div>}
+          {/* 盒子里每一条都能改(双击);底下能补一条、能丢文件。以前这儿是纯文字 + 一行死的「+ 补一条 / 丢进材料」 */}
           {entries.map(([k, v]) => (
-            <div className="field" key={k}><span className="k">{BOX_LABELS[k] || k} · </span><span className="v">{String(v)}</span></div>
+            <EditRow key={k} label={BOX_LABELS[k] || k} long ro={ro} value={String(v)} onSave={(nv) => saveBox(k, nv)} />
           ))}
-          <div className="add">{t('+ 补一条 / 丢进材料')}</div>
+          {!ro && <BoxAdd onAdd={saveBox} />}
+          {!ro && <BoxFiles entry={e} onSaved={onSaved} />}
         </div>
       )}
     </div>

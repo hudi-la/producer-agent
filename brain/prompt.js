@@ -230,7 +230,7 @@ export function entriesBlock(all, opts = {}) {
     const box = Object.entries(e.box || {}).filter(([, v]) => v != null && String(v).trim() !== '')
     if (box.length) {
       lines.push('  盒子（私密外联层，是给你的作战情报，不是对外文案——写「为什么是我」、判断怎么开口时用）：')
-      for (const [k, v] of box) lines.push(`  · ${k}：${v}`)
+      for (const [k, v] of box) lines.push(`  · ${k}：${k === 'files' && Array.isArray(v) ? v.map((f) => f?.name || f).join('、') + '（文件在本机，只有名字）' : v}`)
     }
   }
   lines.push('')
