@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "机会线模块全英文(看板/机会池/造卡任务/展开的卡/铃铛/对话);邮件没开时不再露「展开」开关;接入提示带工具名;发布脚本 zip 传不上自动换 gh"
+  "note": "MCP 桥自己找端口(读启动器记的端口文件,再挨个探,只认本机模式,多台活着挑最新);Fairwind 换端口不用重接"
 }

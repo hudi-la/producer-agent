@@ -54,6 +54,7 @@ async function main() {
   if (!chosen) { say('✗ ' + want + ' 起的十个端口都被占了'); return process.exit(1) }
   process.env.BRAIN_PORT = String(chosen)
   process.env.FAIRWIND_DATA_DIR = DATA
+  try { fs.mkdirSync(DATA, { recursive: true }); fs.writeFileSync(path.join(DATA, 'port'), String(chosen)) } catch (e) { say('端口没记下来:' + e.message) }   // 桥(mcp-bridge)靠这个找到今天的端口
   process.env.FAIRWIND_DIST_DIR = path.join(APP, 'dist')
   process.env.FAIRWIND_APP_ROOT = process.env.FAIRWIND_APP_ROOT || path.dirname(APP)
   for (const k of ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[k]   // 这个包只走本机库
