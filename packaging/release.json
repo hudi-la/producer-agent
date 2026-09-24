@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "设置里有「退出 Fairwind」;启动器把整段端口上的旧版本都请退;包里带 SETUP.md(从装机到用 AI 工具填档案)"
+  "note": "档案页左栏「+ 加一栏」:空库也能加第一条;出厂类目 + 自己起名;页头说清两条路(手填 / AI 工具读网站)"
 }

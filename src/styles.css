@@ -490,6 +490,14 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .lib-pane .kind { margin-top: 0; }
 
 /* 「加一条」：在这之前档案页压根没有这个动作。 */
+.rail-add { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line-2); }
+.rail-plus { color: var(--ink-3); font-size: 12.5px; }
+.rail-menu { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 2px 8px; }
+.rail-menu .rail-b { font-size: 12.5px; padding: 6px 10px; }
+.rail-custom { display: flex; gap: 6px; align-items: center; padding: 4px 10px 2px; }
+.rail-custom input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--line-2); border-radius: 7px; background: var(--paper); color: var(--ink); }
+.rail-custom .kind-add { margin-left: 0; }
+.rail-hint { display: block; padding: 4px 10px 0; font-size: 11px; color: var(--ink-3); line-height: 1.4; }
 .kind-add { font: inherit; font-size: 11.5px; margin-left: 10px; padding: 2px 9px; border-radius: 6px;
   border: 1px dashed var(--line-2); background: transparent; color: var(--ink-3); cursor: pointer;
   transition: color .14s, border-color .14s; }

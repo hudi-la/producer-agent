@@ -6,6 +6,7 @@ import { EditRow, InlineText } from './EditRow.jsx'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
 import { addEntry, setEntryDraft } from '../lib/studio.js'
+import { DB_MODE } from '../lib/backends.js'
 import EntryChat from './EntryChat.jsx'
 import DrawerGrip from './DrawerGrip.jsx'
 
@@ -233,6 +234,40 @@ function buildSections(entries) {
   return secs
 }
 
+/**
+ * 左栏最底下那个「+ 加一栏」。空库只有「关于你」一格,以前连第一条作品都没处加
+ * (栏是跟着条目长出来的,一条都没有的栏不画)。这里列出出厂几类里还没有的,
+ * 再给一个「自己起个名」——结构是你的,类目不定死。点了 = 建这一类的第一条,
+ * 栏就长出来,新那条自动展开。
+ */
+function AddRail({ have, onPick }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const choices = []
+  for (const k of KINDS) {
+    if (k.key === 'credit') { for (const g of CREDIT_GROUPS) if (!have.has(`credit:${g.key}`)) choices.push({ label: t(g.label), kind: 'credit', metaType: g.types[0], key: `credit:${g.key}` }) }
+    else if (!have.has(k.key)) choices.push({ label: t(k.label), kind: k.key, key: k.key })
+  }
+  const go = async (c) => { if (busy) return; setBusy(true); try { await onPick(c) ; setOpen(false); setName('') } finally { setBusy(false) } }
+  const custom = () => { const n = name.trim(); if (!n) return; go({ kind: n, key: n }) }
+  return (
+    <div className="rail-add">
+      <button type="button" className={'rail-b rail-plus' + (open ? ' on' : '')} onClick={() => setOpen((o) => !o)} aria-expanded={open}>{t('+ 加一栏')}</button>
+      {open && (
+        <div className="rail-menu">
+          {choices.map((c) => <button type="button" key={c.key} className="rail-b" disabled={busy} onClick={() => go(c)}>{c.label}</button>)}
+          <form className="rail-custom" onSubmit={(e) => { e.preventDefault(); custom() }}>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('自己起个名，比如「驻地日志」')} aria-label={t('新类目的名字')} />
+            <button type="submit" className="kind-add" disabled={busy || !name.trim()}>{t('建')}</button>
+          </form>
+          <small className="rail-hint">{t('类目不定死：你维护什么就有什么栏。一条都没有的栏不显示。')}</small>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Library({ entries, concerns, onProfileSaved, onEntrySaved, onDrawerChange }) {
   const profile = useProfile()
   const sections = buildSections(entries)
@@ -277,6 +312,16 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
     await onEntrySaved?.()
   } : null
 
+  // 加一栏 = 建这一类的第一条。栏是跟着条目长的,建完刷新它就出现了。
+  const addKind = async ({ kind, key, metaType }) => {
+    const id = await addEntry(kind, null)
+    if (metaType) await saveEntry({ id, meta: { type: metaType } })
+    setPick(key)
+    setOpenIds((cur_) => new Set(cur_).add(id))
+    setActiveId(id)
+    await onEntrySaved?.()
+  }
+
   // 左栏那一格上「N 条在写」。这一条不能省：在写的东西 Fairwind 写申请时
   // 翻不到，而你写完忘了点标的话，收不到任何提示。这个数字就是那个提示。
   const draftsIn = (s) => (s.items || []).filter((e) => e.draft).length
@@ -286,7 +331,9 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
       <div className={'page-inner widest' + (active ? ' drawered' : '')}>
         <header className="page-head">
           <h1>{t('我的档案')}</h1>
-          <p className="note">{t('Fairwind 懂你的一切，都收在这里 · {n} 条。作品读自 ', { n: entries.length })}<b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || t('你的作品站')}</b>{t('；工作、教育、战绩、自述一条条补进来。每条下面的')}<span className="bx">{t('盒子')}</span>{t('，放"网站装不下"的私密外联层。')}</p>
+          {DB_MODE === 'local'
+            ? <p className="note">{t('Fairwind 懂你的一切，都收在这里 · {n} 条。左边「+ 加一栏」一条条补；或者让你的 AI 工具从你的网站读进来（设置 → 接给你的 AI 工具）。每条下面的', { n: entries.length })}<span className="bx">{t('盒子')}</span>{t('，放"网站装不下"的私密外联层。')}</p>
+            : <p className="note">{t('Fairwind 懂你的一切，都收在这里 · {n} 条。作品读自 ', { n: entries.length })}<b>{(profile?.website || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || t('你的作品站')}</b>{t('；工作、教育、战绩、自述一条条补进来。每条下面的')}<span className="bx">{t('盒子')}</span>{t('，放"网站装不下"的私密外联层。')}</p>}
         </header>
         <div className="lib-two">
           <nav className="lib-rail" aria-label={t('档案分类')}>
@@ -305,6 +352,7 @@ export default function Library({ entries, concerns, onProfileSaved, onEntrySave
                 </button>
               )
             })}
+            <AddRail have={new Set(sections.map((x) => x.key))} onPick={addKind} />
           </nav>
           <div className="lib-pane">
             {cur.about
