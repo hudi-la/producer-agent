@@ -49,7 +49,7 @@ curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download
 
 两种方式，可以混着用。
 
-**A. 页面上手填**：「我的档案」→ 「关于你」填名字、作品站、身份、常住、阶段、资助偏好；各栏「+ 加一条」。
+**A. 页面上手填**：「我的档案」→ 「关于你」填名字、作品站、身份、常住、阶段、资助偏好。左栏「+ 加一栏」挑一类（作品、自述、工作、教育、展览、驻地、策展、技能、工作坊），或者自己起个名（比如「驻地日志」）——点了就建第一条并展开；之后每栏顶上有「+ 加一条」。
 
 **B. 让你的 AI 工具替你填**（推荐，尤其是有作品集网站的人）：
 
@@ -158,7 +158,7 @@ Top right: **Settings → Installed**. Three layers, each on top of the previous
 
 Two ways; mix freely.
 
-**A. By hand**: My profile → About you (name, website, visa, location, stage, funding preference); "+ Add one" in each section.
+**A. By hand**: My profile → About you (name, website, visa, location, stage, funding preference). In the left column, "+ Add a section": pick a built-in kind (works, statement, jobs, education, exhibitions, residencies, curating, skills, workshops) or name your own (e.g. "residency log"); that creates the first entry and opens it. After that each section has "+ Add one" at the top.
 
 **B. Let your AI tool do it** (recommended, especially if you have a portfolio site):
 
