@@ -8,24 +8,20 @@ Fairwind exposes an MCP server. Claude Code, the Claude desktop app, or any MCP-
 
 ## 接上 · Connect
 
-地址在「设置 → 接给 Claude Code」里，长这样（端口按你机器的来）：
+地址在「设置 → 接给你的 AI 工具」里，长这样（端口按你机器的来）：
 The URL is under Settings → Connect Claude Code. It looks like this (the port depends on your machine):
 
 ```
 http://localhost:8788/mcp
 ```
 
-- **Claude Code**（推荐）：终端里粘 `claude mcp add --transport http fairwind http://localhost:8788/mcp`，之后每次打开 Claude Code 都带着。
-- **Claude 桌面版**：它自己连不到本机地址，要加一个桥。编辑 `~/Library/Application Support/Claude/claude_desktop_config.json`：
-  ```json
-  { "mcpServers": { "fairwind": { "command": "npx", "args": ["-y", "mcp-remote", "http://localhost:8788/mcp"] } } }
-  ```
-  重启 Claude 桌面版。
+- **Claude 桌面版**（推荐，不用终端）：Fairwind 的「设置 → 接给你的 AI 工具」里点一下「接入 Claude 桌面版」，然后把 Claude 桌面版完全退出再打开。对话里就有 Fairwind 的工具了（它靠 Fairwind 自带的一座小桥连本机，那一下替你写好了配置）。
+- **Claude Code**（终端）：粘 `claude mcp add --transport http fairwind http://localhost:8788/mcp`，之后每次打开都带着。
 - **ChatGPT 桌面版**：它的连接器只认公网地址，连不到本机——现在走不通。
 - **别的工具**：凡是支持 Streamable HTTP 的 MCP 客户端都行，填同一个地址；只认 stdio 的用上面那个 `mcp-remote` 桥。
 
-- **Claude Code** (recommended): paste `claude mcp add --transport http fairwind http://localhost:8788/mcp` in Terminal.
-- **Claude desktop app**: it can't reach localhost directly; add the `mcp-remote` bridge shown above to `claude_desktop_config.json` and restart.
+- **Claude desktop app** (recommended, no terminal): in Fairwind, Settings → Connect your AI tool → "Connect Claude desktop", then quit and reopen the Claude app. Its chats now have Fairwind's tools.
+- **Claude Code** (terminal): paste `claude mcp add --transport http fairwind http://localhost:8788/mcp`.
 - **ChatGPT desktop**: its connectors require a public URL, so this doesn't work yet.
 
 只认本机连接；Fairwind 得开着。

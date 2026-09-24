@@ -40,6 +40,7 @@ await buildBrain('brain/server.js', 'brain', { outDir: APP, define: { __FAIRWIND
 copyFileSync(resolve(ROOT, 'packaging/data/judgments-README.md'), join(APP, 'judgments-README.md'))
 copyFileSync(resolve(ROOT, 'packaging/data/judgments-README.en.md'), join(APP, 'judgments-README.en.md'))
 copyFileSync(resolve(ROOT, 'packaging/data/MCP-guide.md'), join(APP, 'MCP-guide.md'))
+copyFileSync(resolve(ROOT, 'packaging/data/mcp-bridge.cjs'), join(APP, 'mcp-bridge.cjs'))   // Claude 桌面版用的 stdio 桥
 
 say('迁移(只带新装要跑的那批)')
 mkdirSync(join(APP, 'migrations'))

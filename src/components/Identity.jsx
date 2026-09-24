@@ -135,13 +135,24 @@ export function LocalAccount() {
 // 接给 Claude Code / GPT 桌面版:一条命令,复制就行。端口按当前页面的来(作者机器上是 8790)
 function McpRow() {
   const [copied, setCopied] = useState(false)
+  const [cd, setCd] = useState(null)      // Claude 桌面版接没接
+  const [cdMsg, setCdMsg] = useState('')
+  useEffect(() => { supa.claudeDesktop.status().then(setCd) }, [])
+  const installCd = async () => { const r = await supa.claudeDesktop.install(); setCd(r); setCdMsg(r.ok ? t('写好了。把 Claude 桌面版完全退出再打开，对话里就有 Fairwind 的工具了') : t('没成:') + r.error) }
   const url = `${location.origin}/mcp`
   const cmd = `claude mcp add --transport http fairwind ${url}`
   const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
   return (
     <div className="la-sub">
-      <div className="la-sub-h">{t('接给 Claude Code')}<small>{t('让 Claude Code（或 Claude 桌面版）能读写你的档案——比如"读我的网站，把作品填进来"')}</small></div>
+      <div className="la-sub-h">{t('接给你的 AI 工具')}<small>{t('让 Claude 桌面版或 Claude Code 能读写你的档案——比如"读我的网站，把作品填进来"')}</small></div>
       <div className="la-acts">
+        <b className="la-k2">{t('Claude 桌面版')}</b>
+        <button type="button" className={'b' + (cd?.current ? '' : ' primary')} onClick={installCd} disabled={cd?.appInstalled === false}>{cd?.current ? t('已接入 · 再写一次') : t('接入 Claude 桌面版')}</button>
+        {cd?.appInstalled === false && <small className="la-hint">{t('这台机器上没装 Claude 桌面版')}</small>}
+        {cdMsg && <span className={'la-note' + (cdMsg.startsWith(t('没成:')) ? ' bad' : '')}>{cdMsg}</span>}
+      </div>
+      <div className="la-acts">
+        <b className="la-k2">Claude Code</b>
         <code className="la-cmd">{cmd}</code>
         <button type="button" className="b" onClick={copy}>{copied ? t('复制好了') : t('复制')}</button>
         <a className="b" href={`${location.origin}/mcp-guide`} target="_blank" rel="noreferrer">{t('说明书')}</a>

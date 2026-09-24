@@ -1911,3 +1911,5 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .modules-sub { grid-column: 1 / -1; margin: 4px 0 8px 30px; }
 .modules-sub .judgments { border: none; background: transparent; padding: 4px 0 0; margin: 0; border-top: 1px dashed var(--line); border-radius: 0; }
 .modules-panel label { display: grid; grid-template-columns: auto auto 1fr; }
+
+.la-k2 { font-size: 12.5px; color: var(--ink-2); font-weight: 500; min-width: 96px; }

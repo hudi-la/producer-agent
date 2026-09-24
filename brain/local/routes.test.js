@@ -126,3 +126,14 @@ test('/judgments/files:读五个(空串)→ 写一个 → 读回;坏文件名 40
   const g2 = res(); await handleLocalRoute(req('GET', '/judgments/files'), g2, ctx); assert.equal(g2.json().files['手记.md'], '交了表就等 20 天')
   const bad = res(); await handleLocalRoute(req('POST', '/judgments/files', { file: 'x.md', content: '' }), bad, ctx); assert.equal(bad.code, 400)
 })
+
+test('/mcp/claude-desktop:没配 → installed:false;POST 写进配置(别的键不动);再 GET → current:true', async () => {
+  const { mkdtempSync: mk, writeFileSync: wf, readFileSync: rf } = await import('node:fs'); const { tmpdir: td } = await import('node:os'); const { join: jn } = await import('node:path')
+  const cdir = mk(jn(td(), 'fw-cd-')); process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG = jn(cdir, 'claude_desktop_config.json'); process.env.BRAIN_PORT = '8799'
+  wf(process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG, JSON.stringify({ preferences: { x: 1 }, mcpServers: { other: { command: 'x' } } }))
+  const g = res(); await handleLocalRoute(req('GET', '/mcp/claude-desktop'), g, ctx); assert.equal(g.json().installed, false)
+  const w = res(); await handleLocalRoute(req('POST', '/mcp/claude-desktop', {}), w, ctx); assert.equal(w.json().ok, true); assert.equal(w.json().current, true)
+  const cfg = JSON.parse(rf(process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG, 'utf8'))
+  assert.equal(cfg.preferences.x, 1); assert.equal(cfg.mcpServers.other.command, 'x'); assert.match(cfg.mcpServers.fairwind.args[0], /mcp-bridge\.cjs$/); assert.equal(cfg.mcpServers.fairwind.args[1], 'http://localhost:8799/mcp')
+  delete process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG; delete process.env.BRAIN_PORT
+})

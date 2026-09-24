@@ -8,6 +8,9 @@ import { setJudgmentsEnabled, readJudgmentFiles, writeJudgmentFile } from '../ju
 import { backupNow, listBackups, scheduleRestore } from './backup.js'
 import { checkUpdate, applyUpdate } from './update.js'
 import { VERSION } from '../version.js'
+import { homedir } from 'node:os'
+import { mkdirSync as mkdirp, readFileSync as readF, writeFileSync as writeF, existsSync as existsF } from 'node:fs'
+import { join as pjoin, dirname as pdirname } from 'node:path'
 
 // 发布位:打包时 define 进来;env 能盖(验收用 file://)。没配 = 检查更新会明说「没配发布位」
 // eslint-disable-next-line no-undef
@@ -25,6 +28,38 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)) }
 const readAll = (req) => new Promise((ok, no) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); req.on('error', no) })
 const readJson = async (req) => { const b = await readAll(req); return b.length ? JSON.parse(b.toString()) : {} }
+
+// ── Claude 桌面版:它只会起 stdio 子进程,够不着本机 http;桥(mcp-bridge.cjs)随包带着,这儿替人写进它的配置 ──
+export function claudeDesktopConfigPath() {
+  return process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG || (process.platform === 'darwin'
+    ? pjoin(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
+    : pjoin(process.env.APPDATA || homedir(), 'Claude', 'claude_desktop_config.json'))
+}
+/** 桥怎么起:包里是 <应用目录>/current/node + mcp-bridge.cjs;开发时是本机 node + packaging/data 那份 */
+export function bridgeCommand(port) {
+  const root = process.env.FAIRWIND_APP_ROOT
+  const distDir = process.env.FAIRWIND_DIST_DIR
+  const appDir = distDir ? pdirname(distDir) : null
+  const packaged = appDir && existsF(pjoin(appDir, 'mcp-bridge.cjs'))
+  const command = packaged && root ? pjoin(root, 'current', 'node') : process.execPath
+  const bridge = packaged ? (root ? pjoin(root, 'current', 'mcp-bridge.cjs') : pjoin(appDir, 'mcp-bridge.cjs')) : pjoin(pdirname(new URL(import.meta.url).pathname), '..', '..', 'packaging', 'data', 'mcp-bridge.cjs')
+  return { command, args: [bridge, `http://localhost:${port}/mcp`] }
+}
+export function claudeDesktopStatus(port) {
+  const p = claudeDesktopConfigPath()
+  let cfg = null; try { cfg = JSON.parse(readF(p, 'utf8')) } catch (_) {}
+  const entry = cfg?.mcpServers?.fairwind || null
+  const want = bridgeCommand(port)
+  return { configPath: p, installed: Boolean(entry), current: entry && entry.command === want.command && JSON.stringify(entry.args) === JSON.stringify(want.args), appInstalled: process.platform === 'darwin' ? existsF('/Applications/Claude.app') : null }
+}
+export function installClaudeDesktop(port) {
+  const p = claudeDesktopConfigPath()
+  let cfg = {}; try { cfg = JSON.parse(readF(p, 'utf8')) } catch (_) {}
+  cfg.mcpServers = { ...(cfg.mcpServers || {}), fairwind: bridgeCommand(port) }
+  mkdirp(pdirname(p), { recursive: true })
+  writeF(p, JSON.stringify(cfg, null, 2) + '\n')
+  return claudeDesktopStatus(port)
+}
 
 /** settings 里能给页面看的那几样。**key 永不回显**,只给「设了没有」和末四位。 */
 export function publicSettings(s) {
@@ -99,6 +134,12 @@ export async function handleLocalRoute(req, res, ctx) {
     const body = await readJson(req)
     try { const lints = writeJudgmentFile(`${dataDir}/judgments`, body.file, body.content); json(res, 200, { ok: true, lints }) }
     catch (e) { json(res, 400, { ok: false, error: e.message }) }
+    return true
+  }
+
+  if (req.method === 'GET' && p === '/mcp/claude-desktop') { json(res, 200, claudeDesktopStatus(process.env.BRAIN_PORT || 8788)); return true }
+  if (req.method === 'POST' && p === '/mcp/claude-desktop') {
+    try { json(res, 200, { ok: true, ...installClaudeDesktop(process.env.BRAIN_PORT || 8788) }) } catch (e) { json(res, 500, { ok: false, error: e.message }) }
     return true
   }
 

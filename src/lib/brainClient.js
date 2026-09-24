@@ -76,6 +76,10 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       async check(force = false) { try { const r = await fetchImpl(`${base}/update/check${force ? '?force' : ''}`); return await r.json() } catch (e) { return { canUpdate: false, error: e.message } } },
       apply: () => post('/update/apply', {}),
     },
+    claudeDesktop: {
+      async status() { try { const r = await fetchImpl(`${base}/mcp/claude-desktop`); return await r.json() } catch (e) { return null } },
+      install: () => post('/mcp/claude-desktop', {}),
+    },
     settings: {
       async get() { try { const r = await fetchImpl(`${base}/settings`); return await r.json() } catch (e) { return null } },
       set: (patch) => post('/settings', patch),
