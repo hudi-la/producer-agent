@@ -104,7 +104,8 @@ export default function App() {
   const [sayFailed, setSayFailed] = useState(0)           // 群发挂了几条，也归 Trouble 说
   // 展示模式：给客户看屏幕时，名字、邮箱这些私人信息盖上小花（见 lib/veil.js）。
   // 开关就是右上角你的名字——它自己也是私人信息，开着的时候连它一起盖。
-  const [veiled, setVeiled] = useState(loadVeiled)
+  // 公开版没有展示模式:浏览器里存过的开关一律不认,不然按钮去掉之后花花摘不下来(2026-09-24 他撞到的)
+  const [veiled, setVeiled] = useState(() => (DB_MODE === 'local' ? false : loadVeiled()))
   const toggleVeil = () => setVeiled((v) => { saveVeiled(!v); return !v })
 
   // 进队的判据是「现在需要你」，不是「库里多了行数据」。
