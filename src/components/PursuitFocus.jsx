@@ -286,8 +286,6 @@ export default function PursuitFocus({
   pursuit: p, messages, variant = 'page', onBack, onMove, onSetBall,
   // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
   onDesk = false, onToggleDesk,
-  // 这张是怎么上桌的（queue.js 的 via）。只有 'update'（收信收出来的）要交代。
-  via = null,
   // 脑子开没开（App 每轮问 /health）。没开 = 输入框直接记笔，不聊天（0125）。
   brainUp = true,
 }) {
@@ -504,17 +502,6 @@ export default function PursuitFocus({
     deliv.filter((d) => d.source_msg).map((d) => [d.source_msg, d.title])
   )
 
-  // 「这次发生了什么」：更新最新信息把这张卡送进队，先交代它动了什么再让你过。
-  // 内容全部从库里读（最新的信、作废行、它提的那句）——队列只存 id 和 via，
-  // 不背内容：背了的那份不会跟着库变，迟早说谎。
-  const viaUpdate = via === 'update'
-  const lastMail = viaUpdate ? [...msgs].reverse().find((m) => m.kind === 'email') : null
-  const proposal = null
-  const mailWhen = (m) => {
-    const d = m?.created_at ? new Date(m.created_at) : null
-    return d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
-  }
-
   // 中栏那一整块：往来时间线 + 输入框。三栏和抽屉装的是同一份内容，
   // 只是三栏把它塞进中间那格，抽屉直接铺满。
   const body = (
@@ -633,22 +620,9 @@ export default function PursuitFocus({
           整页一行放得下就一行，放不下截断；抽屉窄，最多两行。 */}
       <div className="focus-top">
 
-        {/* 你为什么在队里。
-            一张卡进了队却说不出为什么，正是这两刀一直在治的病——所以
-            「更新最新信息送来的」要交代，你自己端上来的（via='pick'/'say'）不用：
-            那是你亲手放的，不用它讲给你听。
-            **必须钉在卡头里，不能待在对话流上方**：打开卡片时那个自动滚到底的
-            effect 会把它滚到可视区外 680px 处——东西在，但你永远看不见。
-            跟两个出口挪上来是同一个理由。 */}
-        {viaUpdate && lastMail && (
-          <div className="qwhat">
-            {lastMail && (
-              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : <Veil>{lastMail.meta?.from_name || '对方'}</Veil>}
-                <button className="lnk" onClick={() => jumpTo(lastMail.id)}>看最近这封 →</button>
-              </span>
-            )}
-          </div>
-        )}
+        {/* 「有新信」那条横幅删了。新消息只有一种说法：小红点 + 那封信
+            自己躺在对话流里。专门再报一遍，报的还是「这条线最后一封」而不是
+            「新」——三周前那封会天天挂在头上说自己新。 */}
 
         {/* 「现在该干什么」那一块删了。系统不再替你判这事该不该动——
             你觉得该动，点亮上面那个「待处理」标签。 */}

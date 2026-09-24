@@ -824,12 +824,6 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 /* 被新信作废的待办：划掉留痕，不删掉。旁边那个「因为这封信 →」点得回去。 */
 .pf-void { font-size: 12px; color: var(--ink-3); }
 .pf-void s { text-decoration-color: var(--g2); }
-/* 「这次发生了什么」：更新最新信息送进队的卡，对话上方先交代这轮动了什么 */
-/* 你为什么在队里。钉在卡头里（不在对话流上方）——放流里会被「自动滚到底」
-   那个 effect 滚出可视区，东西在但你永远看不见。 */
-.qwhat { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 9px;
-  padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--ink-2);
-  background: var(--accent-soft); display: flex; flex-direction: column; gap: 4px; }
 /* 抽屉里那条活着的待办。原来只显示做完的和作废的 —— 唯独没显示「现在该干什么」。 */
 .pf-live { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
   font-size: 12.5px; color: var(--ink); }

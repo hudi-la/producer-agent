@@ -817,7 +817,6 @@ export default function App() {
               // 而 A 的回复回来时还会塞进你正看着的 B 卡里。
               key={cur.pursuit.id} variant="page" pursuit={cur.pursuit}
               messages={pl.messagesByPursuit[cur.pursuit.id]}
-              via={queue.items.find((x) => keyOf(x) === queue.at)?.via || null}
               /* 从一条线上点相关的人 → 开成旁边一格。两边本来是断的：
                  线上看得到往来，却点不进那个人是谁。 */
               onOpenPerson={(c) => openOnDesk('contact', c.id)}
