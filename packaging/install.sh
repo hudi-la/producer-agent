@@ -53,8 +53,10 @@ mkdir -p "$APPB/Contents/MacOS"
 cat > "$APPB/Contents/MacOS/Fairwind" <<'SH'
 #!/bin/sh
 # 双击 Fairwind.app 就是跑这一行。current 指向哪个版本就跑哪个;更新只换那个指针。
+# 不常驻:把 brain 放到后台就退出——不然 macOS 会认为"这个应用已经在跑",第二次双击什么都不发生。
+# launcher 自己会判断:已经在跑就只开页面,端口被占就换一个。
 ROOT="$HOME/Applications/Fairwind"
-exec "$ROOT/current/node" "$ROOT/current/launcher.cjs"
+nohup "$ROOT/current/node" "$ROOT/current/launcher.cjs" >/dev/null 2>&1 &
 SH
 chmod +x "$APPB/Contents/MacOS/Fairwind"
 # 图标:包里带着 Fairwind.icns(顶栏那个「羽」),放进 .app 里

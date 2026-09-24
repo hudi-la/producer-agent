@@ -57,30 +57,7 @@ rmSync(stage, { recursive: true, force: true })
 
 say('自带 node + 启动器')
 copyFileSync(NODE_BIN, join(APP, process.platform === 'win32' ? 'node.exe' : 'node'))
-writeFileSync(join(APP, 'launcher.cjs'), `// Fairwind 启动器。数据在用户目录,程序在这个文件夹;这个文件夹更新时整个换。
-const path = require('node:path'), os = require('node:os'), fs = require('node:fs')
-const APP = __dirname
-const DATA = process.env.FAIRWIND_DATA_DIR || (process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Fairwind')
-  : process.platform === 'win32' ? path.join(process.env.APPDATA || os.homedir(), 'Fairwind') : path.join(os.homedir(), '.fairwind'))
-fs.mkdirSync(DATA, { recursive: true })
-process.env.FAIRWIND_DATA_DIR = DATA
-process.env.FAIRWIND_DIST_DIR = path.join(APP, 'dist')
-process.env.FAIRWIND_APP_ROOT = process.env.FAIRWIND_APP_ROOT || path.dirname(APP)
-process.env.BRAIN_PORT = process.env.BRAIN_PORT || '8788'
-// 云端的钥匙一律清空:这个包只走本机库
-for (const k of ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[k]
-require('bytenode')
-require(path.join(APP, 'brain.jsc'))
-// 起来之后把页面开出来。FAIRWIND_NO_OPEN=1 时不开(验收脚本用)
-if (!process.env.FAIRWIND_NO_OPEN) setTimeout(() => {
-  const url = 'http://localhost:' + process.env.BRAIN_PORT
-  const { spawn } = require('node:child_process')
-  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open'
-  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url]
-  try { spawn(opener, args, { stdio: 'ignore', detached: true }).unref() } catch (_) {}
-}, 2500)
-`)
+copyFileSync(resolve(ROOT, 'packaging/data/launcher.cjs'), join(APP, 'launcher.cjs'))   // 启动器是一个普通文件,不在这儿拼字符串
 writeFileSync(join(APP, 'VERSION'), version + '\n')
 copyFileSync(resolve(ROOT, 'packaging/data/LICENSE.txt'), join(APP, 'LICENSE.txt'))
 copyFileSync(resolve(ROOT, 'packaging/data/Fairwind.icns'), join(APP, 'Fairwind.icns'))   // 装机脚本放进 .app
