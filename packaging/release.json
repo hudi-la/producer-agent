@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "模型来源四选一（Claude key / Claude 订阅 / GPT / Gemini）、中英文、Logo、双击修好"
+  "note": "更新后自动换掉旧进程；首次启动页也能更新；GPT / Gemini 可选"
 }
