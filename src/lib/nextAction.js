@@ -17,6 +17,8 @@
 //
 // 设计稿：docs/specs/2026-08-12-four-signals-design.md
 
+import { t } from '../i18n/index.js'
+
 const startOfToday = () => {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
@@ -36,7 +38,7 @@ export function daysFromToday(dateStr) {
 /** 'YYYY-MM-DD' → '8月12日'。 */
 export const MD = (dateStr) => {
   const d = asDate(dateStr)
-  return d ? `${d.getMonth() + 1}月${d.getDate()}日` : ''
+  return d ? t('{m}月{d}日', { m: d.getMonth() + 1, d: d.getDate() }) : ''
 }
 
 /**
@@ -70,11 +72,11 @@ export function deadlineLine(p) {
   const text = p.deadline || MD(p.deadline_at)
   const n = daysFromToday(p.deadline_at)
   // 日期照常显示（那是事实），但不再算「急」——急的意思是「你还得赶」。
-  if (交出去了(p)) return { text: `截止 ${text}`, urgent: false }
-  if (n === null || n > SOON_DAYS) return { text: `截止 ${text}`, urgent: false }
-  if (n < 0) return { text: `截止 ${text} · 已过`, urgent: true, over: true }
-  if (n === 0) return { text: `截止 ${text} · 今天`, urgent: true }
-  return { text: `截止 ${text} · 还剩 ${n} 天`, urgent: true }
+  if (交出去了(p)) return { text: t('截止 {text}', { text }), urgent: false }
+  if (n === null || n > SOON_DAYS) return { text: t('截止 {text}', { text }), urgent: false }
+  if (n < 0) return { text: t('截止 {text} · 已过', { text }), urgent: true, over: true }
+  if (n === 0) return { text: t('截止 {text} · 今天', { text }), urgent: true }
+  return { text: t('截止 {text} · 还剩 {n} 天', { text, n }), urgent: true }
 }
 
 /**
@@ -84,5 +86,5 @@ export function deadlineLine(p) {
 export function openLine(p) {
   const n = daysFromToday(p.opens_at)
   if (n === null || n <= 0) return null
-  return { text: `${MD(p.opens_at)}起开放 · 还有 ${n} 天` }
+  return { text: t('{d}起开放 · 还有 {n} 天', { d: MD(p.opens_at), n }) }
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { undoStateMove } from '../lib/stateMoves.js'
+import { t } from '../i18n/index.js'
 
 // 它在聊天里改了提醒 —— 气泡底下摆一张小卡，**出现的时候已经改完了**。
 //
@@ -29,14 +30,14 @@ export default function StateMoveCard({ msgId, move, onUndone }) {
   return (
     <div className={`lcard scard${undone ? ' scard-undone' : ''}`}>
       <div className="lcard-h">
-        <span className="lcard-tag">{undone ? '撤回了 —— 提醒长回去了' : '提醒改成了'}</span>
+        <span className="lcard-tag">{undone ? t('撤回了 —— 提醒长回去了') : t('提醒改成了')}</span>
       </div>
       <div className="lcard-sub">{move.line}</div>
-      {move.why && <div className="scard-why">凭什么：{move.why}</div>}
+      {move.why && <div className="scard-why">{t('凭什么：{why}', { why: move.why })}</div>}
       {err && <div className="lcard-err">{err}</div>}
       {!undone && (
         <button className="lnk" disabled={busy} onClick={undo}>
-          {busy ? '撤着……' : '撤回'}
+          {busy ? t('撤着……') : t('撤回')}
         </button>
       )}
     </div>

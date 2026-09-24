@@ -5,6 +5,7 @@
 //    往往来历史里写消息，且要跑 agent。
 import { supa, BRAIN } from './backends.js'
 import { frameSplitter, frameData } from './sse.js'
+import { t } from '../i18n/index.js'
 
 /** 拉这条机会线最新的往来。没连库时返回 null（保留调用方手上的种子数据）。 */
 export async function fetchMessages(pursuitId) {
@@ -93,10 +94,10 @@ export async function sendMessage(owner, text, meta, runId) {
       body: JSON.stringify({ ...ownerBody(owner), text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) }),
     })
   } catch (_) {
-    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
+    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
   }
   const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.error || `脑子出错了（${res.status}）`)
+  if (!res.ok) throw new Error(body.error || t('脑子出错了（{status}）', { status: res.status }))
   return body   // { mine, reply } —— 你按了终止的话 reply 是 null、带 aborted: true
 }
 
@@ -128,12 +129,12 @@ export async function streamChat(body, onEvent) {
       body: JSON.stringify(body),
     })
   } catch (_) {
-    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
+    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
   }
   if (res.status === 404) throw new NoStream()
   if (!res.ok) {
     const b = await res.json().catch(() => ({}))
-    throw new Error(b.error || `脑子出错了（${res.status}）`)
+    throw new Error(b.error || t('脑子出错了（{status}）', { status: res.status }))
   }
 
   const reader = res.body.getReader()
@@ -160,7 +161,7 @@ export async function streamChat(body, onEvent) {
   // 流断在半路上（脑子挂了、网线拔了）：没有 done 帧就是没想完，
   // 不能静悄悄返回一个空回复——那看起来像它想完了但什么都没说。
   if (err) throw new Error(err)
-  if (!reply && !aborted) throw new Error('Fairwind 那边断了 —— 再说一次让它重想')
+  if (!reply && !aborted) throw new Error(t('Fairwind 那边断了 —— 再说一次让它重想'))
   return { mine, reply, aborted }
 }
 
@@ -195,7 +196,7 @@ export { NoStream }
  * 它却仍在按那句错话想事情。见 0066 那道迁移。
  */
 export async function rewindChat(msgId) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_rewind_chat', { p_msg_id: msgId })
   if (error) throw new Error(error.message)
   return data ?? 0
@@ -240,7 +241,7 @@ export async function stopThinking(runId) {
  * 「该不该我动」是判断，判断归你。
  */
 export async function setBall(pursuitId, ball) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_set_ball', { p_pursuit_id: pursuitId, p_ball: ball ?? null })
   if (error) throw new Error(error.message)
   return { ok: true, ball: ball ?? null }
@@ -252,7 +253,7 @@ export async function setBall(pursuitId, ball) {
  * 详情页也仍看得到你做过这件事。
  */
 export async function setActionDone(pursuitId, done) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_set_action_done', { p_pursuit_id: pursuitId, p_done: done })
   if (error) throw new Error(error.message)
   return { ok: true, done }
@@ -265,7 +266,7 @@ export async function setActionDone(pursuitId, done) {
  * kind：note（一般）| meet（见了面）| decision（拍板了）。
  */
 export async function addPursuitNote(pursuitId, text, kind = 'note') {
-  if (!supa) throw new Error('还没连上库')
+  if (!supa) throw new Error(t('还没连上库'))
   const { data, error } = await supa.rpc('pa_add_pursuit_note', {
     p_pursuit_id: pursuitId, p_text: text, p_kind: kind,
   })
@@ -274,7 +275,7 @@ export async function addPursuitNote(pursuitId, text, kind = 'note') {
 }
 
 export async function setJot(pursuitId, jot) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_set_jot', { p_pursuit_id: pursuitId, p_jot: jot ?? '' })
   if (error) throw new Error(error.message)
   return { ok: true }
@@ -282,7 +283,7 @@ export async function setJot(pursuitId, jot) {
 
 /** 「碰过了」：记下今天碰的，并把待碰日清掉。没有撤销。 */
 export async function markTouched(pursuitId) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_mark_touched', { p_pursuit_id: pursuitId })
   if (error) throw new Error(error.message)
   return { ok: true }
@@ -318,7 +319,7 @@ export async function acceptNextAction(pursuitId) {
 
 /** 移卡：改这条线的阶段。 */
 export async function setStage(pursuitId, stage) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_set_stage', { p_pursuit_id: pursuitId, p_stage: stage })
   if (error) throw new Error(error.message)
   return { ok: true, stage }

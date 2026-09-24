@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "接给你的 AI 工具:Claude 桌面版 / Codex / Gemini CLI 三颗接入按钮(同一座桥);ChatGPT 聊天 app 接不上,说明书写明走 Codex"
+  "note": "机会线模块全英文(看板/机会池/造卡任务/展开的卡/铃铛/对话);邮件没开时不再露「展开」开关;接入提示带工具名;发布脚本 zip 传不上自动换 gh"
 }

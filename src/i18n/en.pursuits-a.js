@@ -1,0 +1,55 @@
+// src/i18n/en.pursuits-a.js —— 机会线模块第一批：看板（Pipeline）、机会池（Opportunities）、
+// 造卡任务面板（TasksPanel）、lib/opportunities、lib/tasks、data/schema 里的显示文字。
+// 键是中文原文（见 index.js）。待合并进 en.js。
+export default {
+  // ── 看板：列名 ──
+  '新机会': 'New', '匹配项目': 'Matching', '一起写': 'Writing together', '发出&提交': 'Sent & submitted',
+  '进一步': 'In conversation', '谈成': 'Won', '暂停处理': 'Paused', '持续关注': 'Watching',
+  // ── 看板：卡面 ──
+  '记几个字……': 'Jot a few words…', '点一下改': 'Click to edit', '记几个字': 'Jot a few words', '＋ 记一笔': '＋ Jot',
+  '读透了，等你批': 'Read through, waiting for your call', '一起挑作品': 'Picking works together', '一起写中': 'Writing together',
+  '已交': 'Submitted', '沟通中': 'In conversation', '谈成 ✓': 'Won ✓',
+  '静了 —— 没在等任何东西': 'Quiet — not waiting on anything', 'Fairwind 回复了': 'Fairwind replied',
+  '在展开的卡片区': 'In Open cards', '还没点开过': 'Never opened', '新': 'New', '无固定截止': 'No fixed deadline', '新来信': 'New mail',
+  // ── 看板：一叠 ──
+  '勾选这一叠 {n} 张': 'Select all {n} cards in this stack', '有你还没读到的新消息': 'New messages you haven\'t read',
+  '一批机构': 'A batch of organizations', '{n} 张': '{n} cards', ' · {n} 张新': ' · {n} new', ' · {n} 张待处理': ' · {n} need action',
+  ' · 已选 {n}': ' · {n} selected', '展开': 'Expand',
+  // ── 机会池：表 ──
+  '还没判': 'Not judged yet', '凭证：{x}': 'Evidence: {x}', '待复查': 'Needs recheck', '没查过': 'Not checked',
+  '已在看板上': 'On the board', '划回来': 'Bring back', '捡出来': 'Pick up', '别再提': 'Drop',
+  '机会池 · {n} 行': 'Opportunity pool · {n} rows',
+  '最近一轮 {round}：表里 {open} 个开着、{watching} 个还关着、{onboard} 个已经在看板上。': 'Last round {round}: {open} open, {watching} still closed, {onboard} already on the board.',
+  '表里 {open} 个开着、{watching} 个还关着、{onboard} 个已经在看板上。': '{open} open, {watching} still closed, {onboard} already on the board.',
+  '看哪些': 'Which to show', '全部': 'All', '搜名字 / 机构 / 类型…': 'Search name / organization / type…', '没成：': "Didn't work: ",
+  '状态': 'Status', '机会': 'Opportunity', '匹配': 'Fit', '够得着': 'Within reach', '时间': 'When', '上次查': 'Last checked',
+  '没有匹配「{q}」的行。': 'No rows match "{q}".', '这一格现在没有开着的机会。下一轮复查会更新。': 'No open opportunities here right now. The next recheck will update this.',
+  '这一格是空的。': 'This lane is empty.',
+  // ── 机会池：lib/opportunities ──
+  '开着': 'Open', '关着': 'Closed', '有点悬': 'A stretch', '多半白投': 'Long shot', '没查到': 'Not found',
+  '开着的': 'Open', '关注中': 'Watching', '别再提了': 'Dropped',
+  '截止 {d}': 'Due {d}', '没记截止': 'No deadline noted', '约 {d} 开': 'Opens around {d}', '上轮 {d}': 'Last round {d}', '{d} 查过': 'Checked {d}',
+  // ── 造卡任务面板 ──
+  '提示词不能是空的': "The prompt can't be empty", '（还没写提示词）': '(no prompt yet)',
+  '排期': 'Schedule', '手动': 'Manual', '每周': 'Weekly', '每天': 'Daily', '现在跑一次': 'Run now',
+  '脑子没开 · 到点不会跑；开了会立刻补跑': "Brain is off · won't run on schedule; it catches up as soon as it's on", '（已经排上了一次）': ' (one run already queued)',
+  '不排期，想跑就按上面那颗': 'Not scheduled; press the button above whenever you want a run', '提示词': 'Prompt',
+  '今天几号、表里已有哪些机会、按什么格式报——系统跑的时候补在后面，这儿不用写。「复查表里哪几行、判几个够不够得着、最多造几张卡」在这条任务的 config 里。': "Today's date, what's already in the pool and the report format are appended at run time, so you don't write them here. Which rows to recheck, how many to judge for reach and how many cards to make at most live in this task's config.",
+  '上次': 'Last run', '脑子没开——到点的任务不会跑。另开一个终端跑 ': "Brain is off — scheduled tasks won't run. Open another terminal and run ", '，开了会立刻补跑。': '; it catches up as soon as it\'s on.',
+  '定时跑的': 'Scheduled', '脑子到点自己跑：先查关注表里那些开了没有，再出去找新的，最后把够得着的造成卡。点开能改排期和提示词。': 'The brain runs these on schedule: first recheck whether the watched ones have opened, then scout for new ones, then make cards for the ones within reach. Open one to change its schedule and prompt.',
+  ' · 上次：{s}': ' · last: {s}', '开 · {s}': 'On · {s}', '关掉这条任务': 'Turn this task off', '打开这条任务': 'Turn this task on',
+  '跑过的专项': 'One-off runs', '当时手动跑出来的一批，后台不会再跑它们。战报留着——里面有查了但没建卡的和原因。': 'Batches run by hand back then; nothing will run them again. Their reports stay — they list what was checked but not carded, and why.',
+  '跑过': 'Ran', '卡的出处': 'Card origins', '：': ': ', '——不是任务，是你手动贴进来的卡挂的标记。': ' — not tasks, just the tag on cards you pasted in by hand.', '还没接': 'Not wired up yet',
+  // ── lib/tasks ──
+  '周日': 'Sunday', '周一': 'Monday', '周二': 'Tuesday', '周三': 'Wednesday', '周四': 'Thursday', '周五': 'Friday', '周六': 'Saturday',
+  '每{w} {h}': 'Every {w} {h}', '每天 {h}': 'Daily {h}',
+  '刚开始': 'just started', '{n} 分钟前开始': 'started {n} min ago', '{n} 小时前开始，可能卡住了': 'started {n} h ago, may be stuck',
+  '正在找……（{ago}）': 'Scouting… ({ago})', '排上了，脑子一分钟内接手': 'Queued; the brain picks it up within a minute', '下次 {when}': 'Next {when}',
+  // ── data/schema：造卡任务类型说明 ──
+  '每周三步：先查关注表里那些开了没有，再扫聚合源和搜索找新的，最后把够得着的造成卡': 'Three steps every week: recheck whether the watched ones have opened, scan aggregators and search for new ones, then make cards for the ones within reach',
+  '扫模特/演艺经纪的 commercial / lifestyle / beauty 板，逐家核实投递入口再造卡': 'Scan the commercial / lifestyle / beauty boards of model and talent agencies, verify each submission entry point, then make cards',
+  '朋友转的、你刷到的——贴链接 / 截图 / 一句话，我写成卡': 'Forwarded by a friend or spotted by you — paste a link, screenshot or one line and I write the card',
+  '专盯某机构，它开下一轮 open call 就造张卡': 'Watch one organization; the moment it opens the next call, make a card',
+  '进你信箱的邀约 / open call → 自动造卡': 'Invitations / open calls landing in your inbox → cards made automatically',
+  '某联系人久没动静 → 造张"该 nudge 了"的卡': 'A contact has gone quiet → make a "time to nudge" card',
+}

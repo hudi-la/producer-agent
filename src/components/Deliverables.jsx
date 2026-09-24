@@ -7,6 +7,7 @@ import { setAnswer } from '../lib/forms.js'
 // 这封信到底发给谁——名单从信头账本算，你自己勾。
 import Recipients from './Recipients.jsx'
 import { useModules } from '../lib/ModulesContext.jsx'
+import { t } from '../i18n/index.js'
 
 // 右栏：交付。
 //
@@ -17,12 +18,12 @@ import { useModules } from '../lib/ModulesContext.jsx'
 // 规则层（字数/词数/页数/大小/必填）是**闸**不是提醒：没过，「定稿」就是灰的。
 
 const KIND_LABEL = {
-  idea: '构想', concept: '概念文本', statement: '陈述', bio: 'Bio',
-  email: '邮件', form: '表单', file: '文件',
+  idea: t('构想'), concept: t('概念文本'), statement: t('陈述'), bio: 'Bio',
+  email: t('邮件'), form: t('表单'), file: t('文件'),
 }
 
 function whereItGoes(kind) {
-  return kind === 'email' ? '发出后去 左栏 · 往来' : '定稿后去 左栏 · 文件'
+  return kind === 'email' ? t('发出后去 左栏 · 往来') : t('定稿后去 左栏 · 文件')
 }
 
 function Editor({ d, onSaved, onErr, onChanged, pursuitId }) {
@@ -58,7 +59,7 @@ function Editor({ d, onSaved, onErr, onChanged, pursuitId }) {
         className="dv-edit"
         value={body}
         rows={d.kind === 'bio' ? 5 : 8}
-        placeholder="还没有内容。你写，或者在中间那栏让 Fairwind 起一版。"
+        placeholder={t('还没有内容。你写，或者在中间那栏让 Fairwind 起一版。')}
         onChange={(e) => setBody(e.target.value)}
       />
       {checks.filter((c) => !c.item).map((c) => (
@@ -68,7 +69,7 @@ function Editor({ d, onSaved, onErr, onChanged, pursuitId }) {
           {c.detail && <span className="sp2">{c.detail}</span>}
         </div>
       ))}
-      <span className="dv-save">{dirty ? '存中…' : ''}</span>
+      <span className="dv-save">{dirty ? t('存中…') : ''}</span>
       <Acts d={d} allOk={allOk} onErr={onErr} onChanged={onChanged} pursuitId={pursuitId} />
     </>
   )
@@ -123,7 +124,7 @@ function Field({ d, f, check, onErr, onChanged }) {
         className="dv-edit"
         value={text}
         rows={4}
-        placeholder="还没填。你写，或者回中栏让 Fairwind 起一版。"
+        placeholder={t('还没填。你写，或者回中栏让 Fairwind 起一版。')}
         onChange={(e) => setText(e.target.value)}
       />
       <div className="dvf-foot">
@@ -131,7 +132,7 @@ function Field({ d, f, check, onErr, onChanged }) {
           {check?.ok ? '✓' : '!'} {check?.label}
         </span>
         {check?.detail && <span className="dvf-lim">{check.detail}</span>}
-        <span className="dv-save">{dirty ? '存中…' : ''}</span>
+        <span className="dv-save">{dirty ? t('存中…') : ''}</span>
       </div>
     </div>
   )
@@ -188,7 +189,7 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
   const n = to.length + cc.length
   // 按钮上写「2 人」而不是把三个地址挤成一行：地址长起来会把按钮撑爆，
   // 而**谁**在上面那份名单里逐个看得见，这儿只需要答「几个」。
-  const whoSay = n === 1 ? to[0] : `${n} 人`
+  const whoSay = n === 1 ? to[0] : t('{n} 人', { n })
 
   // 文字类：定稿 = 搬到左栏。
   //
@@ -217,10 +218,10 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
     return (
       <div className="dv-acts">
         <button className="b primary" disabled={!allOk || busy} onClick={() => go('final')}
-          title={allOk ? '' : '规则没过，先把上面那几条弄对'}>
-          {busy ? '定稿中……' : '定稿'}
+          title={allOk ? '' : t('规则没过，先把上面那几条弄对')}>
+          {busy ? t('定稿中……') : t('定稿')}
         </button>
-        {!allOk && <span className="dv-why">规则没过，定不了稿</span>}
+        {!allOk && <span className="dv-why">{t('规则没过，定不了稿')}</span>}
       </div>
     )
   }
@@ -239,20 +240,20 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
       <button className="b primary" disabled={!canSend}
         onClick={() => (armed ? go('send') : setArmed(true))}
         onBlur={() => setArmed(false)}
-        title={!allOk ? '规则没过，先把上面那几条弄对' : !to.length ? '这份产出上没有收件人' : ''}>
-        {busy === 'send' ? '正在发……' : armed ? `确认发给 ${whoSay}` : '发送'}
+        title={!allOk ? t('规则没过，先把上面那几条弄对') : !to.length ? t('这份产出上没有收件人') : ''}>
+        {busy === 'send' ? t('正在发……') : armed ? t('确认发给 {who}', { who: whoSay }) : t('发送')}
       </button>
       {armed
-        ? <span className="dv-why warn">按下去信就出去了，撤不回来。</span>
+        ? <span className="dv-why warn">{t('按下去信就出去了，撤不回来。')}</span>
         : <span className="dv-why">{
-            !allOk ? '规则没过，发不了'
-              : !to.length ? '一个收件人都没勾，发不了'
-              : `发给 ${whoSay}${cc.length ? `（含抄送 ${cc.length}）` : ''} · 发出后当场记进左栏往来`
+            !allOk ? t('规则没过，发不了')
+              : !to.length ? t('一个收件人都没勾，发不了')
+              : t('发给 {who}{cc} · 发出后当场记进左栏往来', { who: whoSay, cc: cc.length ? t('（含抄送 {n}）', { n: cc.length }) : '' })
           }</span>}
       {/* 退路：要加附件（作品集 PDF）的信走这条——放进草稿箱，去 Gmail 挂上附件再发。 */}
       {mods.mail && <button className="b" disabled={!allOk || busy} onClick={() => go('draft')}
-        title="要加附件的信走这条：放进草稿箱，去 Gmail 挂上附件再发">
-        {busy === 'draft' ? '正在放……' : d.meta?.gmail_draft_id ? '再放一次草稿箱' : '放进草稿箱'}
+        title={t('要加附件的信走这条：放进草稿箱，去 Gmail 挂上附件再发')}>
+        {busy === 'draft' ? t('正在放……') : d.meta?.gmail_draft_id ? t('再放一次草稿箱') : t('放进草稿箱')}
       </button>}
     </div>
     </>
@@ -273,13 +274,12 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
 
   return (
     <div className="deliv">
-      <p className="secttl">产出</p>
+      <p className="secttl">{t('产出')}</p>
       {err && <div className="dv-err">{err}</div>}
 
       {drafts.length === 0 && (
         <p className="empty">
-          还没有产出。要交出去的东西——申请材料、回信、表单答案——都在这儿长出来。
-          你可以自己建一份，或者在中间那栏跟 Fairwind 说「起一版」。
+          {t('还没有产出。要交出去的东西——申请材料、回信、表单答案——都在这儿长出来。你可以自己建一份，或者在中间那栏跟 Fairwind 说「起一版」。')}
         </p>
       )}
 
@@ -294,32 +294,32 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
               <h4>{d.title}</h4>
               <span className={'pill ' + (d.blocked_by || waiting ? 'block'
                 : d.kind === 'email' && d.meta?.gmail_draft_id ? 'ready' : 'draft')}>
-                {waiting ? '等前一份定稿'
-                  : d.blocked_by ? '挡住了'
+                {waiting ? t('等前一份定稿')
+                  : d.blocked_by ? t('挡住了')
                   // 一张表填到什么程度，一眼看得见——这是「一份产出装一张表」
                   // 换来的东西：拆成八份的话这句话没处说。
-                  : fprog ? `${fprog.hit} / ${fprog.total} 格过闸`
-                  : d.kind === 'email' && d.meta?.gmail_draft_id ? '在草稿箱 · 那份要你自己按'
-                  : prog ? `${prog.hit} / ${prog.total}` : '你在改'}
+                  : fprog ? t('{hit} / {total} 格过闸', { hit: fprog.hit, total: fprog.total })
+                  : d.kind === 'email' && d.meta?.gmail_draft_id ? t('在草稿箱 · 那份要你自己按')
+                  : prog ? `${prog.hit} / ${prog.total}` : t('你在改')}
               </span>
             </div>
             <div className="dv-meta">
               {/* 类型跟标题一样时就不重复说一遍（「概念文本 · 概念文本」） */}
               {(KIND_LABEL[d.kind] || d.kind) !== d.title && <span>{KIND_LABEL[d.kind] || d.kind}</span>}
-              {d.due && <span>到期 <b>{d.due}</b></span>}
-              {d.source && <span>料来自 <b>{d.source}</b></span>}
+              {d.due && <span>{t('到期')} <b>{d.due}</b></span>}
+              {d.source && <span>{t('料来自')} <b>{d.source}</b></span>}
               <span>{whereItGoes(d.kind)}</span>
             </div>
             <div className="dv-body">
               {waiting ? (
                 <div className="dv-block">
-                  等 <b>{dep.title}</b> 定稿。它没定，这份写了也要推翻重来。
+                  {t('等')} <b>{dep.title}</b> {t('定稿。它没定，这份写了也要推翻重来。')}
                 </div>
               ) : d.blocked_by ? (
                 <div className="dv-block">
                   {d.blocked_by}
                   {d.blocked_ref && (
-                    <button className="jump" onClick={() => onJump?.(d.blocked_ref)}>← 跳回那段对话</button>
+                    <button className="jump" onClick={() => onJump?.(d.blocked_ref)}>{t('← 跳回那段对话')}</button>
                   )}
                 </div>
               ) : Array.isArray(d.rules?.fields) ? (
@@ -329,16 +329,16 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
               ) : (
                 <Editor d={d} onErr={report} onChanged={onChanged} pursuitId={pursuitId} />
               )}
-              <button className="dv-del" onClick={() => drop(d.id)} title="删掉这份草稿">删掉</button>
+              <button className="dv-del" onClick={() => drop(d.id)} title={t('删掉这份草稿')}>{t('删掉')}</button>
             </div>
           </div>
         )
       })}
 
-      <button className="newout" onClick={add}>+ 新建一份产出</button>
+      <button className="newout" onClick={add}>{t('+ 新建一份产出')}</button>
 
       {files.length > 0 && (
-        <p className="dv-foot">另有 {files.length} 份已定稿，在左栏「文件」里。</p>
+        <p className="dv-foot">{t('另有 {n} 份已定稿，在左栏「文件」里。', { n: files.length })}</p>
       )}
     </div>
   )

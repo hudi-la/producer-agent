@@ -1,4 +1,5 @@
 import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
+import { t } from '../i18n/index.js'
 
 // 机会池 = 他那张 Excel 搬进库之后的样子。
 //
@@ -12,17 +13,17 @@ import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
 // ── 说人话 ────────────────────────────────────────────────────
 
 /** 上次查的时候开着没有。 */
-export const STATUS_LABEL = { open: '开着', closed: '关着', unknown: '没查过' }
+export const STATUS_LABEL = { open: t('开着'), closed: t('关着'), unknown: t('没查过') }
 
 /**
  * 够不够得着。**unknown 不是「差」，是「往届名单没查到」** ——
  * 这两件事在界面上必须分得开，不然他会把「没查到」当成「不行」。
  */
 export const REACH_LABEL = {
-  realistic: '够得着',
-  stretch: '有点悬',
-  longshot: '多半白投',
-  unknown: '没查到',
+  realistic: t('够得着'),
+  stretch: t('有点悬'),
+  longshot: t('多半白投'),
+  unknown: t('没查到'),
 }
 
 const RANK = { realistic: 0, unknown: 1, stretch: 2, longshot: 3 }
@@ -36,10 +37,10 @@ export function laneOf(o) {
 }
 
 export const LANES = [
-  ['open', '开着的'],
-  ['watching', '关注中'],
-  ['onboard', '已在看板上'],
-  ['dropped', '别再提了'],
+  ['open', t('开着的')],
+  ['watching', t('关注中')],
+  ['onboard', t('已在看板上')],
+  ['dropped', t('别再提了')],
 ]
 
 /** 日期说成「9/7」；没有就空。 */
@@ -52,11 +53,11 @@ export const shortDate = (d) => {
 /** 截止那一格：能算出日子的说日子，算不出的原样显示原话（截短）。 */
 export function whenText(o) {
   if (o.status === 'open') {
-    if (o.deadline_at) return `截止 ${shortDate(o.deadline_at)}`
-    return o.deadline ? String(o.deadline).slice(0, 22) : '没记截止'
+    if (o.deadline_at) return t('截止 {d}', { d: shortDate(o.deadline_at) })
+    return o.deadline ? String(o.deadline).slice(0, 22) : t('没记截止')
   }
-  if (o.opens_at) return `约 ${shortDate(o.opens_at)} 开`
-  if (o.deadline_at) return `上轮 ${shortDate(o.deadline_at)}`
+  if (o.opens_at) return t('约 {d} 开', { d: shortDate(o.opens_at) })
+  if (o.deadline_at) return t('上轮 {d}', { d: shortDate(o.deadline_at) })
   return o.deadline ? String(o.deadline).slice(0, 22) : ''
 }
 
@@ -71,7 +72,7 @@ export function staleOpen(o, today = new Date().toISOString().slice(0, 10)) {
 }
 
 /** 上次查是什么时候。**从来没查过要说出来**，空着会被当成「查过没事」。 */
-export const checkedText = (o) => (o.checked_at ? `${shortDate(o.checked_at)} 查过` : '没查过')
+export const checkedText = (o) => (o.checked_at ? t('{d} 查过', { d: shortDate(o.checked_at) }) : t('没查过'))
 
 // ── 排序 ──────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ export async function loadPool() {
 
 /** 捡出来：池子里一行变成看板上一张卡。幂等，已经捡过就返回原来那张。 */
 export async function pickOpportunity(id) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_pick_opportunity', { p_id: id })
   if (error) throw new Error(error.message)
   return data
@@ -134,14 +135,14 @@ export async function pickOpportunity(id) {
 
 /** 别再提：不再复查、不再推。**不删行**——删了就没法回答「这个我当初为什么划掉」。 */
 export async function dropOpportunity(id, why = null) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_drop_opportunity', { p_id: id, p_why: why })
   if (error) throw new Error(error.message)
 }
 
 /** 划错了能划回来。没有撤销的破坏性动作，用着用着就没人敢按了。 */
 export async function undropOpportunity(id) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_undrop_opportunity', { p_id: id })
   if (error) throw new Error(error.message)
 }

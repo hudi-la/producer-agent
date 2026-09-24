@@ -40,7 +40,7 @@ const token = sh('gh auth token')
 const zipName = `Fairwind-${version}-mac-arm64.zip`
 const buf = readFileSync(zip)
 let up = false
-for (let i = 1; i <= 6 && !up; i++) {
+for (let i = 1; i <= 4 && !up; i++) {
   for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name | endswith(".zip")) | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`)
   try {
     const r = await fetch(`https://uploads.github.com/repos/${REPO}/releases/${relId}/assets?name=${encodeURIComponent(zipName)}`, { method: 'POST', headers: { authorization: `token ${token}`, 'content-type': 'application/zip', 'content-length': String(buf.length) }, body: buf, duplex: 'half' })
@@ -49,6 +49,13 @@ for (let i = 1; i <= 6 && !up; i++) {
     if (!up) console.log('  ' + (await r.text()).slice(0, 200))
   } catch (e) { console.log(`  传 zip 第 ${i} 次:${e.cause?.code || e.message}`) }
   if (!up) await new Promise((r) => setTimeout(r, 8000))
+}
+// node 那条路老是 EPIPE / bad record MAC 时换 gh(Go 的 http)再试几次——9/24 实测 node 连败 18 次,gh 第二次就过
+for (let i = 1; i <= 6 && !up; i++) {
+  for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name | endswith(".zip")) | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`)
+  try { run(`gh release upload v${version} --repo ${REPO} --clobber "${zip}"`); const size = sh(`gh api repos/${REPO}/releases/tags/v${version} --jq '.assets[] | select(.name | endswith(".zip")) | .size'`); up = String(buf.length) === size; console.log(`  gh 传 zip 第 ${i} 次:${up ? '成' : '尺寸不对 ' + size}`) }
+  catch (e) { console.log(`  gh 传 zip 第 ${i} 次:没成`) }
+  if (!up) await new Promise((r) => setTimeout(r, 15000))
 }
 if (!up) { console.error('zip 传不上去,网络的事,再跑一次'); process.exit(1) }
 say('校验')

@@ -8,7 +8,9 @@
 // 库里 ball_eff 已经直接等于 p.ball（0058），这儿只是照读。
 //
 // 三态：待处理 / 等回复 / 一个都不点。点已经亮着的那个 = 灭掉。
-export const BALL_LABEL = { me: '待处理', them: '等回复' }
+import { t } from '../i18n/index.js'
+
+export const BALL_LABEL = { me: t('待处理'), them: t('等回复') }
 
 /** 界面上摆出来的两个标，顺序固定。 */
 export const BALL_STATES = [['me', BALL_LABEL.me], ['them', BALL_LABEL.them]]

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { liveInit, liveStep, stripTag } from './liveText.js'
+import { t } from '../i18n/index.js'
 
 /**
  * 报工具动作那行小字。
@@ -59,11 +60,11 @@ export function useLiveReply() {
     }
     if (e.t === 'tool') {
       const say = toolSay(e.name)
-      if (say) setAct(say)
+      if (say) setAct(t(say))
     } else if (e.t === 'thinking') {
       // 它在想。思考不产可见的字，可能一想就是十几秒——不说一声的话，
       // 这段等待跟「卡死了」长得一模一样。
-      setAct((cur) => cur || '在想…')
+      setAct((cur) => cur || t('在想…'))
     }
   }, [flush])
 

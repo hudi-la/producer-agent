@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { stateLine, whyLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
 import Veil from './Veil.jsx'
+import { t } from '../i18n/index.js'
 
 // 顶栏那块通知面板。装的是**所有该动和在等的事** —— 机会线的和人的都在这儿。
 //
@@ -50,8 +51,8 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
           {/* 人名过展示模式；机会线的标题不用——演示的正是这些机会（见 Veil.jsx） */}
           {(() => {
             const 名 = it.subject_kind === 'pursuit'
-              ? (it.name || '（没名字）')
-              : <Veil>{it.name || '（没名字）'}</Veil>
+              ? (it.name || t('（没名字）'))
+              : <Veil>{it.name || t('（没名字）')}</Veil>
             return 能勾
               ? <span className="nname as-text">{名}</span>
               : <button className="nname" onClick={() => onOpen(it)}>{名}</button>
@@ -69,20 +70,20 @@ function StateRow({ it, picking, checked, onPick, onHandled, onReschedule, onOpe
           /* 表单交了、微信里说了、当面聊了 —— 系统看不见邮箱外的事。
              这一下是**记一笔**（进时间线，留痕迹），不是把提醒抹掉。
              停了的（连发三封没回）也要有这个出口：换了法子、或决定收了。 */
-          <button className="nbtn" title="已处理 —— 记一笔，留痕迹" aria-label="已处理"
+          <button className="nbtn" title={t('已处理 —— 记一笔，留痕迹')} aria-label={t('已处理')}
                   onClick={() => onHandled(it)}>✓</button>
         )}
         {/* 改期：默认等待天数对这个 case 不合适时（「说好周四再催」），
             直接把到点日改掉 —— 原来这个结论只能活在对话里，没处落。
             原生 date input 披着链接的皮：点开就是日历。 */}
         {it.state === 'WAITING_REPLY' && it.anchor_id && (
-          <label className="nresched" title="改到点日">
-            改期
+          <label className="nresched" title={t('改到点日')}>
+            {t('改期')}
             <input type="date" value=""
                    onChange={(e) => e.target.value && onReschedule(it, e.target.value)} />
           </label>
         )}
-        <button className="nopen" onClick={() => onOpen(it)}>打开卡片</button>
+        <button className="nopen" onClick={() => onOpen(it)}>{t('打开卡片')}</button>
       </div>
       )}
     </div>
@@ -96,7 +97,7 @@ function Fold({ title, note, items, render }) {
   return (
     <section className="nsect">
       <button className="nfold" onClick={() => setOpen((x) => !x)}>
-        {open ? '▾' : '▸'} {title}（{items.length}）
+        {open ? '▾' : '▸'} {t('{title}（{n}）', { title, n: items.length })}
       </button>
       {open && (
         <>
@@ -116,11 +117,10 @@ function Fold({ title, note, items, render }) {
 function MailAge({ mail }) {
   if (!mail?.at) return null
   const min = Math.round((Date.now() - new Date(mail.at)) / 60000)
-  const ago = min < 1 ? '刚刚' : min < 60 ? `${min} 分钟前` : `${Math.round(min / 60)} 小时前`
+  const ago = min < 1 ? t('刚刚') : min < 60 ? t('{n} 分钟前', { n: min }) : t('{n} 小时前', { n: Math.round(min / 60) })
   return (
     <p className="nnone nfresh">
-      账面截至{ago}收信。<b>你刚发的信要等下一轮</b>（≤5 分钟）才会把
-      对应的条目消掉 —— 那不是没记上，是还没收到。
+      {t('账面截至{ago}收信。', { ago })}<b>{t('你刚发的信要等下一轮')}</b>{t('（≤5 分钟）才会把对应的条目消掉 —— 那不是没记上，是还没收到。')}
     </p>
   )
 }
@@ -138,19 +138,19 @@ export default function Notifications({ data, mail, judging, onJudgeMore, onHand
   const 待判 = stale.length + (stale.length ? 0 : unjudged.length)
 
   return (
-    <div className="npanel" role="dialog" aria-label="消息">
+    <div className="npanel" role="dialog" aria-label={t('消息')}>
       <header className="nhead">
         {/* 「消息」不叫「该动的」：这块板子装的不全是催你动的东西——
             等待那一层是「在等别人」。
             「今天：」那一段才是该动的，标题不该替其中一个区说话。 */}
-        <h2>消息</h2>
-        {due.length > 0 && <span className="ncount">{due.length} 件</span>}
+        <h2>{t('消息')}</h2>
+        {due.length > 0 && <span className="ncount">{t('{n} 件', { n: due.length })}</span>}
         <span className="sp" />
         {/* 挂到看板上：每张卡头顶吊一个状态气泡；发出&提交/进一步/谈成里
             **没有气泡的卡**就是该起疑的 —— 一条线安静了，是真没事还是判漏了，
             看板上一眼能扫出来。这是「判为不用回」那层退役后错判的发现口。 */}
-        <button className="lnk" onClick={onAudit}>{auditOn ? '收起看板气泡' : '打开看板气泡'}</button>
-        <button className="nclose" onClick={onClose} aria-label="收起">✕</button>
+        <button className="lnk" onClick={onAudit}>{auditOn ? t('收起看板气泡') : t('打开看板气泡')}</button>
+        <button className="nclose" onClick={onClose} aria-label={t('收起')}>✕</button>
       </header>
 
       <MailAge mail={mail} />
@@ -158,19 +158,19 @@ export default function Notifications({ data, mail, judging, onJudgeMore, onHand
       {/* 空可以，骗人不行 —— 说清是「真没有」还是「没连上」。 */}
       {source === 'empty' && (
         <p className="nnone">
-          {reason === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
-           : '连上了但查询报错。'}
-          <b>这不是「你没有要办的事」。</b>
+          {reason === 'no-config' ? t('没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。')
+           : t('连上了但查询报错。')}
+          <b>{t('这不是「你没有要办的事」。')}</b>
         </p>
       )}
 
       {judging && (
-        <p className="nnone"><i className="spin" aria-hidden="true" /> 正在读近期往来重判…</p>
+        <p className="nnone"><i className="spin" aria-hidden="true" /> {t('正在读近期往来重判…')}</p>
       )}
       {!judging && 待判 > 0 && (
         <p className="nnone">
-          还有 {待判} 条最近有往来的在排队重判（每 5 分钟自动判一批）。
-          <button className="lnk" onClick={onJudgeMore}>现在就判</button>
+          {t('还有 {n} 条最近有往来的在排队重判（每 5 分钟自动判一批）。', { n: 待判 })}
+          <button className="lnk" onClick={onJudgeMore}>{t('现在就判')}</button>
         </p>
       )}
 
@@ -178,18 +178,18 @@ export default function Notifications({ data, mail, judging, onJudgeMore, onHand
           标题改叫「消息」之后，这一段得自己有个名字——不然它跟下面「等待」
           那一折看着是同一堆东西，而这两堆的分别正是这块板子的全部意思。 */}
       <section className="nsect">
-        <div className="nsect-h"><h3>今天：</h3></div>
+        <div className="nsect-h"><h3>{t('今天：')}</h3></div>
         {due.length ? due.map((it) => (
           <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(qKey(it.subject_kind, it.subject_id))} onPick={onPick}
                     onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
         )) : source !== 'empty' && (
-          <p className="nnone">现在没有到点的。看看新机会吧。</p>
+          <p className="nnone">{t('现在没有到点的。看看新机会吧。')}</p>
         )}
       </section>
 
       {/* 等待：没到点的，折叠着，数字露在外面 */}
-      <Fold title="等待" items={waiting}
-            note="还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。"
+      <Fold title={t('等待')} items={waiting}
+            note={t('还没到点的。到了那天自动挪到上面 —— 中间对方回了，它自己就没了。')}
             render={(it) => (
               <StateRow key={it.key} it={it} picking={picking} checked={picked?.has(qKey(it.subject_kind, it.subject_id))} onPick={onPick}
                         onHandled={onHandled} onReschedule={onReschedule} onOpen={onOpen} />
@@ -198,8 +198,8 @@ export default function Notifications({ data, mail, judging, onJudgeMore, onHand
       {/* 没归到任何线的往来 —— 不逐条列，但不许是隐形的 */}
       {unclaimed > 0 && (
         <p className="nnone">
-          还有 {unclaimed} 个地址的往来没归到任何线，在
-          <button className="lnk" onClick={onGoPeople}>人际管理页</button>处理。
+          {t('还有 {n} 个地址的往来没归到任何线，在', { n: unclaimed })}
+          <button className="lnk" onClick={onGoPeople}>{t('人际管理页')}</button>{t('处理。')}
         </p>
       )}
 

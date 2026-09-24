@@ -1,7 +1,11 @@
 // src/i18n/en.js —— 英文。键是中文原文(见 index.js)。
 // 2026-09-17 先覆盖第一个包露面的那一层(我的档案 + 首次启动 + 账号 + 判据 + 模块开关 + 顶栏);
-// 机会线 / 邮件两个模块的界面还没翻,开了那两个模块英文用户会看到中文——ModulesPanel 里明说。
-export default {
+// 9/24 机会线模块翻完了(字典拆在 en.pursuits-a/b、en.misc-c 里,底下合进来);邮件模块的界面还没翻——ModulesPanel 里明说。
+import a from './en.pursuits-a.js'
+import b from './en.pursuits-b.js'
+import c from './en.misc-c.js'
+
+const base = {
   // ── 顶栏 / 主区 ──
   '展开的卡片': 'Open cards', '项目争取': 'Pursuits', '人际管理': 'People', '我的档案': 'My profile', '时间线': 'Timeline',
   '主区': 'Main areas', '该动的': 'Needs action', '我': 'Me', '展示中': 'Presenting',
@@ -34,7 +38,7 @@ export default {
   // ── 关于你的字段 ──
   '邮箱': 'Email', 'Fairwind 用这个账号发信。必须是你授权给 brain 的那个 Gmail，对不上会当场拒发。': 'Fairwind sends from this address. It must be the Gmail you authorized; otherwise sending is refused.',
   '身份': 'Status', '例：O-1、绿卡、公民。Fairwind 拿它判断你能不能申。': 'e.g. O-1, green card, citizen. Fairwind uses it to judge eligibility.',
-  '常住': 'Based in', '多个地方用「、」分开。': 'Separate several places with commas.', '阶段': 'Career stage', '例：emerging、mid-career。': 'e.g. emerging, mid-career.',
+  '常住': 'Based in', '多个地方用「、」分开。': 'Separate several places with commas.', '阶段': 'Stage', '例：emerging、mid-career。': 'e.g. emerging, mid-career.',
   '资助偏好': 'Funding preference', '排除规则': 'Exclusion rule', '满足这条的机会不进主名单。写错了你会看不见一整类机会。': "Opportunities matching this never reach the main list. Get it wrong and a whole category disappears.",
   '关注规则': 'Watch rule', '够不着但值得盯的，按这条留下来。': 'Out of reach but worth watching — kept by this rule.',
   '名字': 'Name', '作品站': 'Website', '改完 Fairwind 下一次开口就用新的——它读的就是这里，没有第二份。': 'Fairwind uses the new values next time it speaks — this is the only copy.',
@@ -67,7 +71,7 @@ export default {
   '写好了。把 Claude 桌面版完全退出再打开，对话里就有 Fairwind 的工具了': 'Done. Quit the Claude desktop app completely and reopen it; Fairwind\'s tools will be in the chat', '没成:': "Didn't work: ",
   '让它能读写你的档案、机会卡、判据——比如"读我的网站，把作品填进来"。ChatGPT 聊天 app 接不上（它只认公网地址），用 ChatGPT 的人走 Codex。': 'Let it read and write your profile, pursuit cards and judgment rules — e.g. "read my website and fill in my works". The ChatGPT chat app can\'t connect (it only accepts public URLs); ChatGPT users use Codex.',
   '接入': 'Connect', '这台机器上没见到它': 'not found on this machine', 'Codex': 'Codex', 'Gemini CLI': 'Gemini CLI',
-  '写好了。把它完全退出再打开，对话里就有 Fairwind 的工具了': 'Done. Quit it completely and reopen; Fairwind\'s tools will be in the chat',
+  '写好了。把 {app} 完全退出再打开，对话里就有 Fairwind 的工具了': 'Done. Quit {app} completely and reopen; Fairwind\'s tools will be in the chat', '它': 'it',
   'Claude Code 在终端里粘那一行；别的工具怎么接，看说明书。地址：': 'Claude Code: paste that line in Terminal; other tools: see the guide. URL: ',
   '说明书': 'Guide', '复制': 'Copy', '复制好了': 'Copied', '在终端里粘这一行；Claude 桌面版和别的工具怎么接，看说明书。地址：': 'Paste this line in Terminal; see the guide for the Claude desktop app and other tools. URL: ',
   '设置': 'Settings', '系统设置': 'Settings', '有新版本 {v}:去「设置」里更新': 'Version {v} is out: update in Settings',
@@ -82,7 +86,7 @@ export default {
   // ── 模块开关 ──
   '装了哪些': 'What\'s installed', '你是谁、作品与履历、语气、书桌。关不掉。': 'Who you are, works and CV, voice, desk. Always on.',
   '机会线': 'Pursuits', '项目争取的看板、写信稿、找机会。': 'The pursuits board, letter drafts, scouting.', '邮件': 'Mail', '连 Gmail，信自动归线归人；人际管理、时间线、展开的卡片跟它一起开。要先开机会线。': 'Connect Gmail; mail is filed to pursuits and people. People, Timeline and Open cards come with it. Needs Pursuits first.',
-  '这两个模块的界面暂时还是中文的。': 'The interface of these two modules is still in Chinese for now.',
+  '邮件模块的界面暂时还是中文的。': 'The mail module\'s interface is still in Chinese for now.', '待处理': 'My move', '等回复': 'Their move',
   // ── 我的判据 ──
   '我的判据': 'My judgment rules', 'Fairwind 每次判断都读这些;骨架在程序里,口味在你这儿': 'Fairwind reads these on every judgment; the skeleton is in the program, the taste is yours',
   '用我的判据': 'Using my rules', '用出厂判据(我的先关着)': 'Using factory rules (mine are off)', '文件在 ': 'Files live in ', ',怎么写看里面的 README': ', see the README inside for how to write them',
@@ -105,3 +109,10 @@ export default {
   '资格搁置': 'eligibility on hold', '{visa} · 资格搁置': '{visa} · eligibility on hold',
   '没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）': 'No database connection (check VITE_SUPABASE_* in .env.local)', '这条没有 id，存不了': "This entry has no id and can't be saved",
 }
+
+// ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
+const extra = { '已选 {n} 张': '{n} selected', '说给第 {i}/{n} 条': 'Telling {i}/{n}', '说一句…': 'Say something…', '全部展开': 'Open all', '批量操作': 'Batch', '每周找机会': 'Weekly opportunity scout', '没配发布位': 'No release source configured',
+  '去「展开的卡片」看它。要拿走，在那排卡片上按 ×。': 'See it under Open cards. To remove it, press × on that row of cards.', '展开——今天要弄它。你留在这儿接着挑，挑完点顶栏「展开的卡片」过去。': 'Open: work on it today. Stay here and keep picking; then go to Open cards in the top bar.', '在展开的卡片区': 'In Open cards' }
+
+// 三份分册合进来;base 里的键优先(撞键时以档案层那份为准——别在分册里改 base 的意思)
+export default { ...a, ...b, ...c, ...extra, ...base }

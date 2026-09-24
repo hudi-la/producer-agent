@@ -23,37 +23,39 @@ import MemoCard from './MemoCard.jsx'
 import { heldLabel, useProfile } from '../lib/profile.js'
 import { onPulse } from '../lib/pulse.js'
 import DeskToggle from './DeskToggle.jsx'
+import { useModules } from '../lib/ModulesContext.jsx'
 import { useGrow } from '../lib/useGrow.js'
 // 搬去 components/Md.jsx 了 —— 名片那边也要用同一份，抄两遍迟早会分叉
 // （已经分叉过一次：名片上的粗体渲成了四个星号）。
 import Md from './Md.jsx'
+import { t } from '../i18n/index.js'
 
 const STAGE_LABELS = {
-  pending: '新机会', matching: '匹配项目', writing: '一起写', sent: '发出&提交',
-  replying: '进一步', won: '谈成', paused: '暂停处理', watch: '持续关注',
+  pending: t('新机会'), matching: t('匹配项目'), writing: t('一起写'), sent: t('发出&提交'),
+  replying: t('进一步'), won: t('谈成'), paused: t('暂停处理'), watch: t('持续关注'),
 }
 const STAGE_ORDER = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused', 'watch']
 
-const srcLabel = (s) => (s === 'manual' ? '你丢的' : 'scout')
-const PAYOFF = { paid: '给钱', access: '给圈子', both: '钱 + 圈子' }
+const srcLabel = (s) => (s === 'manual' ? t('你丢的') : 'scout')
+const PAYOFF = { paid: t('给钱'), access: t('给圈子'), both: t('钱 + 圈子') }
 
 function Facts({ p }) {
   const profile = useProfile()
   const stars = p.match_stars ? '★'.repeat(p.match_stars) : null
   return (
     <div className="pfacts">
-      {p.kind && <span className="pf"><i>类型</i>{p.kind}</span>}
-      {p.opens_at && <span className="pf"><i>开放</i>{p.opens_at}</span>}
-      {p.deadline && <span className="pf warn"><i>截止</i>{p.deadline}</span>}
-      {p.org && <span className="pf"><i>机构</i>{p.org}</span>}
-      {p.location && <span className="pf"><i>地点</i>{p.location}</span>}
-      {p.funding && <span className="pf"><i>资助</i>{p.funding}</span>}
+      {p.kind && <span className="pf"><i>{t('类型')}</i>{p.kind}</span>}
+      {p.opens_at && <span className="pf"><i>{t('开放')}</i>{p.opens_at}</span>}
+      {p.deadline && <span className="pf warn"><i>{t('截止')}</i>{p.deadline}</span>}
+      {p.org && <span className="pf"><i>{t('机构')}</i>{p.org}</span>}
+      {p.location && <span className="pf"><i>{t('地点')}</i>{p.location}</span>}
+      {p.funding && <span className="pf"><i>{t('资助')}</i>{p.funding}</span>}
       {/* 从卡面撤下来的——它是决定要不要推的依据，该在这儿而不是天天占卡上一行 */}
-      {p.payoff && <span className="pf"><i>回报</i>{PAYOFF[p.payoff] || p.payoff}</span>}
-      {stars && <span className="pf"><i>匹配</i>{stars}</span>}
-      <span className="pf"><i>来源</i>{srcLabel(p.source)}</span>
-      <span className="pf"><i>主打作品</i>{p.work_title || '待定'}</span>
-      {p.url && <a className="pf pf-a" href={p.url} target="_blank" rel="noreferrer"><i>链接</i>官方页面 ↗</a>}
+      {p.payoff && <span className="pf"><i>{t('回报')}</i>{PAYOFF[p.payoff] || p.payoff}</span>}
+      {stars && <span className="pf"><i>{t('匹配')}</i>{stars}</span>}
+      <span className="pf"><i>{t('来源')}</i>{srcLabel(p.source)}</span>
+      <span className="pf"><i>{t('主打作品')}</i>{p.work_title || t('待定')}</span>
+      {p.url && <a className="pf pf-a" href={p.url} target="_blank" rel="noreferrer"><i>{t('链接')}</i>{t('官方页面 ↗')}</a>}
       {!p.eligible && <span className="pf held">{heldLabel(profile)}</span>}
     </div>
   )
@@ -79,8 +81,8 @@ function Deadline({ p }) {
   const urgent = left != null && left <= 14
   return (
     <span className={'dl' + (urgent ? ' urgent' : '')}>
-      <i>截止</i><b>{raw}</b>
-      {left != null && <em>{left < 0 ? '已过' : left === 0 ? '今天' : `剩 ${left} 天`}</em>}
+      <i>{t('截止')}</i><b>{raw}</b>
+      {left != null && <em>{left < 0 ? t('已过') : left === 0 ? t('今天') : t('剩 {n} 天', { n: left })}</em>}
     </span>
   )
 }
@@ -120,8 +122,8 @@ function Letter({ m }) {
   // （Gmail 对这种信不给标签，收信那道「没 SENT 就拦」的闸摸空了——
   //   所以在这儿用时间说话：sent_at 在未来 = 还没发生。）
   const 预约中 = !进来的 && new Date(m.created_at) > new Date()
-  const who = 进来的 ? (m.meta?.from_name || m.counterpart_email || '对方')
-    : 预约中 ? '预约发送 · 还没送出' : '你发出'
+  const who = 进来的 ? (m.meta?.from_name || m.counterpart_email || t('对方'))
+    : 预约中 ? t('预约发送 · 还没送出') : t('你发出')
   // **原文和摘要不是一回事，不许混着显示。**
   //
   // 库里有两种信：body_raw 是 Gmail 取回来的原文，content 有时候是人写的
@@ -140,14 +142,14 @@ function Letter({ m }) {
     <div id={'msg-' + m.id} className={'arrival' + (进来的 ? ' in' : ' out')}>
       <div className="arr-top">
         <span className="arr-mark" aria-hidden="true">✉</span>
-        <b>{进来的 ? <><Veil>{who}</Veil> 来信</> : who}</b>
-        {只有摘要 && <span className="arr-tag">摘要 · 原文没存下来</span>}
+        <b>{进来的 ? <><Veil>{who}</Veil>{t(' 来信')}</> : who}</b>
+        {只有摘要 && <span className="arr-tag">{t('摘要 · 原文没存下来')}</span>}
         <span className="arr-when">{md(m.created_at)}</span>
       </div>
-      <div className="arr-gist">{head.slice(0, GIST_CAP) || '（这封信没有正文）'}</div>
+      <div className="arr-gist">{head.slice(0, GIST_CAP) || t('（这封信没有正文）')}</div>
       {有更多 && (
         <button className="arr-more" onClick={() => setOpen((x) => !x)}>
-          {open ? '收起原文' : '展开原文'} {open ? '▾' : '▸'}
+          {open ? t('收起原文') : t('展开原文')} {open ? '▾' : '▸'}
         </button>
       )}
       {open && <pre className="arr-raw">{raw}</pre>}
@@ -165,7 +167,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   if (m.role === 'note') {
     return (
       <div id={'msg-' + m.id} className="notecard">
-        <span className="ntag">{m.kind === 'decision' ? '决定' : m.kind === 'memo' ? '记忆' : m.kind === 'meet' ? '见面' : '备注'}</span>
+        <span className="ntag">{m.kind === 'decision' ? t('决定') : m.kind === 'memo' ? t('记忆') : m.kind === 'meet' ? t('见面') : t('备注')}</span>
         <div className="md"><Md>{m.content}</Md></div>
       </div>
     )
@@ -174,7 +176,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
     return (
       <div className="msg-row">
         <div className="briefcard">
-          <div className="byline"><span className="pdot" aria-hidden="true" /><span className="pname">Fairwind <span>· 讲懂这个机会</span></span></div>
+          <div className="byline"><span className="pdot" aria-hidden="true" /><span className="pname">Fairwind <span>· {t('讲懂这个机会')}</span></span></div>
           <div className="md"><Md>{m.content}</Md></div>
         </div>
       </div>
@@ -184,7 +186,7 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
     return (
       <div className="msg-row">
         <div className="draftcard">
-          <div className="draft-top"><span className="pname">草稿</span><span className="lang">EN</span></div>
+          <div className="draft-top"><span className="pname">{t('草稿')}</span><span className="lang">EN</span></div>
           <div className="draft-body md"><Md>{m.content}</Md></div>
         </div>
       </div>
@@ -197,14 +199,14 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   // CultureHub 的正式邀请，看起来都像是 Fairwind 说的。这是在骗人。
   const mine = m.role === 'artist'
   const external = m.role === 'org'
-  const who = mine ? '你' : external ? (m.meta?.from_name || '对方') : 'Fairwind'
+  const who = mine ? t('你') : external ? (m.meta?.from_name || t('对方')) : 'Fairwind'
   // 群发的那句要标明是群发的。不标的话，半年后你翻回这条线看见自己说
   // 「帮我起一封信问问日程」，会以为当时专门为这家想过——其实那是一句群发。
   const bc = m.meta?.broadcast
   return (
     <div id={'msg-' + m.id} className={'msg' + (mine ? ' you' : external ? ' org' : ' producer')}>
-      <span className="who">{external ? <Veil>{who}</Veil> : who}{m.kind === 'email' && <span className="viamail"> · 邮件</span>}
-        {bc && <span className="viamail"> · 同时发给了 {bc.count} 条线</span>}
+      <span className="who">{external ? <Veil>{who}</Veil> : who}{m.kind === 'email' && <span className="viamail"> · {t('邮件')}</span>}
+        {bc && <span className="viamail">{t(' · 同时发给了 {n} 条线', { n: bc.count })}</span>}
       </span>
       {/* 你自己说的那句能改了重说；别人的（它的回复、机构来信）不能——
           改别人说过的话是伪造记录，不是「重说」。 */}
@@ -249,8 +251,8 @@ function MailAnchor({ m, onJump }) {
   const mine = m.role === 'artist'
   return (
     <div id={'msg-' + m.id} className="mailanchor">
-      <b>{when}</b> {mine ? '你发了一封' : <><Veil>{m.meta?.from_name || '对方'}</Veil>来信</>}
-      <button className="lnk" onClick={() => onJump?.(m.id)}>看左栏 ↖</button>
+      <b>{when}</b> {mine ? t('你发了一封') : <><Veil>{m.meta?.from_name || t('对方')}</Veil>{t('来信')}</>}
+      <button className="lnk" onClick={() => onJump?.(m.id)}>{t('看左栏 ↖')}</button>
     </div>
   )
 }
@@ -263,16 +265,16 @@ function PromotedAnchor({ m, title }) {
   const when = d && !Number.isNaN(+d) ? `${d.getMonth() + 1}/${d.getDate()}` : ''
   return (
     <div id={'msg-' + m.id} className="mailanchor">
-      <b>{when}</b> Fairwind 起了一版 → 成了右栏的《{title}》
+      <b>{when}</b> {t('Fairwind 起了一版 → 成了右栏的《{title}》', { title })}
     </div>
   )
 }
 
 function emptyText(stage) {
   // 新机会的卡本该在后台就读透了。还空着 = 脑子没开，或刚进来还没轮到。
-  if (stage === 'pending') return 'Fairwind 还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。'
-  if (stage === 'matching') return '你批准了——接下来我们一起挑用哪件作品，再往下写。'
-  return '这条机会线还没有往来。我这就开始。'
+  if (stage === 'pending') return t('Fairwind 还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。')
+  if (stage === 'matching') return t('你批准了——接下来我们一起挑用哪件作品，再往下写。')
+  return t('这条机会线还没有往来。我这就开始。')
 }
 
 // 两种装法，同一套内容：
@@ -292,6 +294,7 @@ export default function PursuitFocus({
   brainUp = true,
 }) {
   const inDrawer = variant === 'drawer'
+  const mods = useModules()   // 「展开的卡片」区跟邮件一起开,那颗开关也跟着
   // 说话那一整套（发、边想边出字、重说、终止）在 useChat 里，跟档案里那张
   // 书桌共用同一份 —— 照抄两份的话，出错那几条路迟早只修好一边。
   // 这一页多出来的东西（笔卡、信卡、邮件锚点、stalled、stoppedId）留在这儿。
@@ -440,7 +443,7 @@ export default function PursuitFocus({
   // PDF 直接在浏览器里看就行，不用先落到你的下载文件夹里。
   async function openFile(a) {
     try {
-      if (!a.storage_key) throw new Error('这份只有登记没有字节（多半是早年的空行）')
+      if (!a.storage_key) throw new Error(t('这份只有登记没有字节（多半是早年的空行）'))
       window.open(await attachmentUrl(a.storage_key), '_blank', 'noopener')
     } catch (e) {
       setErr(e.message)
@@ -562,8 +565,8 @@ export default function PursuitFocus({
               {/* 没在想、又确实欠着一条回复——说实话，别拿三个点糊弄过去 */}
               {stalled && (
                 <div className="stalled">
-                  Fairwind 没回这条（多半是当时脑子没开，或者那次想崩了）。
-                  <b>再说一次就行</b>——它带着这条线的全部往来，你不用重讲。
+                  {t('Fairwind 没回这条（多半是当时脑子没开，或者那次想崩了）。')}
+                  <b>{t('再说一次就行')}</b>{t('——它带着这条线的全部往来，你不用重讲。')}
                 </div>
               )}
               {/* 已经在出字了就直接渲染成气泡，一行一行看着它想；还没出字
@@ -601,9 +604,9 @@ export default function PursuitFocus({
           rows={1}
           value={text}
           disabled={busy}
-          placeholder={busy ? 'Fairwind 在想……（想完会自动出现，你不用守着）'
-            : !brainUp ? '脑子没开：这句会直接记成一笔，不是聊天'
-            : '一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲'}
+          placeholder={busy ? t('Fairwind 在想……（想完会自动出现，你不用守着）')
+            : !brainUp ? t('脑子没开：这句会直接记成一笔，不是聊天')
+            : t('一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲')}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
@@ -612,13 +615,13 @@ export default function PursuitFocus({
           }}
         />
         {busy ? (
-          <button className="send stop" aria-label="终止" title="终止——停掉 Fairwind 这次的回复" onClick={stop}>
+          <button className="send stop" aria-label={t('终止')} title={t('终止——停掉 Fairwind 这次的回复')} onClick={stop}>
             <svg width="15" height="15" viewBox="0 0 16 16"><rect x="4.5" y="4.5" width="7" height="7" rx="1.4" fill="#fff" /></svg>
           </button>
         ) : (
           // 必须包一层箭头函数：onClick={send} 会把鼠标事件当第一个参数塞进去，
           // 而 send 的第一个参数现在是「重说」交过来的那句话。
-          <button className="send" aria-label="发送" onClick={() => send()} disabled={!text.trim()}>
+          <button className="send" aria-label={t('发送')} onClick={() => send()} disabled={!text.trim()}>
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M8 3 4.5 6.5M8 3l3.5 3.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         )}
@@ -643,8 +646,8 @@ export default function PursuitFocus({
         {viaUpdate && lastMail && (
           <div className="qwhat">
             {lastMail && (
-              <span>有新信 · {mailWhen(lastMail)} {lastMail.role === 'artist' ? '你发的' : <Veil>{lastMail.meta?.from_name || '对方'}</Veil>}
-                <button className="lnk" onClick={() => jumpTo(lastMail.id)}>看最近这封 →</button>
+              <span>{t('有新信')} · {mailWhen(lastMail)} {lastMail.role === 'artist' ? t('你发的') : <Veil>{lastMail.meta?.from_name || t('对方')}</Veil>}
+                <button className="lnk" onClick={() => jumpTo(lastMail.id)}>{t('看最近这封 →')}</button>
               </span>
             )}
           </div>
@@ -655,20 +658,20 @@ export default function PursuitFocus({
 
         <div className="ft-head">
           {inDrawer ? (
-            <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+            <button className="back" onClick={onBack} aria-label={t('收起')} title={t('收起')}><span aria-hidden="true">✕</span><span className="t"> {t('收起')}</span></button>
           ) : (
-            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> 看板</button>
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span> {t('看板')}</button>
           )}
           <h1 className="ft-title" title={p.title}>{p.title}</h1>
           {/* 「整页 →」退役了。整页只在工作区里有，去工作区的路是这颗开关 + 顶栏那个字。 */}
-          {inDrawer && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
+          {inDrawer && mods.mail && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
         <div className="ft-ctl">
         {/* 截止跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关 */}
         <Deadline p={p} />
         {/* **你自己点的标签**，系统不再往里插手。
             点已经亮着的那个 = 灭掉，回到「一个都不点」。 */}
-        <div className="ballsw" role="group" aria-label="球在谁那边">
+        <div className="ballsw" role="group" aria-label={t('球在谁那边')}>
           {BALL_STATES.map(([v, label]) => (
             <button
               key={v}
@@ -684,7 +687,7 @@ export default function PursuitFocus({
             </button>
           ))}
         </div>
-        <label className="stg-lbl">阶段
+        <label className="stg-lbl">{t('阶段')}
           <select
             className="stg-sel"
             value={stage}

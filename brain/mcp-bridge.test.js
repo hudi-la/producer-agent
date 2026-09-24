@@ -4,9 +4,12 @@ import assert from 'node:assert/strict'
 import http from 'node:http'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')   // 从哪个目录跑都找得到桥
 import { openLocalDb, applyMigrations, setLocalUid, registerLocalUser, assumeUser } from './local/migrate.js'
 import { makeLocalDb } from './local/localdb.js'
 import { handleMcp } from './mcp.js'
@@ -21,7 +24,7 @@ before(async () => {
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok))
   const url = `http://127.0.0.1:${srv.address().port}/mcp`
   client = new Client({ name: 't', version: '1' })
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [resolve('packaging/data/mcp-bridge.cjs'), url], cwd: resolve('.') }))
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [resolve(ROOT, 'packaging/data/mcp-bridge.cjs'), url], cwd: ROOT }))
 })
 after(async () => { await client.close().catch(() => {}); srv.close(); await pg.close(); rmSync(dir, { recursive: true, force: true }) })
 

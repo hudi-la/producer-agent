@@ -142,8 +142,8 @@ function McpRow() {
   const load = () => supa.mcpTargets.list().then(setTargets)
   useEffect(() => { load() }, [])
   const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
-  const install = async (t) => { const r = await supa.mcpTargets.install(t); setMsg((m) => ({ ...m, [t]: r.ok ? t('写好了。把它完全退出再打开，对话里就有 Fairwind 的工具了') : t('没成:') + r.error })); await load() }
   const RESTART = { 'claude-desktop': 'Claude', codex: 'Codex', 'gemini-cli': 'Gemini CLI' }
+  const install = async (target) => { const r = await supa.mcpTargets.install(target); setMsg((m) => ({ ...m, [target]: r.ok ? t('写好了。把 {app} 完全退出再打开，对话里就有 Fairwind 的工具了', { app: RESTART[target] || t('它') }) : t('没成:') + r.error })); await load() }
   return (
     <div className="la-sub">
       <div className="la-sub-h">{t('接给你的 AI 工具')}<small>{t('让它能读写你的档案、机会卡、判据——比如"读我的网站，把作品填进来"。ChatGPT 聊天 app 接不上（它只认公网地址），用 ChatGPT 的人走 Codex。')}</small></div>
@@ -152,7 +152,7 @@ function McpRow() {
           <b className="la-k2">{t(x.label)}</b>
           <button type="button" className={'b' + (x.current ? '' : ' primary')} onClick={() => install(x.target)}>{x.current ? t('已接入 · 再写一次') : t('接入')}</button>
           {x.appInstalled === false && <small className="la-hint">{t('这台机器上没见到它')}</small>}
-          {msg[x.target] && <span className={'la-note' + (msg[x.target].startsWith(t('没成:')) ? ' bad' : '')}>{msg[x.target].replace('它', RESTART[x.target] || '它')}</span>}
+          {msg[x.target] && <span className={'la-note' + (msg[x.target].startsWith(t('没成:')) ? ' bad' : '')}>{msg[x.target]}</span>}
         </div>
       ))}
       <div className="la-acts">
@@ -208,7 +208,7 @@ function UpdateRow() {
   }
   return (
     <div className="la-sub">
-      <div className="la-sub-h">{t('版本')}<small>{info?.current || ''}{info?.canUpdate ? t(' · 有新版本 {v}', { v: info.latest }) + (info.note ? ':' + info.note : '') : info?.error ? ` · ${info.error}` : info ? t(' · 已是最新') : ''}</small></div>
+      <div className="la-sub-h">{t('版本')}<small>{info?.current || ''}{info?.canUpdate ? t(' · 有新版本 {v}', { v: info.latest }) + (info.note ? ':' + info.note : '') : info?.error ? ` · ${t(info.error)}` : info ? t(' · 已是最新') : ''}</small></div>
       <div className="la-acts">
         <button type="button" className="b" disabled={busy} onClick={check}>{busy ? t('在看…') : t('检查更新')}</button>
         {info?.canUpdate && <button type="button" className="b primary" disabled={busy} onClick={apply}>{t('更新到 {v}', { v: info.latest })}</button>}

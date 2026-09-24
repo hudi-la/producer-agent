@@ -1,5 +1,7 @@
 // src/lib/brainClient.js —— 本机模式下前端的「supa」:同一个表面,底下是 fetch 到 brain。
 // 只仿今天代码真用到的那一点(跟 brain/local/localdb.js 同一份清单)。21 个 import supa 的文件一个不改。
+import { t } from '../i18n/index.js'
+
 const ok = (data) => ({ data, error: null })
 const bad = (message) => ({ data: null, error: { message } })
 
@@ -45,7 +47,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
             try { for (const k of keys) await fetchImpl(`${base}/files/${encodeURIComponent(k)}`, { method: 'DELETE' }); return ok(keys) } catch (e) { return bad(e.message) }
           },
           async download(key) {
-            try { const r = await fetchImpl(`${base}/files/${encodeURIComponent(key)}`); if (!r.ok) return bad(`没有这个文件:${key}`); const buf = await r.arrayBuffer(); return ok({ arrayBuffer: async () => buf }) } catch (e) { return bad(e.message) }
+            try { const r = await fetchImpl(`${base}/files/${encodeURIComponent(key)}`); if (!r.ok) return bad(t('没有这个文件:{key}', { key })); const buf = await r.arrayBuffer(); return ok({ arrayBuffer: async () => buf }) } catch (e) { return bad(e.message) }
           },
           async createSignedUrl(key) { return ok({ signedUrl: `${base}/files/${encodeURIComponent(key)}` }) },
         }
@@ -56,8 +58,8 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       async getUser() { const m = await whoami(); return { data: { user: m.user }, error: null } },
       onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } } },
       async signOut() { return { error: null } },
-      async signInWithPassword() { return { data: null, error: { message: '本机模式没有登录这回事' } } },
-      async signUp() { return { data: null, error: { message: '本机模式没有登录这回事' } } },
+      async signInWithPassword() { return { data: null, error: { message: t('本机模式没有登录这回事') } } },
+      async signUp() { return { data: null, error: { message: t('本机模式没有登录这回事') } } },
     },
     /** 首次启动页用 */
     setup: (body) => post('/setup', body),

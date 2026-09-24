@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { sendMessageStream, stopThinking } from './chat.js'
 import { useLiveReply } from './useLiveReply.js'
 import { dropFrom } from './rewind.js'
+import { t } from '../i18n/index.js'
 
 /**
  * 「说一句、边想边出字、说错了重说、想太久就停」——这一整套。
@@ -33,19 +34,19 @@ export function useChat({ owner, reload, rewind, offline = null }) {
   // 两条路必须共用这一个函数：乐观插入、换掉临时条、失败时话还不还给你——
   // 那三件事分两份写，迟早有一边漏掉，而漏掉的那边会静悄悄吞掉你打的字。
   const send = useCallback(async (said) => {
-    const t = (said ?? text).trim()
-    if (!t || busy) return
+    const txt = (said ?? text).trim()
+    if (!txt || busy) return
 
     if (offline && !offline.up) {
       if (said == null) setText('')
       setErr(null)
       try {
-        await offline.note(t)
+        await offline.note(txt)
         const rows = await reload()
         if (rows) setMsgs(rows)
       } catch (e) {
-        setErr('没记上：' + (e?.message || e))
-        if (said == null) setText((cur) => cur || t)
+        setErr(t('没记上：') + (e?.message || e))
+        if (said == null) setText((cur) => cur || txt)
       }
       return
     }
@@ -57,12 +58,12 @@ export function useChat({ owner, reload, rewind, offline = null }) {
     // 想完了才返回，那时候早没得停了。
     const runId = crypto.randomUUID()
     runIdRef.current = runId
-    const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: t }
+    const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: txt }
     setMsgs((m) => [...m, tmp])
     let landedMine = null
     let aborted = false
     try {
-      const r = await sendMessageStream(owner, t, undefined, runId, (e) => {
+      const r = await sendMessageStream(owner, txt, undefined, runId, (e) => {
         // 你那条一落库就回来了：拿真的换掉临时那条（临时的没有 id、没有时间）。
         if (e.t === 'mine') {
           landedMine = e.row
@@ -84,14 +85,14 @@ export function useChat({ owner, reload, rewind, offline = null }) {
       //   连不上 → 一个字都没存 → 把内容还回输入框，别让你白打
       //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
       const rows = await reload()
-      const landed = rows?.some((m) => m.role === 'artist' && m.content === t)
+      const landed = rows?.some((m) => m.role === 'artist' && m.content === txt)
       if (rows) setMsgs(rows)
       else setMsgs((m) => m.filter((x) => x.id !== tmp.id))
       if (!landed) {
-        setText((cur) => cur || t)   // 期间你要是又打了别的，就别覆盖
-        setErr(e.message + '（你的话还在框里，没丢）')
+        setText((cur) => cur || txt)   // 期间你要是又打了别的，就别覆盖
+        setErr(e.message + t('（你的话还在框里，没丢）'))
       } else {
-        setErr(e.message + '（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）')
+        setErr(e.message + t('（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）'))
       }
     } finally {
       setBusy(false)
@@ -110,18 +111,18 @@ export function useChat({ owner, reload, rewind, offline = null }) {
    * 撤失败就停在编辑态：话还在框里，错话摆在下面，你可以再按一次。
    */
   const resay = useCallback(async (id, said) => {
-    const t = said.trim()
-    if (!t || busy) return
+    const txt = said.trim()
+    if (!txt || busy) return
     setErr(null)
     try {
       await rewind(id)
     } catch (e) {
-      setErr('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
+      setErr(t('没撤成：') + e.message + t('（你改的字还在，可以再按一次重说）'))
       return
     }
     setEditId(null)
     setMsgs((cur) => dropFrom(cur, id))
-    await send(t)
+    await send(txt)
   }, [busy, rewind, send])
 
   // 终止：掐掉正在跑的那一次，不写回复。你说的那句留着——它是你说的话，不是它想的。

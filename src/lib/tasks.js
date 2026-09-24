@@ -1,4 +1,5 @@
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 
 // 造卡任务：排期怎么说成人话，以及面板上那两个写口。
 //
@@ -6,18 +7,18 @@ import { supa } from './backends.js'
 // 面板上显示成「每周一 08:00 · 下次 9/7」。老那列 schedule（'weekly' / '手动'）
 // 只当兼容读法：没填新三列的老任务，照旧显示「每周」。
 
-export const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+export const WEEKDAYS = [t('周日'), t('周一'), t('周二'), t('周三'), t('周四'), t('周五'), t('周六')]
 export const HOURS = Array.from({ length: 24 }, (_, h) => h)
 
 const hh = (h) => String(h).padStart(2, '0') + ':00'
 
 /** 「每周一 08:00」「每天 08:00」「手动」。没排期也没老 schedule 的返回 null。 */
-export function scheduleText(t) {
-  if (t?.run_every === 'week') return `每${WEEKDAYS[t.run_weekday ?? 1]} ${hh(t.run_hour ?? 8)}`
-  if (t?.run_every === 'day') return `每天 ${hh(t.run_hour ?? 8)}`
-  if (t?.prompt) return '手动'
-  if (t?.schedule === 'weekly') return '每周'
-  if (t?.schedule) return t.schedule
+export function scheduleText(task) {
+  if (task?.run_every === 'week') return t('每{w} {h}', { w: WEEKDAYS[task.run_weekday ?? 1], h: hh(task.run_hour ?? 8) })
+  if (task?.run_every === 'day') return t('每天 {h}', { h: hh(task.run_hour ?? 8) })
+  if (task?.prompt) return t('手动')
+  if (task?.schedule === 'weekly') return t('每周')
+  if (task?.schedule) return task.schedule
   return null
 }
 
@@ -41,20 +42,20 @@ export function fmtLocal(iso, tz = 'America/Los_Angeles') {
  *   next     下次 9/7 08:00
  *   none     （没排期）
  */
-export function runState(t, { now = Date.now(), tz } = {}) {
-  if (t?.running_since) {
-    const min = Math.max(0, Math.round((now - new Date(t.running_since).getTime()) / 60000))
-    const ago = min < 1 ? '刚开始' : min < 60 ? `${min} 分钟前开始` : `${Math.round(min / 60)} 小时前开始，可能卡住了`
-    return { kind: 'running', text: `正在找……（${ago}）` }
+export function runState(task, { now = Date.now(), tz } = {}) {
+  if (task?.running_since) {
+    const min = Math.max(0, Math.round((now - new Date(task.running_since).getTime()) / 60000))
+    const ago = min < 1 ? t('刚开始') : min < 60 ? t('{n} 分钟前开始', { n: min }) : t('{n} 小时前开始，可能卡住了', { n: Math.round(min / 60) })
+    return { kind: 'running', text: t('正在找……（{ago}）', { ago }) }
   }
-  if (t?.run_now) return { kind: 'queued', text: '排上了，脑子一分钟内接手' }
-  if (t?.enabled && t?.next_run_at) return { kind: 'next', text: `下次 ${fmtLocal(t.next_run_at, tz)}` }
+  if (task?.run_now) return { kind: 'queued', text: t('排上了，脑子一分钟内接手') }
+  if (task?.enabled && task?.next_run_at) return { kind: 'next', text: t('下次 {when}', { when: fmtLocal(task.next_run_at, tz) }) }
   return { kind: 'none', text: '' }
 }
 
 /** 面板上那几样能改的。patch 里没给的键不动。run_every 传 'manual' = 取消排期。 */
 export async function setTask(id, patch = {}) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_set_task', {
     p_id: id,
     p_enabled: patch.enabled ?? null,
@@ -69,7 +70,7 @@ export async function setTask(id, patch = {}) {
 
 /** 「现在跑一次」：拨 run_now，脑子每 30 秒看一眼就接手。关着的任务也能这样跑一次。 */
 export async function runTaskNow(id) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_run_task_now', { p_id: id })
   if (error) throw new Error(error.message)
 }
@@ -88,11 +89,11 @@ export async function runTaskNow(id) {
  */
 export function groupTasks(tasks = []) {
   const timed = [], ran = [], origins = [], notYet = []
-  for (const t of tasks) {
-    if (t.prompt) timed.push(t)
-    else if (t.last_run_at || (t.last_result && t.last_result !== '未接')) ran.push(t)
-    else if (t.type === 'manual') origins.push(t)
-    else notYet.push(t)
+  for (const task of tasks) {
+    if (task.prompt) timed.push(task)
+    else if (task.last_run_at || (task.last_result && task.last_result !== '未接')) ran.push(task)
+    else if (task.type === 'manual') origins.push(task)
+    else notYet.push(task)
   }
   return { timed, ran, origins, notYet }
 }

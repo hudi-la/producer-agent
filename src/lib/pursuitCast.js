@@ -1,4 +1,5 @@
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 
 // 一条线的班底，和由它推导出来的往来。
 //
@@ -7,7 +8,7 @@ import { supa } from './backends.js'
 // 要判断的才找脑子，记事实的自己来。
 
 const rpc = async (fn, args) => {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc(fn, args)
   if (error) throw new Error(error.message)
   return data

@@ -16,7 +16,7 @@ export default function ModulesPanel() {
   return (
     <section className="modules-panel">
       <h3>{t('装了哪些')}</h3>
-      {getLang() === 'en' && <small className="modules-note">{t('这两个模块的界面暂时还是中文的。')}</small>}
+      {getLang() === 'en' && <small className="modules-note">{t('邮件模块的界面暂时还是中文的。')}</small>}
       {ROWS.map(([k, name, why]) => (
         <div key={k} className="modules-row">
           <label>

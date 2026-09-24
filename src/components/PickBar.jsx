@@ -1,4 +1,5 @@
 import React from 'react'
+import { t } from '../i18n/index.js'
 
 // 看板和通讯录头一行共用的那一段：平时是各自的动作按钮（children），
 // 勾选时换成「已选 N · 说一句… · 全部展开 · 取消」。两边勾的是同一摞 picked，
@@ -10,20 +11,20 @@ import React from 'react'
 export default function PickBar({ picking, pickedCount, saying, onStart, onCancel, onSay, onPickAll, children }) {
   return (
     <div className="areabar">
-      {picking && <span className="pickinfo">已选 {pickedCount} 张</span>}
+      {picking && <span className="pickinfo">{t('已选 {n} 张', { n: pickedCount })}</span>}
       {/* 系统在报，不能点——所以不进按钮组，灰字带转圈 */}
-      {saying && <span className="refreshing"><i className="spin" aria-hidden="true" />说给第 {saying.i}/{saying.n} 条</span>}
+      {saying && <span className="refreshing"><i className="spin" aria-hidden="true" />{t('说给第 {i}/{n} 条', { i: saying.i, n: saying.n })}</span>}
       <span className="sp" />
       {picking ? (
         <>
-          <button className="wbtn" disabled={!pickedCount || Boolean(saying)} onClick={onSay}>说一句…</button>
-          <button className="wbtn" disabled={!pickedCount} onClick={onPickAll}>全部展开</button>
-          <button className="btn" onClick={onCancel}>取消</button>
+          <button className="wbtn" disabled={!pickedCount || Boolean(saying)} onClick={onSay}>{t('说一句…')}</button>
+          <button className="wbtn" disabled={!pickedCount} onClick={onPickAll}>{t('全部展开')}</button>
+          <button className="btn" onClick={onCancel}>{t('取消')}</button>
         </>
       ) : (
         <>
           {children}
-          <button className="wbtn" onClick={onStart}>批量操作</button>
+          <button className="wbtn" onClick={onStart}>{t('批量操作')}</button>
         </>
       )}
     </div>

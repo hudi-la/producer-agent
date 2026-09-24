@@ -9,20 +9,21 @@ import { tintSlots, slotOf, inBatch } from '../lib/batchTint.js'
 import Veil from './Veil.jsx'
 // 「新」= 从来没点开过（seen_at 是 null）。不是新状态，是 pursuit_seen 早就有的事实。
 import { isFresh } from '../lib/tasks.js'
+import { t } from '../i18n/index.js'
 
 // 顺序：卡进来先等你批（Fairwind 已在后台读透），批了就一起挑作品/写，
 // 然后发出去、等回信；末尾两个收尾去处——成了 = 谈成，停了 = 暂停处理。
 const STAGES = [
-  ['pending', '新机会'],
-  ['matching', '匹配项目'],
-  ['writing', '一起写'],
-  ['sent', '发出&提交'],
-  ['replying', '进一步'],
-  ['won', '谈成'],
-  ['paused', '暂停处理'],
+  ['pending', t('新机会')],
+  ['matching', t('匹配项目')],
+  ['writing', t('一起写')],
+  ['sent', t('发出&提交')],
+  ['replying', t('进一步')],
+  ['won', t('谈成')],
+  ['paused', t('暂停处理')],
   // 可能以后有用的，放最后。放进来的卡之后再定行为（2026-08-20）——
   // 现在它不静音（信照归、state 照算），也不算「该有动静的」（不吊灰气泡）。
-  ['watch', '持续关注'],
+  ['watch', t('持续关注')],
 ]
 
 // 一次造卡任务造出来的卡，够多就折成一叠——首页恒静，想看才展开。
@@ -43,8 +44,8 @@ function Jot({ p, onSave }) {
 
   const commit = () => {
     setEditing(false)
-    const t = text.trim()
-    if (t !== (p.jot || '')) onSave?.(p, t)
+    const v = text.trim()
+    if (v !== (p.jot || '')) onSave?.(p, v)
   }
 
   const stop = (e) => e.stopPropagation()   // 卡整体可点，这一小块不能连带触发
@@ -57,7 +58,7 @@ function Jot({ p, onSave }) {
         value={text}
         autoFocus
         rows={2}
-        placeholder="记几个字……"
+        placeholder={t('记几个字……')}
         onClick={stop}
         onMouseDown={stop}
         onChange={(e) => setText(e.target.value)}
@@ -77,9 +78,9 @@ function Jot({ p, onSave }) {
       className={'pc-jot' + (p.jot ? ' has' : '')}
       onClick={(e) => { stop(e); setEditing(true) }}
       onMouseDown={stop}
-      title={p.jot ? '点一下改' : '记几个字'}
+      title={p.jot ? t('点一下改') : t('记几个字')}
     >
-      {p.jot || '＋ 记一笔'}
+      {p.jot || t('＋ 记一笔')}
     </button>
   )
 }
@@ -87,15 +88,15 @@ function Jot({ p, onSave }) {
 function statusText(p, held) {
   if (!p.eligible && (p.stage === 'pending' || p.stage === 'matching')) return held
   switch (p.stage) {
-    case 'pending': return '读透了，等你批'
-    case 'matching': return '一起挑作品'
-    case 'writing': return '一起写中'
-    case 'sent': return '已交'
-    case 'replying': return '沟通中'
-    case 'won': return '谈成 ✓'
+    case 'pending': return t('读透了，等你批')
+    case 'matching': return t('一起挑作品')
+    case 'writing': return t('一起写中')
+    case 'sent': return t('已交')
+    case 'replying': return t('沟通中')
+    case 'won': return t('谈成 ✓')
     // 为什么停下来（不投 / 资格暂缓 / 你没兴趣）是卡上的事，列不再分。
-    case 'paused': return '暂停处理'
-    case 'watch': return '持续关注'
+    case 'paused': return t('暂停处理')
+    case 'watch': return t('持续关注')
     default: return ''
   }
 }
@@ -146,14 +147,14 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
           有状态 → 金（等待）/ 红（到点）；该有动静却没有 → 灰气泡点名。 */}
       {audit && (st || 该有动静的.has(p.stage)) && (
         <div className={'pc-bubble' + (!st ? ' quiet' : st.zone === 'due' ? ' due' : '')}>
-          {st ? goldLine(st) : '静了 —— 没在等任何东西'}
+          {st ? goldLine(st) : t('静了 —— 没在等任何东西')}
         </div>
       )}
       {picking && <span className="pc-check" aria-hidden="true" />}
-      {unseen && <span className="pc-badge" aria-label="Fairwind 回复了" />}
+      {unseen && <span className="pc-badge" aria-label={t('Fairwind 回复了')} />}
       {/* 卡角上的记号：这张今天挑了。跟顶栏数字、抽屉那颗开关一起翻面——
           关了抽屉回到看板，一眼看得出挑了哪几张、还没挑哪几张。 */}
-      {onDesk && <span className="pc-desk" aria-label="在展开的卡片区">在展开的卡片区</span>}
+      {onDesk && <span className="pc-desk" aria-label={t('在展开的卡片区')}>{t('在展开的卡片区')}</span>}
       {/* 你自己点的标签。系统不动它——点亮了就一直亮着，直到你再点。 */}
       {ball && (
         <div className={'pc-ball ' + ball}>
@@ -162,7 +163,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
       )}
       {/* 从来没点开过的卡挂个「新」。点开 → markSeen → 灭，跟红点同一个机制。
           scout 每周撒进来的那几张就靠它认：你还没看过的一眼能挑出来。 */}
-      <div className="pc-t">{isFresh(p) && <span className="pc-fresh" aria-label="还没点开过">新</span>}{p.title}</div>
+      <div className="pc-t">{isFresh(p) && <span className="pc-fresh" aria-label={t('还没点开过')}>{t('新')}</span>}{p.title}</div>
       {p.match_stars ? <div className="pc-stars">{'★'.repeat(p.match_stars)}</div> : null}
 
       {/* 「该干什么」那一行删了（见 lib/nextAction.js 顶部）。
@@ -171,7 +172,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
       {ddl ? (
         <div className={'pc-ddl' + (ddl.urgent ? ' due' : '')}>{ddl.text}</div>
       ) : !投过了 && (
-        <div className="pc-ddl none">无固定截止</div>
+        <div className="pc-ddl none">{t('无固定截止')}</div>
       )}
       {/* 开放日期也是确定的信息，有就显示。不替你判急不急。 */}
       {opn && <div className="pc-ddl">{opn.text}</div>}
@@ -188,7 +189,7 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
             卡面上的位置很贵：这条线有信在等你的时候，「新来信」比「沟通中」要紧。
             点开这张卡就灭（跟右上角红点同一个机制），退回显示阶段。 */}
         {p.new_mail
-          ? <span className="pc-new">新来信</span>
+          ? <span className="pc-new">{t('新来信')}</span>
           : statusText(p, held)}
       </div>
     </div>
@@ -225,7 +226,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
             className={'pc-check st' + (allOn ? ' on' : hit ? ' half' : '')}
             role="checkbox"
             aria-checked={allOn ? 'true' : hit ? 'mixed' : 'false'}
-            aria-label={`勾选这一叠 ${items.length} 张`}
+            aria-label={t('勾选这一叠 {n} 张', { n: items.length })}
             onClick={(e) => { e.stopPropagation(); onPick(ids, !allOn) }}
           />
         )}
@@ -234,15 +235,15 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
             都会让它挪位；二是它跟卡上那个**有意义**的球点（.pc-ball.me .bd）
             几乎同色同大小——同一个记号在卡上是「该你动」，在叠头上什么都不是。
             「这儿是一摞」已经由身后那两层垫纸、「N 张」和「展开」说了三遍。 */}
-        {anyUnseen && !open && <span className="pc-badge" aria-label="有你还没读到的新消息" />}
+        {anyUnseen && !open && <span className="pc-badge" aria-label={t('有你还没读到的新消息')} />}
         <span className="stack-txt">
-          <span className="stack-n">{name || '一批机构'}</span>
+          <span className="stack-n">{name || t('一批机构')}</span>
           <span className="stack-c">
-            {items.length} 张{fresh ? ` · ${fresh} 张新` : ''}{mine ? ` · ${mine} 张待处理` : ''}
-            {picking && hit ? ` · 已选 ${hit}` : ''}
+            {t('{n} 张', { n: items.length })}{fresh ? t(' · {n} 张新', { n: fresh }) : ''}{mine ? t(' · {n} 张待处理', { n: mine }) : ''}
+            {picking && hit ? t(' · 已选 {n}', { n: hit }) : ''}
           </span>
         </span>
-        <span className="stack-chev" aria-hidden="true">{open ? '收起' : '展开'}</span>
+        <span className="stack-chev" aria-hidden="true">{open ? t('收起') : t('展开')}</span>
       </div>
       {open && items.map((p) => (
         <PCard
@@ -261,7 +262,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
   const [over, setOver] = useState(null)
   const [openStacks, setOpenStacks] = useState(() => new Set())
 
-  const taskName = (id) => tasks.find((t) => t.id === id)?.name
+  const taskName = (id) => tasks.find((x) => x.id === id)?.name
 
   const toggleStack = (id) =>
     setOpenStacks((prev) => {

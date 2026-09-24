@@ -6,6 +6,7 @@
 //  · Fairwind 只有 pa_upsert_deliverable 一个口，且**只能碰 status='draft'**。
 //    它没有定稿的口——「定稿」这个动作在数据库层面就只对你开放。
 import { supa, BRAIN } from './backends.js'
+import { t } from '../i18n/index.js'
 
 /** 拉这条线的全部产出。没连库时返回 null。 */
 export async function fetchDeliverables(pursuitId) {
@@ -20,7 +21,7 @@ export async function fetchDeliverables(pursuitId) {
 
 /** 定稿 / 取消定稿。定稿 = 从右栏搬到左栏，取消 = 搬回来接着改（同一份，不生第二个版本）。 */
 export async function setFinal(id, final) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_set_final', { p_id: id, p_final: final })
   if (error) throw new Error(error.message)
   return { ok: true }
@@ -28,7 +29,7 @@ export async function setFinal(id, final) {
 
 /** 你在页面上改草稿。已定稿的改不动——函数会拒，前端也不该给你改的机会。 */
 export async function editDeliverable(id, { title, body } = {}) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_edit_deliverable', {
     p_id: id, p_title: title ?? null, p_body: body ?? null,
   })
@@ -38,7 +39,7 @@ export async function editDeliverable(id, { title, body } = {}) {
 
 /** 你自己新建一份空的。 */
 export async function newDeliverable(pursuitId, kind = 'file', title = '未命名') {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_new_deliverable', {
     p_pursuit_id: pursuitId, p_kind: kind, p_title: title,
   })
@@ -48,7 +49,7 @@ export async function newDeliverable(pursuitId, kind = 'file', title = '未命�
 
 /** 删。只能删草稿——定稿的要先取消定稿，免得一按就没。 */
 export async function deleteDeliverable(id) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { error } = await supa.rpc('pa_delete_deliverable', { p_id: id })
   if (error) throw new Error(error.message)
   return { ok: true }
@@ -69,13 +70,13 @@ const safeName = (name) =>
  * 而你没法从界面上看出它是鬼。
  */
 export async function uploadAttachment(pursuitId, file) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const key = `${pursuitId}/${crypto.randomUUID()}-${safeName(file.name)}`
   const up = await supa.storage.from(BUCKET).upload(key, file, {
     contentType: file.type || 'application/octet-stream',
     upsert: false,
   })
-  if (up.error) throw new Error('传不上去：' + up.error.message)
+  if (up.error) throw new Error(t('传不上去：') + up.error.message)
   const { data, error } = await supa.rpc('pa_add_attachment', {
     p_pursuit_id: pursuitId,
     p_filename: file.name,
@@ -86,16 +87,16 @@ export async function uploadAttachment(pursuitId, file) {
   if (error) {
     // 字节传上去了但登记失败：把刚传的那份收掉，别在桶里留无主的东西。
     await supa.storage.from(BUCKET).remove([key]).catch(() => {})
-    throw new Error('登记失败：' + error.message)
+    throw new Error(t('登记失败：') + error.message)
   }
   return data
 }
 
 /** 现拿一条能打开这份文件的临时链接。默认 60 秒——够点开，不够被转发。 */
 export async function attachmentUrl(storageKey, seconds = 60) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.storage.from(BUCKET).createSignedUrl(storageKey, seconds)
-  if (error) throw new Error('打不开：' + error.message)
+  if (error) throw new Error(t('打不开：') + error.message)
   return data.signedUrl
 }
 
@@ -105,7 +106,7 @@ export async function attachmentUrl(storageKey, seconds = 60) {
  * 桶里那步失败不报错：留个孤儿对象没人看得见，比让你以为没删掉强。
  */
 export async function deleteAttachment(id) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data: key, error } = await supa.rpc('pa_delete_attachment', { p_id: id })
   if (error) throw new Error(error.message)
   if (key) await supa.storage.from(BUCKET).remove([key]).catch(() => {})
@@ -137,10 +138,10 @@ async function callBrain(path, payload) {
       body: JSON.stringify(payload),
     })
   } catch (_) {
-    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
+    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
   }
   const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.error || `脑子出错了（${res.status}）`)
+  if (!res.ok) throw new Error(body.error || t('脑子出错了（{status}）', { status: res.status }))
   return body
 }
 

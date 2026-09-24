@@ -3,7 +3,7 @@
 //
 // 拆分之前这些跟 57 条胡地的作品/履历同住一个文件（旧 src/data/entriesSeed.js），
 // 见 docs/specs/2026-08-13-skeleton-and-flesh-design.md。
-
+import { t } from '../i18n/index.js'
 
 // credit 子分组的类型顺序 + 标签（作品按 concern 子分组，见 CONCERNS_SEED）
 export const CREDIT_ORDER = ['个展', '群展', '驻地', 'grant', '策展']
@@ -43,7 +43,7 @@ export function subInfo(entry) {
     case 'job': return clean([m.org, period, m.location])
     case 'education': return clean([m.school, m.year, m.location])
     case 'credit': return clean([m.org, m.year, m.location]) // type 已是子分组标题，不重复
-    case 'statement': return clean([{ artist: 'Artist Statement', 'bio-short': '一句话', 'bio-long': '长 Bio', research: '读博方向' }[m.scope] || m.scope])
+    case 'statement': return clean([{ artist: 'Artist Statement', 'bio-short': t('一句话'), 'bio-long': t('长 Bio'), research: t('读博方向') }[m.scope] || m.scope])
     // 自定义类目:meta 里前三个键的值当副标题——结构是各人自己的,这儿不猜键名
     default: return clean(Object.values(m).filter((v) => typeof v === 'string').slice(0, 3))
   }
@@ -83,10 +83,10 @@ export const EDITABLE = {
 // 这些描述的是**系统支持哪几类造卡任务**，不是某个人的任务清单。
 // 清单（哪几条开着、上次跑出什么）是内容，在 src/demo/tasks.js。
 export const TASK_DESC = {
-  scout_aggregators: '每周三步：先查关注表里那些开了没有，再扫聚合源和搜索找新的，最后把够得着的造成卡',
-  agency_scout: '扫模特/演艺经纪的 commercial / lifestyle / beauty 板，逐家核实投递入口再造卡',
-  manual: '朋友转的、你刷到的——贴链接 / 截图 / 一句话，我写成卡',
-  institution_monitor: '专盯某机构，它开下一轮 open call 就造张卡',
-  email_watch: '进你信箱的邀约 / open call → 自动造卡',
-  relationship_followup: '某联系人久没动静 → 造张"该 nudge 了"的卡',
+  scout_aggregators: t('每周三步：先查关注表里那些开了没有，再扫聚合源和搜索找新的，最后把够得着的造成卡'),
+  agency_scout: t('扫模特/演艺经纪的 commercial / lifestyle / beauty 板，逐家核实投递入口再造卡'),
+  manual: t('朋友转的、你刷到的——贴链接 / 截图 / 一句话，我写成卡'),
+  institution_monitor: t('专盯某机构，它开下一轮 open call 就造张卡'),
+  email_watch: t('进你信箱的邀约 / open call → 自动造卡'),
+  relationship_followup: t('某联系人久没动静 → 造张"该 nudge 了"的卡'),
 }

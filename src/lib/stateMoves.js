@@ -4,9 +4,10 @@
 // 走浏览器直连 anon —— 脑子开没开都撤得了。钥匙是气泡 id，笔靠
 // meta.state_move.src_msg 找回来（0123）。
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 
 export async function undoStateMove(msgId) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_undo_state_move', { p_src_msg: msgId })
   if (error) throw new Error(error.message)
   return data
@@ -14,7 +15,7 @@ export async function undoStateMove(msgId) {
 
 /** 记忆那张小卡的撤回（0125）：线上的 memo 笔软删；人的关系记忆长回旧值。 */
 export async function undoMemo(msgId) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_undo_memo', { p_src_msg: msgId })
   if (error) throw new Error(error.message)
   return data

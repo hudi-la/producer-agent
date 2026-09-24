@@ -82,7 +82,7 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
             <b>{t('Fairwind 的脑子没开')}</b>
             <span className="tr-fix">
               {t('新机会的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。')}
-              另开一个终端跑 <code>npm run brain</code>
+              {t('另开一个终端跑 ')}<code>npm run brain</code>
             </span>
           </span>
         </div>
@@ -96,7 +96,7 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
             <b>{t('脑子跑的是旧代码')}</b>
             <span className="tr-fix">
               {t('它开着，但启动之后代码又改过——新加的行为不会生效，而且看不出来。')}
-              到跑 brain 的那个终端按 Ctrl-C，再 <code>npm run brain</code>
+              {t('到跑 brain 的那个终端按 Ctrl-C，再 ')}<code>npm run brain</code>
             </span>
           </span>
         </div>
