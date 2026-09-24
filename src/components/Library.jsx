@@ -82,7 +82,8 @@ function Entry({ e, open, active, onToggle, onSaved }) {
       <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
-          <InlineText value={e.title} cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
+          {/* 库里新建的默认标题是中文「（未命名）」(pa_add_entry);英文界面上按语言显示,存回去还是你打的字 */}
+          <InlineText value={e.title === '（未命名）' ? t('（未命名）') : e.title} cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
           <InlineText value={e.body} cls="w-d" long ro={ro}
                       placeholder={open ? t('双击写点描述') : null}
                       onSave={(v) => save({ body: v })} />
