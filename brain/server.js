@@ -14,7 +14,11 @@
 
 import http from 'node:http'
 import { createClient } from '@supabase/supabase-js'
-import { query, createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
+import { query } from '@anthropic-ai/claude-agent-sdk'
+// 工具定义一次两边用;GPT / Gemini 走 OpenAI 兼容接口 + 自己的工具循环(engine/)
+import { toSdkServer, defineTool, builtinTools } from './engine/tools.js'
+import { engineOf, providerConfig, PROVIDERS } from './engine/index.js'
+import { runAgent } from './engine/openaiCompat.js'
 import { z } from 'zod'
 import { read, slice, imageBudget, IMG_CAP } from './files.js'
 // 拼 prompt 的活儿全在 prompt.js —— 纯函数，所以有 prompt.test.js 按着。
@@ -335,19 +339,17 @@ function filesServer(atts) {
   // 图片的额度，跟着这一次对话活。造在这儿而不是模块顶上——
   // 放模块顶上的话它会跨对话累加，聊到第四条线就再也开不了图了。
   const budget = imageBudget()
-  return createSdkMcpServer({
-    name: 'pursuit_files',
-    tools: [
-      tool(
-        'open_file',
-        `打开这条机会线上的一份文件。文本类拿回文字，图片类你直接看得见。文件清单在 prompt 里给了；要用哪份才开哪份，别一上来全开一遍。文件太长会分段给你，按提示用 from 接着要下一段。
+  return toSdkServer('pursuit_files', [
+      defineTool({
+        name: 'open_file',
+        description: `打开这条机会线上的一份文件。文本类拿回文字，图片类你直接看得见。文件清单在 prompt 里给了；要用哪份才开哪份，别一上来全开一遍。文件太长会分段给你，按提示用 from 接着要下一段。
 
 图片格外要克制：一段文字开完就沉进历史，一张图**进来就一直占着上下文，后面每一轮都重付一次**。所以图只在真要看它才开——判断得靠图里的东西（作品长什么样、海报上的日期、截图里的报错）才开；光是"这条线上有张图"不是理由。一条对话最多 ${IMG_CAP} 张。`,
-        {
+        shape: {
           name: z.string().describe('文件名，跟清单里写的一致（写个能认出来的片段也行）'),
           from: z.number().optional().describe('从第几个字接着看。第一次不用传。图片没有分段，不用传'),
         },
-        async ({ name, from }) => {
+        handler: async ({ name, from }) => {
           const a = find(name)
           if (!a) {
             const list = atts.map((x) => x.filename).join('、') || '（这条线上没有文件）'
@@ -390,9 +392,8 @@ function filesServer(atts) {
             return { content: [{ type: 'text', text: `《${a.filename}》打不开：${err.message}` }] }
           }
         },
-      ),
-    ],
-  })
+      }),
+  ])
 }
 
 // ── 书桌上：看一眼作品长什么样 ──────────────────────────────────
@@ -419,19 +420,17 @@ function worksServer(entries) {
   // 图的额度跟着这一次对话活。造在这儿而不是模块顶上——放顶上会跨对话累加，
   // 聊到第四栏就再也开不了图了。
   const budget = imageBudget()
-  return createSdkMcpServer({
-    name: 'studio_works',
-    tools: [
-      tool(
-        'open_work_image',
-        `看一眼某件作品长什么样。要判断画面里的东西（这件作品是什么形态、那个装置多大、颜色什么调子）才开——光是"这条有图"不是理由。
+  return toSdkServer('studio_works', [
+      defineTool({
+        name: 'open_work_image',
+        description: `看一眼某件作品长什么样。要判断画面里的东西（这件作品是什么形态、那个装置多大、颜色什么调子）才开——光是"这条有图"不是理由。
 
 一段文字开完就沉进历史，**一张图进来就一直占着上下文、后面每一轮都重付一次**。一条对话最多 ${IMG_CAP} 张。`,
-        {
+        shape: {
           title: z.string().describe('作品标题（写个能认出来的片段也行）'),
           index: z.number().optional().describe('第几张，从 1 数。不传就是第一张'),
         },
-        async ({ title, index }) => {
+        handler: async ({ title, index }) => {
           const e = find(title)
           if (!e) {
             const list = withImg.map((x) => `《${x.title}》`).join('、') || '（这一栏没有带图的条目）'
@@ -467,9 +466,8 @@ function worksServer(entries) {
             return { content: [{ type: 'text', text: `《${e.title}》第 ${nth} 张打不开：${err.message}` }] }
           }
         },
-      ),
-    ],
-  })
+      }),
+  ])
 }
 
 /**
@@ -495,7 +493,28 @@ function worksServer(entries) {
  */
 const asSystem = (s) => (typeof s === 'string' || Array.isArray(s) ? s : systemFor(s))
 
+// 非 Claude 引擎的 think:工具名字沿用 Claude 那条路的白名单——内建的(WebSearch / WebFetch)换成我们自己的平替,
+// MCP 的(mcp__pursuit_files__open_file 之类)从 toSdkServer 挂在 server 上的 specs 里取回来;
+// claude.ai 的 Gmail 连接器工具(mcp__claude_ai_Gmail__*)别的引擎没有,丢掉并说一声。
+async function thinkViaCompat(cfg, prompt, tools, system, abortController, mcpServers, onEvent, maxTurns) {
+  const want = new Set(tools || [])
+  const specs = [...builtinTools([...want])]
+  for (const server of Object.values(mcpServers || {})) for (const sp of server?.__specs || []) if (want.has(sp.fullName)) specs.push(sp)
+  const dropped = [...want].filter((n) => n.startsWith('mcp__claude_ai_') || n === 'ToolSearch')
+  if (dropped.length) console.log(`  ↳ ${PROVIDERS[cfg.name].label} 没有这些工具,这次不带:${dropped.join('、')}`)
+  const { blocks, usage } = await runAgent({ ...cfg, system: asSystem(system), prompt, tools: specs, maxTurns, onEvent, abortController, log: (m) => console.log(m) })
+  const n = (x) => x.toLocaleString('en-US')
+  console.log(`  ↳ ${PROVIDERS[cfg.name].label}(${cfg.model}) token:入 ${n(usage.inp)} / 缓存读 ${n(usage.cacheRead)} / 出 ${n(usage.out)}`)
+  const { text, notes, recovered } = foldReply(blocks)
+  if (recovered) console.log('  ⚠️ 最后一轮它一个字没说,拿最后一段工作稿顶上了')
+  if (!text) throw new Error('Fairwind 没说话(空回复)')
+  return { text, usage, notes, recovered }
+}
+
 async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null, maxTurns = 20, tier = GOOD) {
+  // GPT / Gemini:同一个签名、同一个返回形状,底下换成 engine/openaiCompat 的循环
+  const cfg = providerConfig(tier)
+  if (cfg) return thinkViaCompat(cfg, prompt, tools, system, abortController, mcpServers, onEvent, maxTurns)
   // 分档见 models.js:判断和邮件小活走便宜档,带人格和信息库的走好档。
   // 两档都没配环境变量时 model 是 null、不进 options——跟今天逐字相同。
   const model = modelFor(tier)
@@ -2328,7 +2347,7 @@ async function main() {
   server.listen(PORT, () => {
   console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
   console.log(`   放行来源：${ORIGIN}`)
-  console.log(process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
+  console.log(engineOf() !== 'claude' ? `   模型：${PROVIDERS[engineOf()].label}（你自己的 API key）\n` : process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
   applyTimers()
   })
 }

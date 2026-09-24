@@ -85,13 +85,13 @@ function AccountRow() {
 // 这儿的输入框空着 = 不动原来的,填了 = 换掉。改完当场生效,brain 不用重启。
 function LocalAccount() {
   const [cur, setCur] = useState(null)
-  const [form, setForm] = useState({ email: '', apiKey: '', oauthToken: '', provider: 'claude-key', model: '', modelCheap: '', backupDir: '', lang: 'zh' })
+  const [form, setForm] = useState({ email: '', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '', provider: 'claude-key', model: '', modelCheap: '', backupDir: '', lang: 'zh' })
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
-  const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, lang: s.lang || 'zh', provider: s.provider || 'claude-key', apiKey: '', oauthToken: '' })) } })
+  const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, lang: s.lang || 'zh', provider: s.provider || 'claude-key', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })) } })
   useEffect(() => { load() }, [])
   if (!cur) return null
-  const dirty = form.apiKey || form.oauthToken || form.provider !== (cur.provider || 'claude-key') || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir || form.lang !== (cur.lang || 'zh')
+  const dirty = form.apiKey || form.oauthToken || form.openaiKey || form.geminiKey || form.provider !== (cur.provider || 'claude-key') || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir || form.lang !== (cur.lang || 'zh')
   const save = async (e) => {
     e.preventDefault(); setBusy(true); setNote('')
     const r = await supa.settings.set(form)
@@ -117,8 +117,8 @@ function LocalAccount() {
       <F k="email" label={t('邮箱')} type="email" hint={t('只用来在这台机器上认出你')} />
       <div className="la-row"><span className="la-k">{t('模型来源')}</span>
         <ProviderPicker compact value={form.provider} onChange={(v) => setForm((f) => ({ ...f, provider: v }))}
-          apiKey={form.apiKey} onApiKey={(v) => setForm((f) => ({ ...f, apiKey: v }))} apiKeyHint={cur.apiKeySet ? cur.apiKeyHint : ''}
-          token={form.oauthToken} onToken={(v) => setForm((f) => ({ ...f, oauthToken: v }))} tokenHint={cur.oauthTokenSet ? cur.oauthTokenHint : ''} /></div>
+          keys={form} onKey={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
+          hints={{ apiKey: cur.apiKeySet ? cur.apiKeyHint : '', oauthToken: cur.oauthTokenSet ? cur.oauthTokenHint : '', openaiKey: cur.openaiKeySet ? cur.openaiKeyHint : '', geminiKey: cur.geminiKeySet ? cur.geminiKeyHint : '' }} /></div>
       <F k="model" label={t('好档模型')} placeholder={t('空 = 默认')} hint={t('聊天、写信、讲懂用这档')} />
       <F k="modelCheap" label={t('便宜档模型')} placeholder={t('空 = 默认')} hint={t('判断、收信那些小活用这档')} />
       <F k="backupDir" label={t('备份目录')} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" hint={t('选一个在 iCloud Drive 或 Google Drive 里的')} />

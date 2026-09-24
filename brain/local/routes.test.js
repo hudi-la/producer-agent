@@ -104,3 +104,11 @@ test('/settings:切到订阅路 → env 里只剩 CLAUDE_CODE_OAUTH_TOKEN;切回
   const b = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-key' }), b, ctx)
   assert.equal(process.env.CLAUDE_CODE_OAUTH_TOKEN, undefined); assert.ok(process.env.ANTHROPIC_API_KEY)
 })
+
+test('/settings:切到 gemini → env 里 FAIRWIND_PROVIDER=gemini + GEMINI_API_KEY,别家的 key 清掉;切回 claude-key 反过来', async () => {
+  const a = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'gemini', geminiKey: 'AIzaSy-test-key-7777' }), a, ctx)
+  assert.equal(a.json().provider, 'gemini'); assert.equal(a.json().geminiKeyHint, 'AIzaSy…7777'); assert.equal(JSON.stringify(a.json()).includes('test-key'), false)
+  assert.equal(process.env.FAIRWIND_PROVIDER, 'gemini'); assert.equal(process.env.GEMINI_API_KEY, 'AIzaSy-test-key-7777'); assert.equal(process.env.ANTHROPIC_API_KEY, undefined)
+  const b = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-key' }), b, ctx)
+  assert.equal(process.env.FAIRWIND_PROVIDER, 'claude'); assert.equal(process.env.GEMINI_API_KEY, undefined); assert.ok(process.env.ANTHROPIC_API_KEY)
+})

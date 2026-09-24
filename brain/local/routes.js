@@ -29,16 +29,23 @@ const readJson = async (req) => { const b = await readAll(req); return b.length 
 /** settings 里能给页面看的那几样。**key 永不回显**,只给「设了没有」和末四位。 */
 export function publicSettings(s) {
   const k = s.apiKey || '', o = s.oauthToken || ''
-  return { email: s.email || '', provider: s.provider || 'claude-key', oauthTokenSet: Boolean(o), oauthTokenHint: o ? `${o.slice(0, 12)}…${o.slice(-4)}` : '', model: s.model || '', modelCheap: s.modelCheap || '', backupDir: s.backupDir || '',
+  const hint = (v, head) => (v ? `${v.slice(0, head)}…${v.slice(-4)}` : '')
+  return { email: s.email || '', provider: s.provider || 'claude-key', oauthTokenSet: Boolean(o), oauthTokenHint: hint(o, 12),
+           openaiKeySet: Boolean(s.openaiKey), openaiKeyHint: hint(s.openaiKey || '', 6), geminiKeySet: Boolean(s.geminiKey), geminiKeyHint: hint(s.geminiKey || '', 6), model: s.model || '', modelCheap: s.modelCheap || '', backupDir: s.backupDir || '',
            judgmentsEnabled: s.judgmentsEnabled !== false, lang: s.lang === 'en' ? 'en' : 'zh',
            ready: Boolean(s.ready), apiKeySet: Boolean(k), apiKeyHint: k ? `${k.slice(0, 7)}…${k.slice(-4)}` : '' }
 }
 
 /** 把 settings 推进 process.env。启动时(server.js connect)和改完都调。 */
 export function exportEnv(s) {
-  // 两条路互斥:SDK 有 API key 就走 key,没有就找 CLAUDE_CODE_OAUTH_TOKEN(订阅)。选哪条就只留哪条
-  if (s.provider === 'claude-subscription') { delete process.env.ANTHROPIC_API_KEY; if (s.oauthToken) process.env.CLAUDE_CODE_OAUTH_TOKEN = s.oauthToken }
-  else { delete process.env.CLAUDE_CODE_OAUTH_TOKEN; if (s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey }
+  // 选哪条就只留哪条的凭据在 env 里:Claude 两条走 SDK(ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN),
+  // GPT / Gemini 走 engine/openaiCompat(FAIRWIND_PROVIDER + 各自的 key)
+  for (const k of ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'GEMINI_API_KEY']) delete process.env[k]
+  process.env.FAIRWIND_PROVIDER = s.provider === 'openai' || s.provider === 'gemini' ? s.provider : 'claude'
+  if (s.provider === 'claude-subscription') { if (s.oauthToken) process.env.CLAUDE_CODE_OAUTH_TOKEN = s.oauthToken }
+  else if (s.provider === 'openai') { if (s.openaiKey) process.env.OPENAI_API_KEY = s.openaiKey }
+  else if (s.provider === 'gemini') { if (s.geminiKey) process.env.GEMINI_API_KEY = s.geminiKey }
+  else if (s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey
   process.env.BRAIN_MODEL = s.model || ''
   process.env.BRAIN_MODEL_CHEAP = s.modelCheap || ''
   setJudgmentsEnabled(s.judgmentsEnabled !== false)
@@ -68,8 +75,8 @@ export async function handleLocalRoute(req, res, ctx) {
     const patch = {}
     for (const k of ['email', 'model', 'modelCheap', 'backupDir']) if (typeof body[k] === 'string') patch[k] = body[k].trim()
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) patch.apiKey = body.apiKey.trim()   // 空着 = 不动原来的
-    if (typeof body.oauthToken === 'string' && body.oauthToken.trim()) patch.oauthToken = body.oauthToken.trim()
-    if (body.provider === 'claude-key' || body.provider === 'claude-subscription') patch.provider = body.provider
+    for (const k of ['oauthToken', 'openaiKey', 'geminiKey']) if (typeof body[k] === 'string' && body[k].trim()) patch[k] = body[k].trim()
+    if (['claude-key', 'claude-subscription', 'openai', 'gemini'].includes(body.provider)) patch.provider = body.provider
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang
     const s = saveSettings(dataDir, patch)

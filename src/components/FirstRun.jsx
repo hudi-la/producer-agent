@@ -8,9 +8,8 @@ import ProviderPicker from './ProviderPicker.jsx'
 export default function FirstRun({ onDone }) {
   const [lang, setLangState] = useState('zh')
   const [email, setEmail] = useState('')
-  const [apiKey, setApiKey] = useState('')
   const [provider, setProvider] = useState('claude-key')
-  const [token, setToken] = useState('')
+  const [keys, setKeys] = useState({ apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })
   const [backupDir, setBackupDir] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -18,10 +17,10 @@ export default function FirstRun({ onDone }) {
 
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr('')
-    const r = await supa.setup({ lang, email: email.trim(), provider, apiKey: apiKey.trim(), oauthToken: token.trim(), backupDir: backupDir.trim() })
+    const r = await supa.setup({ lang, email: email.trim(), provider, ...Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, v.trim()])), backupDir: backupDir.trim() })
     setBusy(false)
     if (r.error) return setErr(r.error.message)
-    if (!r.ready) return setErr(provider === 'claude-key' ? t('邮箱和 API key 都要填') : t('邮箱和登录令牌都要填'))
+    if (!r.ready) return setErr(provider === 'claude-subscription' ? t('邮箱和登录令牌都要填') : t('邮箱和 API key 都要填'))
     onDone?.()
   }
 
@@ -36,7 +35,7 @@ export default function FirstRun({ onDone }) {
         <p>{t('三样东西。都在你自己这台机器上，不上传。')}</p>
         <label>{t('你的邮箱')}<small>{t('只用来在这台机器上认出你')}</small>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
-        <ProviderPicker value={provider} onChange={setProvider} apiKey={apiKey} onApiKey={setApiKey} token={token} onToken={setToken} />
+        <ProviderPicker value={provider} onChange={setProvider} keys={keys} onKey={(k, v) => setKeys((s) => ({ ...s, [k]: v }))} />
         <label>{t('备份放哪个文件夹')}<small>{t('选一个在 iCloud Drive 或 Google Drive 里的，备份就自动上了你自己的云。可以先空着')}</small>
           <input value={backupDir} onChange={(e) => setBackupDir(e.target.value)} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" /></label>
         {err && <p className="first-run-err">{err}</p>}

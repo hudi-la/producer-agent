@@ -30,5 +30,8 @@ test('模型来源:订阅路 ready 看令牌不看 key;不认的来源退回 cla
   assert.equal(s.ready, false)
   s = saveSettings(dir, { oauthToken: 'sk-ant-oat01-xxx' }); assert.equal(s.ready, true)
   s = saveSettings(dir, { provider: 'gpt' }); assert.equal(s.provider, 'claude-key'); assert.equal(s.ready, false)
+  s = saveSettings(dir, { provider: 'gemini' }); assert.equal(s.ready, false)
+  s = saveSettings(dir, { geminiKey: 'AIza-x' }); assert.equal(s.ready, true)
+  s = saveSettings(dir, { provider: 'openai' }); assert.equal(s.ready, false)
   rmSync(dir, { recursive: true, force: true })
 })

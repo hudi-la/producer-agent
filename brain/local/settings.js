@@ -4,15 +4,16 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 const FILE = (dir) => join(dir, 'settings.json')
-// 模型来源:claude-key(自己的 API key)| claude-subscription(Claude Code 的登录令牌,走订阅)。
-// GPT / Gemini 这套程序跑不了(brain 是 Claude Agent SDK),界面上灰着写明,这里不认。
-const withReady = (s) => ({ ...s, provider: s.provider === 'claude-subscription' ? 'claude-subscription' : 'claude-key',
-  ready: Boolean(s.email && (s.provider === 'claude-subscription' ? s.oauthToken : s.apiKey)) })
+// 模型来源:claude-key(自己的 Anthropic key)| claude-subscription(Claude Code 的登录令牌,走订阅)
+//         | openai(OPENAI key,走 OpenAI 兼容接口)| gemini(Gemini key,同一套接口)。engine/ 里有第二套循环。
+export const PROVIDERS = ['claude-key', 'claude-subscription', 'openai', 'gemini']
+const keyOf = (s) => s.provider === 'claude-subscription' ? s.oauthToken : s.provider === 'openai' ? s.openaiKey : s.provider === 'gemini' ? s.geminiKey : s.apiKey
+const withReady = (s) => { const p = PROVIDERS.includes(s.provider) ? s.provider : 'claude-key'; return { ...s, provider: p, ready: Boolean(s.email && keyOf({ ...s, provider: p })) } }
 
 export function loadSettings(dataDir) {
   mkdirSync(dataDir, { recursive: true })
   if (!existsSync(FILE(dataDir))) {
-    const fresh = { uid: randomUUID(), email: '', apiKey: '', model: '', modelCheap: '', backupDir: '', judgmentsEnabled: true, lang: 'zh', provider: 'claude-key', oauthToken: '' }
+    const fresh = { uid: randomUUID(), email: '', apiKey: '', model: '', modelCheap: '', backupDir: '', judgmentsEnabled: true, lang: 'zh', provider: 'claude-key', oauthToken: '', openaiKey: '', geminiKey: '' }
     writeFileSync(FILE(dataDir), JSON.stringify(fresh, null, 2))
     return withReady(fresh)
   }
