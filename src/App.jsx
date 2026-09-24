@@ -21,7 +21,8 @@ import Mark from './components/Mark.jsx'
 import Trouble from './components/Trouble.jsx'
 import DrawerGrip, { restoreDrawerWidth } from './components/DrawerGrip.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
-import { checkBrain, BRAIN } from './lib/backends.js'
+import { checkBrain, BRAIN, DB_MODE } from './lib/backends.js'
+import SettingsPage from './components/SettingsPage.jsx'
 import { onPulse } from './lib/pulse.js'
 import { cleanCopy } from './lib/cleanCopy.js'
 import SayTo from './components/SayTo.jsx'
@@ -41,7 +42,6 @@ import { Flower } from './components/Veil.jsx'
 // 模块开关(2026-09-16):关着的模块,它的主区、顶栏件、邮件界面都不出现。云端永远全开
 import { useModules } from './lib/ModulesContext.jsx'
 import { allowedAreas } from './lib/modules.js'
-import ModulesPanel from './components/ModulesPanel.jsx'
 
 // 顶栏一级：头一个是**桌面**（工作区——今天摊在桌上的活），后面四个是**架子**
 // （东西住的地方，你去找到一个拿到桌上来做）。桌子满、架子安静，本来就是两种东西。
@@ -757,12 +757,21 @@ export default function App() {
             页面上的名字、邮箱全换成小花；再点一下摘掉。
             开着的时候这颗按钮自己也得盖——你的名字同样是私人信息，
             而且它正好当场演示了「盖住」长什么样。 */}
-        {brain?.update?.canUpdate && <span className="upd-dot" title={t('有新版本 {v}:去「我的档案 → 关于你」底下更新', { v: brain.update.latest })} />}
+        {brain?.update?.canUpdate && <span className="upd-dot" title={t('有新版本 {v}:去「设置」里更新', { v: brain.update.latest })} />}
+        {DB_MODE === 'local' ? (
+          // 公开版没有展示模式(那是他给客户看屏幕用的);右上角是系统设置:装了哪些、账号、备份、更新、接 Claude Code
+          <button className={'veilbtn' + (area === 'settings' ? ' on' : '')} onClick={() => { setArea('settings'); if (view.name !== 'home') closeDrawer() }} title={t('系统设置')}>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 5, verticalAlign: -3 }}>
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" />
+            </svg>{t('设置')}
+          </button>
+        ) : (
         <button className={'veilbtn' + (veiled ? ' on' : '')} onClick={toggleVeil}
                 title={veiled ? t('展示模式开着：私人信息都盖着小花。点一下摘掉。')
                               : t('展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。')}>
           {veiled ? <><Flower size={14} /><span>{t('展示中')}</span></> : (profile?.name || t('我'))}
         </button>
+        )}
       </header>
 
       {/* 批量操作开着时，面板里的条目也是勾选目标 —— 勾的是同一摞 picked：
@@ -877,14 +886,13 @@ export default function App() {
             states={new Map([...(notes?.due || []), ...(notes?.waiting || [])].map((x) => [x.subject_id, x]))}
           />
         </>
+      ) : area === 'settings' ? (
+        <SettingsPage />
       ) : area === 'profile' ? (
-        <>
-          <Library entries={lib.entries} concerns={lib.concerns}
-                   onProfileSaved={() => loadProfile().then(setProfile)}
-                   onEntrySaved={() => loadLibrary().then(setLib)}
-                   onDrawerChange={setStudioOpen} />
-          <ModulesPanel />
-        </>
+        <Library entries={lib.entries} concerns={lib.concerns}
+                 onProfileSaved={() => loadProfile().then(setProfile)}
+                 onEntrySaved={() => loadLibrary().then(setLib)}
+                 onDrawerChange={setStudioOpen} />
       ) : area === 'ledger' ? (
         <Timeline
           /* 待办从这儿来：跟 🔔 同一份 v_pa_state，不另查一遍 */

@@ -27,7 +27,7 @@
 
 // ledger 是 2026-08-22 补的：流水页 8/20 建的时候漏进这张白名单，
 // 后果是在流水页刷新一下就被弹回项目争取，地址栏也从来不说你在流水。
-const AREAS = new Set(['desk', 'pursue', 'people', 'profile', 'ledger'])
+const AREAS = new Set(['desk', 'pursue', 'people', 'profile', 'ledger', 'settings'])   // settings:本机模式的系统设置
 
 /** 当前状态 → 地址栏该长什么样（含 pathname，可以直接喂 replaceState）。 */
 export function toUrl(area, view, pathname = window.location.pathname) {

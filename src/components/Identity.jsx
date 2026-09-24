@@ -71,7 +71,7 @@ function AccountRow() {
     if (!supa || supa.mode === 'local') return
     supa.auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
   }, [])
-  if (supa?.mode === 'local') return <><Judgments /><LocalAccount /></>
+  if (supa?.mode === 'local') return <Judgments />   // 账号搬去了「设置」(SettingsPage)
   if (!supa || !email) return null
   return (
     <div className="idnote acct">
@@ -83,7 +83,7 @@ function AccountRow() {
 
 // 本机模式的账号块。key **永远不回显**:brain 只给「设了没有」和末四位,
 // 这儿的输入框空着 = 不动原来的,填了 = 换掉。改完当场生效,brain 不用重启。
-function LocalAccount() {
+export function LocalAccount() {
   const [cur, setCur] = useState(null)
   const [form, setForm] = useState({ email: '', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '', provider: 'claude-key', model: '', modelCheap: '', backupDir: '', lang: 'zh' })
   const [busy, setBusy] = useState(false)

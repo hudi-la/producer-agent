@@ -36,17 +36,21 @@ if (!exists) run(`gh release create v${version} --repo ${REPO} --title "Fairwind
 else run(`gh release upload v${version} --repo ${REPO} --clobber packaging/out/latest.json packaging/install.sh`)
 const relId = sh(`gh api repos/${REPO}/releases/tags/v${version} --jq .id`)
 const token = sh('gh auth token')
-for (let i = 1; i <= 4; i++) {
+// zip 用 node 自己的 fetch 传:本机 curl(LibreSSL)传 178MB 老报 bad record mac;node 那套(OpenSSL)稳得多
+const zipName = `Fairwind-${version}-mac-arm64.zip`
+const buf = readFileSync(zip)
+let up = false
+for (let i = 1; i <= 6 && !up; i++) {
   for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name | endswith(".zip")) | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`)
-  // curl 中途断掉会以非零退出,execSync 会抛——接住,当一次失败重试
-  let code = '0'
-  try { code = sh(`curl -sS -o /dev/null -w '%{http_code}' --http1.1 -X POST -H "Authorization: token ${token}" -H "Content-Type: application/zip" --data-binary @"${zip}" "https://uploads.github.com/repos/${REPO}/releases/${relId}/assets?name=Fairwind-${version}-mac-arm64.zip"`) }
-  catch (e) { code = 'curl 断了:' + String(e.stderr || e.message).trim().split('\n')[0] }
-  console.log(`  传 zip 第 ${i} 次:HTTP ${code}`)
-  if (code === '201') break
-  if (i === 4) { console.error('zip 传不上去,网络的事,再跑一次'); process.exit(1) }
-  execSync('sleep 5')
+  try {
+    const r = await fetch(`https://uploads.github.com/repos/${REPO}/releases/${relId}/assets?name=${encodeURIComponent(zipName)}`, { method: 'POST', headers: { authorization: `token ${token}`, 'content-type': 'application/zip', 'content-length': String(buf.length) }, body: buf, duplex: 'half' })
+    console.log(`  传 zip 第 ${i} 次:HTTP ${r.status}`)
+    up = r.status === 201
+    if (!up) console.log('  ' + (await r.text()).slice(0, 200))
+  } catch (e) { console.log(`  传 zip 第 ${i} 次:${e.cause?.code || e.message}`) }
+  if (!up) await new Promise((r) => setTimeout(r, 8000))
 }
+if (!up) { console.error('zip 传不上去,网络的事,再跑一次'); process.exit(1) }
 say('校验')
 const assets = sh(`gh release view v${version} --repo ${REPO} --json assets -q '.assets[] | .name + " " + (.size|tostring)'`)
 console.log(assets)

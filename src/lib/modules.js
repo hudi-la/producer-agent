@@ -16,5 +16,5 @@ export async function postModules(patch, fetchImpl = (...a) => globalThis.fetch(
 
 /** 给定开关,哪些主区能进。档案永远在;其余四个都是机会线模块的。 */
 export function allowedAreas(mods) {
-  return (mods?.pursuits ? ['desk', 'pursue', 'people', 'ledger'] : []).concat(['profile'])
+  return (mods?.pursuits ? ['desk', 'pursue', 'people', 'ledger'] : []).concat(['profile', 'settings'])
 }
