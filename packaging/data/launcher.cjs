@@ -35,6 +35,16 @@ async function main() {
   const want = Number(process.env.BRAIN_PORT || 8788)
   let chosen = null
   // 8789 留给 Gmail 授权的本机回调口(brain/mail/auth.js),别拿它当 brain 的口
+  // 第一遍:整段口上凡是别的版本的本机 Fairwind,都请它退——旧版本可能在更靠后的口上(8788 被别的 brain 占过的话)
+  for (let port = want; port < want + 12; port++) {
+    if (port === 8789) continue
+    const h = await health(port)
+    if (h && h.mode === 'local' && MY_VERSION && h.version && h.version !== MY_VERSION) {
+      say('请 ' + port + ' 上的旧版 ' + h.version + ' 退出')
+      await new Promise((ok) => { const rq = http.request({ host: '127.0.0.1', port, path: '/quit', method: 'POST', timeout: 2000 }, (rs) => { rs.resume(); rs.on('end', ok) }); rq.on('error', ok); rq.on('timeout', () => { rq.destroy(); ok() }); rq.end() })
+    }
+  }
+  await new Promise((r) => setTimeout(r, 600))
   for (let port = want; port < want + 12; port++) {
     if (port === 8789) continue
     const h = await health(port)

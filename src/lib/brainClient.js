@@ -78,6 +78,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       async check(force = false) { try { const r = await fetchImpl(`${base}/update/check${force ? '?force' : ''}`); return await r.json() } catch (e) { return { canUpdate: false, error: e.message } } },
       apply: () => post('/update/apply', {}),
     },
+    quit: () => post('/quit', {}),
     mcpTargets: {
       async list() { try { const r = await fetchImpl(`${base}/mcp/targets`); return await r.json() } catch (e) { return [] } },
       install: (target) => post('/mcp/targets', { target }),

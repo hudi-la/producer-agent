@@ -128,6 +128,7 @@ export function LocalAccount() {
       <McpRow />
       <BackupRow backupDir={cur.backupDir} />
       <UpdateRow />
+      <QuitRow />
     </form>
   )
 }
@@ -195,6 +196,17 @@ function BackupRow({ backupDir }) {
 }
 
 // 更新那一行:版本、检查、有新版就一颗「更新」
+function QuitRow() {
+  const [gone, setGone] = useState(false)
+  const quit = async () => { if (!confirm(t('退出 Fairwind？定时任务和接给 AI 工具的门都会停，再双击 Fairwind 就回来。'))) return; try { await supa.quit() } catch (_) {} setGone(true) }
+  return (
+    <div className="la-sub">
+      <div className="la-sub-h">{t('退出')}<small>{t('关掉网页不等于退出，它在后台跑着。')}</small></div>
+      <div className="la-acts">{gone ? <span className="la-note">{t('已退出。要再开，双击 Fairwind。')}</span> : <button type="button" className="b" onClick={quit}>{t('退出 Fairwind')}</button>}</div>
+    </div>
+  )
+}
+
 function UpdateRow() {
   const [info, setInfo] = useState(null)
   const [busy, setBusy] = useState(false)

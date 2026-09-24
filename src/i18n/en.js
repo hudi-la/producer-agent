@@ -111,7 +111,7 @@ const base = {
 }
 
 // ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
-const extra = { '已选 {n} 张': '{n} selected', '说给第 {i}/{n} 条': 'Telling {i}/{n}', '说一句…': 'Say something…', '全部展开': 'Open all', '批量操作': 'Batch', '每周找机会': 'Weekly opportunity scout', '没配发布位': 'No release source configured',
+const extra = { '已选 {n} 张': '{n} selected', '说给第 {i}/{n} 条': 'Telling {i}/{n}', '说一句…': 'Say something…', '全部展开': 'Open all', '批量操作': 'Batch', '每周找机会': 'Weekly opportunity scout', '没配发布位': 'No release source configured', '退出': 'Quit', '退出 Fairwind': 'Quit Fairwind', '关掉网页不等于退出，它在后台跑着。': 'Closing the tab doesn\'t quit it; it keeps running in the background.', '退出 Fairwind？定时任务和接给 AI 工具的门都会停，再双击 Fairwind 就回来。': 'Quit Fairwind? Scheduled tasks and the door for AI tools stop; double-click Fairwind to come back.', '已退出。要再开，双击 Fairwind。': 'Quit. Double-click Fairwind to reopen.',
   '去「展开的卡片」看它。要拿走，在那排卡片上按 ×。': 'See it under Open cards. To remove it, press × on that row of cards.', '展开——今天要弄它。你留在这儿接着挑，挑完点顶栏「展开的卡片」过去。': 'Open: work on it today. Stay here and keep picking; then go to Open cards in the top bar.', '在展开的卡片区': 'In Open cards' }
 
 // 三份分册合进来;base 里的键优先(撞键时以档案层那份为准——别在分册里改 base 的意思)

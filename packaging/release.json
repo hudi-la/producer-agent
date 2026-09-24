@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "MCP 桥自己找端口(读启动器记的端口文件,再挨个探,只认本机模式,多台活着挑最新);Fairwind 换端口不用重接"
+  "note": "设置里有「退出 Fairwind」;启动器把整段端口上的旧版本都请退;包里带 SETUP.md(从装机到用 AI 工具填档案)"
 }
