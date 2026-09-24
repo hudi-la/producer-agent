@@ -1887,3 +1887,7 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .prov-opt { position: relative; }
 
 .fr-upd { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; border: 1px dashed var(--line-2, var(--ink-3)); border-radius: 8px; }
+
+.la-cmd { font-size: 11.5px; padding: 6px 9px; background: var(--paper); border: 1px solid var(--line-2, var(--ink-3)); border-radius: 6px; user-select: all; overflow-x: auto; white-space: nowrap; }
+.la-hint { color: var(--ink-3); font-size: 11.5px; }
+.la-hint code { font-size: 11px; }

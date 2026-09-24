@@ -19,6 +19,8 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 import { toSdkServer, defineTool, builtinTools } from './engine/tools.js'
 import { engineOf, providerConfig, PROVIDERS } from './engine/index.js'
 import { runAgent } from './engine/openaiCompat.js'
+// 给 Claude Code / GPT 桌面版开的门:档案那几个工具做成 MCP(brain/mcp.js)
+import { handleMcp } from './mcp.js'
 import { z } from 'zod'
 import { read, slice, imageBudget, IMG_CAP } from './files.js'
 // 拼 prompt 的活儿全在 prompt.js —— 纯函数，所以有 prompt.test.js 按着。
@@ -2003,6 +2005,12 @@ const server = http.createServer(async (req, res) => {
       catch (e) { send(res, 400, { error: e.message }) }
     })
     return
+  }
+  // MCP:只认回环地址来的连接——这扇门能写档案,不能开给局域网
+  if (req.url === '/mcp' || req.url.startsWith('/mcp?')) {
+    const ip = req.socket.remoteAddress || ''
+    if (!/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(ip)) return send(res, 403, { error: 'MCP 只听本机' })
+    return handleMcp(req, res, { db, version: VERSION, dataDir: LOCAL_MODE?.dataDir || null, modules: MODS }).catch((e) => { console.error('  ✗ MCP:' + e.message); if (!res.headersSent) send(res, 500, { error: e.message }) })
   }
   const mod = moduleOf(req.url)
   if (!isEnabled(MODS, mod)) return send(res, 404, { error: 'module off', module: mod })

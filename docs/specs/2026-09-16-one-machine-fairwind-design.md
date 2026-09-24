@@ -502,6 +502,16 @@ mac `~/Library/Application Support/Fairwind/`，win `%APPDATA%\Fairwind\`。更�
 - 默认模型名写死在 `engine/index.js` 一处（gpt-5 / gpt-5-mini、gemini-2.5-pro / gemini-2.5-flash），账号块两档能改；`OPENAI_BASE_URL` / `GEMINI_BASE_URL` 可覆盖（验收用假服务）。
 - 验过：假 OpenAI 服务端到端（选 GPT → 书桌聊天 → 要 WebFetch → 回话落库）。**真 key 没验**——他有 key 时点一次就知道；判据格式（[[TAG]] 等）是纯文本协议，模型无关，但换模型判断口味会变。
 
+## 二十二、给 Claude Code / GPT 桌面版开的门：MCP（2026-09-24 加）
+
+他的判断：学员本来就要学"agent 用工具读写你的系统"，所以档案的导入不只做页面上的一键，还开一扇 agent 能进的门。
+
+- `brain/mcp.js`：Streamable HTTP 的 MCP 服务，挂在 brain 的 `/mcp`，每个请求一份无状态传输。**只认回环地址**（能写档案，不开给局域网）。
+- 工具六个，只开档案那一层：`fairwind_info`（版本、数据目录、判据目录、模块）、`fairwind_profile_get/set`、`fairwind_entries_list`、`fairwind_entry_add`（kind/title/body/medium/year/meta/images/site_path/draft）、`fairwind_entry_set`。全部走 `pa_*` / `v_pa_*`；挂图片和网站路径靠 0144 的 `pa_set_entry_images`。工具说明里写清七种 kind 各自的 meta 键。
+- 学员怎么接：「关于你 → 账号 → 接给 Claude Code」给一条 `claude mcp add --transport http fairwind http://localhost:<口>/mcp`，复制到终端；GPT 桌面版在连接器设置里填同一个地址。之后在 Claude Code 里说"读我的网站，把作品填进 Fairwind"，它用自己的联网工具读、用这六个工具写。
+- 验过：官方 client 走一遍（列工具、加、列、改）；真的 Claude Code 一次性 `--mcp-config` 连上本机 brain，加了一条作品、列出来、报了版本。
+- 页面上的一键导入（抓网站 → 当前引擎抽结构 → 预览勾选 → 入库）是同一批函数的另一条路，下一步。
+
 ## 名词表
 
 | 名字 | 是什么 |

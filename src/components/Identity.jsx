@@ -126,9 +126,28 @@ function LocalAccount() {
         <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? t('存着…') : t('保存')}</button>
         {note && <span className={'la-note' + (note.startsWith(t('没存上:')) ? ' bad' : '')}>{note}</span>}
       </div>
+      <McpRow />
       <BackupRow backupDir={cur.backupDir} />
       <UpdateRow />
     </form>
+  )
+}
+
+// 接给 Claude Code / GPT 桌面版:一条命令,复制就行。端口按当前页面的来(作者机器上是 8790)
+function McpRow() {
+  const [copied, setCopied] = useState(false)
+  const url = `${location.origin}/mcp`
+  const cmd = `claude mcp add --transport http fairwind ${url}`
+  const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
+  return (
+    <div className="la-sub">
+      <div className="la-sub-h">{t('接给 Claude Code')}<small>{t('让 Claude Code（或 GPT 桌面版）能读写你的档案——比如"读我的网站，把作品填进来"')}</small></div>
+      <div className="la-acts">
+        <code className="la-cmd">{cmd}</code>
+        <button type="button" className="b" onClick={copy}>{copied ? t('复制好了') : t('复制')}</button>
+      </div>
+      <small className="la-hint">{t('在终端里粘这一行；GPT 桌面版在它的连接器设置里填这个地址：')}<code>{url}</code></small>
+    </div>
   )
 }
 
