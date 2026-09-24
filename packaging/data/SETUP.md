@@ -2,7 +2,7 @@
 
 从装机到让你自己的 AI 工具替你填档案，全部步骤、命令和要说的话都在这里。中文在前，English below.
 
-**前提**：一台 Apple 芯片的 Mac（M1 以后）；一个模型来源（四选一，见第 2 步）；想用 AI 工具帮你填东西的话，装好 Claude 桌面版（免费版即可）。你的数据只在你这台机器上，不经过任何人的服务器。
+**前提**：一台 Mac（Apple 芯片或 Intel 都行，macOS 12 以上）；一个模型来源（四选一，见第 2 步）；想用 AI 工具帮你填东西的话，装好 Claude 桌面版（免费版即可）。你的数据只在你这台机器上，不经过任何人的服务器。
 
 ---
 
@@ -113,7 +113,7 @@ ChatGPT 聊天 app 接不上（它只认公网地址）；用 ChatGPT 的人装 
 
 # English
 
-**You need**: an Apple-silicon Mac (M1 or later); one model source (pick one in step 2); and, if you want an AI tool to fill things in for you, the Claude desktop app (free tier is fine). Your data stays on your machine; nothing goes through anyone's server.
+**You need**: a Mac (Apple silicon or Intel, macOS 12 or later); one model source (pick one in step 2); and, if you want an AI tool to fill things in for you, the Claude desktop app (free tier is fine). Your data stays on your machine; nothing goes through anyone's server.
 
 ## 1 · Install (2 minutes)
 

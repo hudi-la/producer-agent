@@ -24,3 +24,14 @@
 - Windows（`node-win-x64`）同一套流程
 - SDK 的平台二进制（`@anthropic-ai/claude-agent-sdk-<平台>`，约 256MB）跟着 node_modules 一起打包后能不能被找到
 - `brain/server.js` 整个打包（现在只验了 `local/spike.js` 这个小入口）
+
+
+## Intel 包(2026-09-25)
+
+同一台 Apple 芯片的机器借 Rosetta 出 mac-x64:
+```
+cd packaging/runtime && curl -fsSL -o x.tgz https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-x64.tar.gz && tar xzf x.tgz && mv node-v24.21.0-darwin-x64 node-darwin-x64 && rm x.tgz
+npm install --no-save --force @esbuild/darwin-x64@<esbuild 版本>   # build-brain 在 x64 node 里 import esbuild,要它的 x64 二进制
+```
+之后 `packaging/release.mjs` 看见 `node-darwin-x64` 就自动多出一份;build.mjs 里 npm 用自带 node 跑,SDK 的平台二进制才是 x64 的。
+包起来验过:解开后 `arch -x86_64 ./Fairwind/node ./Fairwind/launcher.cjs` → /health 正常。
