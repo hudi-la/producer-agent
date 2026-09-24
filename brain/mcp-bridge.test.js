@@ -36,6 +36,14 @@ before(async () => {
 })
 after(async () => { await client.close().catch(() => {}); srv.close(); decoy.close(); await pg.close(); rmSync(dir, { recursive: true, force: true }) })
 
+test('--fixed:配置指哪台就是哪台,不探(哪怕它不是本机模式)', async () => {
+  // decoy 那台 mode=cloud、没有 /mcp——固定模式下桥就该老老实实连它,列不到工具而不是偷偷跳去别台
+  const c2 = new Client({ name: 't2', version: '1' })
+  await c2.connect(new StdioClientTransport({ command: process.execPath, args: [resolve(ROOT, 'packaging/data/mcp-bridge.cjs'), `http://127.0.0.1:${decoy.address().port}/mcp`, '--fixed'], cwd: ROOT, env: { ...process.env, FAIRWIND_DATA_DIR: dir } }))
+  const { tools } = await c2.listTools(); assert.equal(tools.length, 0)
+  await c2.close()
+})
+
 test('几台本机版都活着时挑版本最高的(桥里同一套比较)', () => {
   const num = (v) => v.split('.').map((x) => parseInt(x, 10) || 0)
   const newest = (found) => [...found].sort((a, b) => { const x = num(a.v), y = num(b.v); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); return 0 })[0]

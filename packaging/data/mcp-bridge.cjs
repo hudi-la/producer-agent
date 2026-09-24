@@ -7,6 +7,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const http = require('node:http')
 const argUrl = process.argv[2] || 'http://localhost:8788/mcp'
+const FIXED = process.argv.includes('--fixed')   // 写死就是这台,不探——作者自己那份(云端模式)走这个
 const here = __dirname
 
 // Fairwind 每次启动的端口不一定一样(8788 被作者自己的 brain 占着就往后挪)。
@@ -21,6 +22,7 @@ const health = (port) => new Promise((ok) => {
   }); rq.on('error', () => ok(null)); rq.on('timeout', () => { rq.destroy(); ok(null) })
 })
 async function findUrl() {
+  if (FIXED) return argUrl
   const u = new URL(argUrl)
   const ports = []; let fromFile = false
   try { const p = Number(fs.readFileSync(path.join(DATA, 'port'), 'utf8').trim()); if (p) { ports.push(p); fromFile = true } } catch {}
