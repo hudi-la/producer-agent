@@ -137,3 +137,18 @@ test('/mcp/claude-desktop:没配 → installed:false;POST 写进配置(别的键
   assert.equal(cfg.preferences.x, 1); assert.equal(cfg.mcpServers.other.command, 'x'); assert.match(cfg.mcpServers.fairwind.args[0], /mcp-bridge\.cjs$/); assert.equal(cfg.mcpServers.fairwind.args[1], 'http://localhost:8799/mcp')
   delete process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG; delete process.env.BRAIN_PORT
 })
+
+test('/mcp/targets:codex 写 toml(已有内容保留、重写不重复);gemini 写 json;不认识的目标 400', async () => {
+  const { mkdtempSync: mk, writeFileSync: wf, readFileSync: rf } = await import('node:fs'); const { tmpdir: td } = await import('node:os'); const { join: jn } = await import('node:path')
+  const d = mk(jn(td(), 'fw-tg-')); process.env.FAIRWIND_CODEX_CONFIG = jn(d, 'config.toml'); process.env.FAIRWIND_GEMINI_CONFIG = jn(d, 'settings.json'); process.env.BRAIN_PORT = '8799'
+  wf(process.env.FAIRWIND_CODEX_CONFIG, 'model = "gpt-5"\n\n[mcp_servers.other]\ncommand = "x"\n')
+  let w = res(); await handleLocalRoute(req('POST', '/mcp/targets', { target: 'codex' }), w, ctx); assert.equal(w.json().current, true, w.text())
+  w = res(); await handleLocalRoute(req('POST', '/mcp/targets', { target: 'codex' }), w, ctx)
+  const toml = rf(process.env.FAIRWIND_CODEX_CONFIG, 'utf8')
+  assert.equal((toml.match(/\[mcp_servers\.fairwind\]/g) || []).length, 1); assert.match(toml, /model = "gpt-5"/); assert.match(toml, /\[mcp_servers\.other\]/); assert.match(toml, /http:\/\/localhost:8799\/mcp/)
+  w = res(); await handleLocalRoute(req('POST', '/mcp/targets', { target: 'gemini-cli' }), w, ctx); assert.equal(w.json().current, true)
+  assert.equal(JSON.parse(rf(process.env.FAIRWIND_GEMINI_CONFIG, 'utf8')).mcpServers.fairwind.args[1], 'http://localhost:8799/mcp')
+  const g = res(); await handleLocalRoute(req('GET', '/mcp/targets'), g, ctx); assert.equal(g.json().length, 3); assert.equal(g.json().find((x) => x.target === 'codex').current, true)
+  const bad = res(); await handleLocalRoute(req('POST', '/mcp/targets', { target: 'chatgpt' }), bad, ctx); assert.equal(bad.code, 400)
+  delete process.env.FAIRWIND_CODEX_CONFIG; delete process.env.FAIRWIND_GEMINI_CONFIG; delete process.env.BRAIN_PORT
+})

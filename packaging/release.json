@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "Claude 桌面版一键接入：设置里点一下、重启桌面版就能让它读写你的档案"
+  "note": "接给你的 AI 工具:Claude 桌面版 / Codex / Gemini CLI 三颗接入按钮(同一座桥);ChatGPT 聊天 app 接不上,说明书写明走 Codex"
 }

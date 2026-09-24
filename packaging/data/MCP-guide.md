@@ -15,14 +15,15 @@ The URL is under Settings → Connect Claude Code. It looks like this (the port 
 http://localhost:8788/mcp
 ```
 
-- **Claude 桌面版**（推荐，不用终端）：Fairwind 的「设置 → 接给你的 AI 工具」里点一下「接入 Claude 桌面版」，然后把 Claude 桌面版完全退出再打开。对话里就有 Fairwind 的工具了（它靠 Fairwind 自带的一座小桥连本机，那一下替你写好了配置）。
+- **Claude 桌面版 / Codex / Gemini CLI**（不用终端）：Fairwind 的「设置 → 接给你的 AI 工具」里点对应的「接入」，然后把那个工具完全退出再打开。对话里就有 Fairwind 的工具了（Fairwind 自带一座小桥连本机，那一下替你写好了配置）。
 - **Claude Code**（终端）：粘 `claude mcp add --transport http fairwind http://localhost:8788/mcp`，之后每次打开都带着。
-- **ChatGPT 桌面版**：它的连接器只认公网地址，连不到本机——现在走不通。
-- **别的工具**：凡是支持 Streamable HTTP 的 MCP 客户端都行，填同一个地址；只认 stdio 的用上面那个 `mcp-remote` 桥。
+- **ChatGPT 聊天 app**：接不上——它的连接器只认公网地址、起不了本机程序。用 ChatGPT 的人走 **Codex**（OpenAI 自己的 agent，ChatGPT 账号能用）。
+- **别的工具**：能起本机程序（stdio）的 MCP 客户端都能用包里那座桥：`<Fairwind>/node <Fairwind>/mcp-bridge.cjs http://localhost:8788/mcp`；支持 Streamable HTTP 的直接填地址。
 
-- **Claude desktop app** (recommended, no terminal): in Fairwind, Settings → Connect your AI tool → "Connect Claude desktop", then quit and reopen the Claude app. Its chats now have Fairwind's tools.
+- **Claude desktop / Codex / Gemini CLI** (no terminal): Settings → Connect your AI tool → "Connect", then quit and reopen that app. Its chats now have Fairwind's tools.
 - **Claude Code** (terminal): paste `claude mcp add --transport http fairwind http://localhost:8788/mcp`.
-- **ChatGPT desktop**: its connectors require a public URL, so this doesn't work yet.
+- **ChatGPT chat app**: can't connect (its connectors need a public URL). ChatGPT users use **Codex**, OpenAI's own agent.
+- **Other tools**: any MCP client that can launch a local (stdio) program can use the bundled bridge: `<Fairwind>/node <Fairwind>/mcp-bridge.cjs http://localhost:8788/mcp`.
 
 只认本机连接；Fairwind 得开着。
 

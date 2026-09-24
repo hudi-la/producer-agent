@@ -135,29 +135,33 @@ export function LocalAccount() {
 // 接给 Claude Code / GPT 桌面版:一条命令,复制就行。端口按当前页面的来(作者机器上是 8790)
 function McpRow() {
   const [copied, setCopied] = useState(false)
-  const [cd, setCd] = useState(null)      // Claude 桌面版接没接
-  const [cdMsg, setCdMsg] = useState('')
-  useEffect(() => { supa.claudeDesktop.status().then(setCd) }, [])
-  const installCd = async () => { const r = await supa.claudeDesktop.install(); setCd(r); setCdMsg(r.ok ? t('写好了。把 Claude 桌面版完全退出再打开，对话里就有 Fairwind 的工具了') : t('没成:') + r.error) }
+  const [targets, setTargets] = useState([])     // 三个能接的桌面工具,各自接没接
+  const [msg, setMsg] = useState({})
   const url = `${location.origin}/mcp`
   const cmd = `claude mcp add --transport http fairwind ${url}`
+  const load = () => supa.mcpTargets.list().then(setTargets)
+  useEffect(() => { load() }, [])
   const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
+  const install = async (t) => { const r = await supa.mcpTargets.install(t); setMsg((m) => ({ ...m, [t]: r.ok ? t('写好了。把它完全退出再打开，对话里就有 Fairwind 的工具了') : t('没成:') + r.error })); await load() }
+  const RESTART = { 'claude-desktop': 'Claude', codex: 'Codex', 'gemini-cli': 'Gemini CLI' }
   return (
     <div className="la-sub">
-      <div className="la-sub-h">{t('接给你的 AI 工具')}<small>{t('让 Claude 桌面版或 Claude Code 能读写你的档案——比如"读我的网站，把作品填进来"')}</small></div>
-      <div className="la-acts">
-        <b className="la-k2">{t('Claude 桌面版')}</b>
-        <button type="button" className={'b' + (cd?.current ? '' : ' primary')} onClick={installCd} disabled={cd?.appInstalled === false}>{cd?.current ? t('已接入 · 再写一次') : t('接入 Claude 桌面版')}</button>
-        {cd?.appInstalled === false && <small className="la-hint">{t('这台机器上没装 Claude 桌面版')}</small>}
-        {cdMsg && <span className={'la-note' + (cdMsg.startsWith(t('没成:')) ? ' bad' : '')}>{cdMsg}</span>}
-      </div>
+      <div className="la-sub-h">{t('接给你的 AI 工具')}<small>{t('让它能读写你的档案、机会卡、判据——比如"读我的网站，把作品填进来"。ChatGPT 聊天 app 接不上（它只认公网地址），用 ChatGPT 的人走 Codex。')}</small></div>
+      {targets.map((x) => (
+        <div className="la-acts" key={x.target}>
+          <b className="la-k2">{t(x.label)}</b>
+          <button type="button" className={'b' + (x.current ? '' : ' primary')} onClick={() => install(x.target)}>{x.current ? t('已接入 · 再写一次') : t('接入')}</button>
+          {x.appInstalled === false && <small className="la-hint">{t('这台机器上没见到它')}</small>}
+          {msg[x.target] && <span className={'la-note' + (msg[x.target].startsWith(t('没成:')) ? ' bad' : '')}>{msg[x.target].replace('它', RESTART[x.target] || '它')}</span>}
+        </div>
+      ))}
       <div className="la-acts">
         <b className="la-k2">Claude Code</b>
         <code className="la-cmd">{cmd}</code>
         <button type="button" className="b" onClick={copy}>{copied ? t('复制好了') : t('复制')}</button>
         <a className="b" href={`${location.origin}/mcp-guide`} target="_blank" rel="noreferrer">{t('说明书')}</a>
       </div>
-      <small className="la-hint">{t('在终端里粘这一行；Claude 桌面版和别的工具怎么接，看说明书。地址：')}<code>{url}</code></small>
+      <small className="la-hint">{t('Claude Code 在终端里粘那一行；别的工具怎么接，看说明书。地址：')}<code>{url}</code></small>
     </div>
   )
 }

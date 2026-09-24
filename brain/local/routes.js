@@ -45,21 +45,41 @@ export function bridgeCommand(port) {
   const bridge = packaged ? (root ? pjoin(root, 'current', 'mcp-bridge.cjs') : pjoin(appDir, 'mcp-bridge.cjs')) : pjoin(pdirname(new URL(import.meta.url).pathname), '..', '..', 'packaging', 'data', 'mcp-bridge.cjs')
   return { command, args: [bridge, `http://localhost:${port}/mcp`] }
 }
-export function claudeDesktopStatus(port) {
-  const p = claudeDesktopConfigPath()
-  let cfg = null; try { cfg = JSON.parse(readF(p, 'utf8')) } catch (_) {}
-  const entry = cfg?.mcpServers?.fairwind || null
-  const want = bridgeCommand(port)
-  return { configPath: p, installed: Boolean(entry), current: entry && entry.command === want.command && JSON.stringify(entry.args) === JSON.stringify(want.args), appInstalled: process.platform === 'darwin' ? existsF('/Applications/Claude.app') : null }
+// 三个目标,同一座桥:Claude 桌面版 / Codex(OpenAI 的 agent,ChatGPT 账号能用)/ Gemini CLI。
+// ChatGPT 聊天 app 本身只认公网 https 连接器,起不了本机程序——接不上,不列。
+export const TARGETS = {
+  'claude-desktop': { label: 'Claude 桌面版', file: () => process.env.FAIRWIND_CLAUDE_DESKTOP_CONFIG || (process.platform === 'darwin' ? pjoin(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json') : pjoin(process.env.APPDATA || homedir(), 'Claude', 'claude_desktop_config.json')), kind: 'json', key: 'mcpServers', app: () => (process.platform === 'darwin' ? existsF('/Applications/Claude.app') : null) },
+  'codex': { label: 'Codex', file: () => process.env.FAIRWIND_CODEX_CONFIG || pjoin(homedir(), '.codex', 'config.toml'), kind: 'toml', app: () => existsF(pjoin(homedir(), '.codex')) },
+  'gemini-cli': { label: 'Gemini CLI', file: () => process.env.FAIRWIND_GEMINI_CONFIG || pjoin(homedir(), '.gemini', 'settings.json'), kind: 'json', key: 'mcpServers', app: () => existsF(pjoin(homedir(), '.gemini')) },
 }
-export function installClaudeDesktop(port) {
-  const p = claudeDesktopConfigPath()
-  let cfg = {}; try { cfg = JSON.parse(readF(p, 'utf8')) } catch (_) {}
-  cfg.mcpServers = { ...(cfg.mcpServers || {}), fairwind: bridgeCommand(port) }
+export function targetStatus(name, port) {
+  const t = TARGETS[name]; if (!t) throw new Error('不认识的目标:' + name)
+  const p = t.file(); const want = bridgeCommand(port)
+  let entry = null
+  if (t.kind === 'json') { let cfg = null; try { cfg = JSON.parse(readF(p, 'utf8')) } catch (_) {} entry = cfg?.[t.key]?.fairwind || null }
+  else { let txt = ''; try { txt = readF(p, 'utf8') } catch (_) {} const m = txt.match(/\[mcp_servers\.fairwind\]\s*\ncommand\s*=\s*"([^"]*)"\s*\nargs\s*=\s*(\[[^\]]*\])/); if (m) { try { entry = { command: m[1], args: JSON.parse(m[2]) } } catch (_) { entry = { command: m[1] } } } }
+  return { target: name, label: t.label, configPath: p, installed: Boolean(entry), current: Boolean(entry && entry.command === want.command && JSON.stringify(entry.args) === JSON.stringify(want.args)), appInstalled: t.app() }
+}
+export function installTarget(name, port) {
+  const t = TARGETS[name]; if (!t) throw new Error('不认识的目标:' + name)
+  const p = t.file(); const want = bridgeCommand(port)
   mkdirp(pdirname(p), { recursive: true })
-  writeF(p, JSON.stringify(cfg, null, 2) + '\n')
-  return claudeDesktopStatus(port)
+  if (t.kind === 'json') {
+    let cfg = {}; try { cfg = JSON.parse(readF(p, 'utf8')) } catch (_) {}
+    cfg[t.key] = { ...(cfg[t.key] || {}), fairwind: want }
+    writeF(p, JSON.stringify(cfg, null, 2) + '\n')
+  } else {
+    let txt = ''; try { txt = readF(p, 'utf8') } catch (_) {}
+    const block = `[mcp_servers.fairwind]\ncommand = ${JSON.stringify(want.command)}\nargs = ${JSON.stringify(want.args)}\n`
+    const re = /\[mcp_servers\.fairwind\][\s\S]*?(?=\n\[|$)/
+    txt = re.test(txt) ? txt.replace(re, block.trimEnd()) : (txt.trimEnd() + (txt.trim() ? '\n\n' : '') + block)
+    writeF(p, txt.endsWith('\n') ? txt : txt + '\n')
+  }
+  return targetStatus(name, port)
 }
+// 旧名字留着(测试和老调用)
+export const claudeDesktopStatus = (port) => targetStatus('claude-desktop', port)
+export const installClaudeDesktop = (port) => installTarget('claude-desktop', port)
 
 /** settings 里能给页面看的那几样。**key 永不回显**,只给「设了没有」和末四位。 */
 export function publicSettings(s) {
@@ -140,6 +160,12 @@ export async function handleLocalRoute(req, res, ctx) {
   if (req.method === 'GET' && p === '/mcp/claude-desktop') { json(res, 200, claudeDesktopStatus(process.env.BRAIN_PORT || 8788)); return true }
   if (req.method === 'POST' && p === '/mcp/claude-desktop') {
     try { json(res, 200, { ok: true, ...installClaudeDesktop(process.env.BRAIN_PORT || 8788) }) } catch (e) { json(res, 500, { ok: false, error: e.message }) }
+    return true
+  }
+  if (req.method === 'GET' && p === '/mcp/targets') { json(res, 200, Object.keys(TARGETS).map((n) => targetStatus(n, process.env.BRAIN_PORT || 8788))); return true }
+  if (req.method === 'POST' && p === '/mcp/targets') {
+    const body = await readJson(req)
+    try { json(res, 200, { ok: true, ...installTarget(body.target, process.env.BRAIN_PORT || 8788) }) } catch (e) { json(res, 400, { ok: false, error: e.message }) }
     return true
   }
 
