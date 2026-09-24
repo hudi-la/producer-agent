@@ -83,6 +83,7 @@ if (!process.env.FAIRWIND_NO_OPEN) setTimeout(() => {
 `)
 writeFileSync(join(APP, 'VERSION'), version + '\n')
 copyFileSync(resolve(ROOT, 'packaging/data/LICENSE.txt'), join(APP, 'LICENSE.txt'))
+copyFileSync(resolve(ROOT, 'packaging/data/Fairwind.icns'), join(APP, 'Fairwind.icns'))   // 装机脚本放进 .app
 
 say('打 zip')
 const zipName = `Fairwind-${version}-${PLATFORM}.zip`

@@ -57,6 +57,9 @@ ROOT="$HOME/Applications/Fairwind"
 exec "$ROOT/current/node" "$ROOT/current/launcher.cjs"
 SH
 chmod +x "$APPB/Contents/MacOS/Fairwind"
+# 图标:包里带着 Fairwind.icns(顶栏那个「羽」),放进 .app 里
+mkdir -p "$APPB/Contents/Resources"
+[ -f "$ROOT/current/Fairwind.icns" ] && cp "$ROOT/current/Fairwind.icns" "$APPB/Contents/Resources/Fairwind.icns"
 # 本机临时签名(ad-hoc,不用苹果账号):Apple Silicon 对完全没签名的程序有时会拒。
 # 这不是公证——真要浏览器下载后双击就开,得有开发者账号(见 packaging/ACCEPTANCE.md)。
 codesign --force --sign - "$APPB" >/dev/null 2>&1 || true
@@ -70,10 +73,12 @@ cat > "$APPB/Contents/Info.plist" <<'PL'
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>Fairwind</string>
+  <key>CFBundleIconFile</key><string>Fairwind</string>
   <key>LSUIElement</key><false/>
 </dict></plist>
 PL
 
+touch "$APPB"
 echo
 echo "装好了:$ROOT/current → app-$VER"
 echo "以后双击「应用程序」里(你的用户目录下那个 Applications)的 Fairwind 就行。"
