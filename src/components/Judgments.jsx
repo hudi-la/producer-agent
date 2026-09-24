@@ -27,7 +27,7 @@ export default function Judgments() {
           <input type="checkbox" checked={s.judgmentsEnabled !== false} onChange={flip} />
           {s.judgmentsEnabled !== false ? t('用我的判据') : t('用出厂判据(我的先关着)')}
         </label>
-        <span className="jd-dir">{t('文件在 ')}<code>{'<data dir>'}/judgments/</code>{t(',怎么写看里面的 README')}</span>
+        <span className="jd-dir">{t('文件在 ')}<code className="jd-path" title={s.judgmentsDir || ''}>{s.judgmentsDir || 'judgments/'}</code>{t(',怎么写看里面的 README')}</span>
         <span className="sp" />
         <button type="button" className="b" disabled={busy} onClick={preview}>{busy ? t('在判…') : t('看看会怎么变')}</button>
       </div>

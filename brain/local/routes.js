@@ -89,7 +89,7 @@ export async function handleLocalRoute(req, res, ctx) {
     return true
   }
 
-  if (req.method === 'GET' && p === '/settings') { json(res, 200, publicSettings(ctx.settings)); return true }
+  if (req.method === 'GET' && p === '/settings') { json(res, 200, { ...publicSettings(ctx.settings), dataDir, judgmentsDir: `${dataDir}/judgments` }); return true }
   // 更新之后旧进程还在跑,启动器会看见版本对不上,叫它退场再起新的。只听本机,别人叫不动
   if (req.method === 'POST' && p === '/quit') { json(res, 200, { ok: true, bye: true }); setTimeout(() => (ctx.exit || process.exit)(0), 200); return true }
 

@@ -3,7 +3,6 @@ import { t } from '../i18n/index.js'
 import { saveProfile, useProfile } from '../lib/profile.js'
 import { supa } from '../lib/backends.js'
 import { EditRow } from './EditRow.jsx'
-import Judgments from './Judgments.jsx'
 import ProviderPicker from './ProviderPicker.jsx'
 
 // 「关于你」——档案页最上面那一块。
@@ -71,7 +70,7 @@ function AccountRow() {
     if (!supa || supa.mode === 'local') return
     supa.auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
   }, [])
-  if (supa?.mode === 'local') return <Judgments />   // 账号搬去了「设置」(SettingsPage)
+  if (supa?.mode === 'local') return null   // 本机模式:判据和账号都在「设置」(SettingsPage)
   if (!supa || !email) return null
   return (
     <div className="idnote acct">

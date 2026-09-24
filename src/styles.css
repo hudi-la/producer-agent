@@ -1895,3 +1895,6 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .settings-page { max-width: 880px; margin: 0 auto; padding: 28px 24px 60px; display: grid; gap: 18px; }
 .settings-page .modules-panel { margin: 0; }
 .settings-page .local-account { margin-top: 0; }
+
+.jd-path { user-select: all; }
+.settings-page .judgments { margin-top: 0; }
