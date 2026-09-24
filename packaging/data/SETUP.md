@@ -63,7 +63,7 @@ curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download
 
 > 读 https://你的网站.com，把作品、展览、驻地、教育、自述填进 Fairwind。先 list 一遍别重复；每件作品把图片链接一起带上；日期和机构拿不准的标成 draft。填完告诉我加了几条、哪几条不确定。
 
-回到 Fairwind 刷新页面，逐条看；不对的直接在页面上改，或者再跟它说：
+回到 Fairwind 刷新页面，逐条看；不对的直接在页面上改，或者再跟它说。AI 导进来的条目默认算「写完」，Fairwind 写申请时会用；它拿不准的会标成「在写 · 写申请时不用」，你看过没问题就点「写完了」（栏头有「全部标成写完」）。
 
 > 「XX」那条的年份错了，是 2023；「YY」是群展不是个展。
 
@@ -172,7 +172,7 @@ It should list a dozen tools starting with `fairwind_…`. Then:
 
 > Read https://my-site.com and fill my works, exhibitions, residencies, education and statement into Fairwind. List first so nothing is duplicated; attach image links to each work; mark uncertain dates or organizations as draft. When done, tell me how many you added and which are uncertain.
 
-Back in Fairwind, refresh and check each entry; fix on the page or tell it:
+Back in Fairwind, refresh and check each entry; fix on the page or tell it. Entries the AI imports count as finished and Fairwind will use them; the ones it was unsure about are marked "In progress · not used yet" — once you've checked them, mark them finished (the section header has "Mark all finished").
 
 > The year on "XX" is wrong, it's 2023; "YY" is a group show, not a solo.
 

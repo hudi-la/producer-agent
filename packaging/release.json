@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "档案页左栏「+ 加一栏」:空库也能加第一条;出厂类目 + 自己起名;页头说清两条路(手填 / AI 工具读网站)"
+  "note": "AI 工具导进来的条目默认算写完(拿不准才标在写);「在写」的标自己说清写申请时不用;栏头一键全部标成写完"
 }

@@ -69,3 +69,11 @@ test('判据:写 → 读回;不许的文件名拒;lint 点名;preview 通到 bra
   const bad = await call('fairwind_judgments_write', { file: '../settings.json', content: 'x' }); assert.equal(bad.r.isError, true)
   const p = await call('fairwind_judgments_preview', { limit: 3 }); assert.equal(p.j.limit, 3)
 })
+
+test('这扇门加的条目默认算写完(draft=false);明说 draft:true 才是在写', async () => {
+  await call('fairwind_entry_add', { kind: 'work', title: '默认写完' })
+  await call('fairwind_entry_add', { kind: 'work', title: '明说在写', draft: true })
+  const rows = (await call('fairwind_entries_list', { kind: 'work' })).j
+  const byTitle = Object.fromEntries(rows.map((r) => [r.title, r.draft]))
+  assert.equal(byTitle['默认写完'], false); assert.equal(byTitle['明说在写'], true)
+})

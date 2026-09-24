@@ -64,13 +64,14 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
 
   server.registerTool('fairwind_entry_add', {
     title: '加一条档案', description: '新加一条。先用 fairwind_entries_list 看有没有同名的,别重复加。' + '\n' + KINDS,
-    inputSchema: { kind: z.string().describe('默认七种之一,或你自己的类目名'), title: z.string(), body: z.string().optional(), medium: z.string().optional(), year: z.string().optional(), meta: z.record(z.string(), z.any()).optional(), images: z.array(z.string()).optional(), site_path: z.string().optional(), draft: z.boolean().optional().describe('还没写完就标 true,写申请时会跳过它') },
+    inputSchema: { kind: z.string().describe('默认七种之一,或你自己的类目名'), title: z.string(), body: z.string().optional(), medium: z.string().optional(), year: z.string().optional(), meta: z.record(z.string(), z.any()).optional(), images: z.array(z.string()).optional(), site_path: z.string().optional(), draft: z.boolean().optional().describe('默认 false = 写完的,Fairwind 写申请时会用它。只有内容拿不准/没写完才标 true,那样它会跳过这条,直到人在页面上点「写完了」') },
   }, async ({ kind, title, body, medium, year, meta, images, site_path, draft }) => {
     try {
       const id = await rpc('pa_add_entry', { p_kind: kind, p_title: title })
       if (body !== undefined || medium !== undefined || year !== undefined || meta !== undefined) await rpc('pa_set_entry', { p_id: id, p_title: null, p_body: body ?? null, p_medium: medium ?? null, p_year: year ?? null, p_meta: meta ?? null })
       if (images || site_path) await rpc('pa_set_entry_images', { p_id: id, p_images: images ?? null, p_site_path: site_path ?? null })
-      if (draft !== undefined) await rpc('pa_set_entry_draft', { p_id: id, p_draft: draft })
+      // 库里新建一律 draft=true(页面上「+ 加一条」是人要开始写);这扇门进来的是搬现成的——不传就算写完
+      await rpc('pa_set_entry_draft', { p_id: id, p_draft: draft ?? false })
       return text({ ok: true, id })
     } catch (e) { return fail(e) }
   })

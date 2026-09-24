@@ -94,7 +94,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
                 要把一条标成在写，在展开后那块里切（见下面 EntryFields 上面那一行）。 */}
             {e.draft && (
               <button className="draftchip on" onClick={flipDraft} disabled={ro}
-                      title={t('写申请时翻不到这条。点一下算写完')}>{t('在写')}</button>
+                      title={t('写申请时翻不到这条。点一下算写完')}>{t('在写 · 写申请时不用')}</button>
             )}
             {facts.map((f, i) => <span className="w-medium" key={i}>{f}</span>)}
             {e.source === 'website' && <span className="src-tag">{t('读自网站')}</span>}
@@ -165,6 +165,15 @@ function subGroups(items, sub, concerns) {
 function KindSection({ label, items, sub, concerns, onSaved, openIds, activeId, onToggle, onAdd }) {
   // 只有一个子组时不写子标题——「策展」那一格底下再顶一行「策展项目」是重复的。
   const groups = sub ? subGroups(items, sub, concerns) : null
+  // 在写的那几条 Fairwind 写申请时不用。一次导进来十几条全是在写的话,一条条点太烦——
+  // 栏头给一颗「全部标成写完」。规则本身不变(见 brain/prompt.js entriesBlock),只是让人看得见、能一下过。
+  const drafts = items.filter((e) => e.draft)
+  const [flipping, setFlipping] = useState(false)
+  const finishAll = async () => {
+    if (!confirm(t('把这栏 {n} 条都标成写完？之后 Fairwind 写申请时就会用它们。', { n: drafts.length }))) return
+    setFlipping(true)
+    try { for (const e of drafts) await setEntryDraft(e.id, false); await onSaved?.() } finally { setFlipping(false) }
+  }
   const one = (e) => (
     <Entry e={e} key={e.id || e.title + e.sort}
            open={openIds.has(e.id)} active={e.id === activeId}
@@ -179,6 +188,12 @@ function KindSection({ label, items, sub, concerns, onSaved, openIds, activeId, 
             那栏放一份新 proposal，只有开 SQL 一条路。 */}
         {onAdd && <button className="kind-add" onClick={onAdd}>{t('+ 加一条')}</button>}
       </div>
+      {drafts.length > 0 && (
+        <div className="kind-drafts">
+          <span>{t('{n} 条在写：Fairwind 写申请时不用它们。看过没问题就点「写完了」。', { n: drafts.length })}</span>
+          {drafts.length > 1 && <button type="button" className="kind-add" disabled={flipping} onClick={finishAll}>{flipping ? t('标着…') : t('全部标成写完')}</button>}
+        </div>
+      )}
       {groups ? (
         groups.map(([subLabel, g]) => (
           <div className="concern" key={subLabel}>
