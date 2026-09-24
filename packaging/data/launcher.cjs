@@ -7,6 +7,7 @@
 // 日志写在 <数据目录>/fairwind.log,出了事有地方看。
 const path = require('node:path'), os = require('node:os'), fs = require('node:fs'), http = require('node:http'), net = require('node:net')
 const APP = __dirname
+const MY_VERSION = (() => { try { return fs.readFileSync(path.join(APP, 'VERSION'), 'utf8').trim() } catch { return '' } })()
 const DATA = process.env.FAIRWIND_DATA_DIR || (process.platform === 'darwin'
   ? path.join(os.homedir(), 'Library', 'Application Support', 'Fairwind')
   : process.platform === 'win32' ? path.join(process.env.APPDATA || os.homedir(), 'Fairwind') : path.join(os.homedir(), '.fairwind'))
@@ -37,7 +38,15 @@ async function main() {
   for (let port = want; port < want + 12; port++) {
     if (port === 8789) continue
     const h = await health(port)
-    if (h && h.mode === 'local' && h.version) { say('已经在跑(' + port + ', ' + h.version + '),只开页面'); openBrowser('http://localhost:' + port); return process.exit(0) }
+    if (h && h.mode === 'local' && h.version) {
+      if (!MY_VERSION || h.version === MY_VERSION) { say('已经在跑(' + port + ', ' + h.version + '),只开页面'); openBrowser('http://localhost:' + port); return process.exit(0) }
+      // 更新过了,跑着的还是旧版:叫它退场,等口空出来,再往下起新的
+      say('跑着的是 ' + h.version + ',这儿是 ' + MY_VERSION + ':叫旧的退场')
+      await new Promise((ok) => { const rq = http.request({ host: '127.0.0.1', port, path: '/quit', method: 'POST', timeout: 2000 }, (rs) => { rs.resume(); rs.on('end', ok) }); rq.on('error', ok); rq.on('timeout', () => { rq.destroy(); ok() }); rq.end() })
+      for (let i = 0; i < 20 && !(await free(port)); i++) await new Promise((r) => setTimeout(r, 250))
+      if (await free(port)) { chosen = port; break }
+      say(port + ' 旧的没让出来,换下一个'); continue
+    }
     if (h) { say(port + ' 上是别的 Fairwind/brain(' + (h.mode || '?') + '),换下一个'); continue }
     if (await free(port)) { chosen = port; break }
     say(port + ' 被别的程序占着,换下一个')

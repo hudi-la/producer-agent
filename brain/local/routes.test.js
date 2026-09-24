@@ -112,3 +112,10 @@ test('/settings:切到 gemini → env 里 FAIRWIND_PROVIDER=gemini + GEMINI_API_
   const b = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-key' }), b, ctx)
   assert.equal(process.env.FAIRWIND_PROVIDER, 'claude'); assert.equal(process.env.GEMINI_API_KEY, undefined); assert.ok(process.env.ANTHROPIC_API_KEY)
 })
+
+test('/quit:答一声再退场(退场用注入的 exit,测试里不真退)', async () => {
+  let code = null
+  const r = res(); await handleLocalRoute(req('POST', '/quit', {}), r, { ...ctx, exit: (c) => { code = c } })
+  assert.deepEqual(r.json(), { ok: true, bye: true })
+  await new Promise((ok) => setTimeout(ok, 300)); assert.equal(code, 0)
+})

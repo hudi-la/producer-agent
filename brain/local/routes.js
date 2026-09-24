@@ -90,6 +90,8 @@ export async function handleLocalRoute(req, res, ctx) {
   }
 
   if (req.method === 'GET' && p === '/settings') { json(res, 200, publicSettings(ctx.settings)); return true }
+  // 更新之后旧进程还在跑,启动器会看见版本对不上,叫它退场再起新的。只听本机,别人叫不动
+  if (req.method === 'POST' && p === '/quit') { json(res, 200, { ok: true, bye: true }); setTimeout(() => (ctx.exit || process.exit)(0), 200); return true }
 
   // ── 备份 ──
   if (req.method === 'GET' && p === '/backup/list') { json(res, 200, { dir: ctx.settings.backupDir || '', files: listBackups(ctx.settings.backupDir) }); return true }
