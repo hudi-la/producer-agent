@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "Gemini 默认型号换成 3.1-pro-preview / 3.5-flash(2.5 对新用户 404),模型下线时按接口点名的型号自动换;机会卡的 MCP 工具不再按模块隐藏(模块没开也能加卡)"
+  "note": "型号备选链(Gemini 免费档 key 用不了 pro 时自动落到 flash);桥在工具清单变化时主动通知 Claude 刷新(不用重启);合进作者这两周的改动:对话里「重开一轮」、盒子文本能补能改、条目按钮改叫「展开/收起」"
 }
