@@ -393,6 +393,10 @@ body.resizing .drawer-grip::before { opacity: .75; }
 
 /* 会长高的输入框。圆角从 999px 收到 22px——长成一大块之后，胶囊形的两头会鼓成
    两个半圆，越高越丑。按钮贴底（align-items: flex-end），框往上长，按钮不动。 */
+/* .flat：抽屉里那一份。同样的胶囊、同样那颗圆按钮，只是不浮着——
+   它本来就在最底下一行，不需要再从底部往上抬。 */
+.composer.flat { position: static; transform: none; width: 100%; box-shadow: none; backdrop-filter: none;
+  background: var(--paper-2); }
 .composer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; width: min(var(--focus-col), calc(100% - 2 * var(--focus-pad))); display: flex; align-items: flex-end; gap: 12px; background: color-mix(in srgb, var(--paper-2) 92%, transparent); border: 1px solid var(--line-2); border-radius: 22px; padding: 8px 10px 8px 18px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
 /* 高度由 JS 按内容量出来写在 style 上；这儿只定上限——到 38vh 就不再长，自己滚。
    上下 8px 内边距让单行时的高度正好跟右边那颗圆按钮齐平。 */
@@ -539,6 +543,21 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .echat-hd { position: relative; padding: 18px 44px 14px 20px; border-bottom: 1px solid var(--line);
   font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-3); font-weight: 600; }
+/* 「重开一轮」。放在头上、挨着标题：它是对这一条对话整体的动作，
+   不是对某一句的。 */
+.echat-new { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; vertical-align: 1px;
+  font: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  color: var(--ink-3); background: transparent; border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 2px 8px 2px 6px; cursor: pointer; transition: color .14s, border-color .14s; }
+.echat-new:hover:not(:disabled) { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.echat-new:disabled { opacity: .4; cursor: default; }
+
+/* 那道线。线以上的话没有消失 —— 往上滚就看得见，只是它不再读了。
+   所以画成一道淡淡的分隔，不是一堵墙。 */
+.echat-line { display: flex; align-items: center; gap: 10px; margin: 2px 0;
+  font-size: 10.5px; color: var(--ink-3); }
+.echat-line::before, .echat-line::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+
 .echat-x { position: absolute; top: 14px; right: 14px; width: 24px; height: 24px; line-height: 1;
   font: inherit; font-size: 17px; border: none; border-radius: 7px; background: transparent;
   color: var(--ink-3); cursor: pointer; transition: color .14s, background .14s; }
@@ -548,16 +567,7 @@ body.resizing .drawer-grip::before { opacity: .75; }
 .echat-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px;
   display: flex; flex-direction: column; gap: 16px; }
 .echat-err { margin: 0 16px 8px; font-size: 11.5px; color: var(--accent); line-height: 1.5; }
-.echat-composer { display: flex; align-items: flex-end; gap: 9px; padding: 12px 16px 16px;
-  border-top: 1px solid var(--line); background: var(--paper); }
-.echat-composer textarea { flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 1.6;
-  resize: none; max-height: 38vh; overflow-y: auto; border: 1px solid var(--line-2); border-radius: 12px;
-  padding: 9px 12px; background: var(--paper-2); color: var(--ink); }
-.echat-composer textarea:focus { outline: none; border-color: var(--accent); }
-.echat-composer button { font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 10px;
-  border: none; cursor: pointer; background: var(--ink); color: var(--paper); }
-.echat-composer button:disabled { opacity: .35; cursor: default; }
-.echat-composer button.stop { background: var(--ink-3); }
+.echat-composer { padding: 12px 14px 14px; border-top: 1px solid var(--line); background: var(--paper); }
 
 /* 右边聊的是哪一条，左边那条要认得出来。只加一道竖线，不改底色——
    底色一变，这一栏里哪条展开着就看不清了。 */
@@ -655,7 +665,8 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .chev { color: var(--ink-3); font-size: 20px; line-height: 1; transition: transform .18s; margin-top: 2px;
   background: none; border: 0; padding: 0 2px; cursor: pointer; font-family: inherit; }
 .chev.open { transform: rotate(90deg); }
-/* 档案条目右上角那颗「编辑 / 完成」。长得跟机会卡上「展开」那颗（.desktg）一家：
+/* 档案条目右上角那颗「一起写 / 合上」。它不管改字（改字是双击那一段）——
+   它摊开的是字段、盒子和右边那条对话。长得跟机会卡上「展开」那颗（.desktg）一家：
    胶囊、图标 + 两个字，打开时换强调色不换位——位置一动你就找不到它了。 */
 .edtg { display: inline-flex; align-items: center; gap: 5px; flex: none; margin-top: 1px;
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
@@ -668,10 +679,19 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .box { border-top: 1px dashed var(--line); padding: 13px 13px 14px; display: grid; gap: 8px; }
 .bx-h { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
 .bx-empty { font-size: 12px; color: var(--ink-3); line-height: 1.55; }
+/* 盒子里「+ 补一条」：名字一行、内容一块。名字是自由文本（库里现有的键
+   都是他自己起的名），datalist 只给几个常用的当提示，不拦别的。 */
+.boxadd { display: grid; gap: 6px; margin-top: 4px; }
+.boxadd-k { font-weight: 600; }
 .field { font-size: 12.5px; line-height: 1.55; }
 .field .k { color: var(--ink-3); }
 .field .v { color: var(--ink); }
-.box .add { font-size: 11.5px; color: var(--ink-3); border: 1px dashed var(--line-2); border-radius: 8px; padding: 7px 10px; text-align: center; margin-top: 2px; }
+/* 这一行以前是个 <div>，一行死文字，从头到尾点不动（0129 才接上）。
+   现在是真按钮，所以要有能按的样子。 */
+.box .add { font: inherit; font-size: 11.5px; width: 100%; color: var(--ink-3); background: none;
+  border: 1px dashed var(--line-2); border-radius: 8px; padding: 7px 10px; text-align: center;
+  margin-top: 2px; cursor: pointer; transition: color .14s, border-color .14s; }
+.box .add:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 
 /* ── 造卡任务 modal ── */
 .taskmodal { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-46%) scale(.98); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .24s; z-index: 40; width: min(560px,92vw); max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-2); border-radius: 18px; box-shadow: 0 30px 80px -30px #241f1b99; padding: 24px 24px 26px; }
@@ -825,12 +845,6 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 /* 被新信作废的待办：划掉留痕，不删掉。旁边那个「因为这封信 →」点得回去。 */
 .pf-void { font-size: 12px; color: var(--ink-3); }
 .pf-void s { text-decoration-color: var(--g2); }
-/* 「这次发生了什么」：更新最新信息送进队的卡，对话上方先交代这轮动了什么 */
-/* 你为什么在队里。钉在卡头里（不在对话流上方）——放流里会被「自动滚到底」
-   那个 effect 滚出可视区，东西在但你永远看不见。 */
-.qwhat { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 9px;
-  padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--ink-2);
-  background: var(--accent-soft); display: flex; flex-direction: column; gap: 4px; }
 /* 抽屉里那条活着的待办。原来只显示做完的和作废的 —— 唯独没显示「现在该干什么」。 */
 .pf-live { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
   font-size: 12.5px; color: var(--ink); }

@@ -12,9 +12,10 @@
 // **这儿没有一支给 AI 的写入口，一支都没有。** 书桌上 Fairwind 写不了库：
 // 它写的每个字都是稿子，进档案是他自己复制过去、在那一格里自己改的。
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 
 const needDb = () => {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
 }
 
 /** 拉这一条的对话。没连库时返回 null（跟 fetchMessages 一个规矩）。 */
@@ -23,6 +24,20 @@ export async function fetchStudioThread(entryId) {
   const { data, error } = await supa.rpc('pa_studio_thread', { p_entry_id: entryId })
   if (error) return null
   return data || []
+}
+
+/**
+ * 「重开一轮」：在流里划一道线。返回那条线（空对话、或上一条已经是线时返回 null）。
+ *
+ * 线以上的照常摆在界面上 —— 往上滚就看得见。变的只有一件事：Fairwind 的
+ * prompt 只读最后一道线以下的。**不存档、不藏起来**：藏起来就欠一个
+ * 「翻旧对话」的界面，而没有那个界面时「存起来了」等于「丢了」。
+ */
+export async function restartStudio(entryId) {
+  needDb()
+  const { data, error } = await supa.rpc('pa_restart_studio', { p_entry_id: entryId })
+  if (error) throw new Error(error.message)
+  return data ?? null
 }
 
 /**
@@ -59,7 +74,12 @@ export async function addEntry(kind, title) {
   return data
 }
 
-/** 盒子里补/改一条文本(为什么是现在 / 隐线 / 备注……)。键是自由文本。 */
+/**
+ * 往盒子里补一条 / 改一条。key 是那一条叫什么（为什么是现在 / 隐线 / …）。
+ *
+ * **合并，不替换**：只补一条不该把别的抹掉。删不掉键，只能把值清空——
+ * 空值界面上本来就不显示，看得见的效果就是没了。
+ */
 export async function setEntryBox(id, key, value) {
   needDb()
   const { error } = await supa.rpc('pa_set_entry_box', { p_id: id, p_key: key, p_value: value })

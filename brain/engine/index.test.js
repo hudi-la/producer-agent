@@ -15,3 +15,10 @@ test('providerConfig:按档给模型,没配用默认;没 key 说清;base url 可
   assert.throws(() => providerConfig('good', { FAIRWIND_PROVIDER: 'openai' }), /API key/)
   assert.equal(providerConfig('good', { FAIRWIND_PROVIDER: 'openai', OPENAI_API_KEY: 'k', OPENAI_BASE_URL: 'http://proxy/v1' }).baseURL, 'http://proxy/v1')
 })
+
+test('providerConfig 带备选链:默认是链头,用户指定的放最前、链里去掉它', () => {
+  const g = providerConfig('good', { FAIRWIND_PROVIDER: 'gemini', GEMINI_API_KEY: 'k' })
+  assert.equal(g.model, 'gemini-3.1-pro-preview'); assert.deepEqual(g.fallbacks, ['gemini-3.5-flash', 'gemini-3-flash-preview'])
+  const c = providerConfig('cheap', { FAIRWIND_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', BRAIN_MODEL_CHEAP: 'gemini-3-flash-preview' })
+  assert.equal(c.model, 'gemini-3-flash-preview'); assert.deepEqual(c.fallbacks, ['gemini-3.5-flash', 'gemini-2.5-flash'])
+})

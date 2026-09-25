@@ -76,3 +76,16 @@ test('404 但没点名接替的 → 照旧报错,不瞎换', async () => {
   const fetchImpl = async () => ({ ok: false, status: 404, text: async () => 'not found' })
   await assert.rejects(runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'hi', fetchImpl }), /模型接口回 404/)
 })
+
+test('429 没额度 → 不傻等,直接换备选链下一个;503 重试两次还挤 → 也换', async () => {
+  const models = []
+  const fetchImpl = async (url, init) => {
+    const b = JSON.parse(init.body); models.push(b.model)
+    if (b.model === 'pro') return { ok: false, status: 429, text: async () => '{"error":{"message":"You exceeded your current quota, please check your plan and billing details."}}' }
+    if (b.model === 'flash') return { ok: false, status: 503, text: async () => 'high demand' }
+    return sse([delta({ content: 'ok' })])
+  }
+  const r = await runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'pro', fallbacks: ['flash', 'flash-preview'], prompt: 'hi', fetchImpl })
+  assert.deepEqual(models, ['pro', 'flash', 'flash', 'flash', 'flash-preview'])
+  assert.deepEqual(r.blocks, [{ type: 'text', text: 'ok' }])
+})

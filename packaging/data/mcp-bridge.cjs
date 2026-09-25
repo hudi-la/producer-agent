@@ -57,7 +57,21 @@ async function main() {
   const connect = async () => { try { url = await findUrl(); await client.connect(new StreamableHTTPClientTransport(new URL(url))); return true } catch (e) { process.stderr.write(`mcp-bridge:连不上 ${url}(Fairwind 开着吗?)${e.message}\n`); return false } }
   let up = await connect()
 
-  const server = new Server({ name: 'fairwind', version: '1' }, { capabilities: { tools: {} } })
+  const server = new Server({ name: 'fairwind', version: '1' }, { capabilities: { tools: { listChanged: true } } })
+  // Claude 桌面版只在启动时拿一次工具清单。Fairwind 那头的清单会变(开了邮件模块判据工具才出现;
+  // Fairwind 重启、换端口):每 20 秒对一次,变了就通知它重新拿——不用退出 Claude 再开(9/25 学员撞到)
+  let lastNames = null
+  const poll = async () => {
+    try {
+      if (!up) up = await connect()
+      if (!up) return
+      const { tools } = await client.listTools()
+      const names = tools.map((t) => t.name).sort().join(',')
+      if (lastNames !== null && names !== lastNames) { try { await server.sendToolListChanged() } catch (_) {} }
+      lastNames = names
+    } catch (_) { up = false }
+  }
+  setInterval(poll, 20000).unref()
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     if (!up) up = await connect()
     if (!up) return { tools: [] }

@@ -40,7 +40,8 @@ export async function* sseChunks(body) {
  * @param {Function} [o.fetchImpl]
  * @returns {Promise<{ blocks: object[], usage: object }>}
  */
-export async function runAgent({ baseURL, apiKey, model, system, prompt, tools = [], maxTurns = 20, onEvent = null, abortController = null, fetchImpl = (...a) => globalThis.fetch(...a), log = () => {} }) {
+export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system, prompt, tools = [], maxTurns = 20, onEvent = null, abortController = null, fetchImpl = (...a) => globalThis.fetch(...a), log = () => {} }) {
+  const spare = [...fallbacks]   // 这个型号不行就换下一个(下线 / 没额度 / 挤不上)
   const sys = Array.isArray(system) ? system.map((s) => (typeof s === 'string' ? s : s?.text || '')).join('\n') : (system || '')
   const messages = [...(sys ? [{ role: 'system', content: sys }] : []), { role: 'user', content: prompt }]
   const byName = new Map(tools.map((t) => [t.name, t]))
@@ -62,10 +63,13 @@ export async function runAgent({ baseURL, apiKey, model, system, prompt, tools =
       })
       if (res.ok) break
       const txt = await res.text().catch(() => '')
-      if ((res.status === 429 || res.status >= 500) && attempt < 2) { log(`  ↳ ${res.status},${2 ** attempt}s 后重试`); await sleep(1000 * 2 ** attempt); continue }
+      const quota = res.status === 429 && /quota|billing/i.test(txt)   // 429 两种:挤(等等再试)和没额度(等也没用,换型号)
+      if ((res.status === 429 || res.status >= 500) && !quota && attempt < 2) { log(`  ↳ ${res.status},${2 ** attempt}s 后重试`); await sleep(1000 * 2 ** attempt); continue }
       // 模型下线了(Gemini 对新用户回 404 并点名接替的型号,9/25 学员撞到):照它说的换一次再试
       const hint = res.status === 404 && txt.match(/models\/([\w.-]+)/g)?.map((m) => m.slice(7)).find((m) => m !== model)
-      if (hint && attempt < 2) { log(`  ↳ ${model} 没了,换 ${hint}`); model = hint; body.model = hint; continue }
+      if (hint && attempt < 2 && !spare.includes(hint)) { log(`  ↳ ${model} 没了,换 ${hint}`); model = hint; body.model = hint; continue }
+      // 下线 / 没额度 / 重试完还是挤:顺着备选链换下一个
+      if ((res.status === 404 || quota || res.status === 429 || res.status >= 500) && spare.length) { const next = spare.shift(); log(`  ↳ ${model} ${res.status}${quota ? '(没额度)' : ''},换 ${next}`); model = next; body.model = next; attempt = -1; continue }
       throw new Error(`模型接口回 ${res.status}:${txt.slice(0, 300)}`)
     }
     // 收流:文字边收边报;tool_calls 按 index 拼

@@ -3,10 +3,10 @@ import { t } from '../i18n/index.js'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
 import Identity from './Identity.jsx'
 import { EditRow, InlineText } from './EditRow.jsx'
+import { useGrow } from '../lib/useGrow.js'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
 import { addEntry, setEntryDraft, setEntryBox, setEntryBoxJson } from '../lib/studio.js'
-import { useGrow } from '../lib/useGrow.js'
 import { supa } from '../lib/backends.js'
 import { DB_MODE } from '../lib/backends.js'
 import EntryChat from './EntryChat.jsx'
@@ -126,6 +126,10 @@ function FileLink({ f }) {
   return url ? <a className="v" href={url} target="_blank" rel="noreferrer">{f.name}</a> : <span className="v">{f.name}</span>
 }
 
+// 盒子里能补的那几样。写在这儿是**提示**不是限制：库里现有的键五花八门
+// （guardrail、two_lists、proven_first_email……都是他自己起的名），
+// 写死一份清单就等于把那些键判成非法。所以只做候选，想叫什么都行。
+
 /**
  * 展开后那块「这条的字段」—— 这一类特有的那几条事实（媒介 / 机构 / 年份 / 地点）。
  *
@@ -180,7 +184,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
     <div className={'work' + (active ? ' active' : '')}>
       {/* 这一行以前整个是一个 <button>。改成 div 是因为标题和描述现在要能就地双击编辑——
           输入框套在按钮里既是无效 HTML，点一下还会把整条折起来。
-          点空白处仍然开/关编辑；键盘走右边那个真按钮（编辑 / 完成）。 */}
+          点空白处仍然展开/收起；键盘走右边那个真按钮（展开 / 收起）。 */}
       <div className="work-hd" onClick={toggle}>
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
@@ -203,19 +207,25 @@ function Entry({ e, open, active, onToggle, onSaved }) {
             {e.source === 'website' && <span className="src-tag">{t('读自网站')}</span>}
           </div>
         </div>
-        {/* 以前这儿是 › / ⌄ —— 那个符号说的是「底下还有详情没展开」。可折叠着的时候
-            文案本来就全摆着，打开之后多出来的是字段、盒子、和右边的对话：那是**改这一条**，
-            不是看详情。所以按钮直说：编辑 / 完成。 */}
+        {/* 这颗按钮**不管改字**。改字是双击那一段（InlineText），折叠着也能改，
+            改完那一格自己有「确定 / 取消」—— 两套东西，各管各的。
+            它管的是「把这一条摊开来干活」：在写/写完的开关、字段、盒子，
+            外加右边那条对话。
+            名字换过三回：› （光一个箭头，说的是「底下还有详情」）、「编辑」
+            （那是双击在干的事，屏幕上于是有两个「编辑」各管一半）、「一起写」
+            （把右边那条对话说成了主角，可它主要就是展开）。现在就叫展开，
+            但写成字不留一个光箭头——箭头不说它展开的是什么。 */}
         <button type="button" className={'edtg' + (open ? ' on' : '')} aria-pressed={open}
-                title={open ? t('改完了，收起字段和右边的对话') : t('改这一条：打开字段、盒子，右边开这一条的对话')}
+                title={open ? t('收起字段、盒子和右边的对话（改好的字早存下了，这儿不管存）')
+                            : t('展开这一条：字段、盒子，右边开这一条的对话。里面的字都是双击改')}
                 onClick={(ev) => { ev.stopPropagation(); toggle() }}>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
                strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {open
-              ? <path d="M20 6 9 17l-5-5" />
-              : <><path d="M12 20h9" /><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" /></>}
+              ? <path d="m18 15-6-6-6 6" />
+              : <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" /></>}
           </svg>
-          {open ? t('完成') : t('编辑')}
+          {open ? t('收起') : t('展开')}
         </button>
       </div>
       {open && (

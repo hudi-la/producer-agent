@@ -9,8 +9,10 @@ import { modelFor } from '../models.js'
 
 export const PROVIDERS = {
   claude: { label: 'Claude' },
-  openai: { label: 'GPT', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY', good: 'gpt-5', cheap: 'gpt-5-mini' },
-  gemini: { label: 'Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', good: 'gemini-3.1-pro-preview', cheap: 'gemini-3.5-flash' },
+  // good / cheap 各是一条备选链:第一个是默认;它 404 下线、429 没额度(免费档 key 用不了 pro)、503 挤不上时,
+  // 顺着往下换(engine/openaiCompat.js)。9/25 用免费档 Gemini key 实测:pro 一律 429 没额度,flash 常 503 挤,3.5-flash 和 3-flash-preview 稳。
+  openai: { label: 'GPT', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY', good: ['gpt-5', 'gpt-5-mini'], cheap: ['gpt-5-mini', 'gpt-5'] },
+  gemini: { label: 'Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', good: ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3-flash-preview'], cheap: ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash'] },
 }
 
 /** 现在走哪条。'claude' | 'openai' | 'gemini' */
@@ -26,6 +28,7 @@ export function providerConfig(tier, env = process.env) {
   if (name === 'claude') return null
   const apiKey = env[p.keyEnv]
   if (!apiKey) throw new Error(`选了 ${p.label},但还没填它的 API key(在「关于你 → 账号」里)`)
-  const model = modelFor(tier, env) || (tier === 'cheap' ? p.cheap : p.good)
-  return { name, baseURL: env[`${p.keyEnv.replace('_API_KEY', '')}_BASE_URL`] || p.baseURL, apiKey, model }
+  const chain = tier === 'cheap' ? p.cheap : p.good
+  const model = modelFor(tier, env) || chain[0]
+  return { name, baseURL: env[`${p.keyEnv.replace('_API_KEY', '')}_BASE_URL`] || p.baseURL, apiKey, model, fallbacks: chain.filter((m) => m !== model) }
 }
