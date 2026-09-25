@@ -91,7 +91,8 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
   // ── 机会卡:机会线模块开着才有(表全建、能力分装——关着的模块连工具都不露)──
   const STAGES = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused', 'watch']
   const STAGE_DOC = 'stage:pending 新机会 | matching 匹配项目 | writing 一起写 | sent 发出&提交 | replying 进一步 | won 谈成 | paused 暂停 | watch 持续关注'
-  if (modules?.pursuits) {
+  { // 机会卡的工具**永远在**:模块没开也能加——卡进库,开了模块就看得见。学员在 Claude 里加卡时模块常常还没开,
+    // 而 Claude 桌面版只在启动时拿一次工具清单,门控在这儿等于「没有这个工具」(9/25 Valeria 撞到)
     server.registerTool('fairwind_pursuits_list', {
       title: '列机会卡', description: '看板上的机会线(卡)。要去重、要改某张先调它拿 id。' + STAGE_DOC,
       inputSchema: { stage: z.enum(STAGES).optional() },
@@ -109,7 +110,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
     }, async (a) => {
       try {
         const r = await rpc('pa_create_pursuit', { p_title: a.title, p_kind: a.kind ?? null, p_org: a.org ?? null, p_location: a.location ?? null, p_funding: a.funding ?? null, p_deadline: a.deadline ?? null, p_deadline_at: a.deadline_at ?? null, p_opens_at: a.opens_at ?? null, p_url: a.url ?? null, p_match_stars: a.match_stars ?? null, p_why: a.why ?? null, p_notes: a.notes ?? null, p_eligible: a.eligible ?? true, p_source: 'mcp', p_task_id: null })
-        return text({ ok: true, ...(r && typeof r === 'object' ? r : { id: r }) })
+        return text({ ok: true, ...(r && typeof r === 'object' ? r : { id: r }), ...(modules?.pursuits ? {} : { note: '卡已进库。机会线模块还没开——Fairwind 设置 → 装了哪些 → 打开「机会线」就能在看板上看到' }) })
       } catch (e) { return fail(e) }
     })
     server.registerTool('fairwind_pursuit_set', {

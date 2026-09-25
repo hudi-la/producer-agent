@@ -63,6 +63,9 @@ export async function runAgent({ baseURL, apiKey, model, system, prompt, tools =
       if (res.ok) break
       const txt = await res.text().catch(() => '')
       if ((res.status === 429 || res.status >= 500) && attempt < 2) { log(`  ↳ ${res.status},${2 ** attempt}s 后重试`); await sleep(1000 * 2 ** attempt); continue }
+      // 模型下线了(Gemini 对新用户回 404 并点名接替的型号,9/25 学员撞到):照它说的换一次再试
+      const hint = res.status === 404 && txt.match(/models\/([\w.-]+)/g)?.map((m) => m.slice(7)).find((m) => m !== model)
+      if (hint && attempt < 2) { log(`  ↳ ${model} 没了,换 ${hint}`); model = hint; body.model = hint; continue }
       throw new Error(`模型接口回 ${res.status}:${txt.slice(0, 300)}`)
     }
     // 收流:文字边收边报;tool_calls 按 index 拼

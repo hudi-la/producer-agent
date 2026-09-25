@@ -77,3 +77,18 @@ test('这扇门加的条目默认算写完(draft=false);明说 draft:true 才是
   const byTitle = Object.fromEntries(rows.map((r) => [r.title, r.draft]))
   assert.equal(byTitle['默认写完'], false); assert.equal(byTitle['明说在写'], true)
 })
+
+test('机会线模块没开:机会卡的工具照样在,加卡进库并提示去开模块', async () => {
+  const db2 = await makeLocalDb({ pg, dataDir: dir, user: { id: UID, email: 'a@b.c' } })
+  const srv2 = http.createServer((req, res) => handleMcp(req, res, { db: db2, version: '9.9.9', dataDir: dir, modules: { profile: true, pursuits: false, mail: false } }))
+  await new Promise((ok) => srv2.listen(0, '127.0.0.1', ok))
+  const c2 = new Client({ name: 't2', version: '1' }); await c2.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${srv2.address().port}/mcp`)))
+  const { tools } = await c2.listTools()
+  assert.ok(tools.some((t) => t.name === 'fairwind_pursuit_add') && tools.some((t) => t.name === 'fairwind_pursuits_list'), '模块关着也列得到机会卡工具')
+  assert.ok(!tools.some((t) => t.name === 'fairwind_judgments_write'), '判据仍跟邮件走')
+  const r = await c2.callTool({ name: 'fairwind_pursuit_add', arguments: { title: '模块没开时加的' } })
+  const j = JSON.parse(r.content[0].text); assert.equal(j.ok, true); assert.match(j.note || '', /机会线模块还没开/)
+  const rows = JSON.parse((await c2.callTool({ name: 'fairwind_pursuits_list', arguments: {} })).content[0].text)
+  assert.ok(rows.some((x) => x.title === '模块没开时加的'))
+  await c2.close(); srv2.close()
+})

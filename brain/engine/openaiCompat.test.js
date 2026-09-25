@@ -59,3 +59,20 @@ test('到 maxTurns 就停,不死循环', async () => {
   const r = await runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'p', tools: [tool], maxTurns: 3, fetchImpl })
   assert.equal(r.usage.turns, 3); assert.equal(r.blocks.filter((b) => b.type === 'tool_use').length, 3)
 })
+
+test('模型下线回 404 并点名接替型号 → 自动换那个再试一次(Gemini 2.5 对新用户的那种)', async () => {
+  const models = []
+  const fetchImpl = async (url, init) => {
+    const b = JSON.parse(init.body); models.push(b.model)
+    if (b.model === 'gemini-2.5-pro') return { ok: false, status: 404, text: async () => '[{"error":{"code":404,"message":"This model models/gemini-2.5-pro is no longer available to new users. Please update your code to use models/gemini-3.1-pro-preview for the latest features"}}]' }
+    return sse([delta({ content: 'ok' })])
+  }
+  const r = await runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'gemini-2.5-pro', prompt: 'hi', fetchImpl })
+  assert.deepEqual(models, ['gemini-2.5-pro', 'gemini-3.1-pro-preview'])
+  assert.deepEqual(r.blocks, [{ type: 'text', text: 'ok' }])
+})
+
+test('404 但没点名接替的 → 照旧报错,不瞎换', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 404, text: async () => 'not found' })
+  await assert.rejects(runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'hi', fetchImpl }), /模型接口回 404/)
+})

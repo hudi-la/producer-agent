@@ -41,7 +41,9 @@ if (!exists) run(`gh release create v${version} --repo ${REPO} --prerelease --ti
 else run(`gh release edit v${version} --repo ${REPO} --prerelease`)
 const relId = sh(`gh api repos/${REPO}/releases/tags/v${version} --jq .id`)
 const token = sh('gh auth token')
-const sizeOf = (name) => sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name == "${name}") | .size'`)
+// 只认 state=uploaded 的:传到一半断了 GitHub 会留一条 state=starter 的僵尸记录,
+// 它带着请求头里声明的 size(文件体根本没到),光比尺寸会被它骗过去——9/24 就是这么发出一个没有包的版本的
+const sizeOf = (name) => sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name == "${name}" and .state == "uploaded") | .size'`)
 const dropAsset = (name) => { for (const id of sh(`gh api repos/${REPO}/releases/${relId}/assets --jq '.[] | select(.name == "${name}") | .id'`).split('\n').filter(Boolean)) sh(`gh api -X DELETE repos/${REPO}/releases/assets/${id}`) }
 // 每个 zip:先 gh(Go 的 http),不行换 node 的 fetch;本机对大文件的 TLS 时好时坏,两条路轮着来
 for (const zip of zips) {

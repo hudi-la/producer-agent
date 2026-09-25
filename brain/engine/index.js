@@ -10,7 +10,7 @@ import { modelFor } from '../models.js'
 export const PROVIDERS = {
   claude: { label: 'Claude' },
   openai: { label: 'GPT', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY', good: 'gpt-5', cheap: 'gpt-5-mini' },
-  gemini: { label: 'Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', good: 'gemini-2.5-pro', cheap: 'gemini-2.5-flash' },
+  gemini: { label: 'Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', good: 'gemini-3.1-pro-preview', cheap: 'gemini-3.5-flash' },
 }
 
 /** 现在走哪条。'claude' | 'openai' | 'gemini' */
