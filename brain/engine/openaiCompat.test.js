@@ -89,3 +89,15 @@ test('429 没额度 → 不傻等,直接换备选链下一个;503 重试两次�
   assert.deepEqual(models, ['pro', 'flash', 'flash', 'flash', 'flash-preview'])
   assert.deepEqual(r.blocks, [{ type: 'text', text: 'ok' }])
 })
+
+test('Gemini 3.x 的 thought_signature(extra_content)下一轮原样带回去', async () => {
+  const reqs = []
+  const fetchImpl = async (url, init) => {
+    reqs.push(JSON.parse(init.body))
+    if (reqs.length === 1) return sse([delta({ tool_calls: [{ index: 0, id: 'c1', extra_content: { google: { thought_signature: 'SIG' } }, function: { name: 'lookup', arguments: '{"q":"x"}' } }] })])
+    return sse([delta({ content: 'done' })])
+  }
+  await runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'hi', fetchImpl, tools: [{ name: 'lookup', description: 'd', input_schema: { type: 'object', properties: {} }, handler: async () => 'r' }] })
+  const asst = reqs[1].messages.find((m) => m.role === 'assistant' && m.tool_calls)
+  assert.deepEqual(asst.tool_calls[0].extra_content, { google: { thought_signature: 'SIG' } })
+})

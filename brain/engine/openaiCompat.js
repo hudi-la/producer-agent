@@ -86,8 +86,10 @@ export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system,
       }
       for (const tc of d.tool_calls || []) {
         const i = tc.index ?? calls.length
-        if (!calls[i]) { calls[i] = { id: tc.id || `call_${turn}_${i}`, name: '', args: '' } }
+        if (!calls[i]) { calls[i] = { id: tc.id || `call_${turn}_${i}`, name: '', args: '', extra: null } }
         if (tc.id) calls[i].id = tc.id
+        // Gemini 3.x 在 tool_call 上带 extra_content.google.thought_signature,下一轮**必须原样带回去**,不然 400(9/29 学员机器上撞到)
+        if (tc.extra_content) calls[i].extra = tc.extra_content
         if (tc.function?.name) { calls[i].name += tc.function.name; log(`  ↳ 动工具 ${((Date.now() - t0) / 1000).toFixed(1)}s:${calls[i].name}`); tell?.({ t: 'tool', name: calls[i].name }) }
         if (tc.function?.arguments) calls[i].args += tc.function.arguments
       }
@@ -96,7 +98,7 @@ export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system,
     const live = calls.filter(Boolean)
     if (!live.length) break
     // 跑工具
-    messages.push({ role: 'assistant', content: text || null, tool_calls: live.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.args || '{}' } })) })
+    messages.push({ role: 'assistant', content: text || null, tool_calls: live.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.args || '{}' }, ...(c.extra ? { extra_content: c.extra } : {}) })) })
     const images = []
     for (const c of live) {
       let input = {}; try { input = JSON.parse(c.args || '{}') } catch (_) {}
@@ -105,6 +107,7 @@ export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system,
       let out
       if (!spec) out = { content: [{ type: 'text', text: `没有叫 ${c.name} 的工具` }] }
       else { try { out = await spec.handler(input) } catch (e) { out = { content: [{ type: 'text', text: `工具出错:${e.message}` }] } } }
+      if (typeof out === 'string') out = { content: [{ type: 'text', text: out }] }   // handler 直接回字符串也收
       const texts = [], imgs = []
       for (const part of out?.content || []) { if (part.type === 'text') texts.push(part.text); else if (part.type === 'image') imgs.push(part) }
       messages.push({ role: 'tool', tool_call_id: c.id, content: texts.join('\n') || (imgs.length ? '(图在下一条消息里)' : '(空)') })

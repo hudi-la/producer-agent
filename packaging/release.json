@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "型号备选链(Gemini 免费档 key 用不了 pro 时自动落到 flash);桥在工具清单变化时主动通知 Claude 刷新(不用重启);合进作者这两周的改动:对话里「重开一轮」、盒子文本能补能改、条目按钮改叫「展开/收起」"
+  "note": "Gemini 3.x 用工具时 400(thought_signature 没带回去)——修了;工具回字符串也收"
 }
