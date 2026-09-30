@@ -137,9 +137,21 @@ function Scheduled({ task, tz, brainUp, onChanged }) {
       {task.last_result && (
         <>
           <div className="tk-k tk-k2">{t('上次')}</div>
-          <pre className="tk-result">{task.last_result}</pre>
+          <Report text={task.last_result} />
         </>
       )}
+    </div>
+  )
+}
+
+/** 战报:第一行是日期,后面一步一条。以前是整段 <pre> 贴出来,报错 JSON 也原样露着,像草稿(9/29 他指出来) */
+function Report({ text, past = false }) {
+  const lines = String(text || '').split('\n').map((l) => l.trim()).filter(Boolean)
+  const [head, ...steps] = lines
+  return (
+    <div className={'tk-result' + (past ? ' past' : '')}>
+      {head && <div className="tk-result-d">{head}</div>}
+      <ul>{steps.map((l, i) => <li key={i}>{l}</li>)}</ul>
     </div>
   )
 }
@@ -237,7 +249,7 @@ export default function TasksPanel({ tasks, open, onClose, brain = null, tz, onC
                       {/* 这儿**不写 TASK_DESC** —— 那句话（「它开下一轮 open call 就造张卡」）
                           描述的是这类任务本来会干的事，而这几条现在什么都不干。
                           战报说的才是真发生过的事。 */}
-                      {tk.last_result && <pre className="tk-result past">{tk.last_result}</pre>}
+                      {tk.last_result && <Report text={tk.last_result} past />}
                     </div>
                     <span className="task-when">{ago(tk.last_run_at) || t('跑过')}</span>
                   </div>

@@ -248,14 +248,37 @@ const names = (xs, n = 8) => {
   return list.slice(0, n).join(' · ') + (list.length > n ? ` …等 ${list.length} 个` : '')
 }
 
-/** 三步各说一句。写进 tasks.last_result，面板上「上次」就是它。 */
+/** 报错原文瘦成一句:模型接口回的 JSON 只留 message,再截到 160 字。战报是给人看的,不贴整段 JSON。 */
+export function brief(msg) {
+  let m = String(msg || '').replace(/\s+/g, ' ').trim()
+  const j = m.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (j) m = (m.match(/^模型接口回 \d+/) || m.match(/^[^:\[{]{0,40}/) || [''])[0].replace(/[:：\s]+$/, '') + (j ? ':' + j[1].replace(/\\"/g, '"') : '')
+  return m.length > 160 ? m.slice(0, 157) + '…' : m
+}
+
+/** 三步各说一句。写进 tasks.last_result，面板上「上次」就是它。按 FAIRWIND_LANG 写中文或英文(学员首启选的语言)。 */
 export function report3({
   today,
   checked = [], opened = [], closedNow = [], leftToCheck = 0,
   found = [], dupFound = [], skipped = [],
   judged = [], made = [], overCap = [], held = [], cardCap = 12,
 }) {
+  const en = process.env.FAIRWIND_LANG === 'en'
   const L = [today]
+  const sk = (s) => `${s.title}${s.why ? `（${brief(s.why)}）` : ''}`
+  if (en) {
+    L.push(checked.length
+      ? `Rechecked ${checked.length}: ${opened.length} opened${opened.length ? ` (${names(opened)})` : ''}, ${closedNow.length} closed, ${checked.length - opened.length - closedNow.length} unchanged; ${leftToCheck} still waiting.`
+      : 'Recheck: nothing due this round.')
+    L.push(found.length ? `Found ${found.length} new, added to the pool: ${names(found)}.` : 'Search: nothing new this round.')
+    if (dupFound.length) L.push(`Already in the pool, skipped ${dupFound.length}: ${names(dupFound)}.`)
+    if (skipped.length) L.push(`Looked at but not added, ${skipped.length}: ${skipped.map(sk).join(' · ')}.`)
+    if (judged.length) L.push(`Judged reach for ${judged.length}: ${judged.map((j) => `${j.title} → ${j.label}${j.why ? ` (${j.why})` : ''}`).join('; ')}.`)
+    L.push(made.length ? `Made ${made.length} card${made.length > 1 ? 's' : ''}: ${names(made)}.` : 'No card qualified this round.')
+    if (overCap.length) L.push(`${overCap.length} more qualified but not made this round (max ${cardCap} per round): ${names(overCap)}. Next round continues.`)
+    if (held.length) L.push(`${held.length} open but below the card threshold, kept in the pool — pick them up yourself if you want: ${names(held)}.`)
+    return L.join('\n')
+  }
   L.push(checked.length
     ? `复查 ${checked.length} 行：${opened.length} 个开了${opened.length ? `（${names(opened)}）` : ''}，${closedNow.length} 个关了，${checked.length - opened.length - closedNow.length} 个没变；还有 ${leftToCheck} 行没轮到。`
     : `复查：这轮没有该查的行。`)
@@ -263,7 +286,7 @@ export function report3({
     ? `找到 ${found.length} 个新的进表：${names(found)}。`
     : '找新的：这轮没有新的。')
   if (dupFound.length) L.push(`表里已有、跳过 ${dupFound.length} 个：${names(dupFound)}。`)
-  if (skipped.length) L.push(`查了没收 ${skipped.length} 个：${skipped.map((s) => `${s.title}${s.why ? `（${s.why}）` : ''}`).join(' · ')}。`)
+  if (skipped.length) L.push(`查了没收 ${skipped.length} 个：${skipped.map(sk).join(' · ')}。`)
   if (judged.length) {
     L.push(`判了 ${judged.length} 个够不够得着：${judged.map((j) => `${j.title} → ${j.label}${j.why ? `（${j.why}）` : ''}`).join('；')}。`)
   }

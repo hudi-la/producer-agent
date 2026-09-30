@@ -1850,7 +1850,7 @@ async function runScoutTask(t) {
     const parsed = parseCards(text)
     if (!parsed) {
       console.warn(`  ⚠️ 找新的这一步没按格式报。它说的是：\n${text.slice(0, 1200)}`)
-      R.skipped.push({ title: '（找新的这一步）', why: '没按格式报，这轮没收到任何新行' })
+      R.skipped.push({ title: process.env.FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: process.env.FAIRWIND_LANG === 'en' ? 'reply was not in the expected format; nothing was added this round' : '没按格式报，这轮没收到任何新行' })
     } else {
       if (parsed.said) console.log(`  ↳ 它说：${parsed.said.slice(0, 300).replace(/\n+/g, ' ')}`)
       const { take, dup } = pick(parsed.cards, existing)
@@ -1872,7 +1872,7 @@ async function runScoutTask(t) {
   } catch (err) {
     // 找新的挂了不该把复查的成果一起丢掉 —— 那一步已经写库了
     console.error(`  ✗ 找新的这一步没成：${err.message}`)
-    R.skipped.push({ title: '（找新的这一步）', why: err.message })
+    R.skipped.push({ title: process.env.FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: err.message })   // report3 里 brief() 会把报错瘦成一句
   }
 
   // ══ 第三步 · 挑 ═════════════════════════════════════════════
@@ -1957,7 +1957,7 @@ async function scoutPass() {
         const out = await runScoutTask(t)
         lastScout = { at, ok: out.ok, task: t.name,
           note: out.ok
-            ? `「${t.name}」跑完：复查 ${out.checked} 行 · 进表 ${out.found} 个 · 造卡 ${out.made} 张`
+            ? (process.env.FAIRWIND_LANG === 'en' ? `"${t.name}" done: rechecked ${out.checked} · added ${out.found} · made ${out.made} card(s)` : `「${t.name}」跑完：复查 ${out.checked} 行 · 进表 ${out.found} 个 · 造卡 ${out.made} 张`)
             : `「${t.name}」没跑成` }
       } catch (err) {
         console.error(`  ✗ 「${t.name}」没跑成：${err.message}`)

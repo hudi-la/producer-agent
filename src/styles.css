@@ -721,7 +721,11 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .tk-prompt:hover { border-color: var(--line-2); }
 .tk-ta { font: inherit; font-size: 12.5px; line-height: 1.55; width: 100%; margin-left: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; resize: none; max-height: 70vh; overflow-y: auto; }
 .tk-hint { font-size: 11px; color: var(--ink-3); margin-top: 6px; line-height: 1.5; }
-.tk-result { font: inherit; font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--ink-2); }
+.tk-result { font: inherit; font-size: 12px; line-height: 1.55; word-break: break-word; margin: 0; color: var(--ink-2); }
+.tk-result-d { font-size: 11px; color: var(--ink-3); margin-bottom: 2px; }
+.tk-result ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.tk-result li { padding-left: 12px; position: relative; }
+.tk-result li::before { content: ''; position: absolute; left: 0; top: .6em; width: 5px; height: 5px; border-radius: 50%; background: var(--line-2); }
 .tk-warn { font-size: 12.5px; line-height: 1.5; padding: 9px 12px; border-radius: 10px; margin: 0 0 12px; background: color-mix(in srgb, var(--wait) 11%, var(--paper)); color: var(--ink); }
 .tk-warn code { font-size: 12px; }
 /* 面板分组：只有第一组是真会跑的，后面几组连开关都没有 */

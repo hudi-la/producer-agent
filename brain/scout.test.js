@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  tail, fullPrompt, parseCards, pick, pickable, report3,
+  tail, fullPrompt, parseCards, pick, pickable, report3, brief,
   checkPrompt, parseChecks, checkCapOf, reachCapOf, cardCapOf,
   CARDS_MARK, CHECKS_MARK, profileBlock } from './scout.js'
 
@@ -179,4 +179,23 @@ test('{{画像}} 换成档案;没占位符的提示词一个字不动;档案空�
   assert.ok(!out.includes('{{画像}}'))
   const same = fullPrompt({ prompt: '手写画像,没占位符' }, ctx); assert.ok(same.startsWith('手写画像,没占位符\n\n== 今天是'))
   assert.match(profileBlock({ profile: null }), /档案还没填/)
+})
+
+test('brief:模型接口回的整段 JSON 只留 message 一句,截到 160 字', () => {
+  const raw = '模型接口回 404:[{\n  "error": {\n    "code": 404,\n    "message": "This model models/gemini-2.5-pro is no longer available to new users. Please update your code to use models/gemini-3.1-pro-preview for the latest features and improvements. We recommend you to use the Interactions API (https://ai.google.dev/gemini-api)."\n  }\n}]'
+  const b = brief(raw)
+  assert.match(b, /^模型接口回 404:This model models\/gemini-2\.5-pro is no longer available/)
+  assert.ok(!b.includes('{') && !b.includes('"code"') && b.length <= 160, b)
+  assert.equal(brief('没按格式报'), '没按格式报')
+  const r = report3({ today: '2026-09-29', skipped: [{ title: '（找新的这一步）', why: raw }] })
+  assert.ok(!r.includes('"error"') && r.includes('（找新的这一步）（模型接口回 404:This model'), r)
+})
+
+test('report3 按 FAIRWIND_LANG 写英文', () => {
+  const was = process.env.FAIRWIND_LANG; process.env.FAIRWIND_LANG = 'en'
+  try {
+    const r = report3({ today: '2026-09-29', found: [{ title: 'Yaddo' }], made: [{ title: 'Yaddo' }] })
+    assert.match(r, /Recheck: nothing due this round/); assert.match(r, /Found 1 new, added to the pool: Yaddo/); assert.match(r, /Made 1 card: Yaddo/)
+    assert.ok(!/[\u4e00-\u9fff]/.test(r), '英文战报里不该有中文:' + r)
+  } finally { if (was === undefined) delete process.env.FAIRWIND_LANG; else process.env.FAIRWIND_LANG = was }
 })
