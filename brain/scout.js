@@ -256,15 +256,43 @@ export function brief(msg) {
   return m.length > 160 ? m.slice(0, 157) + '…' : m
 }
 
+/** 这一步是被什么停下的:没额度 / 型号下线 / 挤不上 / 别的。战报头一句按它说人话。 */
+export function haltKind(msg) {
+  const m = String(msg || '')
+  if (/429/.test(m) && /quota|billing/i.test(m)) return 'quota'
+  if (/模型接口回 404|\b404\b/.test(m)) return 'model'
+  if (/模型接口回 (429|5\d\d)/.test(m)) return 'busy'
+  return 'error'
+}
+const STEP = { recheck: ['复查', 'recheck'], search: ['找新的', 'search'], judge: ['判够不够得着', 'reach judging'] }
+/** 停下来的那一句:放在战报最上面,说清停在哪一步、为什么、接下来怎么办。已做完的部分不丢。 */
+function haltLine(halts, en) {
+  if (!halts?.length) return null
+  const kinds = new Set(halts.map((h) => haltKind(h.why)))
+  const steps = [...new Set(halts.map((h) => h.step))].map((s) => (STEP[s] || [s, s])[en ? 1 : 0]).join(en ? ', ' : '、')
+  const why = brief(halts[0].why)
+  if (kinds.has('quota')) return en
+    ? `⚠️ The model ran out of quota — this run stopped at: ${steps}. What was finished is kept. Quota resets daily (Gemini free tier: midnight Pacific); press "Run now" again then, or add billing to the key. (${why})`
+    : `⚠️ 模型没额度了——这轮停在：${steps}。做完的部分留着。额度每天重置（Gemini 免费档：太平洋时间零点），到时再点「现在跑一次」，或者给 key 开计费。（${why}）`
+  if (kinds.has('model')) return en
+    ? `⚠️ The model is no longer available — this run stopped at: ${steps}. Update Fairwind, or pick another model under Settings → Model source. (${why})`
+    : `⚠️ 这个型号不能用了——这轮停在：${steps}。更新 Fairwind，或去「设置 → 模型来源」换一个。（${why}）`
+  if (kinds.has('busy')) return en
+    ? `⚠️ The model was overloaded — this run stopped at: ${steps}. Nothing is lost; try "Run now" again later. (${why})`
+    : `⚠️ 模型那边挤不上——这轮停在：${steps}。没丢东西，过会儿再点「现在跑一次」。（${why}）`
+  return en ? `⚠️ This run stopped at: ${steps}. (${why})` : `⚠️ 这轮停在：${steps}。（${why}）`
+}
+
 /** 三步各说一句。写进 tasks.last_result，面板上「上次」就是它。按 FAIRWIND_LANG 写中文或英文(学员首启选的语言)。 */
 export function report3({
   today,
   checked = [], opened = [], closedNow = [], leftToCheck = 0,
   found = [], dupFound = [], skipped = [],
-  judged = [], made = [], overCap = [], held = [], cardCap = 12,
+  judged = [], made = [], overCap = [], held = [], cardCap = 12, halts = [],
 }) {
   const en = process.env.FAIRWIND_LANG === 'en'
   const L = [today]
+  const hl = haltLine(halts, en); if (hl) L.push(hl)
   const sk = (s) => `${s.title}${s.why ? `（${brief(s.why)}）` : ''}`
   if (en) {
     L.push(checked.length

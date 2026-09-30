@@ -33,6 +33,8 @@ curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download
 | GPT | `sk-…` | platform.openai.com → API keys |
 | Gemini | `AIza…` | aistudio.google.com/apikey |
 
+关于 Gemini：免费档平时够用（读卡、一起写、聊档案），但**每周找机会那一轮要几十上百次请求，免费档一天的额度多半跑不完一轮**，会停下来并在战报头一句告诉你。要它跑完，在 aistudio 给 key 绑一张卡（一轮几毛钱），或者用 Claude。
+
 4. **备份放哪个文件夹**（可先空着）：选一个在 iCloud Drive 或 Google Drive 里的文件夹，备份就自动上了你自己的云。每天一份、更新前一份、留 14 份。
 
 按「开始」。
@@ -141,6 +143,8 @@ The page asks for three things, all stored only on this machine:
 | Claude subscription (Pro / Max) | login token `sk-ant-oat01-…` | run `claude setup-token` in Terminal and paste the output (install Claude Code first: `npm install -g @anthropic-ai/claude-code`) |
 | GPT | `sk-…` | platform.openai.com → API keys |
 | Gemini | `AIza…` | aistudio.google.com/apikey |
+
+About Gemini: the free tier is fine for daily use (reading cards, writing together, profile chat), but **the weekly opportunity scout makes dozens to a hundred requests and usually won't finish on a free day's quota**; it stops and says so in the first line of its report. To let it finish, add a card to the key in aistudio (a run costs cents) or use Claude.
 
 4. **Backup folder** (optional): pick one inside iCloud Drive or Google Drive and backups go to your own cloud. Daily, plus one before every update; 14 are kept.
 

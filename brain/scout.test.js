@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  tail, fullPrompt, parseCards, pick, pickable, report3, brief,
+  tail, fullPrompt, parseCards, pick, pickable, report3, brief, haltKind,
   checkPrompt, parseChecks, checkCapOf, reachCapOf, cardCapOf,
   CARDS_MARK, CHECKS_MARK, profileBlock } from './scout.js'
 
@@ -198,4 +198,16 @@ test('report3 按 FAIRWIND_LANG 写英文', () => {
     assert.match(r, /Recheck: nothing due this round/); assert.match(r, /Found 1 new, added to the pool: Yaddo/); assert.match(r, /Made 1 card: Yaddo/)
     assert.ok(!/[\u4e00-\u9fff]/.test(r), '英文战报里不该有中文:' + r)
   } finally { if (was === undefined) delete process.env.FAIRWIND_LANG; else process.env.FAIRWIND_LANG = was }
+})
+
+test('停下来的那一句在最上面:没额度 / 型号下线 / 挤,各说各的;中英文', () => {
+  const quota = '模型接口回 429:[{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details."}}]'
+  assert.equal(haltKind(quota), 'quota'); assert.equal(haltKind('模型接口回 404:gone'), 'model'); assert.equal(haltKind('模型接口回 503:busy'), 'busy'); assert.equal(haltKind('boom'), 'error')
+  const r = report3({ today: '2026-09-29', checked: [{ title: 'A' }], halts: [{ step: 'search', why: quota }, { step: 'judge', why: quota }] })
+  const lines = r.split('\n')
+  assert.match(lines[1], /^⚠️ 模型没额度了——这轮停在：找新的、判够不够得着。做完的部分留着。额度每天重置/)
+  assert.match(lines[2], /^复查 1 行/, '复查的成果还在')
+  const was = process.env.FAIRWIND_LANG; process.env.FAIRWIND_LANG = 'en'
+  try { const e = report3({ today: '2026-09-29', halts: [{ step: 'search', why: '模型接口回 404:This model models/x is no longer available' }] }).split('\n')[1]; assert.match(e, /^⚠️ The model is no longer available — this run stopped at: search\./) }
+  finally { if (was === undefined) delete process.env.FAIRWIND_LANG; else process.env.FAIRWIND_LANG = was }
 })

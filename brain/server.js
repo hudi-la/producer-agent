@@ -1778,7 +1778,7 @@ async function runScoutTask(t) {
   const tz = profile?.data?.tz || 'America/Los_Angeles'
   const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })   // YYYY-MM-DD，按当地
 
-  const R = { today, cardCap: cardCapOf(t) }
+  const R = { today, cardCap: cardCapOf(t), halts: [] }   // halts:哪一步被什么停了(没额度 / 型号下线…),战报头一句说清
 
   // ══ 第一步 · 复查池子 ═══════════════════════════════════════
   //
@@ -1806,6 +1806,7 @@ async function runScoutTask(t) {
       checks = parseChecks(text)
     } catch (err) {
       console.warn(`  ⚠️ 复查第 ${i / CHECK_BATCH + 1} 批没成：${err.message}`)
+      if (!R.halts.some((h) => h.step === 'recheck')) R.halts.push({ step: 'recheck', why: err.message })
       continue                       // 这一批留着下轮再查，不写库
     }
     if (!checks) { console.warn(`  ⚠️ 复查第 ${i / CHECK_BATCH + 1} 批没按格式报，跳过不写库`); continue }
@@ -1872,6 +1873,7 @@ async function runScoutTask(t) {
   } catch (err) {
     // 找新的挂了不该把复查的成果一起丢掉 —— 那一步已经写库了
     console.error(`  ✗ 找新的这一步没成：${err.message}`)
+    R.halts.push({ step: 'search', why: err.message })
     R.skipped.push({ title: process.env.FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: err.message })   // report3 里 brief() 会把报错瘦成一句
   }
 
@@ -1907,6 +1909,7 @@ async function runScoutTask(t) {
         console.log(`  · ${o.title} → ${REACH_LABEL[v.reach]}${v.why ? `（${v.why}）` : ''}`)
       } catch (err) {
         console.warn(`  ⚠️ 「${o.title}」判不成：${err.message}`)
+        if (!R.halts.some((h) => h.step === 'judge')) R.halts.push({ step: 'judge', why: err.message })
       }
     }
     open = await openRows()          // 拿刚写进去的 reach 重排

@@ -151,7 +151,7 @@ function Report({ text, past = false }) {
   return (
     <div className={'tk-result' + (past ? ' past' : '')}>
       {head && <div className="tk-result-d">{head}</div>}
-      <ul>{steps.map((l, i) => <li key={i}>{l}</li>)}</ul>
+      <ul>{steps.map((l, i) => <li key={i} className={l.startsWith('⚠️') ? 'warn' : undefined}>{l}</li>)}</ul>
     </div>
   )
 }
