@@ -61,7 +61,7 @@ for (const zip of zips) {
   if (!up) { console.error(`${zipName} 传不上去,网络的事。版本留在预发布,再跑一次这条命令接着传`); process.exit(1) }
 }
 run(`gh release upload v${version} --repo ${REPO} --clobber packaging/out/latest.json packaging/install.sh`)
-run(`gh release edit v${version} --repo ${REPO} --prerelease=false`)
+run(`gh release edit v${version} --repo ${REPO} --prerelease=false --latest`)   // 发布库里所有 release 指向同一个 commit,GitHub 分不出先后,得明说这个是最新
 say('校验')
 const assets = sh(`gh release view v${version} --repo ${REPO} --json assets -q '.assets[] | .name + " " + (.size|tostring)'`)
 console.log(assets)
