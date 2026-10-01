@@ -19,6 +19,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 import { toSdkServer, defineTool, builtinTools } from './engine/tools.js'
 import { engineOf, providerConfig, PROVIDERS } from './engine/index.js'
 import { runAgent } from './engine/openaiCompat.js'
+import { runCodex } from './engine/codex.js'
 // 给 Claude Code / GPT 桌面版开的门:档案那几个工具做成 MCP(brain/mcp.js)
 import { handleMcp } from './mcp.js'
 import { localizeSeedTask } from './scoutDefault.js'
@@ -507,7 +508,7 @@ async function thinkViaCompat(cfg, prompt, tools, system, abortController, mcpSe
   for (const server of Object.values(mcpServers || {})) for (const sp of server?.__specs || []) if (want.has(sp.fullName)) specs.push(sp)
   const dropped = [...want].filter((n) => n.startsWith('mcp__claude_ai_') || n === 'ToolSearch')
   if (dropped.length) console.log(`  ↳ ${PROVIDERS[cfg.name].label} 没有这些工具,这次不带:${dropped.join('、')}`)
-  const { blocks, usage } = await runAgent({ ...cfg, system: asSystem(system), prompt, tools: specs, maxTurns, onEvent, abortController, log: (m) => console.log(m) })
+  const { blocks, usage } = await (cfg.name === 'chatgpt-subscription' ? runCodex : runAgent)({ ...cfg, system: asSystem(system), prompt, tools: specs, maxTurns, onEvent, abortController, log: (m) => console.log(m) })
   const n = (x) => x.toLocaleString('en-US')
   console.log(`  ↳ ${PROVIDERS[cfg.name].label}(${cfg.model}) token:入 ${n(usage.inp)} / 缓存读 ${n(usage.cacheRead)} / 出 ${n(usage.out)}`)
   const { text, notes, recovered } = foldReply(blocks)
@@ -2368,7 +2369,7 @@ async function main() {
   server.listen(PORT, () => {
   console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
   console.log(`   放行来源：${ORIGIN}`)
-  console.log(engineOf() !== 'claude' ? `   模型：${PROVIDERS[engineOf()].label}（你自己的 API key）\n` : process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
+  console.log(engineOf() === 'chatgpt-subscription' ? '   模型：ChatGPT 订阅（Codex）\n' : engineOf() !== 'claude' ? `   模型：${PROVIDERS[engineOf()].label}（你自己的 API key）\n` : process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
   applyTimers()
   })
 }

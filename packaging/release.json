@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "找机会中途停下(没额度 / 型号下线 / 挤不上)时,战报第一句说清停在哪一步、为什么、接下来怎么办;做完的部分留着"
+  "note": "新增 ChatGPT 订阅：在模型来源登录 ChatGPT，无需 API key；聊天、找机会和工具调用可使用订阅额度。"
 }

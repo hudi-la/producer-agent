@@ -115,7 +115,7 @@ export function LocalAccount() {
         <small>{t('选完页面会按新语言重开')}</small></label>
       <F k="email" label={t('邮箱')} type="email" hint={t('只用来在这台机器上认出你')} />
       <div className="la-row"><span className="la-k">{t('模型来源')}</span>
-        <ProviderPicker compact value={form.provider} onChange={(v) => setForm((f) => ({ ...f, provider: v }))}
+        <ProviderPicker compact value={form.provider} onChange={(v) => setForm((f) => ({ ...f, provider: v, ...((v === 'chatgpt-subscription' || f.provider === 'chatgpt-subscription') ? { model: '', modelCheap: '' } : {}) }))}
           keys={form} onKey={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
           hints={{ apiKey: cur.apiKeySet ? cur.apiKeyHint : '', oauthToken: cur.oauthTokenSet ? cur.oauthTokenHint : '', openaiKey: cur.openaiKeySet ? cur.openaiKeyHint : '', geminiKey: cur.geminiKeySet ? cur.geminiKeyHint : '' }} /></div>
       <F k="model" label={t('好档模型')} placeholder={t('空 = 默认')} hint={t('聊天、写信、讲懂用这档')} />

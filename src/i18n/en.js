@@ -6,6 +6,15 @@ import b from './en.pursuits-b.js'
 import c from './en.misc-c.js'
 
 const base = {
+  '开始使用': 'Start',
+  'ChatGPT 订阅': 'ChatGPT subscription',
+  '通过 Codex 使用你的 ChatGPT 订阅额度，无需 API key。额度和模型取决于你的套餐。': 'Use your ChatGPT subscription through Codex, without an API key. Limits and models depend on your plan.',
+  '重新登录 ChatGPT': 'Sign in to ChatGPT again',
+  '已连接 ChatGPT': 'ChatGPT connected', '登录 ChatGPT': 'Sign in with ChatGPT',
+  '正在连接…': 'Connecting…', '打开 ChatGPT 登录页面': 'Open ChatGPT sign-in',
+  '登录完成后回到这里，再保存或开始。': 'After signing in, return here and select Save or Start.',
+  '填写邮箱并登录 ChatGPT': 'Enter your email and sign in with ChatGPT',
+
   // ── 顶栏 / 主区 ──
   '展开的卡片': 'Open cards', '项目争取': 'Pursuits', '人际管理': 'People', '我的档案': 'My profile', '时间线': 'Timeline',
   '主区': 'Main areas', '该动的': 'Needs action', '我': 'Me', '展示中': 'Presenting',

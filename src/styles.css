@@ -1914,6 +1914,11 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 
 /* ── 模型来源（首次启动 / 账号块）──────────────────────────── */
 .prov { display: grid; gap: 10px; }
+.prov-login { display: grid; gap: 10px; }
+.prov-login small { display: block; line-height: 1.6; }
+.prov-login button { justify-self: start; }
+.prov-login p { margin: 0; overflow-wrap: anywhere; }
+.prov-login a { color: var(--ink); text-decoration: underline; }
 .prov-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .prov-opt { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 5px 10px; border: 1px solid var(--line-2, var(--ink-3)); border-radius: 999px; cursor: pointer; color: var(--ink-2); }
 .prov-opt.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }

@@ -62,6 +62,10 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       async signUp() { return { data: null, error: { message: t('本机模式没有登录这回事') } } },
     },
     /** 首次启动页用 */
+    chatgpt: {
+      async status() { try { const r = await fetchImpl(`${base}/chatgpt/status`); return await r.json() } catch (e) { return bad(e.message) } },
+      login: () => post('/chatgpt/login', {}),
+    },
     setup: (body) => post('/setup', body),
     /** 「关于你」底下的账号那块用:读到的永远没有 key 本身,只有「设了没有」和末四位 */
     judgments: {

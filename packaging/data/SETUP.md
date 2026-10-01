@@ -2,7 +2,7 @@
 
 从装机到让你自己的 AI 工具替你填档案，全部步骤、命令和要说的话都在这里。中文在前，English below.
 
-**前提**：一台 Mac（Apple 芯片或 Intel 都行，macOS 12 以上）；一个模型来源（四选一，见第 2 步）；想用 AI 工具帮你填东西的话，装好 Claude 桌面版（免费版即可）。你的数据只在你这台机器上，不经过任何人的服务器。
+**前提**：一台 Mac（Apple 芯片或 Intel 都行，macOS 12 以上）；一个模型来源（五选一，见第 2 步）；想用 AI 工具帮你填东西的话，装好 Claude 桌面版（免费版即可）。你的数据只在你这台机器上，不经过任何人的服务器。
 
 ---
 
@@ -24,11 +24,12 @@ curl -fsSL https://github.com/hudi-la/fairwind-releases/releases/latest/download
 
 1. **语言**：中文 / English。以后在「设置 → 语言」里能换。
 2. **你的邮箱**：只用来在这台机器上认出你，不发信、不上传。
-3. **模型来源**（四选一，钱走你自己的账号）：
+3. **模型来源**（五选一，钱走你自己的账号）：
 
 | 选项 | 要填什么 | 去哪拿 |
 |---|---|---|
 | Claude API key | `sk-ant-…` | console.anthropic.com → API Keys |
+| **ChatGPT 订阅** | 无需 key；点「登录 ChatGPT」 | 用包含 Codex 使用权限的账号登录，回到 Fairwind 保存。安装包自带 Codex，无需另装 |
 | Claude 订阅（Pro / Max） | 登录令牌 `sk-ant-oat01-…` | 终端里跑 `claude setup-token`，把打出来的那串粘进来（要先装 Claude Code：`npm install -g @anthropic-ai/claude-code`） |
 | GPT | `sk-…` | platform.openai.com → API keys |
 | Gemini | `AIza…` | aistudio.google.com/apikey |
@@ -140,6 +141,7 @@ The page asks for three things, all stored only on this machine:
 | Option | What to paste | Where to get it |
 |---|---|---|
 | Claude API key | `sk-ant-…` | console.anthropic.com → API Keys |
+| **ChatGPT subscription** | No key; click **Sign in with ChatGPT** | Sign in with an account that includes Codex access, then return and save. Codex is bundled |
 | Claude subscription (Pro / Max) | login token `sk-ant-oat01-…` | run `claude setup-token` in Terminal and paste the output (install Claude Code first: `npm install -g @anthropic-ai/claude-code`) |
 | GPT | `sk-…` | platform.openai.com → API keys |
 | Gemini | `AIza…` | aistudio.google.com/apikey |
@@ -221,3 +223,27 @@ Turn on Pursuits in Settings; "Pursuits" appears in the top bar.
 | Language change didn't apply | — | the page reopens by itself; if not, refresh |
 
 When you write to Hu Di, include the version (Settings → Version) and the last 30 lines of `fairwind.log`.
+
+
+## ChatGPT 订阅 / ChatGPT subscription
+
+在首次设置或「我的档案 → 关于你 → 账号」的模型来源选择 **ChatGPT 订阅**，点「登录 ChatGPT」，
+打开出现的登录链接，用包含 Codex 使用权限的 ChatGPT 账号登录。回到 Fairwind，看到「已连接 ChatGPT」后点「开始」或「保存」。
+不需要 API key，也不用另装 Codex；安装包自带官方 Codex 运行时。用量计入该账号的 Codex / ChatGPT 套餐额度，模型和额度以账号实际权限为准。
+
+两档模型留空时使用 Codex 默认模型。额度用完或登录失效时会报错，不会自动改用 API key 计费；等额度恢复，或回到模型来源重新登录。
+Fairwind 的登录凭据在数据目录的 `chatgpt/` 中，由 Codex 管理和续期，不会读取或修改你另外安装的 Codex 的登录配置。
+本地数据库备份不包含这份登录凭据，换电脑后重新登录即可。
+
+Choose **ChatGPT subscription** in first-run setup or **My profile → About you → Account**.
+Click **Sign in with ChatGPT**, open the sign-in link and use a ChatGPT account with Codex access.
+Return to Fairwind; once it shows **ChatGPT connected**, click **Start** or **Save**.
+No API key or separate Codex installation is required; the app includes the official Codex runtime.
+Usage counts toward your account’s Codex / ChatGPT plan; available models and limits depend on your account.
+
+Leave both model fields blank for the Codex default. When you reach a limit or your login expires, Fairwind reports the error;
+it never silently switches to API-key billing. Wait for the limit to reset or sign in again.
+Fairwind keeps its own login in `chatgpt/` inside its data directory, separate from your existing Codex configuration.
+Database backups exclude login credentials; sign in again on a new computer.
+
+Official integration: https://learn.chatgpt.com/docs/app-server

@@ -22,3 +22,10 @@ test('providerConfig 带备选链:默认是链头,用户指定的放最前、链
   const c = providerConfig('cheap', { FAIRWIND_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', BRAIN_MODEL_CHEAP: 'gemini-3-flash-preview' })
   assert.equal(c.model, 'gemini-3-flash-preview'); assert.deepEqual(c.fallbacks, ['gemini-3.5-flash', 'gemini-2.5-flash'])
 })
+
+test('ChatGPT subscription has no API key or API model fallback', () => {
+  const env = { FAIRWIND_PROVIDER: 'chatgpt-subscription', FAIRWIND_DATA_DIR: '/data', OPENAI_API_KEY: 'unused' }
+  assert.equal(engineOf(env), 'chatgpt-subscription')
+  assert.deepEqual(providerConfig('good', env), { name: 'chatgpt-subscription', model: null, dataDir: '/data' })
+  assert.equal(providerConfig('cheap', { ...env, BRAIN_MODEL_CHEAP: 'custom' }).model, 'custom')
+})

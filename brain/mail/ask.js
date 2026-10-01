@@ -9,6 +9,10 @@
 // 的材料。认不出就该说认不出，不该去搜一个看起来合理的答案回来。
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { db } from './store.js'
+import { engineOf, providerConfig } from '../engine/index.js'
+import { runCodex } from '../engine/codex.js'
+import { builtinTools } from '../engine/tools.js'
+import { foldReply } from '../reply.js'
 import { modelFor, CHEAP } from '../models.js'
 
 let _profile
@@ -41,6 +45,12 @@ function systemFor(p) {
 /** 问一次。返回纯文本，解析交给调用方。 */
 export async function ask(prompt, { tools = [], maxTurns = 2 } = {}) {
   const p = await profile()
+  if (engineOf() === 'chatgpt-subscription') {
+    const { blocks } = await runCodex({ ...providerConfig(CHEAP), prompt, system: systemFor(p), tools: builtinTools(tools), maxTurns })
+    const { text } = foldReply(blocks)
+    if (!text) throw new Error('空回复')
+    return text
+  }
   // 邮件小活全走便宜档(models.js);没配环境变量时 model 不进 options,行为照旧。
   const model = modelFor(CHEAP)
   const out = []

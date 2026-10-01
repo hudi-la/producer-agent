@@ -63,6 +63,10 @@ const sdkBin = readdirSync(join(APP, 'node_modules/@anthropic-ai')).filter((d) =
 if (!sdkBin.length) console.warn('⚠️ 没找到 SDK 的平台二进制包(@anthropic-ai/claude-agent-sdk-<平台>),学员机器上 brain 起不来模型')
 else if (!sdkBin.some((d) => d.includes(process.arch))) { console.error(`✗ SDK 平台二进制是 ${sdkBin.join(',')},跟目标 ${PLATFORM} 不符`); process.exit(1) }
 else console.log('  SDK 平台二进制:' + sdkBin.join(','))
+// Codex native runtime is an optional platform dependency; fail the build if npm omitted it.
+const codexPackage = join(APP, 'node_modules', '@openai', `codex-${process.platform}-${process.arch}`)
+if (!existsSync(codexPackage)) throw new Error(`Missing ChatGPT runtime: ${codexPackage}`)
+console.log('  ChatGPT runtime:codex-' + process.platform + '-' + process.arch)
 rmSync(stage, { recursive: true, force: true })
 
 say('自带 node + 启动器')

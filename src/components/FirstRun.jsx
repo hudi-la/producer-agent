@@ -27,7 +27,7 @@ export default function FirstRun({ onDone }) {
     const r = await supa.setup({ lang, email: email.trim(), provider, ...Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, v.trim()])), backupDir: backupDir.trim() })
     setBusy(false)
     if (r.error) return setErr(r.error.message)
-    if (!r.ready) return setErr(provider === 'claude-subscription' ? t('邮箱和登录令牌都要填') : t('邮箱和 API key 都要填'))
+    if (!r.ready) return setErr(provider === 'chatgpt-subscription' ? t('填写邮箱并登录 ChatGPT') : provider === 'claude-subscription' ? t('邮箱和登录令牌都要填') : t('邮箱和 API key 都要填'))
     onDone?.()
   }
 
@@ -47,7 +47,7 @@ export default function FirstRun({ onDone }) {
         <label>{t('备份放哪个文件夹')}<small>{t('选一个在 iCloud Drive 或 Google Drive 里的，备份就自动上了你自己的云。可以先空着')}</small>
           <input value={backupDir} onChange={(e) => setBackupDir(e.target.value)} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" /></label>
         {err && <p className="first-run-err">{err}</p>}
-        <button disabled={busy}>{busy ? t('写好了…') : t('开始')}</button>
+        <button disabled={busy}>{busy ? t('写好了…') : t('开始使用')}</button>
       </form>
     </div>
   )

@@ -2,6 +2,7 @@
 // 以及首次启动的 /setup。云端模式下这个文件什么都不做(前端直连 Supabase)。
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
+import { chatgptStatus, chatgptLogin } from '../engine/codex.js'
 import { saveSettings } from './settings.js'
 import { registerLocalUser } from './migrate.js'
 import { localizeSeedTask } from '../scoutDefault.js'
@@ -97,11 +98,11 @@ export function exportEnv(s) {
   // 选哪条就只留哪条的凭据在 env 里:Claude 两条走 SDK(ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN),
   // GPT / Gemini 走 engine/openaiCompat(FAIRWIND_PROVIDER + 各自的 key)
   for (const k of ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'GEMINI_API_KEY']) delete process.env[k]
-  process.env.FAIRWIND_PROVIDER = s.provider === 'openai' || s.provider === 'gemini' ? s.provider : 'claude'
+  process.env.FAIRWIND_PROVIDER = s.provider === 'openai' || s.provider === 'gemini' || s.provider === 'chatgpt-subscription' ? s.provider : 'claude'
   if (s.provider === 'claude-subscription') { if (s.oauthToken) process.env.CLAUDE_CODE_OAUTH_TOKEN = s.oauthToken }
   else if (s.provider === 'openai') { if (s.openaiKey) process.env.OPENAI_API_KEY = s.openaiKey }
   else if (s.provider === 'gemini') { if (s.geminiKey) process.env.GEMINI_API_KEY = s.geminiKey }
-  else if (s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey
+  else if (s.provider !== 'chatgpt-subscription' && s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey
   process.env.BRAIN_MODEL = s.model || ''
   process.env.BRAIN_MODEL_CHEAP = s.modelCheap || ''
   setJudgmentsEnabled(s.judgmentsEnabled !== false)
@@ -124,6 +125,13 @@ export async function handleLocalRoute(req, res, ctx) {
     return true
   }
 
+  if ((req.method === 'GET' && p === '/chatgpt/status') || (req.method === 'POST' && p === '/chatgpt/login')) {
+    const auth = ctx.chatgptAuth || { status: chatgptStatus, login: chatgptLogin }
+    try { json(res, 200, await (p.endsWith('/login') ? auth.login(dataDir) : auth.status(dataDir))) }
+    catch (e) { json(res, 503, { error: { message: e.message } }) }
+    return true
+  }
+
   // 首次启动(/setup)和之后在「关于你」底下改(/settings)走同一条:存盘、登记、把 key 和模型档位
   // 推进 process.env(SDK 起子进程、models.js 挑档位,读的都是 env,所以改完当场生效,不用重启)。
   if (req.method === 'POST' && (p === '/setup' || p === '/settings')) {
@@ -132,9 +140,16 @@ export async function handleLocalRoute(req, res, ctx) {
     for (const k of ['email', 'model', 'modelCheap', 'backupDir']) if (typeof body[k] === 'string') patch[k] = body[k].trim()
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) patch.apiKey = body.apiKey.trim()   // 空着 = 不动原来的
     for (const k of ['oauthToken', 'openaiKey', 'geminiKey']) if (typeof body[k] === 'string' && body[k].trim()) patch[k] = body[k].trim()
-    if (['claude-key', 'claude-subscription', 'openai', 'gemini'].includes(body.provider)) patch.provider = body.provider
+    if (['claude-key', 'claude-subscription', 'openai', 'gemini', 'chatgpt-subscription'].includes(body.provider)) patch.provider = body.provider
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang
+    if ((patch.provider || ctx.settings.provider) === 'chatgpt-subscription') {
+      try {
+        const status = await (ctx.chatgptAuth?.status || chatgptStatus)(dataDir)
+        if (!status.connected) { json(res, 400, { error: { message: '请先登录 ChatGPT / Please sign in with ChatGPT first' } }); return true }
+        patch.chatgptConnected = true
+      } catch (e) { json(res, 503, { error: { message: e.message } }); return true }
+    }
     const s = saveSettings(dataDir, patch)
     ctx.settings = s
     if (s.email) await registerLocalUser(ctx.pg, { id: s.uid, email: s.email })

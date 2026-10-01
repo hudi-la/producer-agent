@@ -161,3 +161,21 @@ test('/setup 选了英文 → 出厂那条找机会任务换成英文;再选中�
   w = res(); await handleLocalRoute(req('POST', '/settings', { lang: 'zh' }), w, ctx); assert.equal(w.code, 200)
   assert.equal(await get(), SCOUT_DEFAULT.zh)
 })
+
+test('ChatGPT login routes and setup verify backend account; client cannot forge ready', async () => {
+  let connected = false
+  ctx.chatgptAuth = {
+    status: async () => ({ connected, email: connected ? 'student@example.com' : '' }),
+    login: async () => ({ authUrl: 'https://auth.openai.com/test', pending: true }),
+  }
+  const r = res(); await handleLocalRoute(req('POST', '/chatgpt/login', {}), r, ctx)
+  assert.equal(r.json().pending, true)
+  const denied = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'chatgpt-subscription', chatgptConnected: true }), denied, ctx)
+  assert.equal(denied.code, 400)
+  connected = true
+  const saved = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'chatgpt-subscription', model: '', modelCheap: '' }), saved, ctx)
+  assert.equal(saved.json().ready, true); assert.equal(saved.json().provider, 'chatgpt-subscription')
+  assert.equal(process.env.FAIRWIND_PROVIDER, 'chatgpt-subscription')
+  for (const k of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'GEMINI_API_KEY']) assert.equal(process.env[k], undefined)
+  delete ctx.chatgptAuth
+})

@@ -6,8 +6,8 @@ import { randomUUID } from 'node:crypto'
 const FILE = (dir) => join(dir, 'settings.json')
 // 模型来源:claude-key(自己的 Anthropic key)| claude-subscription(Claude Code 的登录令牌,走订阅)
 //         | openai(OPENAI key,走 OpenAI 兼容接口)| gemini(Gemini key,同一套接口)。engine/ 里有第二套循环。
-export const PROVIDERS = ['claude-key', 'claude-subscription', 'openai', 'gemini']
-const keyOf = (s) => s.provider === 'claude-subscription' ? s.oauthToken : s.provider === 'openai' ? s.openaiKey : s.provider === 'gemini' ? s.geminiKey : s.apiKey
+export const PROVIDERS = ['claude-key', 'claude-subscription', 'openai', 'gemini', 'chatgpt-subscription']
+const keyOf = (s) => s.provider === 'chatgpt-subscription' ? s.chatgptConnected === true : s.provider === 'claude-subscription' ? s.oauthToken : s.provider === 'openai' ? s.openaiKey : s.provider === 'gemini' ? s.geminiKey : s.apiKey
 const withReady = (s) => { const p = PROVIDERS.includes(s.provider) ? s.provider : 'claude-key'; return { ...s, provider: p, ready: Boolean(s.email && keyOf({ ...s, provider: p })) } }
 
 export function loadSettings(dataDir) {

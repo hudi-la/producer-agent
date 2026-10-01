@@ -35,3 +35,12 @@ test('模型来源:订阅路 ready 看令牌不看 key;不认的来源退回 cla
   s = saveSettings(dir, { provider: 'openai' }); assert.equal(s.ready, false)
   rmSync(dir, { recursive: true, force: true })
 })
+
+test('ChatGPT setup requires server-verified connection, not an API key', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fw-settings-'))
+  try {
+    assert.equal(saveSettings(dir, { email: 'a@b.c', provider: 'chatgpt-subscription', openaiKey: 'unused' }).ready, false)
+    assert.equal(saveSettings(dir, { chatgptConnected: true }).ready, true)
+    assert.equal(loadSettings(dir).provider, 'chatgpt-subscription')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
