@@ -212,7 +212,8 @@ function UpdateRow() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   useEffect(() => { supa.update.check().then(setInfo) }, [])
-  const check = async () => { setBusy(true); setInfo(await supa.update.check(true)); setBusy(false) }
+  const [checked, setChecked] = useState(false)   // 点过「检查更新」:结果没变时也得看得出查过
+  const check = async () => { setBusy(true); setInfo(await supa.update.check(true)); setChecked(true); setBusy(false) }
   const apply = async () => {
     setBusy(true); setMsg('')
     const r = await supa.update.apply(); setBusy(false)
@@ -220,7 +221,7 @@ function UpdateRow() {
   }
   return (
     <div className="la-sub">
-      <div className="la-sub-h">{t('版本')}<small>{info?.current || ''}{info?.canUpdate ? t(' · 有新版本 {v}', { v: info.latest }) + (info.note ? ':' + info.note : '') : info?.error ? ` · ${t(info.error)}` : info ? t(' · 已是最新') : ''}</small></div>
+      <div className="la-sub-h">{t('版本')}<small>{info?.current || ''}{info?.canUpdate ? t(' · 有新版本 {v}', { v: info.latest }) + (info.note ? ':' + info.note : '') : info?.error ? (checked ? t(' · 刚查过') : '') + ` · ${t(info.error)}` : info ? (checked ? t(' · 刚查过，已是最新') : t(' · 已是最新')) : ''}</small></div>
       <div className="la-acts">
         <button type="button" className="b" disabled={busy} onClick={check}>{busy ? t('在看…') : t('检查更新')}</button>
         {info?.canUpdate && <button type="button" className="b primary" disabled={busy} onClick={apply}>{t('更新到 {v}', { v: info.latest })}</button>}

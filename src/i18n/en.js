@@ -65,7 +65,7 @@ const base = {
   '在备…': 'Backing up…', '现在备份': 'Back up now', '从备份恢复:贴一份 .tar.gz 的路径': 'Restore: paste the path of a .tar.gz backup', '恢复…': 'Restore…',
   '备好了:{f}': 'Backed up: {f}', '没备成:': "Backup failed: ", '用这份备份换掉现在的库?现在的库会改名留着,不删。关掉再打开 Fairwind 才生效。': 'Replace the current database with this backup? The current one is kept under a new name, not deleted. Takes effect after you quit and reopen Fairwind.',
   '排好了:关掉再打开就是恢复后的': 'Scheduled: quit and reopen to see the restored data', '没排上:': "Couldn't schedule: ",
-  '版本': 'Version', ' · 有新版本 {v}': ' · version {v} available', ' · 已是最新': ' · up to date', '在看…': 'Checking…', '检查更新': 'Check for updates', '更新到 {v}': 'Update to {v}',
+  '版本': 'Version', ' · 有新版本 {v}': ' · version {v} available', ' · 已是最新': ' · up to date', ' · 刚查过，已是最新': ' · checked just now, up to date', ' · 刚查过': ' · checked just now', '在看…': 'Checking…', '检查更新': 'Check for updates', '更新到 {v}': 'Update to {v}',
   '装好了 {v}:关掉再打开就是新版': 'Installed {v}: quit and reopen to use it', '没更成:': "Update failed: ",
   '模型来源': 'Model source', 'Claude 订阅': 'Claude subscription',
   'Anthropic API key': 'Anthropic API key', 'OpenAI API key': 'OpenAI API key', 'Gemini API key': 'Gemini API key',
