@@ -83,8 +83,9 @@ test('abort, timeout and tool budget terminate the child', async () => {
   await assert.rejects(runCodex({ clientFactory: () => a, prompt: 'hello', abortController: controller }), /cancelled/)
   const b = fake()
   await assert.rejects(runCodex({ clientFactory: () => b, prompt: 'hello', timeoutMs: 10 }), /timed out/)
-  const c = fake({ turn(c) { c.onRequest({ id: 1, method: 'item/tool/call', params: { threadId: 'thread', tool: 'lookup', arguments: {} } }) } })
+  const c = fake({ async turn(c) { for (let i = 1; i <= 9; i++) await c.onRequest({ id: i, method: 'item/tool/call', params: { threadId: 'thread', tool: 'lookup', arguments: {} } }) } })   // 上限 0 + 宽限 8,第 9 次停
   await assert.rejects(runCodex({ clientFactory: () => c, prompt: 'hello', maxTurns: 0, tools: [{ name: 'lookup', description: 'Lookup', shape: {}, handler() { assert.fail('over budget') } }] }), /limit reached/)
+  assert.equal(c.sent.filter((x) => /Tool budget/.test(x.result?.contentItems?.[0]?.text)).length, 8)
   assert.ok(a.closed && b.closed && c.closed)
 })
 
@@ -121,4 +122,17 @@ test('failed login is visible and a fresh attempt clears the error', async () =>
   assert.equal((await chatgptLogin('failed-login', () => retry)).pending, true)
   retry.emit('account/login/completed', { success: true })
   assert.equal((await chatgptStatus('failed-login', () => fake())).connected, true)
+})
+
+test('tool budget: over the limit the model is told to answer now instead of the run dying', async () => {
+  let called = 0
+  const c = fake({ async turn(c) {
+    await c.onRequest({ id: 1, method: 'item/tool/call', params: { threadId: 'thread', callId: 'a', tool: 'lookup', arguments: {} } })
+    await c.onRequest({ id: 2, method: 'item/tool/call', params: { threadId: 'thread', callId: 'b', tool: 'lookup', arguments: {} } })
+    message(c, 'final answer'); complete(c)
+  } })
+  const r = await runCodex({ clientFactory: () => c, prompt: 'hello', maxTurns: 1, tools: [{ name: 'lookup', description: 'Lookup', shape: {}, handler: async () => { called++; return 'ok' } }] })
+  assert.equal(called, 1)
+  assert.match(c.sent[1].result.contentItems[0].text, /Tool budget \(1 calls\)/)
+  assert.deepEqual(r.blocks.map((b) => b.type), ['tool_use', 'text'])
 })

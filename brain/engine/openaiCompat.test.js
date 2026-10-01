@@ -53,11 +53,14 @@ test('接口报错:429/5xx 重试两次后抛;4xx 直接抛,带原文', async ()
   await assert.rejects(() => runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'p', fetchImpl: unauthorized }), /401.*bad key/)
 })
 
-test('到 maxTurns 就停,不死循环', async () => {
+test('到 maxTurns 就停,不死循环;最后一轮收走工具叫它作答', async () => {
   const tool = { name: 't', description: 'd', shape: {}, handler: async () => ({ content: [{ type: 'text', text: 'again' }] }) }
-  const fetchImpl = async () => sse([delta({ tool_calls: [{ index: 0, id: 'c', function: { name: 't', arguments: '{}' } }] })])
+  const reqs = []
+  const fetchImpl = async (url, init) => { reqs.push(JSON.parse(init.body)); return sse([delta({ tool_calls: [{ index: 0, id: 'c', function: { name: 't', arguments: '{}' } }] })]) }
   const r = await runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'p', tools: [tool], maxTurns: 3, fetchImpl })
   assert.equal(r.usage.turns, 3); assert.equal(r.blocks.filter((b) => b.type === 'tool_use').length, 3)
+  assert.ok(reqs[1].tools && !reqs[2].tools, '最后一轮不带工具')
+  assert.match(reqs[2].messages.at(-1).content, /Tool budget \(3 rounds\)/)
 })
 
 test('模型下线回 404 并点名接替型号 → 自动换那个再试一次(Gemini 2.5 对新用户的那种)', async () => {

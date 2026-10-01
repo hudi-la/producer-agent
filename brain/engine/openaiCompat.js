@@ -72,7 +72,10 @@ export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system,
 
   for (let turn = 0; turn < maxTurns; turn++) {
     usage.turns = turn + 1
-    const body = { model, messages, stream: true, stream_options: { include_usage: true }, ...(toolDefs.length ? { tools: toolDefs } : {}) }
+    // 最后一轮不给工具、叫它作答:不然到上限时它还在读网页,整段回复没有结论(找机会要的那行 [[CARDS]] 就没了)
+    const last = turn === maxTurns - 1 && toolDefs.length && turn > 0
+    if (last) messages.push({ role: 'user', content: `工具轮数已到上限(${maxTurns} 轮)。别再调工具了,现在就用已经拿到的信息、按要求的格式作答。/ Tool budget (${maxTurns} rounds) is used up. Stop calling tools and answer now, in the requested format, from what you already have.` })
+    const body = { model, messages, stream: true, stream_options: { include_usage: true }, ...(toolDefs.length && !last ? { tools: toolDefs } : {}) }
     let res
     for (let attempt = 0; ; attempt++) {
       res = await fetchImpl(`${baseURL.replace(/\/$/, '')}/chat/completions`, {

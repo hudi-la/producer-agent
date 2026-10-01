@@ -110,6 +110,8 @@ export async function chatgptLogin(dataDir, factory = createClient) {
   } catch (e) { stop(e); throw e }
 }
 
+const GRACE = 8   // 到上限后还容它调这么多次(每次都只回「别再调了」)
+
 export async function runCodex({ dataDir = process.env.FAIRWIND_DATA_DIR, model, system, prompt, tools = [], maxTurns = 20, onEvent, abortController, clientFactory = createClient, timeoutMs = 10 * 60_000 }) {
   const c = clientFactory(dataDir), start = Date.now(), blocks = []
   const usage = { ms: 0, turns: 1, subtype: 'success', firstMs: null, inp: 0, cacheRead: 0, cacheWrite: 0, out: 0, usd: 0 }
@@ -131,7 +133,13 @@ export async function runCodex({ dataDir = process.env.FAIRWIND_DATA_DIR, model,
       if (m.method !== 'item/tool/call') { c.send({ id: m.id, error: { code: -32601, message: 'Only Fairwind tools are available' } }); return }
       const p = m.params, spec = byName.get(p.tool)
       if (p.threadId !== threadId || !spec || settled) { c.send({ id: m.id, result: { success: false, contentItems: [{ type: 'inputText', text: 'Tool not allowed' }] } }); return }
-      if (++toolCalls > maxTurns) { stop(new Error('ChatGPT 工具调用达到上限 / Tool call limit reached')); return }
+      // 到上限不直接掐死(10/1 找机会读到第 81 个网页整轮作废):先告诉它别再调了、就用手头的按格式作答;
+      // 它还硬要调,再宽限几次就停
+      if (++toolCalls > maxTurns) {
+        if (toolCalls > maxTurns + GRACE) { stop(new Error('ChatGPT 工具调用达到上限 / Tool call limit reached')); return }
+        c.send({ id: m.id, result: { success: true, contentItems: [{ type: 'inputText', text: `工具调用已到上限(${maxTurns} 次),这次没有执行。别再调工具了,现在就用已经拿到的信息、按要求的格式作答。/ Tool budget (${maxTurns} calls) is used up; this call was not run. Stop calling tools and answer now, in the requested format, from what you already have.` }] } })
+        return
+      }
       blocks.push({ type: 'tool_use', id: p.callId, name: p.tool, input: p.arguments }); tell({ t: 'tool', name: p.tool })
       let out
       try { out = await spec.handler(p.arguments) } catch (e) { out = { isError: true, content: [{ type: 'text', text: e.message }] } }
