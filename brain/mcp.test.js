@@ -26,9 +26,9 @@ after(async () => { await client.close().catch(() => {}); srv.close(); await pg.
 
 const call = async (name, args = {}) => { const r = await client.callTool({ name, arguments: args }); const t = r.content?.[0]?.text || ''; return { r, t, j: (() => { try { return JSON.parse(t) } catch { return null } })() } }
 
-test('列工具:档案六个 + 机会卡四个 + 判据三个', async () => {
+test('列工具:档案六个 + 机会卡四个 + 判据三个 + 关注表两个', async () => {
   const { tools } = await client.listTools()
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['fairwind_entries_list', 'fairwind_entry_add', 'fairwind_entry_set', 'fairwind_info', 'fairwind_judgments_list', 'fairwind_judgments_preview', 'fairwind_judgments_write', 'fairwind_profile_get', 'fairwind_profile_set', 'fairwind_pursuit_add', 'fairwind_pursuit_note', 'fairwind_pursuit_set', 'fairwind_pursuits_list'])
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['fairwind_entries_list', 'fairwind_entry_add', 'fairwind_entry_set', 'fairwind_info', 'fairwind_judgments_list', 'fairwind_judgments_preview', 'fairwind_judgments_write', 'fairwind_profile_get', 'fairwind_profile_set', 'fairwind_pursuit_add', 'fairwind_pursuit_note', 'fairwind_pursuit_set', 'fairwind_pursuits_list', 'fairwind_watchlist_add', 'fairwind_watchlist_list'])
 })
 
 test('info 说版本和判据目录;profile 改了读得回', async () => {
@@ -91,4 +91,32 @@ test('机会线模块没开:机会卡的工具照样在,加卡进库并提示去
   const rows = JSON.parse((await c2.callTool({ name: 'fairwind_pursuits_list', arguments: {} })).content[0].text)
   assert.ok(rows.some((x) => x.title === '模块没开时加的'))
   await c2.close(); srv2.close()
+})
+
+
+test('关注表:关闭与资格搁置保留，重复只补空，不生成卡', async () => {
+  const before = (await call('fairwind_pursuits_list')).j.length
+  const args = { title: 'Watch Residency', url: 'https://example.org/residency', status: 'closed', eligible: false, fit_stars: 3, opens_at: '2027-03-01', notes: '🟡 Watch · Next round expected March. Eligibility pending; CV + portfolio required.' }
+  const added = await call('fairwind_watchlist_add', args)
+  assert.equal(added.j?.created, true, added.t)
+  const duplicate = await call('fairwind_watchlist_add', { ...args, title: ' WATCH RESIDENCY ', eligible: true, status: 'open', funding: '$2000', notes: 'must not overwrite' })
+  assert.equal(duplicate.j?.created, false, duplicate.t)
+  assert.equal(duplicate.j.id, added.j.id)
+  const urlDuplicate = await call('fairwind_watchlist_add', { ...args, title: 'Another title', url: args.url + '/' })
+  assert.equal(urlDuplicate.j.id, added.j.id)
+  const rows = (await call('fairwind_watchlist_list', { eligible: false, status: 'closed' })).j
+  const row = rows.find((r) => r.id === added.j.id)
+  assert.equal(row.opens_at, '2027-03-01'); assert.equal(row.notes, args.notes)
+  assert.equal(row.funding, '$2000'); assert.equal(row.pursuit_id, null)
+  assert.equal((await call('fairwind_pursuits_list')).j.length, before)
+})
+
+test('关注表:已有卡跳过；无效日期、空标题、无效状态拒绝', async () => {
+  const existing = await call('fairwind_watchlist_add', { title: ' SOME OPEN CALL 2026 ', status: 'open', eligible: true })
+  assert.equal(existing.j?.skipped, 'already_on_board', existing.t)
+  for (const patch of [{ title: ' ' }, { deadline_at: '2026-02-30' }, { status: 'maybe' }]) {
+    const bad = await call('fairwind_watchlist_add', { title: 'Invalid watch row', status: 'open', eligible: true, ...patch })
+    assert.equal(bad.r.isError, true)
+  }
+  assert.ok(!(await call('fairwind_watchlist_list')).j.some((r) => r.title === 'Invalid watch row'))
 })

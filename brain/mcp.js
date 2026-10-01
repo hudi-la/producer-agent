@@ -88,6 +88,46 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
     } catch (e) { return fail(e) }
   })
 
+  // 机会池是一张关注表；这里只进池，不调用建卡或捡卡 RPC。
+  const OPP_STATUS = ['open', 'closed', 'unknown']
+  server.registerTool('fairwind_watchlist_list', {
+    title: '列持续关注表',
+    description: '独立机会池（不是看板卡片）。写入前先查重，也用 fairwind_pursuits_list 查已有卡。默认包括已捡出/已划掉的行，避免重复发现。可按 status 或 eligible 筛选。',
+    inputSchema: { status: z.enum(OPP_STATUS).optional(), eligible: z.boolean().optional() },
+  }, async ({ status, eligible }) => {
+    try {
+      let q = db.from('v_pa_opportunities').select('*').order('added_at')
+      if (status !== undefined) q = q.eq('status', status)
+      if (eligible !== undefined) q = q.eq('eligible', eligible)
+      const { data, error } = await q
+      if (error) throw new Error(error.message)
+      return text(data)
+    } catch (e) { return fail(e) }
+  })
+  server.registerTool('fairwind_watchlist_add', {
+    title: '加一行持续关注',
+    description: '只添加到机会池，不创建卡片；后续由系统筛选。官方页核实后填写状态、日期和材料（放 notes）。按标题/链接去重，已有行只补空字段，不覆盖已有判断；已有卡则跳过。eligible=false 为资格搁置。已关闭的高匹配项填 status=closed，notes 以「🟡 Watch · Next round expected...」开头；预计开放日有依据才填 opens_at。',
+    inputSchema: {
+      title: z.string().trim().min(1), org: z.string().optional(), kind: z.string().optional(),
+      location: z.string().optional(), funding: z.string().optional(), url: z.url().optional(),
+      deadline: z.string().optional(), deadline_at: z.iso.date().optional(), opens_at: z.iso.date().optional(),
+      status: z.enum(OPP_STATUS), eligible: z.boolean(),
+      fit_stars: z.number().int().min(1).max(3).optional(), why: z.string().optional(), notes: z.string().optional(),
+    },
+  }, async (a) => {
+    try {
+      const { data: cards, error } = await db.from('v_pa_pursuit_cards').select('id, title, url')
+      if (error) throw new Error(error.message)
+      const titleKey = (s) => (s || '').trim().toLowerCase()
+      const urlKey = (s) => titleKey(s).replace(/\/+$/, '')
+      const card = cards?.find((c) => titleKey(c.title) === titleKey(a.title) || (a.url && urlKey(c.url) === urlKey(a.url)))
+      if (card) return text({ ok: true, created: false, skipped: 'already_on_board', pursuit_id: card.id })
+      const args = Object.fromEntries(Object.entries(a).map(([k, v]) => [`p_${k}`, v]))
+      const result = await rpc('pa_upsert_opportunity', { ...args, p_source: 'mcp' })
+      return text({ ok: true, ...result })
+    } catch (e) { return fail(e) }
+  })
+
   // ── 机会卡:机会线模块开着才有(表全建、能力分装——关着的模块连工具都不露)──
   const STAGES = ['pending', 'matching', 'writing', 'sent', 'replying', 'won', 'paused', 'watch']
   const STAGE_DOC = 'stage:pending 新机会 | matching 匹配项目 | writing 一起写 | sent 发出&提交 | replying 进一步 | won 谈成 | paused 暂停 | watch 持续关注'

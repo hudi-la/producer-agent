@@ -62,9 +62,6 @@ chmod +x "$APPB/Contents/MacOS/Fairwind"
 # 图标:包里带着 Fairwind.icns(顶栏那个「羽」),放进 .app 里
 mkdir -p "$APPB/Contents/Resources"
 [ -f "$ROOT/current/Fairwind.icns" ] && cp "$ROOT/current/Fairwind.icns" "$APPB/Contents/Resources/Fairwind.icns"
-# 本机临时签名(ad-hoc,不用苹果账号):Apple Silicon 对完全没签名的程序有时会拒。
-# 这不是公证——真要浏览器下载后双击就开,得有开发者账号(见 packaging/ACCEPTANCE.md)。
-codesign --force --sign - "$APPB" >/dev/null 2>&1 || true
 cat > "$APPB/Contents/Info.plist" <<'PL'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -79,6 +76,10 @@ cat > "$APPB/Contents/Info.plist" <<'PL'
   <key>LSUIElement</key><false/>
 </dict></plist>
 PL
+# 本机临时签名(ad-hoc,不用苹果账号):Apple Silicon 对完全没签名的程序有时会拒。
+# 必须在 Info.plist 写完之后签:没有 Info.plist 时 codesign 认不出这是个 .app,全新安装一直是没签名的。
+# 这不是公证——真要浏览器下载后双击就开,得有开发者账号(见 packaging/ACCEPTANCE.md)。
+codesign --force --sign - "$APPB" >/dev/null 2>&1 || true
 
 touch "$APPB"
 echo

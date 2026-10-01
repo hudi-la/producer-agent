@@ -35,6 +35,8 @@ http://localhost:8788/mcp
 | `fairwind_profile_get` / `_set` | 「关于你」：名字、作品站、身份、常住、阶段、资助偏好、排除/关注规则 |
 | `fairwind_entries_list` | 档案条目。`kind` 不传 = 全部 |
 | `fairwind_entry_add` / `_set` | 加一条 / 改一条：`kind`、`title`、`body`、`medium`、`year`、`meta`（任意键值）、`images`（图片链接）、`site_path`、`draft` |
+| `fairwind_watchlist_list` | 独立机会池；可按 `status` / `eligible` 筛选，包含已捡出和已划掉的行供查重 |
+| `fairwind_watchlist_add` | 只加关注表行，不建卡。必填 `title`、`status`、`eligible`；支持 `fit_stars`、截止/开放日、资助、官网、`notes`（申请材料和核实依据）。标题/链接去重，已有行只补空；已有卡跳过 |
 | `fairwind_pursuits_list` | 看板上的机会卡（模块没开也能加，开了就看得见） |
 | `fairwind_pursuit_add` / `_set` / `_note` | 加一张卡 / 改链接截止阶段小记 / 记一笔手记 |
 | `fairwind_judgments_list` / `_write` | 读、写五个判据文件（邮件模块开着才有） |
@@ -63,3 +65,7 @@ Seven default kinds, plus **any kind name of your own**. The UI grows a section 
 
 - 判断返回哪几个字段（要不要回、等多久、约了什么时候、一句话梗概）由程序定，判据文件里写「加一个字段」不生效，会被点名。
 - 发信永远是你自己的手。工具里没有发信。
+
+### 每周搜机会 · Weekly watchlist intake
+
+先列关注表和卡片查重；官方核实后用 `fairwind_watchlist_add` 加行。资格不符设 `eligible=false`；高匹配但已关闭设 `status=closed`，`notes` 以 `🟡 Watch · Next round expected...` 开头。没有可靠预计日期就省略 `opens_at`。此工具不创建卡片，也不覆盖旧行的状态或资格；后续复查和筛选仍由现有机会池流程处理。
