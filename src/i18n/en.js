@@ -67,7 +67,7 @@ const base = {
   '排好了:关掉再打开就是恢复后的': 'Scheduled: quit and reopen to see the restored data', '没排上:': "Couldn't schedule: ",
   '版本': 'Version', ' · 有新版本 {v}': ' · version {v} available', ' · 已是最新': ' · up to date', ' · 刚查过，已是最新': ' · checked just now, up to date', ' · 刚查过': ' · checked just now', '在看…': 'Checking…', '检查更新': 'Check for updates', '更新到 {v}': 'Update to {v}',
   '装好了 {v}:关掉再打开就是新版': 'Installed {v}: quit and reopen to use it', '没更成:': "Update failed: ",
-  '模型来源': 'Model source', 'Claude 订阅': 'Claude subscription',
+  '模型来源': 'Model source', '在用': 'in use', '还没保存：现在在用的还是 {p}。点「保存」才换过去': 'Not saved yet — still using {p}. Click Save to switch.', 'Claude 订阅': 'Claude subscription',
   'Anthropic API key': 'Anthropic API key', 'OpenAI API key': 'OpenAI API key', 'Gemini API key': 'Gemini API key',
   '去 platform.openai.com 建一个（sk- 开头）。联网查走 DuckDuckGo，不用另配': 'Create one at platform.openai.com (starts with sk-). Web search goes through DuckDuckGo, nothing else to set up',
   '去 aistudio.google.com/apikey 建一个（AIza 开头）。联网查走 DuckDuckGo，不用另配': 'Create one at aistudio.google.com/apikey (starts with AIza). Web search goes through DuckDuckGo, nothing else to set up',

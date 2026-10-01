@@ -1934,6 +1934,8 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .prov-opt.off { opacity: .45; cursor: not-allowed; }
 .prov-opt input { margin: 0; }
 .prov-opt small { font-size: 10.5px; }
+.prov-opt .prov-inuse { margin-left: -2px; color: inherit; opacity: .8; }
+.prov .prov-unsaved { grid-column: 1 / -1; color: var(--accent); font-size: 12px; }
 .prov label { display: grid; gap: .3rem; font-weight: 500; font-size: 13px; }
 .prov small { font-weight: 400; color: var(--ink-2); }
 .prov.compact label { font-weight: 400; }

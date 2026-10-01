@@ -21,8 +21,9 @@ const FIELD = {
   gemini: { k: 'geminiKey', label: 'Gemini API key', hint: '去 aistudio.google.com/apikey 建一个（AIza 开头）。联网查走 DuckDuckGo，不用另配', ph: 'AIza…' },
 }
 
-/** value:当前来源;keys:{apiKey,oauthToken,openaiKey,geminiKey} 正在输入的;hints:{apiKey:'sk-ant-…1234',…} 已设置的末四位 */
-export default function ProviderPicker({ value, onChange, keys, onKey, hints = {}, compact = false }) {
+/** value:当前来源;keys:{apiKey,oauthToken,openaiKey,geminiKey} 正在输入的;hints:{apiKey:'sk-ant-…1234',…} 已设置的末四位
+ *  inUse:已存下、正在用的来源(账号块传;黑药丸只是「选中」,点了保存才算换——不标出来就看不出现在在用哪个) */
+export default function ProviderPicker({ value, onChange, keys, onKey, hints = {}, compact = false, inUse }) {
   const f = FIELD[value] || FIELD['claude-key']
   return (
     <div className={'prov' + (compact ? ' compact' : '')}>
@@ -30,10 +31,11 @@ export default function ProviderPicker({ value, onChange, keys, onKey, hints = {
         {PROVIDERS.map((p) => { const v = p.value || p.key; return (
           <label key={p.key} className={'prov-opt' + (value === v ? ' on' : '')}>
             <input type="radio" name="provider" value={v} checked={value === v} onChange={() => onChange(v)} />
-            {t(p.label)}
+            {t(p.label)}{inUse === v && <small className="prov-inuse">· {t('在用')}</small>}
           </label>
         ) })}
       </div>
+      {inUse && value !== inUse && <small className="prov-unsaved">{t('还没保存：现在在用的还是 {p}。点「保存」才换过去', { p: t(PROVIDERS.find((p) => (p.value || p.key) === inUse)?.label || inUse) })}</small>}
       {value === 'chatgpt-subscription' ? <ChatGPTLogin /> : <label>{t(f.label)}<small>{t(f.hint)}</small>
         <input type="password" value={keys[f.k] || ''} onChange={(e) => onKey(f.k, e.target.value)} autoComplete="off"
                placeholder={hints[f.k] ? t('已设置 · {hint}(要换就填新的)', { hint: hints[f.k] }) : f.ph} required={!hints[f.k]} /></label>}
