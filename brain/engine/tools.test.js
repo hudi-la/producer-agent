@@ -23,7 +23,7 @@ test('WebFetch:HTML 变文字、超长分段;非 200 说清', async () => {
   const big = '<p>' + 'x'.repeat(30000) + '</p>'
   const fetchImpl = async (url) => url.endsWith('/404') ? { ok: false, status: 404 } : { ok: true, headers: { get: () => 'text/html' }, text: async () => big }
   const r = await webFetch(fetchImpl).handler({ url: 'https://a/b' })
-  assert.match(r.content[0].text, /还有 6000 字没给.*from=24000/s)
+  assert.match(r.content[0].text, /还有 22000 字没给.*from=8000/s)
   const r2 = await webFetch(fetchImpl).handler({ url: 'https://a/404' }); assert.match(r2.content[0].text, /HTTP 404/)
 })
 

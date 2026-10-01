@@ -40,6 +40,24 @@ export async function* sseChunks(body) {
  * @param {Function} [o.fetchImpl]
  * @returns {Promise<{ blocks: object[], usage: object }>}
  */
+/**
+ * 把早几轮的工具结果收起来只留开头。每一轮都要把整段对话重发,读过的网页全带着就是 n² 的量——
+ * 找机会一轮读二三十页,后半程每一步都在重读几十万字(10/1 Gemini 免费档 / ChatGPT Plus 一次就超额)。
+ * 最近 keep 轮的工具结果留全(模型还在看它们),更早的只留 head 个字;要点它已按 WebFetch 的说明记进回复里了。
+ * 原地改 messages;收过的不再动。
+ */
+export function foldOldToolResults(messages, { keep = 2, head = 1_500 } = {}) {
+  const turns = []   // 每个带 tool_calls 的 assistant 消息开一轮,后面的 tool 消息归它
+  for (let i = 0; i < messages.length; i++) { if (messages[i].role === 'assistant' && messages[i].tool_calls) turns.push([]); else if (messages[i].role === 'tool' && turns.length) turns.at(-1).push(messages[i]) }
+  let folded = 0
+  for (const t of turns.slice(0, Math.max(0, turns.length - keep))) for (const m of t) {
+    if (typeof m.content !== 'string' || m.content.length <= head + 200) continue
+    m.content = m.content.slice(0, head) + `\n\n(已收起:这页后面 ${m.content.length - head} 字不再带着。要再看,重新 WebFetch 这个网址)`
+    folded++
+  }
+  return folded
+}
+
 export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system, prompt, tools = [], maxTurns = 20, onEvent = null, abortController = null, fetchImpl = (...a) => globalThis.fetch(...a), log = () => {} }) {
   const spare = [...fallbacks]   // 这个型号不行就换下一个(下线 / 没额度 / 挤不上)
   const sys = Array.isArray(system) ? system.map((s) => (typeof s === 'string' ? s : s?.text || '')).join('\n') : (system || '')
@@ -114,6 +132,8 @@ export async function runAgent({ baseURL, apiKey, model, fallbacks = [], system,
       images.push(...imgs)
     }
     if (images.length) messages.push({ role: 'user', content: images.map((p) => ({ type: 'image_url', image_url: { url: `data:${p.mimeType};base64,${p.data}` } })) })
+    const folded = foldOldToolResults(messages)
+    if (folded) log(`  ↳ 收起 ${folded} 段早先的工具结果`)
   }
   usage.ms = Date.now() - t0
   return { blocks, usage }

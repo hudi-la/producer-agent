@@ -25,7 +25,9 @@ export function toOpenAITool(spec) {
 
 // ── 内建两样:联网查、抓网页。Claude 那条路是 SDK 自带的 WebSearch / WebFetch;这儿是给别的引擎的平替 ──
 
-const CAP = 24_000   // 一页最多给这么多字,再长按 from 接着要
+// 一页先给这么多字,再长按 from 接着要。开放征集页的要点(截止、资格、交什么)几乎都在前面;
+// 原来 24_000,找机会一轮读二三十页、每轮又把读过的全带着,Gemini 免费档 / ChatGPT Plus 跑一次就超额(10/1)
+const CAP = 8_000
 
 /** 网页 → 纯文字(去 script/style、标签、实体;压空白)。不追求完美,追求不塞垃圾。 */
 export function htmlToText(html) {
@@ -40,7 +42,7 @@ export function htmlToText(html) {
 
 export const webFetch = (fetchImpl = (...a) => globalThis.fetch(...a)) => defineTool({
   name: 'WebFetch',
-  description: '打开一个网址,拿回页面正文(纯文字)。太长会分段给,按提示用 from 接着要下一段。',
+  description: '打开一个网址,拿回页面正文(纯文字)。太长会分段给,按提示用 from 接着要下一段。读过的页面过几轮会被收起、只剩开头,所以读完立刻把要点(名称、机构、截止、链接、现在开不开放)写进你的回复里,别指望回头再看。',
   shape: { url: z.string().describe('完整网址,http(s) 开头'), from: z.number().optional().describe('从第几个字接着看。第一次不用传') },
   handler: async ({ url, from = 0 }) => {
     try {

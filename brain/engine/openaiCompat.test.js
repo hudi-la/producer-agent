@@ -101,3 +101,31 @@ test('Gemini 3.x 的 thought_signature(extra_content)下一轮原样带回去', 
   const asst = reqs[1].messages.find((m) => m.role === 'assistant' && m.tool_calls)
   assert.deepEqual(asst.tool_calls[0].extra_content, { google: { thought_signature: 'SIG' } })
 })
+
+test('收起早先的工具结果:最近两轮留全,更早的只剩开头;短的不动;收过的不再动', async () => {
+  const { foldOldToolResults } = await import('./openaiCompat.js')
+  const page = (n) => `# page ${n}\n` + 'x'.repeat(5000)
+  const turn = (n) => [{ role: 'assistant', content: null, tool_calls: [{ id: 'c' + n }] }, { role: 'tool', tool_call_id: 'c' + n, content: page(n) }]
+  const messages = [{ role: 'user', content: 'p' }, ...turn(1), ...turn(2), { role: 'assistant', content: null, tool_calls: [{ id: 's' }] }, { role: 'tool', tool_call_id: 's', content: 'short' }, ...turn(3), ...turn(4)]
+  assert.equal(foldOldToolResults(messages), 2)   // 1、2 收起;short 太短不动;3、4 是最近两轮
+  const tools = messages.filter((m) => m.role === 'tool')
+  assert.ok(tools[0].content.length < 1700 && /已收起:这页后面 \d+ 字/.test(tools[0].content) && tools[0].content.startsWith('# page 1'))
+  assert.equal(tools[2].content, 'short')
+  assert.equal(tools[3].content.length, page(3).length); assert.equal(tools[4].content.length, page(4).length)
+  assert.equal(foldOldToolResults(messages), 0)
+})
+
+test('找机会那种跑法:读 25 页,每轮重发的量不再按 n² 长', async () => {
+  const reqs = []
+  const tool = { name: 'WebFetch', description: 'd', shape: { url: z.string() }, handler: async ({ url }) => ({ content: [{ type: 'text', text: `# ${url}\n` + 'deadline Oct 1 '.repeat(500) }] }) }   // 约 8k 字一页
+  const fetchImpl = async (url, init) => {
+    reqs.push(JSON.parse(init.body))
+    if (reqs.length <= 25) return sse([delta({ tool_calls: [{ index: 0, id: 'c' + reqs.length, function: { name: 'WebFetch', arguments: JSON.stringify({ url: 'https://x/' + reqs.length }) } }] })])
+    return sse([delta({ content: 'done' })])
+  }
+  await runAgent({ baseURL: 'http://x/v1', apiKey: 'k', model: 'm', prompt: 'p', tools: [tool], maxTurns: 40, fetchImpl })
+  const sent = reqs.map((b) => JSON.stringify(b.messages).length)
+  const last = sent.at(-1)
+  assert.ok(last < 3 * 8000 + 25 * 1800, `最后一轮重发 ${last} 字,应只剩两页全文 + 二十来个开头`)
+  assert.ok(sent.reduce((a, b) => a + b, 0) < 26 * 60_000, '总量按线性长,不按 n²')
+})
