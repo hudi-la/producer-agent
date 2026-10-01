@@ -26,3 +26,16 @@ export function saveSettings(dataDir, patch) {
   writeFileSync(FILE(dataDir), JSON.stringify(rest, null, 2))
   return withReady(rest)
 }
+
+// 填错栏的 key:认得出是别家的就拦下。浏览器会把存过的「密码」自动填进别的密码框——
+// 10/1 Gemini 的 AIza… 就这么进了 Claude 订阅那栏,找机会跑到一半 401。认不出的格式照收(代理、新格式)。
+const KIND = (v) => /^sk-ant-oat/.test(v) ? 'claude-subscription' : /^sk-ant-/.test(v) ? 'claude-key' : /^AIza/.test(v) ? 'gemini' : /^sk-/.test(v) ? 'openai' : null
+const FIELD_OF = { apiKey: 'claude-key', oauthToken: 'claude-subscription', openaiKey: 'openai', geminiKey: 'gemini' }
+const NAME = { 'claude-key': ['Claude API key', 'Claude API key'], 'claude-subscription': ['Claude 订阅令牌', 'Claude subscription token'], openai: ['OpenAI key', 'OpenAI key'], gemini: ['Gemini key', 'Gemini key'] }
+export function wrongKey(patch) {
+  for (const [k, want] of Object.entries(FIELD_OF)) {
+    const got = typeof patch[k] === 'string' ? KIND(patch[k].trim()) : null
+    if (got && got !== want) return `${NAME[want][0]}那栏里填的是 ${NAME[got][0]}(可能是浏览器自动填的),没存。清空那栏重新粘 / The ${NAME[want][1]} field holds a ${NAME[got][1]} (maybe browser autofill) — not saved. Clear it and paste again`
+  }
+  return null
+}

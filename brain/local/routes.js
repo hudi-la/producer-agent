@@ -3,7 +3,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
 import { chatgptStatus, chatgptLogin } from '../engine/codex.js'
-import { saveSettings } from './settings.js'
+import { saveSettings, wrongKey } from './settings.js'
 import { registerLocalUser } from './migrate.js'
 import { localizeSeedTask } from '../scoutDefault.js'
 import { setJudgmentsEnabled, readJudgmentFiles, writeJudgmentFile } from '../judgments.js'
@@ -140,6 +140,7 @@ export async function handleLocalRoute(req, res, ctx) {
     for (const k of ['email', 'model', 'modelCheap', 'backupDir']) if (typeof body[k] === 'string') patch[k] = body[k].trim()
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) patch.apiKey = body.apiKey.trim()   // 空着 = 不动原来的
     for (const k of ['oauthToken', 'openaiKey', 'geminiKey']) if (typeof body[k] === 'string' && body[k].trim()) patch[k] = body[k].trim()
+    { const bad = wrongKey(patch); if (bad) { json(res, 400, { error: { message: bad } }); return true } }
     if (['claude-key', 'claude-subscription', 'openai', 'gemini', 'chatgpt-subscription'].includes(body.provider)) patch.provider = body.provider
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang

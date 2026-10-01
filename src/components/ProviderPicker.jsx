@@ -37,7 +37,7 @@ export default function ProviderPicker({ value, onChange, keys, onKey, hints = {
       </div>
       {inUse && value !== inUse && <small className="prov-unsaved">{t('还没保存：现在在用的还是 {p}。点「保存」才换过去', { p: t(PROVIDERS.find((p) => (p.value || p.key) === inUse)?.label || inUse) })}</small>}
       {value === 'chatgpt-subscription' ? <ChatGPTLogin /> : <label>{t(f.label)}<small>{t(f.hint)}</small>
-        <input type="password" value={keys[f.k] || ''} onChange={(e) => onKey(f.k, e.target.value)} autoComplete="off"
+        <input key={f.k} type="password" value={keys[f.k] || ''} onChange={(e) => onKey(f.k, e.target.value)} autoComplete="new-password"
                placeholder={hints[f.k] ? t('已设置 · {hint}(要换就填新的)', { hint: hints[f.k] }) : f.ph} required={!hints[f.k]} /></label>}
     </div>
   )

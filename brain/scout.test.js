@@ -202,7 +202,7 @@ test('report3 按 FAIRWIND_LANG 写英文', () => {
 
 test('停下来的那一句在最上面:没额度 / 型号下线 / 挤,各说各的;中英文', () => {
   const quota = '模型接口回 429:[{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details."}}]'
-  assert.equal(haltKind(quota), 'quota'); assert.equal(haltKind('模型接口回 404:gone'), 'model'); assert.equal(haltKind('模型接口回 503:busy'), 'busy'); assert.equal(haltKind('boom'), 'error')
+  assert.equal(haltKind(quota), 'quota'); assert.equal(haltKind('模型接口回 404:gone'), 'model'); assert.equal(haltKind('模型接口回 503:busy'), 'busy'); assert.equal(haltKind('boom'), 'error'); assert.equal(haltKind('Claude Code returned an error result: Failed to authenticate. API Error: 401 Invalid bearer token'), 'auth'); assert.equal(haltKind("You've hit your usage limit"), 'quota')
   const r = report3({ today: '2026-09-29', checked: [{ title: 'A' }], halts: [{ step: 'search', why: quota }, { step: 'judge', why: quota }] })
   const lines = r.split('\n')
   assert.match(lines[1], /^⚠️ 模型没额度了——这轮停在：找新的、判够不够得着。做完的部分留着。额度每天重置/)

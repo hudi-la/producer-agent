@@ -44,3 +44,14 @@ test('ChatGPT setup requires server-verified connection, not an API key', () => 
     assert.equal(loadSettings(dir).provider, 'chatgpt-subscription')
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('wrongKey:认得出是别家的 key 就拦,认不出的照收', async () => {
+  const { wrongKey } = await import('./settings.js')
+  assert.match(wrongKey({ oauthToken: 'AIzaSyXXXX' }), /Claude 订阅令牌那栏里填的是 Gemini key/)
+  assert.match(wrongKey({ geminiKey: 'sk-ant-oat01-x' }), /Gemini key那栏/)
+  assert.match(wrongKey({ apiKey: 'sk-ant-oat01-x' }), /Claude API key那栏/)
+  assert.match(wrongKey({ openaiKey: 'sk-ant-api03-x' }), /OpenAI key那栏/)
+  assert.equal(wrongKey({ oauthToken: 'sk-ant-oat01-abc', apiKey: 'sk-ant-api03-x', openaiKey: 'sk-proj-x', geminiKey: 'AIzaY' }), null)
+  assert.equal(wrongKey({ openaiKey: 'some-proxy-key' }), null)
+  assert.equal(wrongKey({ email: 'a@b' }), null)
+})

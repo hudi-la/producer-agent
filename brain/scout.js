@@ -259,7 +259,8 @@ export function brief(msg) {
 /** 这一步是被什么停下的:没额度 / 型号下线 / 挤不上 / 别的。战报头一句按它说人话。 */
 export function haltKind(msg) {
   const m = String(msg || '')
-  if (/429/.test(m) && /quota|billing/i.test(m)) return 'quota'
+  if (/\b401\b|invalid bearer|failed to authenticate|api key not valid|invalid.?api.?key|incorrect api key/i.test(m)) return 'auth'
+  if ((/429/.test(m) && /quota|billing/i.test(m)) || /usage limit|RESOURCE_EXHAUSTED/i.test(m)) return 'quota'
   if (/模型接口回 404|\b404\b/.test(m)) return 'model'
   if (/模型接口回 (429|5\d\d)/.test(m)) return 'busy'
   return 'error'
@@ -271,6 +272,9 @@ function haltLine(halts, en) {
   const kinds = new Set(halts.map((h) => haltKind(h.why)))
   const steps = [...new Set(halts.map((h) => h.step))].map((s) => (STEP[s] || [s, s])[en ? 1 : 0]).join(en ? ', ' : '、')
   const why = brief(halts[0].why)
+  if (kinds.has('auth')) return en
+    ? `⚠️ The model wouldn't accept your key or login — this run stopped at: ${steps}. Go to Settings → Model source, clear that field and paste it again (Claude subscription: run claude setup-token again), Save, then "Run now". (${why})`
+    : `⚠️ 模型不认你的 key / 登录——这轮停在：${steps}。去「设置 → 模型来源」把那一栏清空重新粘（Claude 订阅：重新跑一次 claude setup-token），保存后再点「现在跑一次」。（${why}）`
   if (kinds.has('quota')) return en
     ? `⚠️ The model ran out of quota — this run stopped at: ${steps}. What was finished is kept. Quota resets daily (Gemini free tier: midnight Pacific); press "Run now" again then, or add billing to the key. (${why})`
     : `⚠️ 模型没额度了——这轮停在：${steps}。做完的部分留着。额度每天重置（Gemini 免费档：太平洋时间零点），到时再点「现在跑一次」，或者给 key 开计费。（${why}）`
