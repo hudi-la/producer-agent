@@ -179,3 +179,20 @@ test('ChatGPT login routes and setup verify backend account; client cannot forge
   for (const k of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'GEMINI_API_KEY']) assert.equal(process.env[k], undefined)
   delete ctx.chatgptAuth
 })
+
+test('Claude 一键登录:链接 → 粘码 → 令牌进设置并推进 env;状态只给末四位', async () => {
+  let token = null
+  ctx.claudeAuth = {
+    start: async () => ({ pending: true, authUrl: 'https://claude.com/x', awaitingCode: true }),
+    submitCode: async (code) => { assert.equal(code, 'the#code'); const s = (await import('./settings.js')).saveSettings(ctx.dataDir, { oauthToken: token = 'sk-ant-oat01-' + 'Z'.repeat(60) }); ctx.settings = s; return { connected: true } },
+    view: () => ({ pending: false, authUrl: null, awaitingCode: false }),
+  }
+  ctx.settings = (await import('./settings.js')).saveSettings(ctx.dataDir, { oauthToken: '' })   // 前面的测试可能存过令牌
+  const before = res(); await handleLocalRoute(req('GET', '/claude/status'), before, ctx); assert.equal(before.json().connected, false)
+  const r = res(); await handleLocalRoute(req('POST', '/claude/login', {}), r, ctx); assert.equal(r.json().awaitingCode, true)
+  const c = res(); await handleLocalRoute(req('POST', '/claude/code', { code: 'the#code' }), c, ctx)
+  assert.equal(c.code, 200); assert.equal(c.json().connected, true); assert.equal(c.json().hint, 'sk-ant-oat01…ZZZZ'); assert.equal(JSON.stringify(c.json()).includes('Z'.repeat(20)), false)
+  const bad = { ...ctx.claudeAuth, submitCode: async () => { throw new Error('Invalid authorization code') } }; ctx.claudeAuth = bad
+  const e = res(); await handleLocalRoute(req('POST', '/claude/code', { code: 'nope' }), e, ctx); assert.equal(e.code, 400); assert.match(e.json().error.message, /Invalid/)
+  delete ctx.claudeAuth
+})

@@ -27,7 +27,7 @@ export default function FirstRun({ onDone }) {
     const r = await supa.setup({ lang, email: email.trim(), provider, ...Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, v.trim()])), backupDir: backupDir.trim() })
     setBusy(false)
     if (r.error) return setErr(r.error.message)
-    if (!r.ready) return setErr(provider === 'chatgpt-subscription' ? t('填写邮箱并登录 ChatGPT') : provider === 'claude-subscription' ? t('邮箱和登录令牌都要填') : t('邮箱和 API key 都要填'))
+    if (!r.ready) return setErr(provider === 'chatgpt-subscription' ? t('填写邮箱并登录 ChatGPT') : provider === 'claude-subscription' ? t('填写邮箱并登录 Claude') : t('邮箱和 API key 都要填'))
     onDone?.()
   }
 

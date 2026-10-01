@@ -3,6 +3,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
 import { chatgptStatus, chatgptLogin } from '../engine/codex.js'
+import { createClaudeAuth } from './claudeAuth.js'
 import { saveSettings, wrongKey } from './settings.js'
 import { registerLocalUser } from './migrate.js'
 import { localizeSeedTask } from '../scoutDefault.js'
@@ -122,6 +123,19 @@ export async function handleLocalRoute(req, res, ctx) {
   if (req.method === 'GET' && p === '/me') {
     const s = ctx.settings
     json(res, 200, { mode: 'local', ready: Boolean(s.ready), lang: s.lang === 'en' ? 'en' : 'zh', user: s.ready ? { id: s.uid, email: s.email } : null })
+    return true
+  }
+
+  // Claude 订阅一键登录:和 ChatGPT 那颗按钮一样。令牌到手直接存进设置(不换来源,换来源还是点保存)
+  if (p === '/claude/status' || p === '/claude/login' || p === '/claude/code') {
+    if (!ctx.claudeAuth) ctx.claudeAuth = createClaudeAuth({ onToken: (token) => { const s = saveSettings(dataDir, { oauthToken: token }); ctx.settings = s; exportEnv(s) } })
+    const a = ctx.claudeAuth
+    const connected = () => { const o = ctx.settings?.oauthToken || ''; return { connected: /^sk-ant-oat/.test(o), hint: o ? `${o.slice(0, 12)}…${o.slice(-4)}` : '' } }
+    try {
+      if (req.method === 'POST' && p === '/claude/login') json(res, 200, { ...(await a.start(dataDir)), ...connected() })
+      else if (req.method === 'POST' && p === '/claude/code') { const body = await readJson(req); await a.submitCode(body.code); json(res, 200, { ...a.view(), ...connected() }) }
+      else json(res, 200, { ...a.view(), ...connected() })
+    } catch (e) { json(res, p === '/claude/status' ? 200 : 400, { ...a.view(), ...connected(), error: { message: e.message } }) }
     return true
   }
 

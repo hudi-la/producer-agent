@@ -62,6 +62,11 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       async signUp() { return { data: null, error: { message: t('本机模式没有登录这回事') } } },
     },
     /** 首次启动页用 */
+    claude: {
+      async status() { try { const r = await fetchImpl(`${base}/claude/status`); return await r.json() } catch (e) { return bad(e.message) } },
+      login: () => post('/claude/login', {}),
+      code: (code) => post('/claude/code', { code }),
+    },
     chatgpt: {
       async status() { try { const r = await fetchImpl(`${base}/chatgpt/status`); return await r.json() } catch (e) { return bad(e.message) } },
       login: () => post('/chatgpt/login', {}),
