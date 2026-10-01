@@ -716,6 +716,15 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .tk-state { font-size: 12px; color: var(--ink-2); margin-top: 8px; }
 .tk-state.running { color: var(--accent); font-weight: 600; }
 .tk-state.off { color: var(--wait); }
+.tk-progress { display: flex; gap: 11px; align-items: flex-start; margin-top: 12px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--paper)); color: var(--ink); }
+.tk-progress.queued { border-color: color-mix(in srgb, var(--wait) 55%, var(--line)); background: color-mix(in srgb, var(--wait) 12%, var(--paper)); }
+.tk-progress strong { display: block; font-size: 13px; line-height: 1.35; }
+.tk-progress-detail { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--ink-2); }
+.tk-progress-icon { flex: none; width: 15px; height: 15px; margin-top: 2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; color: var(--accent); animation: tk-spin 1s linear infinite; }
+.tk-progress.queued .tk-progress-icon { color: var(--wait); }
+.tk-progress.off .tk-progress-icon { animation: none; border-right-color: currentColor; }
+@keyframes tk-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tk-progress-icon { animation: none; border-right-color: currentColor; } }
 .tk-prompt { font: inherit; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--paper-2); border: 1px solid var(--line); max-height: 320px; overflow-y: auto; }
 .task.open .tk-prompt { background: var(--paper-2); }
 .tk-prompt:hover { border-color: var(--line-2); }

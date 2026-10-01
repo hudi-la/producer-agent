@@ -121,11 +121,23 @@ function Scheduled({ task, tz, brainUp, onChanged }) {
         </button>
       </div>
       {/* 脑子没开时「下次 9/7」是假话——那时候要说的是「到点不会跑」。 */}
-      <div className={'tk-state' + (st.kind === 'running' ? ' running' : '') + (!brainUp ? ' off' : '')}>
-        {!brainUp
-          ? t('脑子没开 · 到点不会跑；开了会立刻补跑') + (st.kind === 'queued' ? t('（已经排上了一次）') : '')
-          : st.text || (every === 'manual' ? t('不排期，想跑就按上面那颗') : '')}
-      </div>
+      {st.kind === 'queued' || st.kind === 'running' ? (
+        <div className={'tk-progress ' + st.kind + (!brainUp ? ' off' : '')} role="status" aria-live="polite">
+          <span className="tk-progress-icon" aria-hidden="true" />
+          <div>
+            <strong>{st.kind === 'queued'
+              ? (brainUp ? t('已排队，等待开始') : t('已排队，等待 Fairwind 启动'))
+              : t('正在找机会')}</strong>
+            <div className="tk-progress-detail">{st.kind === 'queued'
+              ? (brainUp ? t('通常 30 秒内开始；整轮预计 5–20 分钟，取决于网页和模型响应。') : t('Fairwind 启动后会接着运行；整轮预计 5–20 分钟。'))
+              : t('通常需要 5–20 分钟，机会多时可能更久。{elapsed}', { elapsed: st.text })}</div>
+          </div>
+        </div>
+      ) : (
+        <div className={'tk-state' + (!brainUp ? ' off' : '')}>
+          {!brainUp ? t('脑子没开 · 到点不会跑；开了会立刻补跑') : st.text || (every === 'manual' ? t('不排期，想跑就按上面那颗') : '')}
+        </div>
+      )}
       {err && <div className="ed-err">{t('没存上：')}{err}</div>}
 
       <div className="tk-k tk-k2">{t('提示词')}</div>

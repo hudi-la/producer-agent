@@ -45,6 +45,11 @@ export default {
   '每{w} {h}': 'Every {w} {h}', '每天 {h}': 'Daily {h}',
   '刚开始': 'just started', '{n} 分钟前开始': 'started {n} min ago', '{n} 小时前开始，可能卡住了': 'started {n} h ago, may be stuck',
   '正在找……（{ago}）': 'Scouting… ({ago})', '排上了，脑子一分钟内接手': 'Queued; the brain picks it up within a minute', '下次 {when}': 'Next {when}',
+  '已排队，等待开始': 'Queued · waiting to start', '已排队，等待 Fairwind 启动': 'Queued · waiting for Fairwind to start',
+  '正在找机会': 'Scouting for opportunities',
+  '通常 30 秒内开始；整轮预计 5–20 分钟，取决于网页和模型响应。': 'Usually starts within 30 seconds. The full run may take 5–20 minutes, depending on websites and the model.',
+  'Fairwind 启动后会接着运行；整轮预计 5–20 分钟。': 'It will run when Fairwind starts. The full run may take 5–20 minutes.',
+  '通常需要 5–20 分钟，机会多时可能更久。{elapsed}': 'Usually takes 5–20 minutes, or longer if there are many opportunities. {elapsed}',
   // ── data/schema：造卡任务类型说明 ──
   '每周三步：先查关注表里那些开了没有，再扫聚合源和搜索找新的，最后把够得着的造成卡': 'Three steps every week: recheck whether the watched ones have opened, scan aggregators and search for new ones, then make cards for the ones within reach',
   '扫模特/演艺经纪的 commercial / lifestyle / beauty 板，逐家核实投递入口再造卡': 'Scan the commercial / lifestyle / beauty boards of model and talent agencies, verify each submission entry point, then make cards',
