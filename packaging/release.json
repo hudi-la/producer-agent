@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "新增 ChatGPT 订阅：在模型来源登录 ChatGPT，无需 API key；聊天、找机会和工具调用可使用订阅额度。"
+  "note": "找机会任务排队与运行状态更醒目，并显示预计耗时。"
 }
