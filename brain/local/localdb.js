@@ -3,11 +3,11 @@
 // 只仿今天代码真用到的那一点(2026-09-16 实测):
 //   .rpc(name, args)
 //   .from(view).select().eq().in().order().limit().maybeSingle()   可 await
-//   .storage.from(bucket).upload/download/remove/createSignedUrl
+//   .storage.from(bucket).upload/download/remove/createSignedUrl/list
 //   .auth.getUser()
 // 返回形状跟 supabase-js 一样:{ data, error },绝不抛。
 // 不做通用 PostgREST。多一个方法就多一处要对拍的地方。
-import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, normalize, resolve, dirname } from 'node:path'
 
 const ok = (data) => ({ data, error: null })
@@ -125,6 +125,23 @@ function makeStorage(dataDir, brainUrl) {
         },
         async createSignedUrl(key) {
           try { pathOf(key); return ok({ signedUrl: `${brainUrl}/files/${encodeURIComponent(key)}` }) } catch (e) { return bad(e.message) }
+        },
+        // 跟 supabase 的 list 同形:只列一层,文件夹的 id 是 null、metadata 是 null;文件带 size / mimetype。
+        // 备份导出(brain/backup)靠它找出所有附件;.type 旁车文件不是附件,不列。
+        async list(prefix = '', { limit = 100, offset = 0 } = {}) {
+          try {
+            const dir = prefix ? pathOf(prefix) : root
+            if (!existsSync(dir) || !statSync(dir).isDirectory()) return ok([])
+            const all = readdirSync(dir, { withFileTypes: true })
+              .filter((d) => !d.name.endsWith('.type') && !d.name.startsWith('.'))
+              .map((d) => {
+                if (d.isDirectory()) return { name: d.name, id: null, metadata: null }
+                const key = prefix ? `${prefix}/${d.name}` : d.name
+                return { name: d.name, id: key, metadata: { size: statSync(join(dir, d.name)).size, mimetype: this.contentTypeOf(key) } }
+              })
+              .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+            return ok(all.slice(offset, offset + limit))
+          } catch (e) { return bad(e.message) }
         },
         contentTypeOf(key) { const p = pathOf(key) + '.type'; return existsSync(p) ? readFileSync(p, 'utf8') : 'application/octet-stream' },
       }

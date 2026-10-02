@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { t } from '../i18n/index.js'
 import { saveProfile, useProfile } from '../lib/profile.js'
 import { supa, brainApi, brainFetch, BRAIN } from '../lib/backends.js'
@@ -143,6 +143,7 @@ function AccountBlock({ machine }) {
       </> : <>
         <Judgments />
         <HostedMcpRow token={cur.mcpToken || ''} onRotated={load} />
+        <MyBackupRow />
       </>}
     </form>
   )
@@ -226,25 +227,62 @@ function BackupRow({ backupDir }) {
   const [list, setList] = useState(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-  const [pathIn, setPathIn] = useState('')
   const load = () => supa.backup.list().then(setList)
   useEffect(() => { load() }, [backupDir])
   const now = async () => { setBusy(true); setMsg(''); const r = await supa.backup.now(); setBusy(false); setMsg(r.ok ? t('备好了:{f}', { f: r.file.split('/').pop() }) : t('没备成:') + r.error); load() }
-  const restore = async () => {
-    if (!pathIn.trim()) return
-    if (!confirm(t('用这份备份换掉现在的库?现在的库会改名留着,不删。关掉再打开 Fairwind 才生效。'))) return
-    const r = await supa.backup.restore(pathIn.trim()); setMsg(r.ok ? t('排好了:关掉再打开就是恢复后的') : t('没排上:') + r.error)
-  }
   const last = list?.files?.[0]
   return (
-    <div className="la-sub">
-      <div className="la-sub-h">{t('备份')}<small>{backupDir ? (last ? t('最近一次 {when}', { when: last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') }) : t('还没备过')) : t('上面先选一个备份目录')}</small></div>
-      <div className="la-acts">
-        <button type="button" className="b" disabled={busy || !backupDir} onClick={now}>{busy ? t('在备…') : t('现在备份')}</button>
-        <input className="la-path" placeholder={t('从备份恢复:贴一份 .tar.gz 的路径')} value={pathIn} onChange={(e) => setPathIn(e.target.value)} />
-        <button type="button" className="b" disabled={!pathIn.trim()} onClick={restore}>{t('恢复…')}</button>
+    <>
+      <div className="la-sub">
+        <div className="la-sub-h">{t('机器备份')}<small>{backupDir ? (last ? t('最近一次 {when}', { when: last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') }) : t('还没备过')) : t('上面先选一个备份目录')}</small></div>
+        <div className="la-acts">
+          <button type="button" className="b" disabled={busy || !backupDir} onClick={now}>{busy ? t('在备…') : t('现在备份')}</button>
+        </div>
+        {msg && <span className={'la-note' + (/^(没|Backup failed|Couldn)/.test(msg) ? ' bad' : '')}>{msg}</span>}
       </div>
-      {msg && <span className={'la-note' + (/^(没|Backup failed|Couldn)/.test(msg) ? ' bad' : '')}>{msg}</span>}
+      <MyBackupRow />
+    </>
+  )
+}
+
+// 我的备份:一个 zip,我名下所有东西 + 附件。本机和线上同一种,哪边导出都能导进另一边——
+// 公司撤了、换电脑、从本机搬上线,都是这两颗(设计稿 2026-10-02 D16)。
+function MyBackupRow() {
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState('')
+  const fileRef = useRef(null)
+  const api = brainApi
+  const download = async () => {
+    if (!api) return
+    setBusy('export'); setMsg(t('在打包…'))
+    try {
+      const blob = await api.backup.export()
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `fairwind-${new Date().toISOString().slice(0, 10)}.zip`; a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
+      setMsg(t('下好了:{mb} MB', { mb: (blob.size / 1048576).toFixed(1) }))
+    } catch (e) { setMsg(t('没打成:') + e.message) }
+    setBusy('')
+  }
+  const restore = async (file) => {
+    if (!file || !api) return
+    if (!confirm(t('用这份备份换掉现在的全部?现在库里我名下的行会先清掉,再导进这份。附件同名的覆盖。'))) { fileRef.current.value = ''; return }
+    setBusy('import'); setMsg(t('在导入…'))
+    const r = await api.backup.import(file, { wipe: true })
+    setBusy(''); fileRef.current.value = ''
+    if (!r.ok) { setMsg(t('没导成:') + (r.error || '')); return }
+    const rows = Object.values(r.tables || {}).reduce((a, b) => a + b, 0)
+    setMsg(t('导好了:{rows} 行、{files} 个文件{failed}', { rows, files: r.files, failed: r.failed?.length ? t(';{n} 个文件没传上', { n: r.failed.length }) : '' }))
+    setTimeout(() => location.reload(), 1200)
+  }
+  return (
+    <div className="la-sub">
+      <div className="la-sub-h">{t('我的备份')}<small>{t('一个 zip:我名下的全部 + 附件。本机版和线上版通用')}</small></div>
+      <div className="la-acts">
+        <button type="button" className="b" disabled={!!busy} onClick={download}>{busy === 'export' ? t('在打包…') : t('下载我的备份')}</button>
+        <input ref={fileRef} type="file" accept=".zip,application/zip" style={{ display: 'none' }} onChange={(e) => restore(e.target.files?.[0])} />
+        <button type="button" className="b" disabled={!!busy} onClick={() => fileRef.current?.click()}>{busy === 'import' ? t('在导入…') : t('用备份恢复…')}</button>
+      </div>
+      {msg && <span className={'la-note' + (/^(没|Couldn|Export failed|Import failed)/.test(msg) ? ' bad' : '')}>{msg}</span>}
     </div>
   )
 }

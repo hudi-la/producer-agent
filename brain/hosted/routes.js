@@ -10,6 +10,9 @@
 //   GET/POST /judgments/files 判据文档(跟本机版同一套界面)
 //   /claude/*                 Claude 订阅一键登录,各人一个 HOME
 //   /chatgpt/*                线上第一期不开(Codex 的 Linux 登录流程下一期验)
+//   GET  /backup/export       我名下所有行 + 附件 → 一个 zip(brain/backup,跟本机版同一种包)
+//   POST /backup/import       上传同样的 zip 写回;?wipe=1 先清我名下的行
+//   POST /settings/mcp-token/rotate  换一串 MCP 令牌
 //   GET 静态文件               dist/ 里真有的才出,/ 回 index.html
 import { existsSync, statSync, readFileSync, mkdirSync } from 'node:fs'
 import { resolve, normalize, extname } from 'node:path'
@@ -17,6 +20,8 @@ import { currentTenant, rowFromSettings } from '../tenant.js'
 import { wrongKey, PROVIDERS } from '../local/settings.js'
 import { FILES as JUDGMENT_FILES, lintJudgments } from '../judgments.js'
 import { createClaudeAuth } from '../local/claudeAuth.js'
+import { handleBackupRoute } from '../backup/routes.js'
+import { VERSION } from '../version.js'
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.map': 'application/json', '.md': 'text/markdown; charset=utf-8' }
 
@@ -41,7 +46,7 @@ export async function handleHostedRoute(req, res, ctx) {
   const p = url.pathname
   const t = currentTenant()
   // 没带身份的只能看静态文件;别的路 server.js 已经拦了(401),这里再守一道
-  const needsMe = (req.method === 'GET' && p === '/me') || p === '/settings' || p === '/setup' || p.startsWith('/claude/') || p.startsWith('/chatgpt/') || p === '/judgments/files'
+  const needsMe = (req.method === 'GET' && p === '/me') || p === '/settings' || p === '/setup' || p.startsWith('/claude/') || p.startsWith('/chatgpt/') || p === '/judgments/files' || p.startsWith('/backup/') || p === '/settings/mcp-token/rotate'
   if (needsMe && !t) { json(res, 401, { error: '请先登录 / sign in first' }); return true }
 
   if (req.method === 'GET' && p === '/me') {
@@ -103,6 +108,21 @@ export async function handleHostedRoute(req, res, ctx) {
     if (error) { json(res, 400, { ok: false, error: error.message }); return true }
     ctx.hosted.invalidate(t.owner)
     json(res, 200, { ok: true, lints: lintJudgments(body.file, content) })
+    return true
+  }
+
+  // 备份往返(D16):我名下的行 + 桶里 owner/ 底下的附件,一个 zip;本机版同一种包
+  if (p === '/backup/export' || p === '/backup/import') {
+    return handleBackupRoute(req, res, { db: t.db, owner: t.owner, email: t.email, prefix: t.owner, appVersion: VERSION })
+  }
+
+  // 换 MCP 令牌(D13):旧的那串当场作废,桥那一行命令要重贴
+  if (req.method === 'POST' && p === '/settings/mcp-token/rotate') {
+    const { data, error } = await t.db.rpc('pa_rotate_mcp_token')
+    if (error) { json(res, 500, { ok: false, error: error.message }); return true }
+    ctx.hosted.invalidate(t.owner)
+    t.settings = { ...t.settings, mcpToken: data }
+    json(res, 200, { ok: true, mcpToken: data })
     return true
   }
 

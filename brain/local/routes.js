@@ -10,6 +10,7 @@ import { registerLocalUser } from './migrate.js'
 import { localizeSeedTask } from '../scoutDefault.js'
 import { setJudgmentsEnabled, readJudgmentFiles, writeJudgmentFile } from '../judgments.js'
 import { backupNow, listBackups, scheduleRestore } from './backup.js'
+import { handleBackupRoute } from '../backup/routes.js'
 import { checkUpdate, applyUpdate } from './update.js'
 import { VERSION } from '../version.js'
 import { homedir } from 'node:os'
@@ -200,6 +201,10 @@ export async function handleLocalRoute(req, res, ctx) {
   }
 
   // ── 备份 ──
+  // 我名下的行 + 附件打成一个 zip,跟托管版同一种包(brain/backup);下面的 tar.gz 是整库的机器级备份,留着
+  if (p === '/backup/export' || p === '/backup/import') {
+    return handleBackupRoute(req, res, { db, owner: ctx.settings.uid || '', email: ctx.settings.email || '', prefix: '', appVersion: VERSION })
+  }
   if (req.method === 'GET' && p === '/backup/list') { json(res, 200, { dir: ctx.settings.backupDir || '', files: listBackups(ctx.settings.backupDir) }); return true }
   if (req.method === 'POST' && p === '/backup/now') {
     try { const file = await backupNow(ctx.pg, ctx.settings.backupDir); json(res, 200, { ok: true, file }) }

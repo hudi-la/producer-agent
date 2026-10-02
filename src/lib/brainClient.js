@@ -82,6 +82,9 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       async list() { try { const r = await fetchImpl(`${base}/backup/list`); return await r.json() } catch (e) { return { dir: '', files: [] } } },
       now: () => post('/backup/now', {}),
       restore: (path) => post('/backup/restore', { path }),
+      // 一种备份两边通(2026-10-02):我名下所有行 + 附件打成一个 zip;导入同样的 zip。本机、托管同一对口
+      async export() { const r = await fetchImpl(`${base}/backup/export`); if (!r.ok) { let e = ''; try { e = (await r.json()).error } catch {} throw new Error(e || `HTTP ${r.status}`) } return await r.blob() },
+      async import(file, { wipe = true } = {}) { try { const r = await fetchImpl(`${base}/backup/import${wipe ? '?wipe=1' : ''}`, { method: 'POST', headers: { 'content-type': 'application/zip' }, body: file }); return await r.json() } catch (e) { return { ok: false, error: e.message } } },
     },
     update: {
       async check(force = false) { try { const r = await fetchImpl(`${base}/update/check${force ? '?force' : ''}`); return await r.json() } catch (e) { return { canUpdate: false, error: e.message } } },
