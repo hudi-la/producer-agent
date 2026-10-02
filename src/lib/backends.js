@@ -24,6 +24,24 @@ export const supa = DB_MODE === 'local' ? brainClient(BRAIN)
   : DB_MODE === 'cloud' ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY) : null
 export const DB_CONFIGURED = !!supa
 
+/**
+ * 调脑子的唯一入口(2026-10-02 起)。云端 / 托管配置下自动带上登录凭证——脑子按它认人(RLS 按人生效);
+ * 本机配置同源、没有登录这回事,头上什么都不加。路径给 '/xxx' 或整个 URL 都行。
+ */
+export async function authHeaders() {
+  if (DB_MODE !== 'cloud' || !supa) return {}
+  try {
+    const { data } = await supa.auth.getSession()
+    const t = data?.session?.access_token
+    return t ? { authorization: `Bearer ${t}` } : {}
+  } catch (_) { return {} }
+}
+export async function brainFetch(input, init = {}) {
+  const url = typeof input === 'string' && input.startsWith('/') ? `${BRAIN}${input}` : input
+  const h = await authHeaders()
+  return fetch(url, { ...init, headers: { ...h, ...(init.headers || {}) } })
+}
+
 /** 退回种子数据的原因。null = 没退，看到的是真数据。 */
 export const FELL_BACK = {
   NO_CONFIG: 'no-config',       // .env.local 里没填 Supabase

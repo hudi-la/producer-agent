@@ -7,6 +7,7 @@
 // 选哪条由 FAIRWIND_PROVIDER 定(本机模式从 settings.provider 来;作者自己那份没设 = claude)。
 // 模型名:两档(models.js)没配就用下面的默认;默认写死在这一处,学员在账号块里改。
 import { modelFor } from '../models.js'
+import { envNow } from '../tenant.js'
 
 export const PROVIDERS = {
   claude: { label: 'Claude' },
@@ -18,13 +19,13 @@ export const PROVIDERS = {
 }
 
 /** 现在走哪条。'claude' | 'openai' | 'gemini' | 'chatgpt-subscription' */
-export function engineOf(env = process.env) {
+export function engineOf(env = envNow()) {
   const p = env.FAIRWIND_PROVIDER
   return p === 'openai' || p === 'gemini' || p === 'chatgpt-subscription' ? p : 'claude'
 }
 
 /** 非 Claude 引擎这一档该连哪儿、用什么模型。没 key 就抛,话说清楚。 */
-export function providerConfig(tier, env = process.env) {
+export function providerConfig(tier, env = envNow()) {
   const name = engineOf(env)
   const p = PROVIDERS[name]
   if (name === 'claude') return null

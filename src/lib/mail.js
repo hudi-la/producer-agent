@@ -1,4 +1,4 @@
-import { supa, BRAIN } from './backends.js'
+import { supa, BRAIN, brainFetch } from './backends.js'
 
 // 全局邮件同步的前端侧。
 //
@@ -87,7 +87,7 @@ export const overrideVerdict = (f) => rpc('pa_verdict_upsert', {
 export const markGreeted = (emails) => rpc('pa_mail_greeted', { p_emails: emails })
 
 async function brain(path, body) {
-  const r = await fetch(`${BRAIN}${path}`, {
+  const r = await brainFetch(`${BRAIN}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body || {}),

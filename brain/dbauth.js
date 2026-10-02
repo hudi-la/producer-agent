@@ -43,6 +43,13 @@ export async function makeDb() {
   const anon = process.env.SUPABASE_ANON_KEY
   const dataDir = process.env.FAIRWIND_DATA_DIR
 
+  // 托管(2026-10-02 起,FAIRWIND_MODE=hosted):一个脑子伺候所有人。service_role 只用来找活、查人、造会话;
+  // 真正读写业务表的客户端按请求 / 按任务建(brain/tenant.js),RLS 对每个人生效。这里不建业务客户端。
+  if (process.env.FAIRWIND_MODE === 'hosted') {
+    if (!url || !anon || !service) throw new Error('hosted 配置要 SUPABASE_URL + SUPABASE_ANON_KEY + SUPABASE_SERVICE_ROLE_KEY 三样都在')
+    return { mode: 'hosted', url, anon, service: createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } }), dataDir: dataDir || '' }
+  }
+
   if (url && service) return { db: createClient(url, service, { auth: { persistSession: false } }), mode: 'service' }
   if (url && anon) {
     const db = createClient(url, anon, {

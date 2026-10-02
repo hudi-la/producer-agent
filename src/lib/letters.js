@@ -5,7 +5,7 @@
 //    照样在产出那儿改得动。
 //  · **要动 Gmail 的**（真发）—— 走本机 sidecar。钥匙在它手上，
 //    浏览器这头永远拿不到。
-import { supa, BRAIN } from './backends.js'
+import { supa, BRAIN, brainFetch } from './backends.js'
 
 const need = () => {
   if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
@@ -44,7 +44,7 @@ export async function adoptLetter(owner, letter, body) {
  * 只有你在页面上按那一下才走到这儿。
  */
 export async function sendLetterNow(owner, deliverableId) {
-  const r = await fetch(`${BRAIN}/mail/send`, {
+  const r = await brainFetch(`${BRAIN}/mail/send`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({

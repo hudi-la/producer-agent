@@ -62,3 +62,18 @@ test('judgeWithFallback:判出来就用;带判据没判出来 → 不带判据�
   calls = 0; const r2 = await judgeWithFallback(run, parse, {})
   assert.equal(r2.tag, null); assert.equal(calls, 1)      // 没判据就不回退——回退没意义
 })
+
+test('托管:判据跟着租户上下文走;没上下文还是模块级的', async () => {
+  const { withTenant, setStaticTenant } = await import('./tenant.js')
+  const { docsFromRows, judgmentsFor, hasJudgments, _setDocs, setJudgmentsEnabled } = await import('./judgments.js')
+  setStaticTenant(null); setJudgmentsEnabled(true); _setDocs({ '*': '模块级' })
+  assert.match(judgmentsFor('NOTE'), /模块级/)
+  const j = docsFromRows([{ name: '全部.md', body: '催紧点' }, { name: '手记.md', body: '  ' }, { name: '别的.md', body: 'x' }])
+  assert.deepEqual(j.docs, { '*': '催紧点' })
+  await withTenant({ judgments: { docs: j.docs, enabled: true } }, async () => {
+    assert.match(judgmentsFor('NOTE'), /催紧点/); assert.doesNotMatch(judgmentsFor('NOTE'), /模块级/); assert.equal(hasJudgments(), true)
+  })
+  await withTenant({ judgments: { docs: j.docs, enabled: false } }, async () => { assert.equal(judgmentsFor('NOTE'), ''); assert.equal(hasJudgments(), false) })
+  assert.match(judgmentsFor('NOTE'), /模块级/)
+  _setDocs({})
+})

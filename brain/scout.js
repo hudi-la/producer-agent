@@ -14,6 +14,8 @@
 //
 // 设计稿：docs/specs/2026-09-03-opportunity-pool-design.md 第六节
 
+import { envNow } from './tenant.js'
+
 export const CARDS_MARK = '[[CARDS]]'
 export const CHECKS_MARK = '[[CHECKS]]'
 
@@ -109,9 +111,9 @@ ${have}
 无独立官网）不要报，把它们放进 skipped 并写清原因。
 
 == 报法 ==
-先用简洁${process.env.FAIRWIND_LANG === 'en' ? '英文' : '中文'}说这轮扫了哪些源、看到了什么，三五句就够。
+先用简洁${envNow().FAIRWIND_LANG === 'en' ? '英文' : '中文'}说这轮扫了哪些源、看到了什么，三五句就够。
 然后**最后一行**单独输出，别的什么都不要加在它后面：
-${CARDS_MARK} {"cards":[{"title":"机会名称","kind":"驻地|grant|奖|群展|开放征集|…","org":"机构","location":"地点","funding":"资助内容","deadline":"截止的官方原话或null","deadline_at":"YYYY-MM-DD或null","opens_at":"YYYY-MM-DD或null（当前未开放时填预计开放日）","url":"官方链接","status":"open或closed（现在接不接受申请）","match_stars":3或2,"why":"${process.env.FAIRWIND_LANG === 'en' ? 'one-line reason in English' : '中文一句话理由'}","notes":"英文 notes，可空","eligible":true或false}],"skipped":[{"title":"查了但没入的","why":"为什么"}]}
+${CARDS_MARK} {"cards":[{"title":"机会名称","kind":"驻地|grant|奖|群展|开放征集|…","org":"机构","location":"地点","funding":"资助内容","deadline":"截止的官方原话或null","deadline_at":"YYYY-MM-DD或null","opens_at":"YYYY-MM-DD或null（当前未开放时填预计开放日）","url":"官方链接","status":"open或closed（现在接不接受申请）","match_stars":3或2,"why":"${envNow().FAIRWIND_LANG === 'en' ? 'one-line reason in English' : '中文一句话理由'}","notes":"英文 notes，可空","eligible":true或false}],"skipped":[{"title":"查了但没入的","why":"为什么"}]}
 
 - 一条都没有也要输出这一行（两个空数组）。
 - 链接填官方页面，不填聚合站的转载页。
@@ -294,7 +296,7 @@ export function report3({
   found = [], dupFound = [], skipped = [],
   judged = [], made = [], overCap = [], held = [], cardCap = 12, halts = [],
 }) {
-  const en = process.env.FAIRWIND_LANG === 'en'
+  const en = envNow().FAIRWIND_LANG === 'en'
   const L = [today]
   const hl = haltLine(halts, en); if (hl) L.push(hl)
   const sk = (s) => `${s.title}${s.why ? `（${brief(s.why)}）` : ''}`

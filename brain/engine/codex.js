@@ -1,6 +1,7 @@
 // ChatGPT subscription through the official, pinned Codex app-server.
 // A private CODEX_HOME keeps Fairwind separate from students' Codex projects,
 // credentials and MCP configuration. Tokens are owned/refreshed by Codex.
+import { envNow } from '../tenant.js'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { mkdirSync } from 'node:fs'
@@ -112,7 +113,7 @@ export async function chatgptLogin(dataDir, factory = createClient) {
 
 const GRACE = 8   // 到上限后还容它调这么多次(每次都只回「别再调了」)
 
-export async function runCodex({ dataDir = process.env.FAIRWIND_DATA_DIR, model, system, prompt, tools = [], maxTurns = 20, onEvent, abortController, clientFactory = createClient, timeoutMs = 10 * 60_000 }) {
+export async function runCodex({ dataDir = envNow().FAIRWIND_DATA_DIR, model, system, prompt, tools = [], maxTurns = 20, onEvent, abortController, clientFactory = createClient, timeoutMs = 10 * 60_000 }) {
   const c = clientFactory(dataDir), start = Date.now(), blocks = []
   const usage = { ms: 0, turns: 1, subtype: 'success', firstMs: null, inp: 0, cacheRead: 0, cacheWrite: 0, out: 0, usd: 0 }
   const tell = (e) => { try { onEvent?.(e) } catch {} }

@@ -1,4 +1,4 @@
-import { supa, DB_CONFIGURED, FELL_BACK, BRAIN } from './backends.js'
+import { supa, DB_CONFIGURED, FELL_BACK, BRAIN, brainFetch } from './backends.js'
 import { BUMP_WAIT } from './cues.js'
 import { day as dayOf } from './when.js'
 
@@ -254,7 +254,7 @@ export async function rescheduleWait(it, due, why = null) {
 export async function rejudge(subjects) {
   if (!subjects?.length) return { judged: 0, failed: 0, touched: 0 }
   try {
-    const r = await fetch(`${BRAIN}/subjects/rejudge`, {
+    const r = await brainFetch(`${BRAIN}/subjects/rejudge`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ subjects }),
     })
@@ -276,7 +276,7 @@ export const REJUDGE_BATCH = 12
 export async function triage(ids) {
   if (!ids?.length) return { judged: 0, failed: 0 }
   try {
-    const r = await fetch(`${BRAIN}/letters/triage`, {
+    const r = await brainFetch(`${BRAIN}/letters/triage`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ids }),
     })

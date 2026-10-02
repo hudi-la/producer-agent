@@ -5,7 +5,7 @@
 //    走 0027 里那几个 security definer 函数。
 //  · Fairwind 只有 pa_upsert_deliverable 一个口，且**只能碰 status='draft'**。
 //    它没有定稿的口——「定稿」这个动作在数据库层面就只对你开放。
-import { supa, BRAIN } from './backends.js'
+import { supa, BRAIN, brainFetch } from './backends.js'
 import { t } from '../i18n/index.js'
 
 /** 拉这条线的全部产出。没连库时返回 null。 */
@@ -132,7 +132,7 @@ export async function fetchAttachments(pursuitId) {
 async function callBrain(path, payload) {
   let res
   try {
-    res = await fetch(`${BRAIN}${path}`, {
+    res = await brainFetch(`${BRAIN}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),

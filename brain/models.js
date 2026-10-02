@@ -8,19 +8,21 @@
 //
 // 两档都不配 = SDK 默认(订阅路径),这是 Hu Di 自己的用法,一个字不变。
 // 学员的 .env 里配上自己的 ANTHROPIC_API_KEY + 两档模型,钱走自己的 key。
+import { envNow } from './tenant.js'
+
 export const GOOD = 'good'
 export const CHEAP = 'cheap'
 
 const KEYS = { [GOOD]: 'BRAIN_MODEL', [CHEAP]: 'BRAIN_MODEL_CHEAP' }
 
 /** 这一档该用什么模型。没配(含空白)= null = 让 SDK 用默认。 */
-export function modelFor(tier, env = process.env) {
+export function modelFor(tier, env = envNow()) {
   const m = env[KEYS[tier]]
   return m && m.trim() ? m.trim() : null
 }
 
 /** 往 query 的 options 里挂 model。null 时不挂键——挂了空值 SDK 会当真。 */
-export function withModel(opts, tier, env = process.env) {
+export function withModel(opts, tier, env = envNow()) {
   const model = modelFor(tier, env)
   return model ? { ...opts, model } : { ...opts }
 }

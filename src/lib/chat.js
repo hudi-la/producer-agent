@@ -3,7 +3,7 @@
 //    后者靠 security definer 函数，能改的列是写死的，anon 拿不到别的写权限。
 //  · 「 Fairwind 去想」(chat / brief) —— 走本机 sidecar，因为那需要 service_role
 //    往往来历史里写消息，且要跑 agent。
-import { supa, BRAIN } from './backends.js'
+import { supa, BRAIN, brainFetch } from './backends.js'
 import { frameSplitter, frameData } from './sse.js'
 import { t } from '../i18n/index.js'
 
@@ -88,7 +88,7 @@ export const ownerBody = (owner) =>
 export async function sendMessage(owner, text, meta, runId) {
   let res
   try {
-    res = await fetch(`${BRAIN}/chat`, {
+    res = await brainFetch(`${BRAIN}/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ...ownerBody(owner), text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) }),
@@ -123,7 +123,7 @@ class NoStream extends Error {}
 export async function streamChat(body, onEvent) {
   let res
   try {
-    res = await fetch(`${BRAIN}/chat/stream`, {
+    res = await brainFetch(`${BRAIN}/chat/stream`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -212,7 +212,7 @@ export async function rewindChat(msgId) {
 export async function stopThinking(runId) {
   if (!runId) return { ok: true, stopped: false }
   try {
-    const res = await fetch(`${BRAIN}/chat/stop`, {
+    const res = await brainFetch(`${BRAIN}/chat/stop`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ run_id: runId }),

@@ -7,6 +7,7 @@
 // 文件名用中文,一格一个;「全部.md」每一格都带上。没有的文件 = 空。
 import { readFileSync, readdirSync, existsSync, watch, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { currentTenant } from './tenant.js'
 
 export const FILES = {
   '全部.md': '*',
@@ -22,6 +23,23 @@ let DOCS = {}          // 事件名 → 文本;'*' 是全部
 let ENABLED = true
 let WATCHER = null
 let SUPPRESS = false      // 回退那一次临时不拼判据
+
+// 托管(2026-10-02 起):判据跟着人走——租户上下文里带着 { docs, enabled } 就用它的;
+// 没带(本机版、他自己的个人版)还是上面这几个模块级变量,行为逐字不变。
+const docsNow = () => { const j = currentTenant()?.judgments; return j ? (j.docs || {}) : DOCS }
+const enabledNow = () => { const j = currentTenant()?.judgments; return j ? j.enabled !== false : ENABLED }
+
+/** 库里的 judgment_docs 行([{name, body}])→ 跟读目录一样的 { docs, lints }。只认那五个名字。 */
+export function docsFromRows(rows = []) {
+  const docs = {}, lints = []
+  for (const r of rows) {
+    const ev = FILES[r.name]; if (!ev) continue
+    const text = String(r.body || '')
+    if (text.trim()) docs[ev] = text.trim()
+    lints.push(...lintJudgments(r.name, text))
+  }
+  return { docs, lints }
+}
 
 /** 读一遍目录。返回 { docs, lints }。 */
 export function loadJudgments(dir) {
@@ -64,13 +82,14 @@ export function useJudgmentsDir(dir, { log = () => {} } = {}) {
 }
 
 export function setJudgmentsEnabled(on) { ENABLED = Boolean(on) }
-export function judgmentsEnabled() { return ENABLED }
-export function hasJudgments() { return ENABLED && Object.keys(DOCS).length > 0 }
+export function judgmentsEnabled() { return enabledNow() }
+export function hasJudgments() { return enabledNow() && Object.keys(docsNow()).length > 0 }
 
 /** 这一格该拼进去的文字。开关关着或没写 = 空串。 */
 export function judgmentsFor(ev) {
-  if (!ENABLED || SUPPRESS) return ''
-  const parts = [DOCS['*'], DOCS[ev]].filter(Boolean)
+  if (!enabledNow() || SUPPRESS) return ''
+  const D = docsNow()
+  const parts = [D['*'], D[ev]].filter(Boolean)
   return parts.length ? `\n【${ev === 'YOUR_ANSWER' ? '见面之后' : ev === 'MY_LETTER' ? '我发出的信' : ev === 'NOTE' ? '手记' : ev === 'THEIR_LETTER' ? '对方来信' : ev},我的判据】\n${parts.join('\n\n')}\n` : ''
 }
 
@@ -90,7 +109,7 @@ export async function withoutJudgments(fn) {
 export async function judgeWithFallback(run, parse, { log = () => {}, what = '' } = {}) {
   let tag = parse(await run())
   if (tag || !hasJudgments()) return { tag, fellBack: false }
-  log(`  ⚠️ ${what}:带着判据文档没判出来(${Object.keys(DOCS).map((k) => k === '*' ? '全部.md' : k).join('、')}),用出厂判据再判一次`)
+  log(`  ⚠️ ${what}:带着判据文档没判出来(${Object.keys(docsNow()).map((k) => k === '*' ? '全部.md' : k).join('、')}),用出厂判据再判一次`)
   tag = await withoutJudgments(async () => parse(await run()))
   return { tag, fellBack: true }
 }

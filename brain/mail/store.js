@@ -3,11 +3,15 @@
 // 单独成文件，是为了让 sync.js / classify.js 里**只有逻辑，没有 RPC 名字**。
 // 换句话说：0045 那批端口叫什么、参数长什么样，只活在这儿。
 import { makeDb } from '../dbauth.js'
+import { currentTenant } from '../tenant.js'
 
 let _db = null
 export function db() {
   // makeDb 变成异步之后(本机模式要开库),这儿不再懒建——server.js 起来时
   // initStore 一次;CLI 脚本(mail/*-run.js、replay.js)各自开头也 initStore。
+  // 托管(2026-10-02 起):有租户上下文就用那个人的客户端;没有(个人版 / 本机版 / CLI)还是 initStore 交进来的那个
+  const t = currentTenant()
+  if (t?.db) return t.db
   if (!_db) throw new Error('store.db() 在 initStore() 之前被调了')
   return _db
 }

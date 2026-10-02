@@ -1,4 +1,4 @@
-import { supa, BRAIN } from './backends.js'
+import { supa, BRAIN, brainFetch } from './backends.js'
 import { streamChat, NoStream } from './chat.js'
 
 // 人这一层的写口。分工跟 chat.js 一模一样：
@@ -118,7 +118,7 @@ export async function fetchContactDeliverables(contactId) {
 const post = async (path, body) => {
   let res
   try {
-    res = await fetch(`${BRAIN}${path}`, {
+    res = await brainFetch(`${BRAIN}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
