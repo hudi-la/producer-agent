@@ -4,6 +4,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs'
 import { normalize, resolve, extname } from 'node:path'
 import { chatgptStatus, chatgptLogin } from '../engine/codex.js'
 import { createClaudeAuth } from './claudeAuth.js'
+import { currentTenant, setStaticTenant, envFor } from '../tenant.js'
 import { saveSettings, wrongKey } from './settings.js'
 import { registerLocalUser } from './migrate.js'
 import { localizeSeedTask } from '../scoutDefault.js'
@@ -94,20 +95,17 @@ export function publicSettings(s) {
            ready: Boolean(s.ready), apiKeySet: Boolean(k), apiKeyHint: k ? `${k.slice(0, 7)}…${k.slice(-4)}` : '' }
 }
 
-/** 把 settings 推进 process.env。启动时(server.js connect)和改完都调。 */
+/**
+ * 把 settings 推进静态租户的 env(2026-10-02 起;以前是 process.env)。启动时(server.js connect)和改完都调。
+ * 选哪条就只留哪条的凭据:Claude 两条走 SDK(ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN),
+ * GPT / Gemini 走 engine/openaiCompat(FAIRWIND_PROVIDER + 各自的 key)。key 从此不进 process.env——
+ * SDK 起的子进程拿到的是 childEnv():进程 env 去掉凭据再盖上这个人的。
+ */
 export function exportEnv(s) {
-  // 选哪条就只留哪条的凭据在 env 里:Claude 两条走 SDK(ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN),
-  // GPT / Gemini 走 engine/openaiCompat(FAIRWIND_PROVIDER + 各自的 key)
-  for (const k of ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'GEMINI_API_KEY']) delete process.env[k]
-  process.env.FAIRWIND_PROVIDER = s.provider === 'openai' || s.provider === 'gemini' || s.provider === 'chatgpt-subscription' ? s.provider : 'claude'
-  if (s.provider === 'claude-subscription') { if (s.oauthToken) process.env.CLAUDE_CODE_OAUTH_TOKEN = s.oauthToken }
-  else if (s.provider === 'openai') { if (s.openaiKey) process.env.OPENAI_API_KEY = s.openaiKey }
-  else if (s.provider === 'gemini') { if (s.geminiKey) process.env.GEMINI_API_KEY = s.geminiKey }
-  else if (s.provider !== 'chatgpt-subscription' && s.apiKey) process.env.ANTHROPIC_API_KEY = s.apiKey
-  process.env.BRAIN_MODEL = s.model || ''
-  process.env.BRAIN_MODEL_CHEAP = s.modelCheap || ''
+  const T = currentTenant() || setStaticTenant({ mode: 'local', env: {}, marks: {} })
+  T.env = envFor(s, { dataDir: process.env.FAIRWIND_DATA_DIR || '' })
+  T.settings = s
   setJudgmentsEnabled(s.judgmentsEnabled !== false)
-  process.env.FAIRWIND_LANG = s.lang === 'en' ? 'en' : 'zh'   // brain 的提示词按它决定跟 ta 说哪种语言
 }
 
 /**

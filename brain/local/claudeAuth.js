@@ -44,7 +44,9 @@ export function createClaudeAuth({ spawnImpl = spawn, binary = findClaudeBinary,
     view,
     /** 起一个 setup-token,等它吐链接(最多 60 秒)。 */
     async start(dataDir) {
-      if (process.platform !== 'darwin') throw new Error('一键登录目前只支持 mac;其他系统在终端里跑 claude setup-token,把令牌粘进来 / One-click sign-in is mac-only for now; run claude setup-token in a terminal and paste the token')
+      // mac 自带 expect;Linux 服务器(托管)装一个就行(apt install expect)。Windows 没有
+      const EXPECT = ['/usr/bin/expect', '/usr/local/bin/expect', '/opt/homebrew/bin/expect'].find((x) => existsSync(x))
+      if (process.platform === 'win32' || !EXPECT) throw new Error('一键登录目前只支持 mac 和装了 expect 的 Linux;其他系统在终端里跑 claude setup-token,把令牌粘进来 / One-click sign-in needs mac or Linux with expect; run claude setup-token in a terminal and paste the token')
       const bin = typeof binary === 'function' ? binary() : binary
       if (!bin) throw new Error('找不到 Claude 程序;在终端里跑 claude setup-token,把令牌粘进来 / Claude binary not found; run claude setup-token in a terminal and paste the token')
       close()
@@ -62,7 +64,7 @@ set timeout -1
 expect_user -re "(.*)\n"
 send -- "$expect_out(1,string)\r"
 expect eof`
-      const child = spawnImpl('/usr/bin/expect', ['-c', script], { env: { ...env, FW_CLAUDE_BIN: bin }, stdio: ['pipe', 'pipe', 'pipe'] })
+      const child = spawnImpl(EXPECT, ['-c', script], { env: { ...env, FW_CLAUDE_BIN: bin }, stdio: ['pipe', 'pipe', 'pipe'] })
       s = { child, raw: '', authUrl: null, pending: true, error: null, done: false, timer: null }
       const me = s
       const onData = (b) => {

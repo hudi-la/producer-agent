@@ -57,7 +57,9 @@ import { backupNow } from './local/backup.js'
 import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
 import { VERSION } from './version.js'
 // 学员自己的判据文档(<数据目录>/judgments/*.md),拼进每一格的收尾之前;判不出来回退出厂判据
-import { useJudgmentsDir, judgeWithFallback, hasJudgments } from './judgments.js'
+import { useJudgmentsDir, judgeWithFallback, hasJudgments, docsFromRows } from './judgments.js'
+import { tenant, currentTenant, withTenant, setStaticTenant, childEnv, envFor, envNow, makeHosted, modulesFor, parseBearer } from './tenant.js'
+import { handleHostedRoute } from './hosted/routes.js'
 import { copyFileSync, existsSync as fsExists, mkdirSync as fsMkdir, readFileSync } from 'node:fs'
 import { join as pathJoin } from 'node:path'
 import { initStore } from './mail/store.js'
@@ -97,7 +99,13 @@ const ORIGIN = process.env.BRAIN_ORIGIN || 'http://localhost:5173'
 // 连库双模(dbauth.js):SERVICE_ROLE 在就走个人版老路;不在就走学员路
 // (anon key + 登录会话)——那个身份被行级权限管着,brain 只看得见这个
 // 学员自己的行,机器上不存在能读别人数据的钥匙(0118 起)。
-let db, DB_MODE, LOCAL_MODE = null, MODS = { profile: true, pursuits: true, mail: true, canToggle: false }
+let DB_MODE, LOCAL_MODE = null
+// 托管(2026-10-02 起,设计稿 2026-10-02 第六节):一个脑子伺候所有人。「我是谁」不再是进程级变量,
+// 而是随请求 / 随任务走的租户上下文(brain/tenant.js)。HOSTED 是造上下文的工厂,SERVICE 是只用来
+// 找活、查人、造会话的 service_role 客户端——业务表永远不以它读写。
+let HOSTED = null, SERVICE = null, DIST_DIR = null
+// `db` 从此是读当前租户的那个客户端:local / service 配置下就是启动时那个静态租户,下面几十处 db.from / db.rpc 一个字不用改
+const db = new Proxy({}, { get: (_, k) => { const d = tenant().db; const v = d[k]; return typeof v === 'function' ? v.bind(d) : v } })
 // 连库放进一个函数、在 main() 里 await:这个文件不能有顶层 await——
 // 打包成字节码时是 CJS,CJS 没有顶层 await(packaging/SPIKE.md 第 3 条)。
 // 判据目录里的 README 按语言放一份;已经有了(他自己改过的)就不动
@@ -111,16 +119,26 @@ function placeJudgmentsReadme(jdir, lang) {
 
 async function connect() {
   const r = await makeDb()
-  db = r.db; DB_MODE = r.mode
+  DB_MODE = r.mode
+  DIST_DIR = process.env.FAIRWIND_DIST_DIR || fileURLToPath(new URL('../dist/', import.meta.url))
+  if (DB_MODE === 'hosted') {
+    SERVICE = r.service
+    HOSTED = makeHosted({ url: r.url, anon: r.anon, service: r.service, createClient, dataRoot: r.dataDir, docsFromRows, log: (m) => console.log(m) })
+    console.log('· 托管:一个脑子伺候所有人,身份随请求 / 随任务走;service_role 只找活')
+    return
+  }
+  // 单人配置:启动时建一次静态租户,一辈子不变——行为逐字等于以前
+  const T = setStaticTenant({ mode: DB_MODE, owner: r.settings?.uid || null, email: r.settings?.email || '', db: r.db, env: null, settings: r.settings || null,   // env 为 null = 读进程的(他自己的 .env);本机版下面 exportEnv 会填
+                              modules: null, dataDir: process.env.FAIRWIND_DATA_DIR || '', marks: {} })
   if (DB_MODE === 'user') {
-    const u = await requireUser(db)
+    const u = await requireUser(r.db)
     console.log(`· 以 ${u.email} 的身份连库(行级权限生效)`)
   }
   if (DB_MODE === 'local') {
     LOCAL_MODE = {
       pg: r.pg, settings: r.settings, dataDir: process.env.FAIRWIND_DATA_DIR,
       // 前端构建产物:开发时是仓库的 dist/,打包后是字节码旁边的 dist/
-      distDir: process.env.FAIRWIND_DIST_DIR || fileURLToPath(new URL('../dist/', import.meta.url)),
+      distDir: DIST_DIR,
       onSetup: async (settings) => { LOCAL_MODE.settings = settings; placeJudgmentsReadme(pathJoin(LOCAL_MODE.dataDir, 'judgments'), settings.lang) },
     }
     exportEnv(r.settings)   // key 和两档模型:settings.json 是学员机器上唯一的一份,不用 .env
@@ -144,8 +162,8 @@ async function connect() {
     setInterval(dailyBackup, 24 * 3600_000)
     console.log(`· 本机库:${LOCAL_MODE.dataDir}${r.settings.ready ? '' : '(还没初始化,等页面上填)'}`)
   }
-  initStore(db)
-  MODS = loadModules({ dataDir: LOCAL_MODE?.dataDir, mode: DB_MODE })
+  initStore(r.db)
+  T.modules = loadModules({ dataDir: LOCAL_MODE?.dataDir, mode: DB_MODE })
 }
 
 // ── 上下文：Fairwind 开工前先想起这条线的一切 ──────────────────────────
@@ -322,6 +340,7 @@ const GMAIL_TOOLS = [
 // run_id 由浏览器生成并随 /chat 一起发过来，不是这边生成再回传的——
 // 回传得等 think() 想完，那时候早没得停了。
 const RUNS = new Map()
+const runKey = (id) => `${currentTenant()?.owner || ''}:${id}`   // 托管下不同人的 run_id 可能撞,加上是谁
 
 // ── 这条线上的文件 ────────────────────────────────────────────
 //
@@ -548,6 +567,7 @@ async function think(prompt, tools = READ_TOOLS, system = null, abortController 
       systemPrompt: asSystem(system),
       allowedTools: tools,
       permissionMode: 'bypassPermissions',      // 无人值守；面是白名单锁死的
+      env: childEnv(),                          // 这个人的 key、模型档位、语言;进程 env 里的凭据一律不带(2026-10-02)
       maxTurns,
       ...(model ? { model } : {}),
       ...(tell ? { includePartialMessages: true } : {}),
@@ -680,7 +700,7 @@ async function handleChat(body, onEvent = null) {
     : (atts.length ? { pursuit_files: filesServer(atts) } : null)
 
   const ac = run_id ? new AbortController() : null
-  if (ac) RUNS.set(run_id, ac)
+  if (ac) RUNS.set(runKey(run_id), ac)
   let reply, usage, notes, recovered
   try {
     ;({ text: reply, usage, notes, recovered } = await think(
@@ -698,7 +718,7 @@ async function handleChat(body, onEvent = null) {
     }
     throw err
   } finally {
-    if (run_id) RUNS.delete(run_id)
+    if (run_id) RUNS.delete(runKey(run_id))
   }
   // 首字比总耗时要紧：边想边出字的意义全在第一个字来得早。
   const firstSay = usage.firstMs != null ? ` / 首字 ${(usage.firstMs / 1000).toFixed(1)}s` : ''
@@ -754,10 +774,10 @@ async function handleChat(body, onEvent = null) {
 function handleStop(body) {
   const { run_id } = body
   if (!run_id) throw new Error('要有 run_id')
-  const ac = RUNS.get(run_id)
+  const ac = RUNS.get(runKey(run_id))
   if (!ac) return { ok: true, stopped: false }
   ac.abort()
-  RUNS.delete(run_id)
+  RUNS.delete(runKey(run_id))
   return { ok: true, stopped: true }
 }
 
@@ -1055,14 +1075,14 @@ ${known.join(', ')}
 // 认过的先记着：读信要一分钟，他点完常常切走了页面 —— 回来再点不该
 // 重花一次钱重读一遍。缓存在内存里就够：草稿本来就是临时的（一旦认领
 // 就落库了），brain 重启丢掉也只是回到「再读一次」。
-const IDENTIFIED = new Map()   // email → { at, out }
+const IDENTIFIED = () => (tenant().marks.identified ??= new Map())   // email → { at, out };按人一份
 const IDENTIFY_TTL = 24 * 3600 * 1000
 
 async function handleIdentify(body) {
   const email = String(body?.email || '').trim().toLowerCase()
   if (!email.includes('@')) throw new Error('要一个邮箱地址')
 
-  const hit = IDENTIFIED.get(email)
+  const hit = IDENTIFIED().get(email)
   if (hit && Date.now() - hit.at < IDENTIFY_TTL) {
     console.log('  ↳ 上次认过，直接给（不重读信）')
     return { ...hit.out, cached: true }
@@ -1330,13 +1350,14 @@ async function handlePersonRefresh(contactId) {
 // prompt.js（语气是数据那一刀，2026-08-24）——原来这儿和 replay.js 各抄
 // 一份，改一处漏一处。多租户接上后这里改用 judgeSystemFor(voice)。
 // 2026-09-16 接上了:语气五栏里的 judge_rule 从 v_pa_voice 读,缓存一分钟。空 = 出厂原文。
-let VOICE_CACHE = { at: 0, voice: null }
+const voiceCache = () => (tenant().marks.voice ??= { at: 0, voice: null })   // 按人一份
 async function judgeSystem() {
-  if (Date.now() - VOICE_CACHE.at > 60_000) {
-    try { const { data } = await db.from('v_pa_voice').select('*').limit(1); VOICE_CACHE = { at: Date.now(), voice: data?.[0] || null } }
-    catch (_) { VOICE_CACHE = { at: Date.now(), voice: null } }
+  const C = voiceCache()
+  if (Date.now() - C.at > 60_000) {
+    try { const { data } = await db.from('v_pa_voice').select('*').limit(1); Object.assign(C, { at: Date.now(), voice: data?.[0] || null }) }
+    catch (_) { Object.assign(C, { at: Date.now(), voice: null }) }
   }
-  return judgeSystemFor(VOICE_CACHE.voice)
+  return judgeSystemFor(C.voice)
 }
 
 /**
@@ -1709,15 +1730,40 @@ ${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ?
 // handleBrief 本来就幂等（有 brief 就 skipped），所以重复扫是安全的；
 // briefed 只是省掉那次白跑的 loadContext，不是正确性的依赖。
 const SWEEP_MS = Number(process.env.BRAIN_SWEEP_MS || 60_000)
-const briefed = new Set()
-const failed = new Map()        // 卡 id → 连续失败次数，用来退避
-let sweeping = false
-let sweeps = 0
+
+// 托管:跨人找活(service_role 只读 0155 的两个口),再换成那个人的身份干活。
+// 每人一次只跑一件(marks[busyKey]),最多 HOSTED_POOL 个人同时跑——找机会一轮五分钟,全站不能排成一条队。
+const HOSTED_POOL = 2
+async function forEachOwnerDue(rpcName, work, { busyKey }) {
+  let rows
+  try { const { data, error } = await SERVICE.rpc(rpcName); if (error) throw new Error(error.message); rows = data || [] }
+  catch (e) { console.error(`✗ ${rpcName}:${e.message}`); return }
+  const byOwner = new Map()
+  for (const r of rows) { if (!byOwner.has(r.owner)) byOwner.set(r.owner, []); byOwner.get(r.owner).push(r) }
+  const owners = [...byOwner.keys()]
+  let i = 0
+  const worker = async () => {
+    while (i < owners.length) {
+      const owner = owners[i++]
+      let t
+      try { t = await HOSTED.forOwner(owner) } catch (e) { console.warn(`  ⚠️ 替 ${owner} 建会话没成:${e.message}`); continue }
+      if (!t.modules.pursuits || t.marks[busyKey]) continue
+      t.marks[busyKey] = true
+      try { await withTenant(t, () => work(byOwner.get(owner))) }
+      catch (e) {
+        console.error(`  ✗ ${t.email}:${e.message}`)
+        if (/jwt|401|expired|refresh/i.test(e.message)) HOSTED.invalidate(owner, { session: true })   // 会话坏了:下次重造
+      } finally { t.marks[busyKey] = false }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(HOSTED_POOL, owners.length) }, worker))
+}
 
 async function sweepBriefs() {
-  if (sweeping) return          // 上一轮还在读（联网研究一张要 30–60 秒），跳过这次
-  sweeping = true
-  sweeps++
+  if (HOSTED) return forEachOwnerDue('pa_briefs_due_all', sweepBriefRows, { busyKey: 'sweeping' })
+  const M = tenant().marks
+  if (M.sweeping) return          // 上一轮还在读（联网研究一张要 30–60 秒），跳过这次
+  M.sweeping = true
   try {
     const { data, error } = await db
       .from('v_pa_pursuits')
@@ -1725,25 +1771,31 @@ async function sweepBriefs() {
       .eq('stage', 'pending')
       .order('created_at')
     if (error) { console.warn('⚠️ 扫新机会失败：' + error.message); return }
-
-    for (const p of data || []) {
-      if (briefed.has(p.id)) continue
-      // 一直失败的卡不能每分钟重试一次——那会没完没了地烧订阅额度，
-      // 而且日志被同一条报错刷屏，真问题反而看不见。失败一次退避一轮。
-      const n = failed.get(p.id) || 0
-      if (n > 0 && sweeps % Math.min(2 ** n, 60) !== 0) continue
-      try {
-        const { skipped } = await handleBrief({ pursuit_id: p.id })
-        briefed.add(p.id)
-        failed.delete(p.id)
-        if (!skipped) console.log(`  ✓ 读透了：${p.title}`)
-      } catch (err) {
-        failed.set(p.id, n + 1)
-        console.warn(`  ⚠️ 读「${p.title}」失败（第 ${n + 1} 次）：${err.message}`)
-      }
-    }
+    await sweepBriefRows(data || [])
   } finally {
-    sweeping = false
+    M.sweeping = false
+  }
+}
+
+// 这一个人待读的卡。briefed / failed / sweeps 都按人记在他的 marks 里
+async function sweepBriefRows(rows) {
+  const M = tenant().marks
+  M.briefed ??= new Set(); M.failed ??= new Map(); M.sweeps = (M.sweeps || 0) + 1
+  for (const p of rows) {
+    if (M.briefed.has(p.id)) continue
+    // 一直失败的卡不能每分钟重试一次——那会没完没了地烧订阅额度，
+    // 而且日志被同一条报错刷屏，真问题反而看不见。失败一次退避一轮。
+    const n = M.failed.get(p.id) || 0
+    if (n > 0 && M.sweeps % Math.min(2 ** n, 60) !== 0) continue
+    try {
+      const { skipped } = await handleBrief({ pursuit_id: p.id })
+      M.briefed.add(p.id)
+      M.failed.delete(p.id)
+      if (!skipped) console.log(`  ✓ 读透了：${p.title}`)
+    } catch (err) {
+      M.failed.set(p.id, n + 1)
+      console.warn(`  ⚠️ 读「${p.title}」失败（第 ${n + 1} 次）：${err.message}`)
+    }
   }
 }
 
@@ -1767,9 +1819,9 @@ async function sweepBriefs() {
 //
 // 设计稿：docs/specs/2026-09-03-opportunity-pool-design.md
 const SCOUT_MS = Number(process.env.SCOUT_SWEEP_MS || 30_000)
-let scouting = false
-let lastScout = { at: null, ok: null, note: '还没跑过', task: null }
-const scoutState = () => ({ ...lastScout, running: scouting })
+const NO_SCOUT = { at: null, ok: null, note: '还没跑过', task: null }
+// 按人:忙碌标记和「上次」都在他的 marks 里;/health 没带身份时(托管、没登录)给空的
+const scoutState = () => { const M = currentTenant()?.marks || {}; return { ...(M.lastScout || NO_SCOUT), running: Boolean(M.scouting) } }
 
 // 一轮 = 三步。每一步都可能没活干，没活干也要在战报里说一句 ——
 // 静默的「什么都没发生」跟「跑挂了」长得一模一样。
@@ -1852,7 +1904,7 @@ async function runScoutTask(t) {
     const parsed = parseCards(text)
     if (!parsed) {
       console.warn(`  ⚠️ 找新的这一步没按格式报。它说的是：\n${text.slice(0, 1200)}`)
-      R.skipped.push({ title: process.env.FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: process.env.FAIRWIND_LANG === 'en' ? 'reply was not in the expected format; nothing was added this round' : '没按格式报，这轮没收到任何新行' })
+      R.skipped.push({ title: envNow().FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: envNow().FAIRWIND_LANG === 'en' ? 'reply was not in the expected format; nothing was added this round' : '没按格式报，这轮没收到任何新行' })
     } else {
       if (parsed.said) console.log(`  ↳ 它说：${parsed.said.slice(0, 300).replace(/\n+/g, ' ')}`)
       const { take, dup } = pick(parsed.cards, existing)
@@ -1875,7 +1927,7 @@ async function runScoutTask(t) {
     // 找新的挂了不该把复查的成果一起丢掉 —— 那一步已经写库了
     console.error(`  ✗ 找新的这一步没成：${err.message}`)
     R.halts.push({ step: 'search', why: err.message })
-    R.skipped.push({ title: process.env.FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: err.message })   // report3 里 brief() 会把报错瘦成一句
+    R.skipped.push({ title: envNow().FAIRWIND_LANG === 'en' ? '(the search step)' : '（找新的这一步）', why: err.message })   // report3 里 brief() 会把报错瘦成一句
   }
 
   // ══ 第三步 · 挑 ═════════════════════════════════════════════
@@ -1939,7 +1991,9 @@ async function runScoutTask(t) {
 }
 
 async function scoutPass() {
-  if (scouting) return
+  if (HOSTED) return forEachOwnerDue('pa_tasks_due_all', (rows) => runDueTasks(rows.map((r) => r.task)), { busyKey: 'scouting' })
+  const M = tenant().marks
+  if (M.scouting) return
   let due
   try {
     const { data, error } = await db.rpc('pa_tasks_due')
@@ -1948,33 +2002,35 @@ async function scoutPass() {
   } catch (err) { console.error('✗ 问谁到点了：', err.message); return }
   if (!due?.length) return
 
-  scouting = true
-  try {
-    for (const t of due) {
-      // 认领。两轮撞上、或者两个脑子，只有一个拿得到
-      const { data: got } = await db.rpc('pa_task_start', { p_id: t.id })
-      if (!got) continue
-      const at = new Date().toISOString()
-      console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 造卡任务「${t.name}」开跑`)
-      lastScout = { at, ok: null, note: `正在跑「${t.name}」`, task: t.name }
+  M.scouting = true
+  try { await runDueTasks(due) } finally { M.scouting = false }
+}
+
+// 这一个人到点的任务,挨个认领、跑、收工
+async function runDueTasks(due) {
+  const M = tenant().marks
+  for (const t of due) {
+    // 认领。两轮撞上、或者两个脑子，只有一个拿得到
+    const { data: got } = await db.rpc('pa_task_start', { p_id: t.id })
+    if (!got) continue
+    const at = new Date().toISOString()
+    console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 造卡任务「${t.name}」开跑${HOSTED ? `(${tenant().email})` : ''}`)
+    M.lastScout = { at, ok: null, note: `正在跑「${t.name}」`, task: t.name }
+    try {
+      const out = await runScoutTask(t)
+      M.lastScout = { at, ok: out.ok, task: t.name,
+        note: out.ok
+          ? (envNow().FAIRWIND_LANG === 'en' ? `"${t.name}" done: rechecked ${out.checked} · added ${out.found} · made ${out.made} card(s)` : `「${t.name}」跑完：复查 ${out.checked} 行 · 进表 ${out.found} 个 · 造卡 ${out.made} 张`)
+          : `「${t.name}」没跑成` }
+    } catch (err) {
+      console.error(`  ✗ 「${t.name}」没跑成：${err.message}`)
+      M.lastScout = { at, ok: false, task: t.name, note: `「${t.name}」没跑成：${err.message}` }
+      // 没跑成也要收工——不然 running_since 挂两小时才松，而且 last_result 不说实话
       try {
-        const out = await runScoutTask(t)
-        lastScout = { at, ok: out.ok, task: t.name,
-          note: out.ok
-            ? (process.env.FAIRWIND_LANG === 'en' ? `"${t.name}" done: rechecked ${out.checked} · added ${out.found} · made ${out.made} card(s)` : `「${t.name}」跑完：复查 ${out.checked} 行 · 进表 ${out.found} 个 · 造卡 ${out.made} 张`)
-            : `「${t.name}」没跑成` }
-      } catch (err) {
-        console.error(`  ✗ 「${t.name}」没跑成：${err.message}`)
-        lastScout = { at, ok: false, task: t.name, note: `「${t.name}」没跑成：${err.message}` }
-        // 没跑成也要收工——不然 running_since 挂两小时才松，而且 last_result 不说实话
-        try {
-          await db.rpc('pa_task_finish', { p_id: t.id, p_ok: false,
-            p_result: `${at.slice(0, 10)} 这轮没跑成：${err.message}` })
-        } catch (e2) { console.error('  ✗ 连收工都没记上：' + e2.message) }
-      }
+        await db.rpc('pa_task_finish', { p_id: t.id, p_ok: false,
+          p_result: `${at.slice(0, 10)} 这轮没跑成：${err.message}` })
+      } catch (e2) { console.error('  ✗ 连收工都没记上：' + e2.message) }
     }
-  } finally {
-    scouting = false
   }
 }
 
@@ -1992,24 +2048,65 @@ const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin
   res.setHeader('access-control-allow-origin', allowOrigin(origin))
   res.setHeader('vary', 'origin')
-  res.setHeader('access-control-allow-headers', 'content-type')
-  res.setHeader('access-control-allow-methods', 'POST, GET, OPTIONS')
+  res.setHeader('access-control-allow-headers', 'content-type, authorization')
+  res.setHeader('access-control-allow-methods', 'POST, GET, PUT, DELETE, OPTIONS')
   if (origin && !LOCAL.test(origin) && origin !== ORIGIN) {
     console.warn(`⚠️ 拦下一个外部来源：${origin}`)
   }
   if (req.method === 'OPTIONS') return res.writeHead(204).end()
+  if (!HOSTED) return dispatch(req, res, origin)
+  // 下面每条 return 都 await:不然 dispatch 里抛的错落不进这个 catch,整个进程会被一个请求带倒
 
+  // 托管:先认人,再干活(设计稿 2026-10-02 D3 / D13)。
+  //   /mcp            桥带来的令牌 → 是谁
+  //   /health 静态文件 不要身份;/health 带了身份就按人报(找机会的状态是按人的)
+  //   其余            浏览器的 JWT,没有 / 过期 → 401
+  try {
+    const path = req.url.split('?')[0]
+    if (path === '/mcp') {
+      const t = await HOSTED.forMcpToken(parseBearer(req))
+      if (!t) return send(res, 401, { error: 'MCP 令牌不对或没带;设置页里有你那一行命令 / bad or missing MCP token' })
+      return await withTenant(t, () => dispatch(req, res, origin))
+    }
+    const open = req.method === 'GET' && (path === '/health' || path === '/mcp-guide' || path === '/' || /\.[a-z0-9]+$/i.test(path))
+    if (open) {
+      const t = path === '/health' ? await HOSTED.fromRequest(req).catch(() => null) : null
+      return await (t ? withTenant(t, () => dispatch(req, res, origin)) : dispatch(req, res, origin))
+    }
+    const t = await HOSTED.fromRequest(req)
+    if (!t) return send(res, 401, { error: '请先登录 / sign in first' })
+    return await withTenant(t, () => dispatch(req, res, origin))
+  } catch (e) {
+    console.error('  ✗ 认人没成:' + e.message)
+    if (!res.headersSent) send(res, 500, { error: e.message })
+  }
+})
+
+async function dispatch(req, res, origin) {
   // 本机模式的那几条路(/me /setup /db/* /files/* 和静态 dist/)。云端模式 LOCAL_MODE 是 null,一律跳过
   if (LOCAL_MODE && await handleLocalRoute(req, res, { db, mode: DB_MODE, ...LOCAL_MODE })) return
+  // 托管的那几条(/me /settings /judgments/files /claude/* 和静态 dist/)
+  if (HOSTED && await handleHostedRoute(req, res, { hosted: HOSTED, distDir: DIST_DIR })) return
 
   // 模块开关:读、写(写完定时器当场跟着变)、门
-  if (req.method === 'GET' && req.url === '/modules') return send(res, 200, MODS)
+  if (req.method === 'GET' && req.url === '/modules') return send(res, 200, tenant().modules)
   if (req.method === 'POST' && req.url === '/modules') {
     let raw = ''
     req.on('data', (c) => (raw += c))
-    req.on('end', () => {
-      try { MODS = setModules({ dataDir: LOCAL_MODE?.dataDir, mode: DB_MODE }, JSON.parse(raw || '{}')); applyTimers(); send(res, 200, MODS) }
-      catch (e) { send(res, 400, { error: e.message }) }
+    req.on('end', async () => {
+      try {
+        const patch = JSON.parse(raw || '{}')
+        if (HOSTED) {
+          // 托管:开关存在那个人的 member_settings.modules 里;邮件线上第一期不开(D9)
+          const t = tenant()
+          const want = { profile: true, pursuits: patch.pursuits === undefined ? t.modules.pursuits : Boolean(patch.pursuits), mail: false }
+          const { error } = await t.db.rpc('pa_set_member_settings', { p: { modules: want } })
+          if (error) throw new Error(error.message)
+          HOSTED.invalidate(t.owner)
+          return send(res, 200, modulesFor({ modules: want }))
+        }
+        tenant().modules = setModules({ dataDir: LOCAL_MODE?.dataDir, mode: DB_MODE }, patch); applyTimers(); send(res, 200, tenant().modules)
+      } catch (e) { send(res, 400, { error: e.message }) }
     })
     return
   }
@@ -2020,14 +2117,15 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 404, { error: '说明书不在' })
   }
-  // MCP:只认回环地址来的连接——这扇门能写档案,不能开给局域网
+  // MCP:本机 / 个人版只认回环地址来的连接——这扇门能写档案,不能开给局域网;托管已经按令牌认过人
   if (req.url === '/mcp' || req.url.startsWith('/mcp?')) {
     const ip = req.socket.remoteAddress || ''
-    if (!/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(ip)) return send(res, 403, { error: 'MCP 只听本机' })
-    return handleMcp(req, res, { db, version: VERSION, dataDir: LOCAL_MODE?.dataDir || null, modules: MODS, previewJudgments }).catch((e) => { console.error('  ✗ MCP:' + e.message); if (!res.headersSent) send(res, 500, { error: e.message }) })
+    if (!HOSTED && !/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(ip)) return send(res, 403, { error: 'MCP 只听本机' })
+    return handleMcp(req, res, { db, version: VERSION, dataDir: HOSTED ? null : (LOCAL_MODE?.dataDir || null), modules: tenant().modules, previewJudgments }).catch((e) => { console.error('  ✗ MCP:' + e.message); if (!res.headersSent) send(res, 500, { error: e.message }) })
   }
   const mod = moduleOf(req.url)
-  if (!isEnabled(MODS, mod)) return send(res, 404, { error: 'module off', module: mod })
+  const mods = currentTenant()?.modules   // 托管下没带身份的只会走到这儿的 core 路(/health、静态),没有开关可看
+  if (mods && !isEnabled(mods, mod)) return send(res, 404, { error: 'module off', module: mod })
 
   // 「看看会怎么变」:最近判过的 N 件事,用现在的判据文档再判一遍(只判不写),跟原结论并排
   if (req.method === 'POST' && req.url === '/judgments/preview') {
@@ -2046,7 +2144,7 @@ const server = http.createServer(async (req, res) => {
     const { lastSweep } = await import('./mail/loop.js')
     // scout = 定时造卡那一轮。面板靠它说「脑子没开 · 到点不会跑」。
     // version:更新那一步拿它跟发布位比;mode/modules:界面按它画,少一次 /modules
-    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, mode: DB_MODE, modules: MODS, update: lastUpdateCheck(), mail: lastSweep(), scout: scoutState() })
+    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, mode: DB_MODE, modules: currentTenant()?.modules || null, update: lastUpdateCheck(), mail: lastSweep(), scout: scoutState() })
   }
 
   if (req.method === 'POST' && req.url === '/chat') {
@@ -2103,8 +2201,8 @@ const server = http.createServer(async (req, res) => {
       let done = false
       res.on('close', () => {
         if (done || !body.run_id) return
-        const ac = RUNS.get(body.run_id)
-        if (ac) { console.log('  ↳ 界面断了，掐掉这一次'); ac.abort(); RUNS.delete(body.run_id) }
+        const ac = RUNS.get(runKey(body.run_id))
+        if (ac) { console.log('  ↳ 界面断了，掐掉这一次'); ac.abort(); RUNS.delete(runKey(body.run_id)) }
       })
 
       try {
@@ -2213,7 +2311,7 @@ const server = http.createServer(async (req, res) => {
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 认人 ${body.email}`)
         const out = await handleIdentify(body)
         console.log(`  ↳ ${out.kind}${out.name ? ' · ' + out.name : ''}${out.match_name ? ' → 命中 ' + out.match_name : ''}`)
-        if (!out.cached) IDENTIFIED.set(String(body.email || '').trim().toLowerCase(), { at: Date.now(), out })
+        if (!out.cached) IDENTIFIED().set(String(body.email || '').trim().toLowerCase(), { at: Date.now(), out })
         send(res, 200, out)
       } catch (err) {
         console.error('✗', err.message)
@@ -2362,14 +2460,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   send(res, 404, { error: 'not found' })
-})
+}
 
 async function main() {
   try { await connect() } catch (err) { console.error('\n✗ ' + err.message + '\n'); process.exit(1) }
-  server.listen(PORT, () => {
-  console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}`)
+  // 托管只听本机,门口交给 Caddy;别的配置跟以前一样
+  const HOST = process.env.BRAIN_HOST || (HOSTED ? '127.0.0.1' : undefined)
+  server.listen(PORT, HOST, () => {
+  console.log(`\n🔥 Fairwind 的脑子醒着  http://localhost:${PORT}${HOSTED ? '(托管)' : ''}`)
   console.log(`   放行来源：${ORIGIN}`)
-  console.log(engineOf() === 'chatgpt-subscription' ? '   模型：ChatGPT 订阅（Codex）\n' : engineOf() !== 'claude' ? `   模型：${PROVIDERS[engineOf()].label}（你自己的 API key）\n` : process.env.ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
+  console.log(engineOf() === 'chatgpt-subscription' ? '   模型：ChatGPT 订阅（Codex）\n' : engineOf() !== 'claude' ? `   模型：${PROVIDERS[engineOf()].label}（你自己的 API key）\n` : envNow().ANTHROPIC_API_KEY ? `   计费：走你自己的 API key\n` : `   计费：走你的 Claude 订阅用量（没用 API key）\n`)
   applyTimers()
   })
 }
@@ -2403,7 +2503,9 @@ const mailLoop = async () => {
 // 云端模式三个永远开着——功能只增不减。
 const timers = {}
 function applyTimers() {
-  const want = { sweepBriefs: isEnabled(MODS, 'pursuits'), scoutPass: isEnabled(MODS, 'pursuits'), mailLoop: isEnabled(MODS, 'mail') }
+  // 托管:两个循环永远开着(每个人开没开机会线在循环里按人看),邮件线上第一期不起
+  const want = HOSTED ? { sweepBriefs: true, scoutPass: true, mailLoop: false }
+    : { sweepBriefs: isEnabled(tenant().modules, 'pursuits'), scoutPass: isEnabled(tenant().modules, 'pursuits'), mailLoop: isEnabled(tenant().modules, 'mail') }
   const every = { sweepBriefs: SWEEP_MS, scoutPass: SCOUT_MS, mailLoop: MAIL_MS }
   const first = { sweepBriefs: 0, scoutPass: 8000, mailLoop: 5000 }     // 起来 5 秒先收一轮信,别让你等五分钟
   const fns = { sweepBriefs, scoutPass, mailLoop }

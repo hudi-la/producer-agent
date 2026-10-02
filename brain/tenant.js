@@ -33,7 +33,11 @@ export function withTenant(t, fn) { return T.run(t, fn) }
  */
 export function envNow() {
   const t = T.getStore() || STATIC
-  return t?.env ? { ...process.env, ...t.env } : process.env
+  if (!t?.env) return process.env
+  // 有租户 env 的配置(本机、托管):进程 env 里的凭据一律不算数——学员 shell 里碰巧有把别家的 key 也不该被捡起来
+  const base = { ...process.env }
+  for (const k of SECRET_KEYS) delete base[k]
+  return { ...base, ...t.env }
 }
 
 /**
@@ -54,9 +58,10 @@ export function envFor(s = {}, { dataDir = '' } = {}) {
   return env
 }
 
-/** 给子进程(SDK 的 claude、Codex)的环境:进程自己的 env 去掉所有凭据,再盖上租户的。 */
 const SECRET_KEYS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_BASE_URL', 'GEMINI_BASE_URL', 'ANTHROPIC_BASE_URL']
+/** 给子进程(SDK 的 claude、Codex)的环境:进程自己的 env 去掉所有凭据,再盖上租户的。没有租户 env(他自己的个人版)就原样。 */
 export function childEnv(t = tenant(), base = process.env) {
+  if (!t?.env) return { ...base }
   const out = { ...base }
   for (const k of SECRET_KEYS) delete out[k]
   for (const k of ['FAIRWIND_PROVIDER', 'BRAIN_MODEL', 'BRAIN_MODEL_CHEAP', 'FAIRWIND_LANG', 'FAIRWIND_DATA_DIR']) delete out[k]

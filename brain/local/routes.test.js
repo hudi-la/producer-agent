@@ -1,4 +1,5 @@
 // brain/local/routes.test.js
+import { envNow } from '../tenant.js'
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -44,9 +45,9 @@ test('/settings:GET 不回显 key,只给末四位;POST 空 key 不动原来的,�
   const g = res(); await handleLocalRoute(req('GET', '/settings'), g, ctx)
   const j = g.json(); assert.equal(j.apiKeySet, true); assert.equal(j.apiKeyHint, 'sk-ant-…nt-1'); assert.equal(JSON.stringify(j).includes('sk-ant-1'), false)
   const w = res(); await handleLocalRoute(req('POST', '/settings', { apiKey: '', model: 'claude-opus-5', modelCheap: 'claude-haiku-4-5-20251001' }), w, ctx)
-  assert.equal(w.json().apiKeySet, true); assert.equal(process.env.ANTHROPIC_API_KEY, 'sk-ant-1'); assert.equal(process.env.BRAIN_MODEL, 'claude-opus-5')
+  assert.equal(w.json().apiKeySet, true); assert.equal(envNow().ANTHROPIC_API_KEY, 'sk-ant-1'); assert.equal(envNow().BRAIN_MODEL, 'claude-opus-5')
   const w2 = res(); await handleLocalRoute(req('POST', '/settings', { apiKey: 'sk-ant-9999' }), w2, ctx)
-  assert.equal(w2.json().apiKeyHint, 'sk-ant-…9999'); assert.equal(process.env.ANTHROPIC_API_KEY, 'sk-ant-9999')
+  assert.equal(w2.json().apiKeyHint, 'sk-ant-…9999'); assert.equal(envNow().ANTHROPIC_API_KEY, 'sk-ant-9999')
 })
 
 test('/db/rpc 和 /db/from 原样转发', async () => {
@@ -100,17 +101,17 @@ test('/settings:切到订阅路 → env 里只剩 CLAUDE_CODE_OAUTH_TOKEN;切回
   const a = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-subscription', oauthToken: 'sk-ant-oat01-abcdefgh-9999' }), a, ctx)
   assert.equal(a.json().provider, 'claude-subscription'); assert.equal(a.json().oauthTokenSet, true); assert.equal(a.json().oauthTokenHint, 'sk-ant-oat01…9999')
   assert.equal(JSON.stringify(a.json()).includes('abcdefgh'), false)
-  assert.equal(process.env.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat01-abcdefgh-9999'); assert.equal(process.env.ANTHROPIC_API_KEY, undefined)
+  assert.equal(envNow().CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat01-abcdefgh-9999'); assert.equal(envNow().ANTHROPIC_API_KEY, undefined)
   const b = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-key' }), b, ctx)
-  assert.equal(process.env.CLAUDE_CODE_OAUTH_TOKEN, undefined); assert.ok(process.env.ANTHROPIC_API_KEY)
+  assert.equal(envNow().CLAUDE_CODE_OAUTH_TOKEN, undefined); assert.ok(envNow().ANTHROPIC_API_KEY)
 })
 
 test('/settings:切到 gemini → env 里 FAIRWIND_PROVIDER=gemini + GEMINI_API_KEY,别家的 key 清掉;切回 claude-key 反过来', async () => {
   const a = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'gemini', geminiKey: 'AIzaSy-test-key-7777' }), a, ctx)
   assert.equal(a.json().provider, 'gemini'); assert.equal(a.json().geminiKeyHint, 'AIzaSy…7777'); assert.equal(JSON.stringify(a.json()).includes('test-key'), false)
-  assert.equal(process.env.FAIRWIND_PROVIDER, 'gemini'); assert.equal(process.env.GEMINI_API_KEY, 'AIzaSy-test-key-7777'); assert.equal(process.env.ANTHROPIC_API_KEY, undefined)
+  assert.equal(envNow().FAIRWIND_PROVIDER, 'gemini'); assert.equal(envNow().GEMINI_API_KEY, 'AIzaSy-test-key-7777'); assert.equal(envNow().ANTHROPIC_API_KEY, undefined)
   const b = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'claude-key' }), b, ctx)
-  assert.equal(process.env.FAIRWIND_PROVIDER, 'claude'); assert.equal(process.env.GEMINI_API_KEY, undefined); assert.ok(process.env.ANTHROPIC_API_KEY)
+  assert.equal(envNow().FAIRWIND_PROVIDER, 'claude'); assert.equal(envNow().GEMINI_API_KEY, undefined); assert.ok(envNow().ANTHROPIC_API_KEY)
 })
 
 test('/quit:答一声再退场(退场用注入的 exit,测试里不真退)', async () => {
@@ -175,8 +176,8 @@ test('ChatGPT login routes and setup verify backend account; client cannot forge
   connected = true
   const saved = res(); await handleLocalRoute(req('POST', '/settings', { provider: 'chatgpt-subscription', model: '', modelCheap: '' }), saved, ctx)
   assert.equal(saved.json().ready, true); assert.equal(saved.json().provider, 'chatgpt-subscription')
-  assert.equal(process.env.FAIRWIND_PROVIDER, 'chatgpt-subscription')
-  for (const k of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'GEMINI_API_KEY']) assert.equal(process.env[k], undefined)
+  assert.equal(envNow().FAIRWIND_PROVIDER, 'chatgpt-subscription')
+  for (const k of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'GEMINI_API_KEY']) assert.equal(envNow()[k], undefined)
   delete ctx.chatgptAuth
 })
 
