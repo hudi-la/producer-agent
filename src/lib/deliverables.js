@@ -5,7 +5,8 @@
 //    走 0027 里那几个 security definer 函数。
 //  · Fairwind 只有 pa_upsert_deliverable 一个口，且**只能碰 status='draft'**。
 //    它没有定稿的口——「定稿」这个动作在数据库层面就只对你开放。
-import { supa, BRAIN, brainFetch } from './backends.js'
+import { supa, BRAIN, brainFetch, currentOwnerId } from './backends.js'
+import { attachmentKey } from './storageKeys.js'
 import { t } from '../i18n/index.js'
 
 /** 拉这条线的全部产出。没连库时返回 null。 */
@@ -59,10 +60,7 @@ export async function deleteDeliverable(id) {
 // 桶是私有的，所以「打开」永远是现拿一条签名 URL，不存永久链接——
 // 存了的话那条链接就等于一把配给全世界的钥匙。
 const BUCKET = 'pursuit-files'
-
-/** 文件名里除了字母数字点横线以外的一律换成 -。中文名在 key 里会出事，但 filename 那列原样留着。 */
-const safeName = (name) =>
-  (name || 'file').normalize('NFKD').replace(/[^\w.\-]+/g, '-').replace(/^-+|-+$/g, '').slice(-80) || 'file'
+// key 怎么拼(含文件名清洗)搬去了 lib/storageKeys.js:托管配置下要带 owner 前缀(D10),本机不带
 
 /**
  * 传一份文件上去。顺序是死的：**先传字节，再登记这一行**。
@@ -71,7 +69,7 @@ const safeName = (name) =>
  */
 export async function uploadAttachment(pursuitId, file) {
   if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
-  const key = `${pursuitId}/${crypto.randomUUID()}-${safeName(file.name)}`
+  const key = attachmentKey({ owner: await currentOwnerId(), pursuitId, uuid: crypto.randomUUID(), name: file.name })
   const up = await supa.storage.from(BUCKET).upload(key, file, {
     contentType: file.type || 'application/octet-stream',
     upsert: false,

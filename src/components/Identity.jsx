@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { t } from '../i18n/index.js'
 import { saveProfile, useProfile } from '../lib/profile.js'
-import { supa } from '../lib/backends.js'
+import { supa, brainApi, brainFetch, BRAIN } from '../lib/backends.js'
 import { EditRow } from './EditRow.jsx'
 import ProviderPicker from './ProviderPicker.jsx'
+import Judgments from './Judgments.jsx'
 
 // 「关于你」——档案页最上面那一块。
 //
@@ -80,20 +81,29 @@ function AccountRow() {
   )
 }
 
-// 本机模式的账号块。key **永远不回显**:brain 只给「设了没有」和末四位,
+// 账号块。key **永远不回显**:brain 只给「设了没有」和末四位,
 // 这儿的输入框空着 = 不动原来的,填了 = 换掉。改完当场生效,brain 不用重启。
-export function LocalAccount() {
+//
+// 2026-10-02 拆成两层(设计稿八):AccountBlock 是三种配置通用的那几样(语言、模型来源、key、两档模型),
+// machine 为真(本机)再长出机器级的:邮箱、备份目录、接入三颗按钮、备份、更新、退出。
+// 托管(云端)没有机器这回事:邮箱就是登录身份,改不了;判据编辑器搬到这儿(本机它住在邮件开关底下,线上没有邮件);
+// 接 AI 工具的那一行带令牌。
+export function LocalAccount() { return <AccountBlock machine /> }
+export function HostedAccount() { return <AccountBlock machine={false} /> }
+
+function AccountBlock({ machine }) {
   const [cur, setCur] = useState(null)
+  const [asked, setAsked] = useState(false)   // 问过 /settings 了(托管下没答 → 得说一句,不能空着)
   const [form, setForm] = useState({ email: '', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '', provider: 'claude-key', model: '', modelCheap: '', backupDir: '', lang: 'zh' })
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
-  const load = () => supa.settings.get().then((s) => { if (s) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, lang: s.lang || 'zh', provider: s.provider || 'claude-key', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })) } })
+  const load = () => (brainApi ? brainApi.settings.get() : Promise.resolve(null)).then((s) => { if (s && !s.error) { setCur(s); setForm((f) => ({ ...f, email: s.email, model: s.model, modelCheap: s.modelCheap, backupDir: s.backupDir, lang: s.lang || 'zh', provider: s.provider || 'claude-key', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })) } setAsked(true) })
   useEffect(() => { load() }, [])
-  if (!cur) return null
+  if (!cur) return (!machine && asked) ? <div className="idnote">{t('设置读不到:脑子没应,或它不是托管的那个。')}</div> : null
   const dirty = form.apiKey || form.oauthToken || form.openaiKey || form.geminiKey || form.provider !== (cur.provider || 'claude-key') || form.email !== cur.email || form.model !== cur.model || form.modelCheap !== cur.modelCheap || form.backupDir !== cur.backupDir 
   const save = async (e) => {
     e.preventDefault(); setBusy(true); setNote('')
-    const r = await supa.settings.set(form)
+    const r = await brainApi.settings.set(form)
     setBusy(false)
     if (r?.error) return setNote(t('没存上:') + r.error.message)
     setNote(t('存好了,下一次开口就用新的')); await load()
@@ -108,28 +118,72 @@ export function LocalAccount() {
   )
   return (
     <form className="local-account" onSubmit={save}>
-      <div className="kind-h la-h">{t('账号')}<small>{t('都在你这台机器上,不上传')}</small></div>
+      <div className="kind-h la-h">{t('账号')}<small>{machine ? t('都在你这台机器上,不上传') : (cur.email ? t('登录身份:') + cur.email : '')}</small></div>
       <label className="la-row"><span className="la-k">{t('语言')}</span>
         {/* 选完当场存、整页按新语言重开——之前要先点保存,提示又说"刷新生效",他刷新了当然没变 */}
-        <select value={form.lang} onChange={async (e) => { const lang = e.target.value; setForm((f) => ({ ...f, lang })); await supa.settings.set({ lang }); location.reload() }}><option value="zh">中文</option><option value="en">English</option></select>
+        <select value={form.lang} onChange={async (e) => { const lang = e.target.value; setForm((f) => ({ ...f, lang })); await brainApi.settings.set({ lang }); location.reload() }}><option value="zh">中文</option><option value="en">English</option></select>
         <small>{t('选完页面会按新语言重开')}</small></label>
-      <F k="email" label={t('邮箱')} type="email" hint={t('只用来在这台机器上认出你')} />
+      {machine && <F k="email" label={t('邮箱')} type="email" hint={t('只用来在这台机器上认出你')} />}
       <div className="la-row"><span className="la-k">{t('模型来源')}</span>
         <ProviderPicker compact value={form.provider} inUse={cur.provider || 'claude-key'} onChange={(v) => setForm((f) => ({ ...f, provider: v, ...((v === 'chatgpt-subscription' || f.provider === 'chatgpt-subscription') ? { model: '', modelCheap: '' } : {}) }))}
           keys={form} onKey={(k, v) => setForm((f) => ({ ...f, [k]: v }))}
           hints={{ apiKey: cur.apiKeySet ? cur.apiKeyHint : '', oauthToken: cur.oauthTokenSet ? cur.oauthTokenHint : '', openaiKey: cur.openaiKeySet ? cur.openaiKeyHint : '', geminiKey: cur.geminiKeySet ? cur.geminiKeyHint : '' }} /></div>
       <F k="model" label={t('好档模型')} placeholder={t('空 = 默认')} hint={t('聊天、写信、讲懂用这档')} />
       <F k="modelCheap" label={t('便宜档模型')} placeholder={t('空 = 默认')} hint={t('判断、收信那些小活用这档')} />
-      <F k="backupDir" label={t('备份目录')} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" hint={t('选一个在 iCloud Drive 或 Google Drive 里的')} />
+      {machine && <F k="backupDir" label={t('备份目录')} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" hint={t('选一个在 iCloud Drive 或 Google Drive 里的')} />}
       <div className="la-acts">
         <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? t('存着…') : t('保存')}</button>
         {note && <span className={'la-note' + (note.startsWith(t('没存上:')) ? ' bad' : '')}>{note}</span>}
       </div>
-      <McpRow />
-      <BackupRow backupDir={cur.backupDir} />
-      <UpdateRow />
-      <QuitRow />
+      {machine ? <>
+        <McpRow />
+        <BackupRow backupDir={cur.backupDir} />
+        <UpdateRow />
+        <QuitRow />
+      </> : <>
+        <Judgments />
+        <HostedMcpRow token={cur.mcpToken || ''} onRotated={load} />
+      </>}
     </form>
+  )
+}
+
+// 托管(云端)的接入:桌面版那三颗「接入」按钮是替人改本机配置文件,线上够不着你的机器——
+// 换成一行命令,带着你自己的令牌,粘进哪个工具都行。令牌漏了就「换一串」,旧的当场作废。
+function HostedMcpRow({ token, onRotated }) {
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  // 地址按脑子的来(托管下脑子直接服务页面,跟页面同源;他自己那份前端和脑子可能不在一个域)
+  const b = new URL(BRAIN)
+  const url = `${b.protocol}//user:${token || t('<令牌>')}@${b.host}/mcp`
+  const cmd = `<Fairwind>/node mcp-bridge.cjs ${url}`
+  const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
+  const rotate = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const r = await brainFetch('/settings/mcp-token/rotate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok || body?.error) throw new Error(body?.error?.message || body?.error || `${r.status}`)
+      setMsg(t('换好了。旧的那串从现在起不认;接着的工具要重新粘一次。')); await onRotated?.()
+    } catch (e) { setMsg(t('没换成:') + e.message) }
+    setBusy(false)
+  }
+  return (
+    <div className="la-sub">
+      <div className="la-sub-h">{t('接给你的 AI 工具')}<small>{t('让它能读写你的档案、机会卡、判据——比如"读我的网站，把作品填进来"。')}</small></div>
+      <small className="la-hint">{t('本机版那三颗「接入」按钮是替你改这台机器上的配置文件;线上够不着你的机器,换成下面这一行——粘进 Claude 桌面版、Codex、Gemini CLI 的 MCP 配置都行(<Fairwind> 换成你装的位置)。这串里带着你的令牌,别给别人看。')}</small>
+      <div className="la-acts">
+        <code className="la-cmd">{cmd}</code>
+        <button type="button" className="b" onClick={copy}>{copied ? t('复制好了') : t('复制')}</button>
+        <a className="b" href={`${BRAIN}/mcp-guide`} target="_blank" rel="noreferrer">{t('说明书')}</a>
+      </div>
+      <div className="la-acts">
+        <button type="button" className="b" disabled={busy} onClick={rotate}>{busy ? t('在换…') : t('换一串')}</button>
+        {!token && <small className="la-hint">{t('还没有令牌:点「换一串」生成一串')}</small>}
+        {msg && <span className={'la-note' + (msg.startsWith(t('没换成:')) ? ' bad' : '')}>{msg}</span>}
+      </div>
+    </div>
   )
 }
 

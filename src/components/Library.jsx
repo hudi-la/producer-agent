@@ -7,8 +7,8 @@ import { useGrow } from '../lib/useGrow.js'
 import { useProfile } from '../lib/profile.js'
 import { saveEntry, patchFor, canEdit } from '../lib/entries.js'
 import { addEntry, setEntryDraft, setEntryBox, setEntryBoxJson } from '../lib/studio.js'
-import { supa } from '../lib/backends.js'
-import { DB_MODE } from '../lib/backends.js'
+import { supa, DB_MODE, currentOwnerId } from '../lib/backends.js'
+import { boxFileKey } from '../lib/storageKeys.js'
 import EntryChat from './EntryChat.jsx'
 import DrawerGrip from './DrawerGrip.jsx'
 
@@ -80,8 +80,9 @@ function BoxFiles({ entry, onSaved }) {
     setBusy(true); setErr(null)
     try {
       const next = [...files]
+      const owner = await currentOwnerId()   // 托管配置下 key 以 owner 开头(D10);本机 null,不带
       for (const f of list) {
-        const key = `box/${entry.id}/${Date.now()}-${f.name.replace(/[^\w.\-\u4e00-\u9fff]+/g, '_')}`
+        const key = boxFileKey({ owner, entryId: entry.id, stamp: Date.now(), name: f.name })
         const r = await supa.storage.from(BOX_BUCKET).upload(key, f, { contentType: f.type || 'application/octet-stream' })
         if (r.error) throw new Error(r.error.message || String(r.error))
         next.push({ name: f.name, key, size: f.size, type: f.type || '', at: new Date().toISOString() })

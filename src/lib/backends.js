@@ -42,6 +42,24 @@ export async function brainFetch(input, init = {}) {
   return fetch(url, { ...init, headers: { ...h, ...(init.headers || {}) } })
 }
 
+/**
+ * 脑子那几条「人的设置」路(/me /settings /judgments/* /claude/* /chatgpt/*),三种配置一个表面:
+ * 本机就是 supa 自己(brainClient);云端 / 托管是同一个 brainClient,底下走 brainFetch 带凭证;
+ * 演示模式没有脑子,null。设置页、判据、模型来源那几块只认这个,不再直接摸 supa.settings。
+ */
+export const brainApi = DB_MODE === 'local' ? supa : DB_MODE === 'cloud' ? brainClient(BRAIN, brainFetch) : null
+
+// 「我是谁」(auth.uid):托管配置下桶的 key 要以它开头(D10)。本机 / 演示没有这回事 → null。
+// 问一次就记住;换了人(登出再登)就清。
+let OWNER = null
+if (DB_MODE === 'cloud' && supa) { try { supa.auth.onAuthStateChange(() => { OWNER = null }) } catch (_) {} }
+export async function currentOwnerId() {
+  if (DB_MODE !== 'cloud' || !supa) return null
+  if (OWNER) return OWNER
+  try { const { data } = await supa.auth.getUser(); OWNER = data?.user?.id || null } catch (_) { OWNER = null }
+  return OWNER
+}
+
 /** 退回种子数据的原因。null = 没退，看到的是真数据。 */
 export const FELL_BACK = {
   NO_CONFIG: 'no-config',       // .env.local 里没填 Supabase

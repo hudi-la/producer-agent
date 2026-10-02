@@ -1,8 +1,9 @@
 // src/components/Judgments.jsx —— 「我的判据」:开关 + 判据目录在哪 + 「看看会怎么变」。
-// 本机模式才有(判据文档住在数据目录里)。骨架在代码里,这儿只管口味那一层。
+// 本机:判据文档住在数据目录里,住在邮件开关底下;托管(2026-10-02 起):住在库里那个人的几行,
+// 住在账号块里,目录那句不出(没有目录)。骨架在代码里,这儿只管口味那一层。
 import { useEffect, useState } from 'react'
 import { t } from '../i18n/index.js'
-import { supa } from '../lib/backends.js'
+import { brainApi } from '../lib/backends.js'
 
 const fmt = (v) => (v == null || v === '' ? '—' : String(v).replace('T', ' ').slice(0, 16))
 
@@ -14,17 +15,17 @@ export default function Judgments() {
   const [editing, setEditing] = useState(null)  // 正在改哪个文件
   const [draft, setDraft] = useState('')
   const [saveMsg, setSaveMsg] = useState('')
-  const loadFiles = () => supa.judgments.files().then((r) => setFiles(r.files || {}))
+  const loadFiles = () => brainApi.judgments.files().then((r) => setFiles(r.files || {}))
   useEffect(() => { loadFiles() }, [])
   const openFile = (f) => { setEditing(f); setDraft(files?.[f] || ''); setSaveMsg('') }
-  const saveFile = async () => { const r = await supa.judgments.write(editing, draft); setSaveMsg(r.ok ? (r.lints?.length ? t('存好了；但这几句不生效：') + r.lints.join('；') : t('存好了，下一次判断就用新的')) : t('没存上:') + r.error); await loadFiles() }
-  const load = () => supa.settings.get().then(setS)
+  const saveFile = async () => { const r = await brainApi.judgments.write(editing, draft); setSaveMsg(r.ok ? (r.lints?.length ? t('存好了；但这几句不生效：') + r.lints.join('；') : t('存好了，下一次判断就用新的')) : t('没存上:') + r.error); await loadFiles() }
+  const load = () => brainApi.settings.get().then(setS)
   useEffect(() => { load() }, [])
   if (!s) return null
-  const flip = async () => { await supa.settings.set({ judgmentsEnabled: !s.judgmentsEnabled }); await load() }
+  const flip = async () => { await brainApi.settings.set({ judgmentsEnabled: !s.judgmentsEnabled }); await load() }
   const preview = async () => {
     setBusy(true); setOut(null)
-    const r = await supa.judgments.preview(20)
+    const r = await brainApi.judgments.preview(20)
     setBusy(false); setOut(r)
   }
   return (
@@ -35,7 +36,7 @@ export default function Judgments() {
           <input type="checkbox" checked={s.judgmentsEnabled !== false} onChange={flip} />
           {s.judgmentsEnabled !== false ? t('用我的判据') : t('用出厂判据(我的先关着)')}
         </label>
-        <span className="jd-dir">{t('文件在 ')}<code className="jd-path" title={s.judgmentsDir || ''}>{s.judgmentsDir || 'judgments/'}</code>{t(',怎么写看里面的 README')}</span>
+        {s.judgmentsDir !== '' && <span className="jd-dir">{t('文件在 ')}<code className="jd-path" title={s.judgmentsDir || ''}>{s.judgmentsDir || 'judgments/'}</code>{t(',怎么写看里面的 README')}</span>}
         <span className="sp" />
         <button type="button" className="b" disabled={busy} onClick={preview}>{busy ? t('在判…') : t('看看会怎么变')}</button>
       </div>

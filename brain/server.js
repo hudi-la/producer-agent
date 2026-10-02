@@ -2087,6 +2087,8 @@ async function dispatch(req, res, origin) {
   if (LOCAL_MODE && await handleLocalRoute(req, res, { db, mode: DB_MODE, ...LOCAL_MODE })) return
   // 托管的那几条(/me /settings /judgments/files /claude/* 和静态 dist/)
   if (HOSTED && await handleHostedRoute(req, res, { hosted: HOSTED, distDir: DIST_DIR })) return
+  // 他自己的个人版(service 配置):前端在云端配置下也会问 /me 定语言——应一声,别 404
+  if (!LOCAL_MODE && !HOSTED && req.method === 'GET' && req.url === '/me') return send(res, 200, { mode: DB_MODE, ready: true, lang: 'zh', user: null })
 
   // 模块开关:读、写(写完定时器当场跟着变)、门
   if (req.method === 'GET' && req.url === '/modules') return send(res, 200, tenant().modules)

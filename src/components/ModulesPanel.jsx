@@ -1,5 +1,5 @@
-// src/components/ModulesPanel.jsx —— 设置里的三行开关。只在本机模式出现(canToggle);
-// 云端模式模块永远全开,这个面板不渲染。
+// src/components/ModulesPanel.jsx —— 设置里的三行开关。脑子说能切(canToggle)才出现;
+// 他自己那份(service 配置)模块永远全开,这个面板不渲染。托管(2026-10-02 起)邮件不供(mailOffered 为假),那一行不画。
 import { useModules } from '../lib/ModulesContext.jsx'
 import Judgments from './Judgments.jsx'
 import { t, getLang } from '../i18n/index.js'
@@ -13,11 +13,12 @@ const ROWS = [
 export default function ModulesPanel() {
   const m = useModules()
   if (!m.canToggle) return null
+  const rows = ROWS.filter(([k]) => k !== 'mail' || m.mailOffered !== false)
   return (
     <section className="modules-panel">
       <h3>{t('装了哪些')}</h3>
-      {getLang() === 'en' && <small className="modules-note">{t('邮件模块的界面暂时还是中文的。')}</small>}
-      {ROWS.map(([k, name, why]) => (
+      {getLang() === 'en' && rows.length === ROWS.length && <small className="modules-note">{t('邮件模块的界面暂时还是中文的。')}</small>}
+      {rows.map(([k, name, why]) => (
         <div key={k} className="modules-row">
           <label>
             <input type="checkbox" checked={!!m[k]} disabled={k === 'profile'} onChange={(e) => m.set({ [k]: e.target.checked })} />

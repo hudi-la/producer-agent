@@ -760,14 +760,18 @@ export default function App() {
             而且它正好当场演示了「盖住」长什么样。 */}
         {/* 有新版本:以前是一颗光秃秃的点,悬停才知道是什么(他 9/25 问「这个红点什么意思」)。
             现在直接写在设置按钮旁边,点了就进设置——版本那一行有「更新到」的按钮 */}
-        {DB_MODE === 'local' ? (
-          // 公开版没有展示模式(那是他给客户看屏幕用的);右上角是系统设置:装了哪些、账号、备份、更新、接 Claude Code
+        {DB_MODE !== 'none' && (
+          // 公开版(本机)右上角是系统设置:装了哪些、账号、备份、更新、接 Claude Code。
+          // 云端 / 托管(2026-10-02 起)也有这颗:装了哪些、账号(语言、模型来源、key)、接 AI 工具的那一行——
+          // 机器级的(备份目录、更新、退出)只在本机。展示模式那颗照旧留在它旁边,一样不少。
           <button className={'veilbtn' + (area === 'settings' ? ' on' : '')} onClick={() => { setArea('settings'); if (view.name !== 'home') closeDrawer() }} title={t('系统设置')}>
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 5, verticalAlign: -3 }}>
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" />
             </svg>{t('设置')}{brain?.update?.canUpdate && <span className="upd-pill">{t('新版本 {v}', { v: brain.update.latest })}</span>}
           </button>
-        ) : (
+        )}
+        {DB_MODE !== 'local' && (
+        // 公开版(本机)没有展示模式(那是他给客户看屏幕用的);云端 / 演示有
         <button className={'veilbtn' + (veiled ? ' on' : '')} onClick={toggleVeil}
                 title={veiled ? t('展示模式开着：私人信息都盖着小花。点一下摘掉。')
                               : t('展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。')}>

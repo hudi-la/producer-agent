@@ -4,7 +4,7 @@
 // GPT / Gemini 走 brain/engine 里那套 OpenAI 兼容接口 + 自己的工具循环。
 // 各家的 key 分开存,切来切去不丢;凭据永不回显,只给末四位。
 import { useEffect, useState } from 'react'
-import { supa } from '../lib/backends.js'
+import { brainApi, DB_MODE } from '../lib/backends.js'
 import { t } from '../i18n/index.js'
 
 export const PROVIDERS = [
@@ -25,13 +25,22 @@ const FIELD = {
  *  inUse:已存下、正在用的来源(账号块传;黑药丸只是「选中」,点了保存才算换——不标出来就看不出现在在用哪个) */
 export default function ProviderPicker({ value, onChange, keys, onKey, hints = {}, compact = false, inUse }) {
   const f = FIELD[value] || FIELD['claude-key']
+  // 托管(云端)上 ChatGPT 订阅这一期不开:脑子的 /chatgpt/status 带 error 回来,药丸灰掉、写明为什么,点不了。
+  // 本机不问——那儿状态出错是一时的(脑子刚起),ChatGPTLogin 自己会把错说出来。
+  const [off, setOff] = useState({})   // { 'chatgpt-subscription': '为什么不可用' }
+  useEffect(() => {
+    if (DB_MODE !== 'cloud' || !brainApi) return
+    let on = true
+    brainApi.chatgpt.status().then((r) => { if (on && r?.error) setOff((o) => ({ ...o, 'chatgpt-subscription': r.error.message })) })
+    return () => { on = false }
+  }, [])
   return (
     <div className={'prov' + (compact ? ' compact' : '')}>
       <div className="prov-row" role="radiogroup" aria-label={t('模型来源')}>
-        {PROVIDERS.map((p) => { const v = p.value || p.key; return (
-          <label key={p.key} className={'prov-opt' + (value === v ? ' on' : '')}>
-            <input type="radio" name="provider" value={v} checked={value === v} onChange={() => onChange(v)} />
-            {t(p.label)}{inUse === v && <small className="prov-inuse">· {t('在用')}</small>}
+        {PROVIDERS.map((p) => { const v = p.value || p.key; const why = off[v]; return (
+          <label key={p.key} className={'prov-opt' + (value === v ? ' on' : '') + (why ? ' off' : '')} title={why || undefined}>
+            <input type="radio" name="provider" value={v} checked={value === v} disabled={!!why} onChange={() => onChange(v)} />
+            {t(p.label)}{inUse === v && <small className="prov-inuse">· {t('在用')}</small>}{why && <small className="prov-inuse">· {t('线上还没开')}</small>}
           </label>
         ) })}
       </div>
@@ -50,7 +59,7 @@ function ChatGPTLogin() {
   useEffect(() => {
     let active = true, timer
     const poll = async () => {
-      const r = await supa.chatgpt.status()
+      const r = await brainApi.chatgpt.status()
       if (!active) return
       setStatus(r)
       if (r.error) setError(r.error.message)
@@ -62,7 +71,7 @@ function ChatGPTLogin() {
   }, [])
   const login = async () => {
     setBusy(true); setError('')
-    const r = await supa.chatgpt.login()
+    const r = await brainApi.chatgpt.login()
     setBusy(false)
     if (r.error) setError(r.error.message)
     else setStatus(r)
@@ -85,9 +94,9 @@ function ClaudeLogin({ hint, keys, onKey }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [manual, setManual] = useState(false)
-  useEffect(() => { let on = true; supa.claude.status().then((r) => { if (on) setStatus(r) }); return () => { on = false } }, [])
-  const login = async () => { setBusy(true); setError(''); setCode(''); const r = await supa.claude.login(); setBusy(false); setStatus(r); if (r.error) setError(r.error.message); else if (r.authUrl) window.open(r.authUrl, '_blank', 'noopener') }
-  const submit = async () => { setBusy(true); setError(''); const r = await supa.claude.code(code); setBusy(false); setStatus(r); if (r.error) setError(r.error.message); else setCode('') }
+  useEffect(() => { let on = true; brainApi.claude.status().then((r) => { if (on) setStatus(r) }); return () => { on = false } }, [])
+  const login = async () => { setBusy(true); setError(''); setCode(''); const r = await brainApi.claude.login(); setBusy(false); setStatus(r); if (r.error) setError(r.error.message); else if (r.authUrl) window.open(r.authUrl, '_blank', 'noopener') }
+  const submit = async () => { setBusy(true); setError(''); const r = await brainApi.claude.code(code); setBusy(false); setStatus(r); if (r.error) setError(r.error.message); else setCode('') }
   const connected = status?.connected || (!status && hint)
   return <div className="prov-login">
     <small>{t('走你的 Claude 订阅（Pro / Max）。登录一次，拿到的是一年期令牌，只存在这台机器上。')}</small>
