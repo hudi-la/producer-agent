@@ -1,0 +1,25 @@
+# /etc/systemd/system/fairwind.service —— 托管的脑子(设计稿 2026-10-02 第十节)
+# 一个进程伺候所有学员。挂了自动拉起;内存上限 2G,不让找机会把这台机器上别人的业务挤死。
+[Unit]
+Description=Fairwind brain (hosted)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fairwind
+Group=fairwind
+WorkingDirectory=/home/fairwind/producer-agent/brain
+EnvironmentFile=/etc/fairwind/env
+ExecStart=/home/fairwind/node/bin/node server.js
+Restart=always
+RestartSec=3
+MemoryMax=2G
+# setup-token 和 Codex 的缓存目录按人放在这里
+StateDirectory=fairwind
+Environment=FAIRWIND_DATA_DIR=/var/lib/fairwind
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
