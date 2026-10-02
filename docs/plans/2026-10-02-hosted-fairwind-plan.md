@@ -87,3 +87,22 @@
 ## 要向公司要的（E 之前）
 1. Supabase：单独一个项目；项目 URL、anon key、service_role key；他是项目 owner。
 2. 机器：fairwind 用户的 ssh（公钥已给）；Caddy 里加一条子域名规则；子域名 DNS。
+
+---
+
+## 进度(2026-10-02 晚)
+
+| 阶段 | 状态 | 提交 |
+|---|---|---|
+| A 库(0150–0157) | 做完,PGlite 上全绿;隔离测试加了目录检查 | 67a21a8、2dbe283 |
+| B 脑子 | 做完;本机配置 / 托管配置各冒烟一遍 | a9412e3 |
+| C 前端 | 做完;两种构建过;本机设置页截图看过,托管设置页没真渲染过(没会话) | 82d02bf |
+| D 备份往返 | 做完;导入时附件 key 换主人(本机包 → 线上加前缀) | 2dbe283 |
+| E 部署 | 文件写好(`packaging/hosted/`),**没上机器**;`scripts/isolation-brain.mjs` 没跑过 | e633adc |
+
+**还差的、要东西的:**
+1. 公司的 Supabase 项目(URL + anon + service_role,他做 owner)→ `supabase db push` → 关自助注册 → 建三个账号 → 跑 `isolation-test.mjs`(DEV_DATABASE_URL)和 `isolation-brain.mjs`。
+2. 机器上的 fairwind 用户(他在 DO 网页 Console 贴那段命令)→ 按 `packaging/hosted/README.md` 装 → Caddy 加一条 → 子域名。
+3. 真机验收(设计稿十三节第 7 条)。
+4. **他自己的生产库**要推这批迁移时:0153 之后旧附件 key 读不到,先 `node scripts/storage-prefix-keys.mjs`(预演)再 `--yes`;0152 把五个函数改回 invoker、0154 换了 pulse 触发器——都该在他自己的云端版上先验一遍。
+5. 下一期:邮件模块线上(Gmail 令牌按人、回调走公网)、ChatGPT 订阅(Codex)Linux 登录、MCP 判据工具在托管下读库(现在判据工具跟邮件模块一起藏着,没露出)。
