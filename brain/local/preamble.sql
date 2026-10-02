@@ -36,3 +36,10 @@ create table if not exists storage.objects (
   bucket_id text,
   name      text
 );
+-- storage.foldername(name):Supabase Storage 自带的函数,0153 的桶策略用它取路径第一段(= owner)。
+-- 本地没有 Storage 服务,只需要这个函数**存在**,让那支迁移能建策略;桩的算法跟真的一致:
+-- 按 '/' 切开、去掉最后一段(文件名)。PGlite 会话是超级用户,策略本身在本地不生效。
+create or replace function storage.foldername(name text) returns text[]
+language sql immutable as $$
+  select (string_to_array(name, '/'))[1 : array_length(string_to_array(name, '/'), 1) - 1]
+$$;

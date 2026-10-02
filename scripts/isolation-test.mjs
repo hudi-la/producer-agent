@@ -167,6 +167,57 @@ async function probes(u, other, otherIds) {
   console.log(`  ✓ ${u.mark}:函数探针(brain_context / person_context / set_stage / set_profile / set_voice)全部挡住`)
 }
 
+/**
+ * 目录检查:不看数据,看权限本身(设计稿 2026-10-02 的 D10 / D11 / D17)。
+ *  · public.pa_* 一律 security invoker——例外只有下面白名单里的几个只读口,
+ *    它们 definer 但只授 service_role(这一条也在这里验)。
+ *  · anon 对任何 pa_* 都没有 execute。
+ *  · 附件桶 pursuit-files 的每条 storage.objects 策略都带 auth.uid()(0153),
+ *    而且没有一条授给 anon。
+ * 跟 brain/local/privileges.test.js 同一套判据;那边在 PGlite 上跑,这边在真库上跑。
+ */
+// 白名单(definer 但只授 service_role、只读):pa_tasks_due_all / pa_briefs_due_all 是 0155 脑子找活的口;
+// pa_owner_of_mcp_token 是 0156 查「这串令牌是谁的」——查的时候还没有身份。
+const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token'])
+
+async function catalogChecks() {
+  const { rows: fns } = await client.query(
+    `select p.proname as name, p.oid::regprocedure::text as sig, p.prosecdef as definer,
+            has_function_privilege('anon', p.oid, 'execute') as anon_can,
+            has_function_privilege('authenticated', p.oid, 'execute') as auth_can,
+            has_function_privilege('service_role', p.oid, 'execute') as service_can
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname like 'pa\\_%' order by 1`)
+  if (fns.length < 80) fail(`只扫到 ${fns.length} 个 pa_*,怀疑连错库`)
+  for (const f of fns) {
+    if (f.definer && !DEFINER_ALLOWLIST.has(f.name)) fail(`${f.sig} 是 security definer(0137 之后不许)`)
+    if (f.anon_can) fail(`anon 能调 ${f.sig}`)
+    if (DEFINER_ALLOWLIST.has(f.name)) {
+      if (!f.definer) fail(`${f.sig} 在白名单里,却不是 definer——白名单该收窄`)
+      if (f.auth_can) fail(`${f.sig} 授给了 authenticated(只许 service_role)`)
+      if (!f.service_can) fail(`${f.sig} 没授给 service_role,脑子找不了活`)
+    }
+  }
+  for (const name of DEFINER_ALLOWLIST) {
+    if (!fns.some((f) => f.name === name)) fail(`找活口 ${name} 不在目录里(0155 没跑?)`)
+  }
+  console.log(`  ✓ ${fns.length} 个 pa_*:definer 只有白名单的 ${[...DEFINER_ALLOWLIST].join(' / ')},anon 一个都调不了`)
+
+  const { rows: pols } = await client.query(
+    `select policyname, cmd, roles::text as roles, coalesce(qual, '') as qual, coalesce(with_check, '') as with_check
+       from pg_policies
+      where schemaname = 'storage' and tablename = 'objects'
+        and (coalesce(qual, '') like '%pursuit-files%' or coalesce(with_check, '') like '%pursuit-files%')
+      order by 1`)
+  if (!pols.length) fail(`storage.objects 上没有一条 pursuit-files 的策略(0153 没跑?)`)
+  for (const p of pols) {
+    const text = p.qual + ' ' + p.with_check
+    if (!text.includes('auth.uid()')) fail(`桶策略 ${p.policyname}(${p.cmd})不带 auth.uid():谁都能摸别人的附件`)
+    if (/\banon\b/.test(p.roles)) fail(`桶策略 ${p.policyname}(${p.cmd})授给了 anon`)
+  }
+  if (pols.length) console.log(`  ✓ pursuit-files 的 ${pols.length} 条桶策略都带 auth.uid(),都不给 anon`)
+}
+
 async function main() {
   loadEnv()
   const url = process.env.DEV_DATABASE_URL
@@ -200,6 +251,9 @@ async function main() {
   await sweep(B, A)
   await probes(B, A, idsA)
 
+  console.log('目录检查(definer / anon / 桶策略):')
+  await catalogChecks()
+
   console.log('anon(没登录)的视角:')
   await client.query('begin')
   await client.query('set local role anon')
@@ -213,7 +267,7 @@ async function main() {
   await client.query('rollback')
   console.log(`  ✓ anon 三条探针全部被挡(${anonBlocked}/3)`)
 
-  console.log('\n' + (失败.length ? `🔴 ${失败.length} 处失败` : '🟢 隔离成立:每张表、每个视图、关键函数、anon,全部干净'))
+  console.log('\n' + (失败.length ? `🔴 ${失败.length} 处失败` : '🟢 隔离成立:每张表、每个视图、关键函数、目录、anon,全部干净'))
   await client.end()
   process.exit(失败.length ? 1 : 0)
 }
