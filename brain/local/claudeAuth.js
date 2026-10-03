@@ -54,12 +54,19 @@ export function createClaudeAuth({ spawnImpl = spawn, binary = findClaudeBinary,
       const env = { HOME: home, PATH: process.env.PATH, USER: process.env.USER, LANG: process.env.LANG || 'en_US.UTF-8', TERM: 'xterm-256color' }
       // 假终端用 mac 自带的 expect 给(script 要求自己的 stdin 也是终端,从程序里起不了);
       // 三段:等它打出「Paste code here」(链接这时已在输出里)→ 从我们这边的 stdin 读一行码、敲进去 → 等它结束(令牌在输出里)。
+      // 花括号里的几个分支必须分行写:写成一行,expect 会把整行当成一个字面字符串去匹配,永远匹配不上,干等 90 秒才往下走——
+      // 本机版一直能用是因为人登录 Claude 通常超过 90 秒;线上有人 10 秒就粘回码,撞上了(2026-10-03)。
+      // 「Paste code here」的单词之间不一定是空格:Linux 上它用光标右移的控制码隔开(2026-10-03 线上撞到,码一直敲不进去),所以只认 Paste…code。
       // stty 把行拉宽,不然令牌会被折行、带着光标码,认不出来
       const script = String.raw`log_user 1
 set bin $env(FW_CLAUDE_BIN)
 spawn -noecho /bin/sh -c "stty cols 400 rows 60; exec \"$bin\" setup-token"
 set timeout 90
-expect { -re {Paste code here} {} timeout { exit 2 } eof { exit 1 } }
+expect {
+  -re {Paste.{0,40}code} {}
+  timeout { exit 2 }
+  eof { exit 1 }
+}
 set timeout -1
 expect_user -re "(.*)\n"
 send -- "$expect_out(1,string)\r"
@@ -70,6 +77,8 @@ expect eof`
       const onData = (b) => {
         me.raw += b.toString(); if (me.raw.length > 400_000) me.raw = me.raw.slice(-200_000)
         if (!me.authUrl) me.authUrl = extractAuthUrl(me.raw)
+        // 码交上去以后 Claude 说码不对:别干等,当场告诉学员(码过期了 / 复制少了一截最常见)
+        if (me.codeSent && !me.saving && !me.failed && /OAuth error/i.test(strip(me.raw.slice(me.codeAt || 0)))) { me.error = '这串码 Claude 不认(可能过期或复制少了),点「登录 Claude」重来一次 / Claude rejected the code (expired or incomplete); sign in again'; me.failed = true }
         const tok = strip(me.raw).match(TOKEN_RE)
         if (tok && !me.done && !me.saving) {
           // 先存(托管版是异步写库),存完才算 done——粘码那次请求要等到「真的存上了」才回话
@@ -90,12 +99,16 @@ expect eof`
       if (!s?.pending || !s.child) throw new Error('先点「登录 Claude」/ Click "Sign in with Claude" first')
       const c = String(code || '').trim()
       if (!c) throw new Error('把登录页给的那串码粘进来 / Paste the code the sign-in page gave you')
+      s.codeAt = s.raw.length; s.codeSent = true
       s.child.stdin.write(c + '\n')   // expect_user 读一行
       const me = s
       for (let i = 0; i < 300 && (me.pending || me.saving) && !me.done && !me.failed; i++) await new Promise((r) => setTimeout(r, 200))
       if (me.done) return { connected: true }
       if (me.failed) { const why = me.error; close(why); throw new Error(why) }
-      const why = me.error || (me.pending ? '等令牌超时 / Timed out waiting for the token' : tail(me.raw) || '登录没完成 / Sign-in did not complete')
+      // 等不到令牌时把它屏幕上最后说了什么带出来(去掉控制码;令牌要是出来了早被上面认走了,这里不会有)
+      const last = tail(me.raw)
+      if (process.env.FAIRWIND_MODE === 'hosted') console.warn('  · Claude 程序最后的输出:\n' + strip(me.raw).split('\n').map((l) => l.trim()).filter(Boolean).slice(-25).map((l) => '    | ' + l.slice(0, 300)).join('\n'))
+      const why = me.error || (me.pending ? '等令牌超时 / Timed out waiting for the token' + (last ? ':' + last : '') : last || '登录没完成 / Sign-in did not complete')
       close(why); throw new Error(why)
     },
     cancel() { close() },
