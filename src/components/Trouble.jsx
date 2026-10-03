@@ -2,6 +2,9 @@ import React from 'react'
 import { t } from '../i18n/index.js'
 import { FELL_BACK } from '../lib/backends.js'
 
+// 托管版(线上)学员没有终端,脑子由服务器管——别叫他们跑命令
+const HOSTED = (import.meta.env || {}).VITE_HOSTED === '1'
+
 // 出事了才说话。
 //
 // 原来顶栏挂着一个「已连 Supabase」的常亮徽章——正常状态天天亮着，
@@ -82,14 +85,14 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
             <b>{t('Fairwind 的脑子没开')}</b>
             <span className="tr-fix">
               {t('新机会的卡不会被自动读透，也没法和 Fairwind 对话。数据是真的，只是它不干活。')}
-              {t('另开一个终端跑 ')}<code>npm run brain</code>
+              {HOSTED ? t('服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。') : <>{t('另开一个终端跑 ')}<code>npm run brain</code></>}
             </span>
           </span>
         </div>
       )}
       {/* 脑子开着，但跑的是旧代码。这个最阴：一切看着都正常，只是新加的行为
           （比如后台读卡）根本没生效，而且没有任何迹象。 */}
-      {brainStale && !brainDown && (
+      {brainStale && !brainDown && !HOSTED && (
         <div className="tr-row warn">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">

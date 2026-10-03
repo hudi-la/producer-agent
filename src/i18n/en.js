@@ -125,6 +125,9 @@ const base = {
 
 // ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
 const backup = {
+  '服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。': 'The server is not responding right now. Refresh in a moment; if it keeps happening, tell Hu Di.',
+  '欢迎': 'Welcome', '先选 Fairwind 跟你说哪种语言,再接上你的模型。': 'Pick the language Fairwind speaks with you, then connect your model.',
+  '先登录 Claude,或者点下面「先跳过」': 'Sign in to Claude first, or press Skip below', '填一个 key,或者点下面「先跳过」': 'Enter a key, or press Skip below', '先跳过,以后在设置里接': 'Skip for now; connect later in Settings',
   '你的 producer。先认一下人。': 'Your producer. Sign in first.', '正在去 Google…': 'Going to Google…', '用 Google 登录': 'Sign in with Google',
   '第一次登录会自动开好你的账号。': 'Your account is created the first time you sign in. ', '隐私说明': 'Privacy',
   'Google 登录还没在后台打开': 'Google sign-in is not enabled yet', '这个 Google 账号还没开通——把邮箱发给 Hu Di 开一下': 'This Google account is not enabled yet; send your email to Hu Di',

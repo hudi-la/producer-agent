@@ -1802,6 +1802,7 @@ button.lg-cell:hover { outline: 1px solid var(--ink-3); outline-offset: 1px; }
 .login-google { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 12px; font-size: 14px; background: #fff; color: #241F1B; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
 .login-google:hover { background: #f6f4ef; }
 .login-google:disabled { opacity: .6; cursor: default; }
+.first-run .fr-skip { font: inherit; font-size: 13px; background: none; border: none; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin-top: 4px; }
 .login-fine { margin: 2px 0 0; font-size: 12px; color: var(--ink-3); text-align: center; }
 .login-fine a { color: var(--ink-2); }
 .login-or { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-3, var(--ink-2)); margin: 2px 0 -4px; }

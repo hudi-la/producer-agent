@@ -73,13 +73,13 @@ export function settingsFromRow(r = {}) {
   return {
     provider: r.provider || 'claude-key', apiKey: r.api_key || '', oauthToken: r.oauth_token || '', openaiKey: r.openai_key || '', geminiKey: r.gemini_key || '',
     model: r.model || '', modelCheap: r.model_cheap || '', lang: r.lang === 'zh' ? 'zh' : 'en', judgmentsEnabled: r.judgments_enabled !== false,
-    modules: r.modules || null, mcpToken: r.mcp_token || '', email: r.email || '',
+    modules: r.modules || null, mcpToken: r.mcp_token || '', email: r.email || '', onboarded: r.onboarded === true,
   }
 }
 
 /** settings 对象 → pa_set_member_settings 要的 jsonb(只带传了的键)。 */
 export function rowFromSettings(patch = {}) {
-  const map = { provider: 'provider', apiKey: 'api_key', oauthToken: 'oauth_token', openaiKey: 'openai_key', geminiKey: 'gemini_key', model: 'model', modelCheap: 'model_cheap', lang: 'lang', judgmentsEnabled: 'judgments_enabled', modules: 'modules' }
+  const map = { provider: 'provider', apiKey: 'api_key', oauthToken: 'oauth_token', openaiKey: 'openai_key', geminiKey: 'gemini_key', model: 'model', modelCheap: 'model_cheap', lang: 'lang', judgmentsEnabled: 'judgments_enabled', modules: 'modules', onboarded: 'onboarded' }
   const out = {}
   for (const [k, col] of Object.entries(map)) if (patch[k] !== undefined) out[col] = patch[k]
   return out

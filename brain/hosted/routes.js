@@ -63,7 +63,7 @@ export async function handleHostedRoute(req, res, ctx) {
   if (req.method === 'GET' && p === '/me') {
     const s = t.settings
     try { await localizeSeedTask(t) } catch (e) { console.warn('  出厂任务换语言没成:' + e.message) }
-    json(res, 200, { mode: 'hosted', ready: Boolean(readyOf(s)), lang: s.lang === 'zh' ? 'zh' : 'en', user: { id: t.owner, email: t.email } })
+    json(res, 200, { mode: 'hosted', ready: Boolean(readyOf(s)), onboarded: s.onboarded === true, lang: s.lang === 'zh' ? 'zh' : 'en', user: { id: t.owner, email: t.email } })
     return true
   }
 
@@ -78,8 +78,10 @@ export async function handleHostedRoute(req, res, ctx) {
     if (PROVIDERS.includes(body.provider)) patch.provider = body.provider
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang
+    if (body.onboarded === true) patch.onboarded = true   // 进门那页走过了(填完或跳过都算)
     if ((patch.provider || t.settings.provider) === 'chatgpt-subscription') { json(res, 400, { error: { message: 'ChatGPT 订阅线上还没开;用 API key 或 Claude 订阅 / ChatGPT subscription is not available online yet' } }); return true }
     const r = await save(t, ctx, patch)
+    if (patch.lang) { t.marks.seedLang = null; try { await localizeSeedTask(t) } catch (_) {} }
     if (r.error) { json(res, 500, { error: { message: r.error } }); return true }
     json(res, 200, { ok: true, ready: r.ready, ...r.pub })
     return true

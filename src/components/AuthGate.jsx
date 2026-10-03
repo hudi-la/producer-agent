@@ -17,6 +17,7 @@ export default function AuthGate({ children }) {
   // 云端 / 托管:语言在脑子的 /me 里(member_settings.lang),得带着会话去问。问完记下是替谁问的——
   // 令牌刷新会换一个 session 对象但人没换,不能因此把 App 卸了重装(桌上开着的东西会丢)。
   const [langFor, setLangFor] = useState(null)
+  const [orient, setOrient] = useState(false)   // 托管:进门那页还没走过
   const shown = useRef(false)   // App 已经露过面:语言这时再变,顶层算好的标签不会跟着变,只能重开
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function AuthGate({ children }) {
     brainFetch('/me').then((r) => (r.ok ? r.json() : null)).catch(() => null).then((me) => {
       if (!on) return
       const lang = me?.lang === 'en' ? 'en' : 'zh'
+      setOrient(me?.mode === 'hosted' && me.onboarded === false)
       if (lang !== getLang()) { setLang(lang); if (shown.current) { location.reload(); return } }
       setLangFor(uid)
     })
@@ -45,6 +47,7 @@ export default function AuthGate({ children }) {
   if (session === 'first-run') return <FirstRun onDone={() => location.reload()} />
   if (!session) return <Login />
   if (DB_MODE === 'cloud' && langFor !== uid) return <div className="loading">…</div>
+  if (orient) return <FirstRun hosted onDone={() => location.reload()} />
   shown.current = true
   return children
 }

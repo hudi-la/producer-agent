@@ -17,8 +17,9 @@ const env = import.meta.env || {}
 export const DB_MODE = env.VITE_DB_MODE === 'local' ? 'local'
   : (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY ? 'cloud' : 'none')
 
+// 本机版和托管版(VITE_HOSTED=1,2026-10-03)的页面都是脑子自己发出来的,同源;只有他自己的个人版开发时是 5173 页面 + 8788 脑子
 export const BRAIN = env.VITE_BRAIN_URL
-  || (DB_MODE === 'local' && typeof location !== 'undefined' ? location.origin : 'http://localhost:8788')
+  || ((DB_MODE === 'local' || env.VITE_HOSTED === '1') && typeof location !== 'undefined' ? location.origin : 'http://localhost:8788')
 
 export const supa = DB_MODE === 'local' ? brainClient(BRAIN)
   : DB_MODE === 'cloud' ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY) : null
