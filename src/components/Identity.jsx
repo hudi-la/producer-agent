@@ -4,7 +4,6 @@ import { saveProfile, useProfile } from '../lib/profile.js'
 import { supa, brainApi, brainFetch, BRAIN } from '../lib/backends.js'
 import { EditRow } from './EditRow.jsx'
 import ProviderPicker from './ProviderPicker.jsx'
-import Judgments from './Judgments.jsx'
 
 // 「关于你」——档案页最上面那一块。
 //
@@ -141,7 +140,7 @@ function AccountBlock({ machine }) {
         <UpdateRow />
         <QuitRow />
       </> : <>
-        <Judgments />
+        {/* 判据判的是信,跟邮件模块走(在「装了哪些」的邮件那一行底下);线上邮件没开,这里不放 */}
         <HostedMcpRow token={cur.mcpToken || ''} onRotated={load} />
         <MyBackupRow />
       </>}
