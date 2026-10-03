@@ -70,7 +70,11 @@ async function sweepAs(me, other) {
   for (const [p, body] of POSTS) {
     const r = await call(p, { jwt: me.jwt, method: 'POST', body })
     if (r.text.includes(other.mark)) fail(`${me.email} POST ${p} 看见了 ${other.email} 的标记`)
+    // 带请求体的路必须真的成功——2026-10-03 线上读请求体时丢了身份,全报 500,只查泄露查不出来
+    if (r.status >= 500 || /租户上下文/.test(r.text)) fail(`${me.email} POST ${p} 没成:${r.status} ${r.text.slice(0, 80)}`)
   }
+  { const r = await call('/modules', { jwt: me.jwt, method: 'POST', body: { pursuits: true } }); const j = JSON.parse(r.text || '{}')
+    if (r.status !== 200 || j.canToggle !== true || j.pursuits !== true) fail(`${me.email} 改模块开关没成:${r.status} ${r.text.slice(0, 80)}`) }
   // 自己的得看得见——空空如也的绿不算证明
   const mine = await call('/judgments/files', { jwt: me.jwt })
   if (!mine.text.includes(me.mark)) fail(`${me.email} 看不见自己的判据`)

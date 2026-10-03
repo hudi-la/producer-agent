@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { supa, brainFetch } from '../lib/backends.js'
 import { t, setLang } from '../i18n/index.js'
-import ProviderPicker from './ProviderPicker.jsx'
+import ProviderPicker, { Spin } from './ProviderPicker.jsx'
 
 export default function FirstRun({ onDone, hosted = false }) {
   // 默认跟浏览器的语言走(mac 就是系统语言);想换点右上角那两颗
@@ -58,16 +58,23 @@ export default function FirstRun({ onDone, hosted = false }) {
           <button type="button" className={lang === 'en' ? 'on' : ''} onClick={() => pick('en')}>English</button>
         </div>
         {upd && <div className="fr-upd">{t(' · 有新版本 {v}', { v: upd.latest }).replace(/^ · /, '')}{upd.note ? ':' + upd.note : ''} <button type="button" className="b" onClick={applyUpdate}>{t('更新到 {v}', { v: upd.latest })}</button>{updMsg && <small>{updMsg}</small>}</div>}
-        <h1>{hosted ? t('欢迎') : t('第一次打开')}</h1>
-        <p>{hosted ? t('先选 Fairwind 跟你说哪种语言,再接上你的模型。') : t('三样东西。都在你自己这台机器上，不上传。')}</p>
+        <header className="fr-head">
+          <h1>{hosted ? t('欢迎') : t('第一次打开')}</h1>
+          <p>{hosted ? t('先选 Fairwind 跟你说哪种语言,再接上你的模型。') : t('三样东西。都在你自己这台机器上，不上传。')}</p>
+        </header>
         {!hosted && <label>{t('你的邮箱')}<small>{t('只用来在这台机器上认出你')}</small>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>}
-        <ProviderPicker value={provider} onChange={setProvider} keys={keys} onKey={(k, v) => setKeys((s) => ({ ...s, [k]: v }))} />
+        <section className="fr-sec">
+          <div className="fr-sec-h">{t('模型')}</div>
+          <ProviderPicker value={provider} onChange={setProvider} keys={keys} onKey={(k, v) => setKeys((s) => ({ ...s, [k]: v }))} />
+        </section>
         {!hosted && <label>{t('备份放哪个文件夹')}<small>{t('选一个在 iCloud Drive 或 Google Drive 里的，备份就自动上了你自己的云。可以先空着')}</small>
           <input value={backupDir} onChange={(e) => setBackupDir(e.target.value)} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" /></label>}
         {err && <p className="first-run-err">{err}</p>}
-        <button disabled={busy}>{busy ? t('写好了…') : t('开始使用')}</button>
-        {hosted && <button type="button" className="fr-skip" disabled={busy} onClick={skip}>{t('先跳过,以后在设置里接')}</button>}
+        <footer className="fr-foot">
+          <button className="fr-go" disabled={busy}>{busy ? <><Spin />{t('正在保存…')}</> : t('开始使用')}</button>
+          {hosted && <button type="button" className="fr-skip" disabled={busy} onClick={skip}>{t('先跳过,以后在设置里接')}</button>}
+        </footer>
       </form>
     </div>
   )

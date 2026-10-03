@@ -9,7 +9,11 @@ export function ModulesProvider({ children }) {
   useEffect(() => { fetchModules().then(setMods) }, [])
   if (!mods) return <div className="loading">…</div>
   // 先按你点的画,再拿 brain 算完依赖闭包的真值盖回来——勾选框不该等一次网络往返才动
-  const set = async (patch) => { setMods((m) => ({ ...m, ...patch })); setMods(await postModules(patch)) }
+  const set = async (patch) => {
+    const before = mods
+    setMods((m) => ({ ...m, ...patch }))
+    try { setMods(await postModules(patch)) } catch (e) { setMods(before); alert?.(e.message) }   // 没存成:退回原样
+  }
   return <Ctx.Provider value={{ ...mods, set }}>{children}</Ctx.Provider>
 }
 

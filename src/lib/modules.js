@@ -10,8 +10,11 @@ export async function fetchModules(fetchImpl = brainFetch) {
 }
 
 export async function postModules(patch, fetchImpl = brainFetch) {
+  // 没存成就抛,别把报错当成新的开关状态——那样整个面板和对应的栏都会消失,还回不来(2026-10-03 线上)
   const r = await fetchImpl(`${BRAIN}/modules`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
-  return r.json()
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok || j.error || typeof j.canToggle !== 'boolean') throw new Error(j.error || `HTTP ${r.status}`)
+  return j
 }
 
 /** 给定开关,哪些主区能进。档案和设置永远在;机会线只带「项目争取」;

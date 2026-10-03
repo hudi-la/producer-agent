@@ -1875,7 +1875,7 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 
 /* ── 首次启动页（本机模式，AuthGate 在还没填邮箱和 key 时进这儿）────── */
 .first-run { min-height: 100vh; display: grid; place-items: center; padding: 2rem; background: var(--paper); }
-.first-run form { width: min(34rem, 100%); display: grid; gap: 1rem; }
+.first-run form { width: min(34rem, 100%); display: grid; gap: 28px; }
 .first-run h1 { font-family: var(--serif); font-size: 26px; font-weight: 600; margin: 0; }
 .first-run label { display: grid; gap: .3rem; font-weight: 500; font-size: 13px; }
 .first-run small { font-weight: 400; color: var(--ink-2); }
@@ -1981,3 +1981,40 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .modules-panel label { display: grid; grid-template-columns: auto auto 1fr; }
 
 .la-k2 { font-size: 12.5px; color: var(--ink-2); font-weight: 500; min-width: 96px; }
+
+/* ── 首启 / 欢迎页的节奏与等待(2026-10-03 整理)──────────────────── */
+.first-run .fr-head { display: grid; gap: 8px; }
+.first-run .fr-head p { margin: 0; color: var(--ink-2); line-height: 1.6; }
+.first-run .fr-sec { display: grid; gap: 14px; padding-top: 22px; border-top: 1px solid var(--line); }
+.first-run .fr-sec-h { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.first-run .fr-foot { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding-top: 22px; border-top: 1px solid var(--line); }
+.first-run .fr-foot .fr-skip { margin: 0; }
+.first-run .fr-lang { margin-bottom: -8px; }
+.first-run button, .prov-login .b { display: inline-flex; align-items: center; gap: 8px; }
+
+.spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; animation: qspin .7s linear infinite; flex: none; opacity: .85; }
+
+.prov-login { gap: 14px; }
+.prov-login .prov-lead { color: var(--ink-2); }
+.cl-ok { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2); font-size: 13px; }
+.cl-ok small { color: var(--ink-3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
+.cl-check { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; background: var(--good, #4a7); color: #fff; flex: none; }
+.cl-ok .b { margin-left: auto; }
+.prov-login .b.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line-2); font-weight: 500; padding: 5px 10px; font-size: 12.5px; }
+.cl-steps { margin: 0; padding: 14px 16px 14px 34px; display: grid; gap: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); }
+.cl-steps li { display: grid; gap: 8px; font-size: 13px; padding-left: 2px; }
+.cl-steps li::marker { color: var(--ink-3); font-weight: 600; }
+.cl-steps b { font-weight: 600; }
+.cl-steps small { color: var(--ink-2); }
+.cl-steps a { margin-left: 4px; }
+.cl-steps .prov-code-row input { padding: 8px 10px; background: var(--paper); }
+.cl-wait { color: var(--ink-3) !important; }
+.cl-err { margin: 0; font-size: 12.5px; color: var(--bad, #a44); padding: 8px 10px; border-radius: 6px; background: color-mix(in srgb, var(--bad, #a44) 8%, transparent); }
+.cl-manual { display: grid; gap: 10px; font-size: 12px; }
+.cl-manual > a { justify-self: start; color: var(--ink-3); text-decoration: underline dotted; text-underline-offset: 3px; }
+
+.modules-row.off { opacity: .5; }
+.modules-row.off label { cursor: not-allowed; }
+.cl-steps { counter-reset: clstep; list-style: none; padding-left: 16px; }
+.cl-steps li { counter-increment: clstep; position: relative; padding-left: 30px; }
+.cl-steps li::before { content: counter(clstep); position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--ink-2); border: 1px solid var(--line-2); }

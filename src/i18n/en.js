@@ -125,6 +125,11 @@ const base = {
 
 // ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
 const backup = {
+  '线上版还没开:要先把 Gmail 接到服务器上,下一期做。': 'Not available online yet: Gmail has to be connected to the server first. Coming next.',
+  '只存在你的账号里。': 'stored only in your account.', '只存在这台机器上。': 'stored only on this machine.', '走你的 Claude 订阅（Pro / Max）。登录一次，拿到的是一年期令牌，': 'Uses your Claude subscription (Pro / Max). Sign in once to get a one-year token, ',
+  '正在打开…': 'Opening…', '重新登录': 'Sign in again', '正在打开 Claude 登录页…': 'Opening the Claude sign-in page…', '在新标签页登录 Claude': 'Sign in to Claude in the new tab',
+  '没弹出来？': "Didn't open? ", '点这里打开': 'Open it here', '把页面最后给的那串码粘到这里': 'Paste the code the page gives you at the end', '正在连接…': 'Connecting…',
+  'Claude 在核对这串码，一般几秒钟。': 'Claude is checking the code; usually a few seconds.', '模型': 'Model', '正在保存…': 'Saving…',
   '服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。': 'The server is not responding right now. Refresh in a moment; if it keeps happening, tell Hu Di.',
   '欢迎': 'Welcome', '先选 Fairwind 跟你说哪种语言,再接上你的模型。': 'Pick the language Fairwind speaks with you, then connect your model.',
   '先登录 Claude,或者点下面「先跳过」': 'Sign in to Claude first, or press Skip below', '填一个 key,或者点下面「先跳过」': 'Enter a key, or press Skip below', '先跳过,以后在设置里接': 'Skip for now; connect later in Settings',

@@ -148,3 +148,43 @@ test('hosted.forMcpToken:令牌 → 人 → 会话;空的或不认识的回 null
   assert.equal(await H.forMcpToken('nope'), null)
   assert.equal(await H.forMcpToken(''), null)
 })
+
+test('bindRequest:请求体的事件回调里也认得出是谁(AsyncLocalStorage 不跟 EventEmitter 走)', async () => {
+  const { EventEmitter } = await import('node:events')
+  const { bindRequest, withTenant, currentTenant, setStaticTenant } = await import('./tenant.js')
+  setStaticTenant(null)
+  const req = new EventEmitter()
+  const seen = []
+  await withTenant({ owner: 'u-body' }, async () => {
+    bindRequest(req, currentTenant())
+    req.on('data', () => seen.push(currentTenant()?.owner))
+    req.on('end', () => seen.push(currentTenant()?.owner))
+  })
+  // 事件在 withTenant 外面触发(真实情况是 socket 那头)
+  setImmediate(() => { req.emit('data', 'x'); req.emit('end') })
+  await new Promise((r) => setTimeout(r, 10))
+  assert.deepEqual(seen, ['u-body', 'u-body'])
+})
+
+test('bindRequest:包过的回调能被原样摘掉;close 之类别的事件不包', async () => {
+  const { EventEmitter } = await import('node:events')
+  const { bindRequest, withTenant, currentTenant } = await import('./tenant.js')
+  const req = new EventEmitter()
+  let n = 0
+  const onEnd = () => n++
+  const onClose = () => {}
+  await withTenant({ owner: 'u' }, async () => { bindRequest(req, currentTenant()); req.on('end', onEnd); req.on('close', onClose) })
+  assert.equal(req.listeners('close')[0], onClose)
+  req.removeListener('end', onEnd)
+  req.emit('end')
+  assert.equal(n, 0)
+  assert.equal(req.listenerCount('end'), 0)
+})
+
+test('bindRequest:回调里的 this 还是那个请求', async () => {
+  const { EventEmitter } = await import('node:events')
+  const { bindRequest, withTenant, currentTenant } = await import('./tenant.js')
+  const req = new EventEmitter(); let self = null
+  await withTenant({ owner: 'u' }, async () => { bindRequest(req, currentTenant()); req.on('end', function () { self = this }) })
+  req.emit('end'); assert.equal(self, req)
+})

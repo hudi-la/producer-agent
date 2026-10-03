@@ -58,7 +58,7 @@ import { loadModules, setModules, moduleOf, isEnabled } from './modules.js'
 import { VERSION } from './version.js'
 // 学员自己的判据文档(<数据目录>/judgments/*.md),拼进每一格的收尾之前;判不出来回退出厂判据
 import { useJudgmentsDir, judgeWithFallback, hasJudgments, docsFromRows } from './judgments.js'
-import { tenant, currentTenant, withTenant, setStaticTenant, childEnv, envFor, envNow, makeHosted, modulesFor, parseBearer } from './tenant.js'
+import { tenant, currentTenant, withTenant, bindRequest, setStaticTenant, childEnv, envFor, envNow, makeHosted, modulesFor, parseBearer } from './tenant.js'
 import { handleHostedRoute } from './hosted/routes.js'
 import { copyFileSync, existsSync as fsExists, mkdirSync as fsMkdir, readFileSync } from 'node:fs'
 import { join as pathJoin } from 'node:path'
@@ -2066,16 +2066,16 @@ const server = http.createServer(async (req, res) => {
     if (path === '/mcp') {
       const t = await HOSTED.forMcpToken(parseBearer(req))
       if (!t) return send(res, 401, { error: 'MCP 令牌不对或没带;设置页里有你那一行命令 / bad or missing MCP token' })
-      return await withTenant(t, () => dispatch(req, res, origin))
+      return await withTenant(t, () => dispatch(bindRequest(req, t), res, origin))
     }
     const open = req.method === 'GET' && (path === '/health' || path === '/mcp-guide' || path === '/' || /\.[a-z0-9]+$/i.test(path))
     if (open) {
       const t = path === '/health' ? await HOSTED.fromRequest(req).catch(() => null) : null
-      return await (t ? withTenant(t, () => dispatch(req, res, origin)) : dispatch(req, res, origin))
+      return await (t ? withTenant(t, () => dispatch(bindRequest(req, t), res, origin)) : dispatch(req, res, origin))
     }
     const t = await HOSTED.fromRequest(req)
     if (!t) return send(res, 401, { error: '请先登录 / sign in first' })
-    return await withTenant(t, () => dispatch(req, res, origin))
+    return await withTenant(t, () => dispatch(bindRequest(req, t), res, origin))
   } catch (e) {
     console.error('  ✗ 认人没成:' + e.message)
     if (!res.headersSent) send(res, 500, { error: e.message })

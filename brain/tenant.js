@@ -28,6 +28,32 @@ export function currentTenant() { return T.getStore() || STATIC || null }
 export function withTenant(t, fn) { return T.run(t, fn) }
 
 /**
+ * 把请求体的事件监听也绑到这个租户上。AsyncLocalStorage 不跟着 EventEmitter 走:req.on('data' / 'end') 的回调
+ * 是在 socket 那头被触发的,那时候已经不在 withTenant 里了,回调里 tenant() 会说「没有租户上下文」。
+ * server.js 有十几处 req.on('end', …) 读请求体(2026-10-03 线上改模块开关就栽在这儿),在入口处统一包一层。
+ */
+export function bindRequest(req, t) {
+  // 只包我们自己读请求体用的 data / end;其余事件(close、error…)Node 内部会按原函数摘掉,不能动。
+  // 包过的记在 map 里,摘的时候(removeListener / off)换回包过的那个——不然 Node 的流内部摘不掉,回调悬着,进程会崩(10-03 撞过)
+  const wrapped = new WeakMap()
+  const wrap = (ev, fn) => {
+    if (typeof fn !== 'function' || (ev !== 'data' && ev !== 'end')) return fn
+    // 普通 function,把 this 原样传下去:Node 自己挂在 end 上的回调靠 this 找到请求(箭头函数会丢,10-03 又崩了一次)
+    if (!wrapped.has(fn)) wrapped.set(fn, function (...a) { return T.run(t, () => fn.apply(this, a)) })
+    return wrapped.get(fn)
+  }
+  for (const m of ['on', 'once', 'addListener', 'prependListener', 'prependOnceListener']) {
+    const orig = req[m].bind(req)
+    req[m] = (ev, fn) => orig(ev, wrap(ev, fn))
+  }
+  for (const m of ['removeListener', 'off']) {
+    const orig = req[m].bind(req)
+    req[m] = (ev, fn) => orig(ev, (typeof fn === 'function' && wrapped.get(fn)) || fn)
+  }
+  return req
+}
+
+/**
  * 「现在的环境」= 进程的 env 盖上租户的 env。models.js / engine/ 的缺省参数都从这儿拿:
  * local 下静态租户的 env 来自 settings.json;service(他自己)下静态租户 env 为空 → 逐字等于以前读 process.env。
  */

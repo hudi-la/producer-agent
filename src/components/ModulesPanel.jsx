@@ -13,16 +13,18 @@ const ROWS = [
 export default function ModulesPanel() {
   const m = useModules()
   if (!m.canToggle) return null
-  const rows = ROWS.filter(([k]) => k !== 'mail' || m.mailOffered !== false)
+  // 托管版邮件这一期不供:那一行照样画、灰掉、写明线上还没开——藏起来看着像少了一个模块(10-03 他问过)
+  const mailOff = m.mailOffered === false
+  const rows = ROWS
   return (
     <section className="modules-panel">
       <h3>{t('装了哪些')}</h3>
-      {getLang() === 'en' && rows.length === ROWS.length && <small className="modules-note">{t('邮件模块的界面暂时还是中文的。')}</small>}
+      {getLang() === 'en' && !mailOff && <small className="modules-note">{t('邮件模块的界面暂时还是中文的。')}</small>}
       {rows.map(([k, name, why]) => (
-        <div key={k} className="modules-row">
+        <div key={k} className={'modules-row' + (k === 'mail' && mailOff ? ' off' : '')}>
           <label>
-            <input type="checkbox" checked={!!m[k]} disabled={k === 'profile'} onChange={(e) => m.set({ [k]: e.target.checked })} />
-            <b>{name}</b><small>{why}</small>
+            <input type="checkbox" checked={!!m[k]} disabled={k === 'profile' || (k === 'mail' && mailOff)} onChange={(e) => m.set({ [k]: e.target.checked })} />
+            <b>{name}</b><small>{k === 'mail' && mailOff ? t('线上版还没开:要先把 Gmail 接到服务器上,下一期做。') : why}</small>
           </label>
           {/* 判据判的是信(要不要回、等多久),归在邮件底下;邮件关着就不露(2026-09-24 他定的) */}
           {k === 'mail' && m.mail && <div className="modules-sub"><Judgments /></div>}
