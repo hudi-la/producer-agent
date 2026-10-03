@@ -105,3 +105,19 @@ test('0154:无主的改动(迁移 / service 老路,uid 为 null)不报错、不�
   assert.equal((await pulseOf(pg, A))[0].n, a0.n, '无主改动拨了 A 的脉搏')
   await pg.close(); rmSync(dir, { recursive: true, force: true })
 })
+
+test('0158:删一个账号——级联删他的行时脉搏不给这个正在消失的人补行,整个删除能成;另一个人的脉搏还在', async () => {
+  const { pg, dir } = await freshWithTwoUsers()
+  await setLocalUid(pg, A)
+  await pg.query(`insert into producer.works (title) values ('A 的作品')`)
+  await pg.query(`insert into producer.pursuits (title) values ('A 的机会')`)
+  const b0 = (await pulseOf(pg, B))[0]
+  await setLocalUid(pg, '')
+  await pg.exec('reset role')
+  await pg.query(`delete from auth.users where id = $1`, [A])          // 0158 之前这句炸:pulse_owner_fkey
+  const { rows } = await pg.query(`select count(*)::int n from producer.pulse where owner = $1`, [A])
+  assert.equal(rows[0].n, 0, 'A 的脉搏行应该跟着人一起没了')
+  await pg.exec('set role authenticated')
+  assert.equal((await pulseOf(pg, B))[0].n, b0.n)
+  await pg.close(); rmSync(dir, { recursive: true, force: true })
+})

@@ -12,6 +12,8 @@
 //
 //   node scripts/db-reset.mjs            跑一遍(不清空,增量)
 //   node scripts/db-reset.mjs --wipe     先清空 producer schema 再跑
+//   node scripts/db-reset.mjs --fresh    不清空,但按**新装**顺序跑(跳过数据修复)——给一个本来就空的新项目建库用(2026-10-02 托管)
+//   node scripts/db-reset.mjs --sync     只跑记账表(supabase_migrations.schema_migrations)里没有的,跑完记上——托管的库发新迁移就用它
 //
 // 连的是 .env 里的 DEV_DATABASE_URL。**脚本拒绝连生产库**(见下面那道闸)。
 import { readFileSync } from 'node:fs'
@@ -43,10 +45,19 @@ async function main() {
 
   const wipe = process.argv.includes('--wipe')
   // 清空重建 = 新装,跳过一次性数据修复(它们修的是他库里的历史行)
-  const files = migrationOrder('supabase/migrations', { fresh: wipe })
+  const sync = process.argv.includes('--sync')
+  const fresh = wipe || sync || process.argv.includes('--fresh')
+  let files = migrationOrder('supabase/migrations', { fresh })
   const client = new pg.Client({ connectionString: url })
   await client.connect()
-  console.log(`连上了 · ${files.length} 支迁移 · ${wipe ? '先清空' : '增量'}`)
+  if (sync) {
+    // 记账表是 record-migrations.mjs / supabase CLI 写的那张;没有就当什么都没跑过
+    const { rows } = await client.query(`select version from supabase_migrations.schema_migrations`).catch(() => ({ rows: [] }))
+    const done = new Set(rows.map((r) => r.version))
+    files = files.filter((f) => !done.has(f.slice(0, 4)))
+    console.log(`记账表里 ${done.size} 支已跑过,这次 ${files.length} 支`)
+  }
+  console.log(`连上了 · ${files.length} 支迁移 · ${wipe ? '先清空' : sync ? '只跑没记过的' : fresh ? '新装(不清空)' : '增量'}`)
 
   if (wipe) {
     await client.query('drop schema if exists producer cascade')
@@ -80,6 +91,7 @@ async function main() {
       await client.query(sql)
       await client.query('commit')
       ok++
+      if (sync) await client.query('insert into supabase_migrations.schema_migrations (version, name) values ($1, $2) on conflict (version) do nothing', [f.slice(0, 4), f.slice(5, -4)])
       process.stdout.write(`\r  ${n}/${files.length} ✓ ${f.slice(0, 52).padEnd(52)}`)
     } catch (err) {
       await client.query('rollback').catch(() => {})
