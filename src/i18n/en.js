@@ -125,6 +125,9 @@ const base = {
 
 // ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
 const backup = {
+  '你的 producer。先认一下人。': 'Your producer. Sign in first.', '正在去 Google…': 'Going to Google…', '用 Google 登录': 'Sign in with Google',
+  '第一次登录会自动开好你的账号。': 'Your account is created the first time you sign in. ', '隐私说明': 'Privacy',
+  'Google 登录还没在后台打开': 'Google sign-in is not enabled yet', '这个 Google 账号还没开通——把邮箱发给 Hu Di 开一下': 'This Google account is not enabled yet; send your email to Hu Di',
   '机器备份': 'Machine backup', '在打包…': 'Packing…', '下好了:{mb} MB': 'Downloaded: {mb} MB', '没打成:': "Export failed: ",
   '用这份备份换掉现在的全部?现在库里我名下的行会先清掉,再导进这份。附件同名的覆盖。': 'Replace everything with this backup? Your rows in the database are cleared first, then this backup is loaded. Files with the same name are overwritten.',
   '在导入…': 'Importing…', '没导成:': 'Import failed: ', '导好了:{rows} 行、{files} 个文件{failed}': 'Imported: {rows} rows, {files} files{failed}', ';{n} 个文件没传上': '; {n} files did not upload',

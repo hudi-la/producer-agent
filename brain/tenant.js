@@ -72,7 +72,7 @@ export function childEnv(t = tenant(), base = process.env) {
 export function settingsFromRow(r = {}) {
   return {
     provider: r.provider || 'claude-key', apiKey: r.api_key || '', oauthToken: r.oauth_token || '', openaiKey: r.openai_key || '', geminiKey: r.gemini_key || '',
-    model: r.model || '', modelCheap: r.model_cheap || '', lang: r.lang === 'en' ? 'en' : 'zh', judgmentsEnabled: r.judgments_enabled !== false,
+    model: r.model || '', modelCheap: r.model_cheap || '', lang: r.lang === 'zh' ? 'zh' : 'en', judgmentsEnabled: r.judgments_enabled !== false,
     modules: r.modules || null, mcpToken: r.mcp_token || '', email: r.email || '',
   }
 }

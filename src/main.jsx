@@ -18,6 +18,8 @@ async function boot() {
   if (DB_MODE === 'local') {
     try { const me = await supa.whoami(); if (me?.lang) setLang(me.lang) } catch (_) {}
   }
+  // 托管版默认英文(2026-10-03):登录页先说英文,登录后按账号设置的语言(新账号默认也是英文)
+  if (DB_MODE === 'cloud') setLang('en')
   createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <AuthGate>

@@ -35,7 +35,7 @@ test('member_settings:注册即有一行;pa_member_settings 遮 key、pa_member_
     const seeded = (await db.one('select pa_member_settings() as s')).s
     assert.ok(seeded, '注册后应有一行')
     assert.equal(seeded.provider, 'claude-key')
-    assert.equal(seeded.lang, 'zh')
+    assert.equal(seeded.lang, 'en')   // 0160:托管版新账号默认英文
     assert.equal(seeded.judgments_enabled, true)
     assert.deepEqual(seeded.modules, { profile: true, pursuits: true, mail: false })
     assert.equal(seeded.api_key_set, false)

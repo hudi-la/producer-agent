@@ -20,6 +20,17 @@ import { currentTenant, rowFromSettings } from '../tenant.js'
 import { wrongKey, PROVIDERS } from '../local/settings.js'
 import { FILES as JUDGMENT_FILES, lintJudgments } from '../judgments.js'
 import { createClaudeAuth } from '../local/claudeAuth.js'
+import { SCOUT_DEFAULT, isSeedPrompt } from '../scoutDefault.js'
+
+/** 出厂那条找机会任务还是原样,就换成这个账号的语言那份;改过的不动。每人每进程做一次(marks 里记着) */
+async function localizeSeedTask(t) {
+  const lang = t.settings.lang === 'en' ? 'en' : 'zh'
+  if (t.marks.seedLang === lang) return
+  const want = SCOUT_DEFAULT[lang]
+  const { data } = await t.db.from('v_pa_tasks').select('id, prompt, type').eq('type', 'scout_aggregators')
+  for (const row of data || []) if (row.prompt !== want && isSeedPrompt(row.prompt)) await t.db.rpc('pa_set_task', { p_id: row.id, p_prompt: want })
+  t.marks.seedLang = lang
+}
 import { handleBackupRoute } from '../backup/routes.js'
 import { VERSION } from '../version.js'
 
@@ -35,7 +46,7 @@ export function publicSettingsOf(s) {
            apiKeySet: Boolean(s.apiKey), apiKeyHint: s.apiKey ? `${s.apiKey.slice(0, 7)}…${s.apiKey.slice(-4)}` : '',
            oauthTokenSet: Boolean(s.oauthToken), oauthTokenHint: hint(s.oauthToken || '', 12),
            openaiKeySet: Boolean(s.openaiKey), openaiKeyHint: hint(s.openaiKey || '', 6), geminiKeySet: Boolean(s.geminiKey), geminiKeyHint: hint(s.geminiKey || '', 6),
-           model: s.model || '', modelCheap: s.modelCheap || '', backupDir: '', judgmentsEnabled: s.judgmentsEnabled !== false, lang: s.lang === 'en' ? 'en' : 'zh',
+           model: s.model || '', modelCheap: s.modelCheap || '', backupDir: '', judgmentsEnabled: s.judgmentsEnabled !== false, lang: s.lang === 'zh' ? 'zh' : 'en',
            ready: Boolean(readyOf(s)), mcpToken: s.mcpToken || '' }
 }
 const readyOf = (s) => s.provider === 'claude-subscription' ? s.oauthToken : s.provider === 'openai' ? s.openaiKey : s.provider === 'gemini' ? s.geminiKey : s.provider === 'chatgpt-subscription' ? false : s.apiKey
@@ -51,7 +62,8 @@ export async function handleHostedRoute(req, res, ctx) {
 
   if (req.method === 'GET' && p === '/me') {
     const s = t.settings
-    json(res, 200, { mode: 'hosted', ready: Boolean(readyOf(s)), lang: s.lang === 'en' ? 'en' : 'zh', user: { id: t.owner, email: t.email } })
+    try { await localizeSeedTask(t) } catch (e) { console.warn('  出厂任务换语言没成:' + e.message) }
+    json(res, 200, { mode: 'hosted', ready: Boolean(readyOf(s)), lang: s.lang === 'zh' ? 'zh' : 'en', user: { id: t.owner, email: t.email } })
     return true
   }
 
