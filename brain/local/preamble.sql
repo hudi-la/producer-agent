@@ -14,6 +14,8 @@ create table if not exists auth.users (
   created_at timestamptz not null default now()
 );
 -- 「现在登录的是谁」:brain 每次开库后 set_config 一次(PGlite 只有一个会话,设一次一直在)
+-- Supabase 默认就把 auth schema 开给这三种角色;不开的话函数体里写 auth.uid() 会 permission denied(0159 起函数体里要写它)
+grant usage on schema auth to anon, authenticated, service_role;
 create or replace function auth.uid() returns uuid
 language sql stable as $$ select nullif(current_setting('fairwind.uid', true), '')::uuid $$;
 -- 迁移记账
