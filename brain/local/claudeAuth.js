@@ -53,24 +53,19 @@ export function createClaudeAuth({ spawnImpl = spawn, binary = findClaudeBinary,
       const home = join(dataDir, 'claude-auth'); mkdirSync(home, { recursive: true })
       const env = { HOME: home, PATH: process.env.PATH, USER: process.env.USER, LANG: process.env.LANG || 'en_US.UTF-8', TERM: 'xterm-256color' }
       // 假终端用 mac 自带的 expect 给(script 要求自己的 stdin 也是终端,从程序里起不了);
-      // 三段:等它打出「Paste code here」(链接这时已在输出里)→ 从我们这边的 stdin 读一行码、敲进去 → 等它结束(令牌在输出里)。
-      // 花括号里的几个分支必须分行写:写成一行,expect 会把整行当成一个字面字符串去匹配,永远匹配不上,干等 90 秒才往下走——
-      // 本机版一直能用是因为人登录 Claude 通常超过 90 秒;线上有人 10 秒就粘回码,撞上了(2026-10-03)。
-      // 「Paste code here」的单词之间不一定是空格:Linux 上它用光标右移的控制码隔开(2026-10-03 线上撞到,码一直敲不进去),所以只认 Paste…code。
-      // stty 把行拉宽,不然令牌会被折行、带着光标码,认不出来
+      // 同时盯两边:Claude 的输出照常转出来(链接、令牌都在里面);我们这边 stdin 来一行码就敲进去。
+      // 2026-10-03 起不再「先等它打出 Paste code here 再读码」:那一步在 Linux 上认不准(单词之间是光标控制码、
+      // 单行花括号又被当成字面串),码在门外排队到超时。学员能拿到码时 Claude 早就在等了,所以码一到就敲进去。
       const script = String.raw`log_user 1
 set bin $env(FW_CLAUDE_BIN)
 spawn -noecho /bin/sh -c "stty cols 400 rows 60; exec \"$bin\" setup-token"
-set timeout 90
-expect {
-  -re {Paste.{0,40}code} {}
-  timeout { exit 2 }
-  eof { exit 1 }
-}
 set timeout -1
-expect_user -re "(.*)\n"
-send -- "$expect_out(1,string)\r"
-expect eof`
+set sid $spawn_id
+expect {
+  -i $user_spawn_id -re "(\[^\n\]*)\n" { send -i $sid -- "$expect_out(1,string)\r"; exp_continue }
+  -i $sid eof { exit 0 }
+  -i $sid -re {.+} { exp_continue }
+}`
       const child = spawnImpl(EXPECT, ['-c', script], { env: { ...env, FW_CLAUDE_BIN: bin }, stdio: ['pipe', 'pipe', 'pipe'] })
       s = { child, raw: '', authUrl: null, pending: true, error: null, done: false, timer: null }
       const me = s
