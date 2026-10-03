@@ -2018,3 +2018,15 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .cl-steps { counter-reset: clstep; list-style: none; padding-left: 16px; }
 .cl-steps li { counter-increment: clstep; position: relative; padding-left: 30px; }
 .cl-steps li::before { content: counter(clstep); position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--ink-2); border: 1px solid var(--line-2); }
+
+/* ── 线上版右上角的账号菜单 ─────────────────────────────── */
+.acct-menu { position: relative; }
+.acct-btn { display: inline-flex; align-items: center; gap: 7px; }
+.acct-btn img, .acct-dot { width: 20px; height: 20px; border-radius: 50%; flex: none; }
+.acct-dot { display: inline-grid; place-items: center; font-size: 11px; font-weight: 600; background: var(--paper-3); color: var(--ink-2); }
+.acct-pop { position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; z-index: 50; display: grid; padding: 6px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper-2); box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+.acct-who { display: grid; gap: 2px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 13px; }
+.acct-who small { color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.acct-pop button { font: inherit; font-size: 13px; text-align: left; padding: 8px 10px; border: none; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
+.acct-pop button:hover { background: var(--paper-3); }
+.acct-pop button:disabled { opacity: .5; cursor: default; }

@@ -25,7 +25,7 @@ export default function Login() {
     if (busy) return
     setBusy(true); setNote(null)
     try {
-      const { error } = await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } })
+      const { error } = await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } })
       if (error) throw error
     } catch (err) {
       const msg = /not enabled|Unsupported provider/i.test(err.message) ? t('Google 登录还没在后台打开')

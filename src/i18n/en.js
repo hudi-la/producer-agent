@@ -125,6 +125,7 @@ const base = {
 
 // ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
 const backup = {
+  '换一个账号': 'Switch account', '退出登录': 'Sign out',
   '线上版还没开:要先把 Gmail 接到服务器上,下一期做。': 'Not available online yet: Gmail has to be connected to the server first. Coming next.',
   '只存在你的账号里。': 'stored only in your account.', '只存在这台机器上。': 'stored only on this machine.', '走你的 Claude 订阅（Pro / Max）。登录一次，拿到的是一年期令牌，': 'Uses your Claude subscription (Pro / Max). Sign in once to get a one-year token, ',
   '正在打开…': 'Opening…', '重新登录': 'Sign in again', '正在打开 Claude 登录页…': 'Opening the Claude sign-in page…', '在新标签页登录 Claude': 'Sign in to Claude in the new tab',

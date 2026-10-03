@@ -23,6 +23,8 @@ import DrawerGrip, { restoreDrawerWidth } from './components/DrawerGrip.jsx'
 import { isPeopleTask, isPursuitTask } from './lib/taskAreas.js'
 import { checkBrain, BRAIN, DB_MODE } from './lib/backends.js'
 import SettingsPage from './components/SettingsPage.jsx'
+import AccountMenu from './components/AccountMenu.jsx'
+const HOSTED = (import.meta.env || {}).VITE_HOSTED === '1'   // 线上版(托管):右上角是账号,不是展示模式
 import { onPulse } from './lib/pulse.js'
 import { cleanCopy } from './lib/cleanCopy.js'
 import SayTo from './components/SayTo.jsx'
@@ -105,7 +107,7 @@ export default function App() {
   // 展示模式：给客户看屏幕时，名字、邮箱这些私人信息盖上小花（见 lib/veil.js）。
   // 开关就是右上角你的名字——它自己也是私人信息，开着的时候连它一起盖。
   // 公开版没有展示模式:浏览器里存过的开关一律不认,不然按钮去掉之后花花摘不下来(2026-09-24 他撞到的)
-  const [veiled, setVeiled] = useState(() => (DB_MODE === 'local' ? false : loadVeiled()))
+  const [veiled, setVeiled] = useState(() => (DB_MODE === 'local' || HOSTED ? false : loadVeiled()))
   const toggleVeil = () => setVeiled((v) => { saveVeiled(!v); return !v })
 
   // 进队的判据是「现在需要你」，不是「库里多了行数据」。
@@ -770,8 +772,9 @@ export default function App() {
             </svg>{t('设置')}{brain?.update?.canUpdate && <span className="upd-pill">{t('新版本 {v}', { v: brain.update.latest })}</span>}
           </button>
         )}
-        {DB_MODE !== 'local' && (
-        // 公开版(本机)没有展示模式(那是他给客户看屏幕用的);云端 / 演示有
+        {HOSTED && <AccountMenu />}
+        {DB_MODE !== 'local' && !HOSTED && (
+        // 公开版(本机)和线上版没有展示模式(那是他给客户看屏幕用的);他自己的云端版 / 演示有
         <button className={'veilbtn' + (veiled ? ' on' : '')} onClick={toggleVeil}
                 title={veiled ? t('展示模式开着：私人信息都盖着小花。点一下摘掉。')
                               : t('展示模式：给客户看屏幕前点一下，名字、邮箱盖上小花。')}>
