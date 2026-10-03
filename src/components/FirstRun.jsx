@@ -32,7 +32,7 @@ export default function FirstRun({ onDone, hosted = false }) {
       return r.ok ? j : { error: j.error || { message: `HTTP ${r.status}` } }
     } catch (e) { return { error: { message: e.message } } }
   }
-  const skip = async () => { setBusy(true); const r = await saveHosted({}); setBusy(false); if (r.error) return setErr(r.error.message); onDone?.() }
+  const skip = async () => { setBusy(true); const r = await saveHosted({ skip: true }); setBusy(false); if (r.error) return setErr(r.error.message); onDone?.() }
 
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr('')

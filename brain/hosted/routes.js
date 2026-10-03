@@ -78,7 +78,8 @@ export async function handleHostedRoute(req, res, ctx) {
     if (PROVIDERS.includes(body.provider)) patch.provider = body.provider
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang
-    if (body.onboarded === true) patch.onboarded = true   // 进门那页走过了(填完或跳过都算)
+    // 进门那页走过了:要么真接上了模型,要么学员明说「先跳过」。没接上就点「开始使用」不算——不然那页再也不出来
+    if (body.onboarded === true && (body.skip === true || readyOf({ ...t.settings, ...patch }))) patch.onboarded = true
     if ((patch.provider || t.settings.provider) === 'chatgpt-subscription') { json(res, 400, { error: { message: 'ChatGPT 订阅线上还没开;用 API key 或 Claude 订阅 / ChatGPT subscription is not available online yet' } }); return true }
     const r = await save(t, ctx, patch)
     if (patch.lang) { t.marks.seedLang = null; try { await localizeSeedTask(t) } catch (_) {} }
@@ -90,16 +91,25 @@ export async function handleHostedRoute(req, res, ctx) {
   // Claude 订阅一键登录:各人一个 HOME(<数据根>/users/<owner>/claude-auth),令牌到手存进他的那一行
   if (p === '/claude/status' || p === '/claude/login' || p === '/claude/code') {
     const M = t.marks
-    if (!M.claudeAuth) M.claudeAuth = createClaudeAuth({ onToken: (token) => save(t, ctx, { oauthToken: token }) })
+    // 令牌到手:存进这个人的那一行,并且先记在 marks 里——粘码那次请求回页面时就能说「连上了」,不用等库那边回来。
+    // 存的时候用当前这次请求的身份(M.claudeT,每次进来都换成新的),登录那次请求的 JWT 可能已经过期
+    M.claudeT = t
+    if (!M.claudeAuth) M.claudeAuth = createClaudeAuth({ onToken: async (token) => {
+      M.claudeToken = token
+      const who = M.claudeT
+      const r = await save(who, ctx, { oauthToken: token, provider: 'claude-subscription' })
+      if (r.error) { console.error(`  ✗ ${who.email} 的 Claude 令牌没存上:${r.error}`); throw new Error('令牌拿到了但没存上:' + r.error) }
+      console.log(`  ✓ ${who.email} 连上了 Claude 订阅`)
+    } })
     const a = M.claudeAuth
-    const connected = () => { const o = t.settings?.oauthToken || ''; return { connected: /^sk-ant-oat/.test(o), hint: o ? `${o.slice(0, 12)}…${o.slice(-4)}` : '' } }
+    const connected = () => { const o = M.claudeToken || t.settings?.oauthToken || ''; return { connected: /^sk-ant-oat/.test(o), hint: o ? `${o.slice(0, 12)}…${o.slice(-4)}` : '' } }
     try {
       if (!t.dataDir) throw new Error('服务器没配数据根目录(FAIRWIND_DATA_DIR)')
       mkdirSync(t.dataDir, { recursive: true })
-      if (req.method === 'POST' && p === '/claude/login') json(res, 200, { ...(await a.start(t.dataDir)), ...connected() })
+      if (req.method === 'POST' && p === '/claude/login') { console.log(`  → ${t.email} 开始登录 Claude`); M.claudeToken = null; json(res, 200, { ...(await a.start(t.dataDir)), ...connected() }) }
       else if (req.method === 'POST' && p === '/claude/code') { const body = await readJson(req); await a.submitCode(body.code); json(res, 200, { ...a.view(), ...connected() }) }
       else json(res, 200, { ...a.view(), ...connected() })
-    } catch (e) { json(res, p === '/claude/status' ? 200 : 400, { ...a.view(), ...connected(), error: { message: e.message } }) }
+    } catch (e) { if (p !== '/claude/status') console.warn(`  ⚠️ ${t.email} 登录 Claude:${e.message.slice(0, 200)}`); json(res, p === '/claude/status' ? 200 : 400, { ...a.view(), ...connected(), error: { message: e.message } }) }
     return true
   }
   if (p === '/chatgpt/status' || p === '/chatgpt/login') { json(res, p === '/chatgpt/status' ? 200 : 501, { connected: false, error: { message: 'ChatGPT 订阅线上还没开 / not available online yet' } }); return true }

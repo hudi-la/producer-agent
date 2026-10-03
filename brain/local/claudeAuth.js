@@ -71,7 +71,11 @@ expect eof`
         me.raw += b.toString(); if (me.raw.length > 400_000) me.raw = me.raw.slice(-200_000)
         if (!me.authUrl) me.authUrl = extractAuthUrl(me.raw)
         const tok = strip(me.raw).match(TOKEN_RE)
-        if (tok && !me.done) { me.done = true; me.pending = false; clearTimeout(me.timer); Promise.resolve(onToken?.(tok[0])).catch((e) => { me.error = e.message }); setTimeout(() => { try { child.kill() } catch {} }, 500) }
+        if (tok && !me.done && !me.saving) {
+          // 先存(托管版是异步写库),存完才算 done——粘码那次请求要等到「真的存上了」才回话
+          me.saving = true; me.pending = false; clearTimeout(me.timer)
+          Promise.resolve(onToken?.(tok[0])).then(() => { me.done = true }, (e) => { me.error = e.message; me.failed = true }).finally(() => setTimeout(() => { try { child.kill() } catch {} }, 500))
+        }
       }
       child.stdout.on('data', onData); child.stderr.on('data', onData)
       child.on('exit', () => { if (me.pending) { me.pending = false; me.error = me.error || tail(me.raw) || '登录没完成,再试一次 / Sign-in did not complete; try again' } })
@@ -88,8 +92,9 @@ expect eof`
       if (!c) throw new Error('把登录页给的那串码粘进来 / Paste the code the sign-in page gave you')
       s.child.stdin.write(c + '\n')   // expect_user 读一行
       const me = s
-      for (let i = 0; i < 300 && me.pending && !me.done; i++) await new Promise((r) => setTimeout(r, 200))
+      for (let i = 0; i < 300 && (me.pending || me.saving) && !me.done && !me.failed; i++) await new Promise((r) => setTimeout(r, 200))
       if (me.done) return { connected: true }
+      if (me.failed) { const why = me.error; close(why); throw new Error(why) }
       const why = me.error || (me.pending ? '等令牌超时 / Timed out waiting for the token' : tail(me.raw) || '登录没完成 / Sign-in did not complete')
       close(why); throw new Error(why)
     },
