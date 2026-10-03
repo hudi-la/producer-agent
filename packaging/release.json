@@ -1,5 +1,5 @@
 {
   "latestUrl": "https://github.com/hudi-la/fairwind-releases/releases/latest/download/latest.json",
   "downloadBase": "https://github.com/hudi-la/fairwind-releases/releases/latest/download",
-  "note": "Sign in to your Claude subscription with one button (no terminal). Fixes a wrong key pasted into another provider's field; scout runs on GPT / Gemini use far fewer tokens and no longer die at the tool-call limit; settings show which model source is in use."
+  "note": "Settings has a new Download my backup / Restore from a backup pair: one zip with everything under your account plus files, and it works for both this app and the online version. Claude subscription sign-in is more reliable."
 }
