@@ -54,6 +54,7 @@ export function createClaudeAuth({ spawnImpl = spawn, binary = findClaudeBinary,
       const env = { HOME: home, PATH: process.env.PATH, USER: process.env.USER, LANG: process.env.LANG || 'en_US.UTF-8', TERM: 'xterm-256color' }
       // 假终端用 mac 自带的 expect 给(script 要求自己的 stdin 也是终端,从程序里起不了);
       // 同时盯两边:Claude 的输出照常转出来(链接、令牌都在里面);我们这边 stdin 来一行码就敲进去。
+      // 码和回车分开敲、中间停一下:真码九十多个字符一口气进去,Claude 当成粘贴,紧跟的回车被吞进粘贴里不算提交(2026-10-03 线上)。
       // 2026-10-03 起不再「先等它打出 Paste code here 再读码」:那一步在 Linux 上认不准(单词之间是光标控制码、
       // 单行花括号又被当成字面串),码在门外排队到超时。学员能拿到码时 Claude 早就在等了,所以码一到就敲进去。
       const script = String.raw`log_user 1
@@ -62,7 +63,7 @@ spawn -noecho /bin/sh -c "stty cols 400 rows 60; exec \"$bin\" setup-token"
 set timeout -1
 set sid $spawn_id
 expect {
-  -i $user_spawn_id -re "(\[^\n\]*)\n" { send -i $sid -- "$expect_out(1,string)\r"; exp_continue }
+  -i $user_spawn_id -re "(\[^\n\]*)\n" { send -i $sid -- "$expect_out(1,string)"; sleep 0.6; send -i $sid -- "\r"; exp_continue }
   -i $sid eof { exit 0 }
   -i $sid -re {.+} { exp_continue }
 }`
