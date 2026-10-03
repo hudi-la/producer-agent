@@ -6,10 +6,16 @@ Fairwind 开了一扇门（MCP）。Claude Code、Claude 桌面版，或任何�
 Fairwind exposes an MCP server. Claude Code, the Claude desktop app, or any MCP-capable tool can connect and, on your behalf, fill your profile from your website, turn an open call into a pursuit card, or rewrite your judgment rules in your own words.
 **The structure is yours**: categories and fields are not fixed — what you maintain, and how detailed, is between you and your AI.
 
+## 线上版 · Online version
+
+用的是网页上的 Fairwind？到「设置 → 接给你的 AI 工具」复制那一行（它带着你自己的令牌），粘进 Claude 桌面版、Codex、Gemini CLI 的 MCP 配置；`<Fairwind>` 换成你装 Fairwind 桌面包的位置——这座小桥在包里。令牌别给别人看；漏了就在同一处点「换一串」，旧的当场作废。下面「接上」那一节讲的是桌面版。
+
+Using Fairwind on the web? Copy the line under Settings → Connect your AI tool (it carries your own token) and paste it into the MCP config of Claude Desktop, Codex or Gemini CLI; replace `<Fairwind>` with where you installed the Fairwind desktop package — the bridge ships in it. Keep the token private; if it leaks, press "Rotate token" in the same place and the old one stops working. The "Connect" section below is for the desktop app.
+
 ## 接上 · Connect
 
 地址在「设置 → 接给你的 AI 工具」里，长这样（端口按你机器的来）：
-The URL is under Settings → Connect Claude Code. It looks like this (the port depends on your machine):
+The URL is under Settings → Connect your AI tool. It looks like this (the port depends on your machine):
 
 ```
 http://localhost:8788/mcp

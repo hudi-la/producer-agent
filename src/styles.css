@@ -1960,7 +1960,7 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .la-hint { color: var(--ink-3); font-size: 11.5px; }
 .la-hint code { font-size: 11px; }
 
-.settings-inner { max-width: 880px; margin: 0 auto; padding: 28px 24px 60px; display: grid; gap: 18px; }
+/* 设置页的宽度、卡片样式在文件末尾「设置页卡片」那一节 */
 .settings-page .modules-panel { margin: 0; }
 .settings-page .local-account { margin-top: 0; }
 
@@ -2030,3 +2030,112 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .acct-pop button { font: inherit; font-size: 13px; text-align: left; padding: 8px 10px; border: none; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
 .acct-pop button:hover { background: var(--paper-3); }
 .acct-pop button:disabled { opacity: .5; cursor: default; }
+
+/* ── 设置页卡片(2026-10-03 重排)───────────────────────────────
+   一张卡管一件事:标题 + 一句说明,里面标签在上、输入框占满,按钮只管这张卡。
+   列宽用 minmax(0,1fr):线上那条带令牌的命令很长,网格列默认按内容撑,
+   1000px 宽时整页被它顶出右边——这里锁住,长命令只在自己的框里横滚。 */
+.settings-page { color-scheme: light dark; }   /* 勾选框、文件框这些原生控件跟着深浅色走,深色下不再白一块 */
+.settings-inner { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.settings-inner > .lib-head { margin-bottom: 4px; }
+.settings-inner > .lib-head h1 { margin: 0; font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: .005em; }
+.set-card, .settings-page .modules-panel { margin: 0; min-width: 0; padding: 22px 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.set-card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.set-card-h h2 { margin: 0; font-family: var(--serif); font-size: 16px; font-weight: 600; letter-spacing: .005em; color: var(--ink); }
+.set-card-h p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+.set-empty { font-size: 13px; color: var(--ink-2); }
+.set-link { font-size: 12.5px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.set-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* 卡里的按钮:一种次要样子 + 一种主要样子(跟首启页那颗深色按钮同色) */
+.set-card .b { font: inherit; font-size: 12.5px; font-weight: 500; line-height: 1.2; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 13px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--paper); color: var(--ink); cursor: pointer; white-space: nowrap; }
+.set-card .b:not(:disabled):hover { border-color: var(--ink-3); }
+.set-card .b.primary { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 600; }
+.set-card .b.primary:not(:disabled):hover { filter: brightness(1.15); }
+.set-card .b:disabled { opacity: .45; cursor: default; }
+.set-card .b:focus-visible, .set-quiet:focus-visible, .cmd-copy:focus-visible, .set-lang button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.set-card .b svg { flex: none; }
+
+/* 字段:标签 → 说明 → 输入框(首启页同一个次序) */
+.set-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.set-field { display: grid; gap: 5px; min-width: 0; font-size: 13px; }
+.set-field .set-k { font-weight: 500; color: var(--ink); }
+.set-field small { color: var(--ink-3); font-size: 12px; line-height: 1.5; }
+.set-inline { display: flex; gap: 8px; align-items: center; min-width: 0; margin-top: 2px; }
+.set-inline input { flex: 1; min-width: 0; }
+.set-card input:not([type=checkbox]):not([type=radio]):not([type=file]) { font: inherit; font-size: 13px; width: 100%; min-width: 0; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 11px; }
+.set-card input::placeholder { color: var(--ink-3); opacity: 1; }
+.set-card input:focus { outline: none; border-color: var(--ink-3); box-shadow: 0 0 0 3px var(--accent-soft); }
+.set-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.set-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 18px; border-top: 1px solid var(--line); }
+.set-card .la-note { font-size: 12.5px; line-height: 1.5; }
+
+/* 模型来源那一块在卡里:药丸、key 框跟上面的字段同一条左边线,输入框占满 */
+.set-card .prov { gap: 14px; }
+.set-card .prov label { gap: 5px; }
+.set-card .prov label > small { color: var(--ink-3); font-size: 12px; line-height: 1.5; font-weight: 400; }
+.set-card .prov .prov-unsaved { margin-top: -4px; }
+.set-card .cl-ok { background: var(--paper); }
+.set-card .cl-steps { background: var(--paper); }
+
+/* 语言:两颗药丸,跟首启页那一对一个样 */
+.set-lang { justify-self: start; align-items: center; }
+.set-lang button { padding: 5px 14px; font-size: 13px; }
+.set-lang .spin { color: var(--ink-3); margin-left: 4px; }
+
+/* 行:名字(和状态)在左,按钮在右;行与行之间一条细线 */
+.set-rows { display: grid; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding: 13px 0; border-top: 1px solid var(--line); }
+.set-rows > .set-row:first-child { border-top: none; padding-top: 0; }
+.set-rows > .set-row:last-child { padding-bottom: 0; }
+.set-row-l { display: grid; gap: 3px; min-width: 0; flex: 1 1 220px; font-size: 13px; }
+.set-row-l b { font-weight: 500; color: var(--ink); }
+.set-row-l small { color: var(--ink-3); font-size: 12px; line-height: 1.5; }
+.set-row-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.set-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.set-hint { color: var(--ink-2); font-size: 12.5px; line-height: 1.6; }
+.set-foot-note { color: var(--ink-3); font-size: 12px; line-height: 1.6; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* 命令框:等宽一行在框里横滚,复制钮贴在框里右边 */
+.cmd-box { position: relative; display: flex; align-items: center; min-width: 0; background: var(--paper); border: 1px solid var(--line-2); border-radius: 8px; }
+.cmd-box code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; color: var(--ink); user-select: all; scrollbar-width: thin; }
+.cmd-copy { flex: none; display: inline-flex; align-items: center; gap: 5px; align-self: stretch; padding: 0 12px; font: inherit; font-size: 12px; color: var(--ink-2);
+  background: transparent; border: none; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; cursor: pointer; }
+.cmd-copy:hover { color: var(--ink); background: var(--paper-3); }
+.cmd-copy.done { color: var(--good); }
+
+/* 令牌警示 + 「换一串」:安静的文字按钮,不跟主要动作抢 */
+.set-warn { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; font-size: 12px; color: var(--accent); line-height: 1.5; }
+.set-quiet { font: inherit; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; border: none; color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; cursor: pointer; }
+.set-quiet:hover:not(:disabled) { color: var(--ink); text-decoration-color: currentColor; }
+.set-quiet:disabled { opacity: .5; cursor: default; }
+
+/* 一张卡里的小节(备份里的「我的备份 / 机器备份」):细线隔开 */
+.set-sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.set-sub + .set-sub { padding-top: 18px; border-top: 1px solid var(--line); }
+.set-sub-h { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; font-size: 13px; }
+.set-sub-h b { font-weight: 500; }
+.set-sub-h small { color: var(--ink-3); font-size: 12px; }
+
+/* 「装了哪些」:勾 + 名字 + 说明;说明在名字底下,窄屏不挤成一条缝 */
+.settings-page .modules-panel h3 { display: none; }
+.modules-list { display: grid; }
+.settings-page .modules-panel label { grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); }
+.settings-page .modules-list > .modules-row:first-child label { border-top: none; padding-top: 0; }
+.settings-page .modules-panel label b { font-weight: 500; }
+.settings-page .modules-panel label small { grid-column: 2; color: var(--ink-3); font-size: 12px; line-height: 1.5; }
+.settings-page .modules-panel input[type=checkbox] { accent-color: var(--ink); width: 15px; height: 15px; margin: 0; transform: translateY(2px); }
+.settings-page .modules-note { color: var(--ink-3); font-size: 12px; }
+.settings-page .modules-sub { margin: 0 0 10px 27px; }
+
+@media (max-width: 560px) {
+  .settings-inner { padding: 22px 16px 60px; gap: 14px; }
+  .set-card, .settings-page .modules-panel { padding: 18px 16px; }
+  .set-pair { grid-template-columns: minmax(0, 1fr); }
+}
+/* .prov label 是给 key 框的竖排;药丸也是 label,别让它跟着变成两行(「在用」掉到第二行,药丸被撑高) */
+.set-card .prov .prov-opt { display: inline-flex; gap: 6px; padding: 6px 12px; font-size: 12.5px; }
+.set-rows.set-divided { padding-top: 14px; border-top: 1px solid var(--line); }

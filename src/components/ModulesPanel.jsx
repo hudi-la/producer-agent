@@ -17,9 +17,11 @@ export default function ModulesPanel() {
   const mailOff = m.mailOffered === false
   const rows = ROWS
   return (
-    <section className="modules-panel">
-      <h3>{t('装了哪些')}</h3>
+    // 跟设置页其它卡片同一个样子(set-card):标题 + 一句说明
+    <section className="modules-panel set-card">
+      <header className="set-card-h"><div><h2>{t('装了哪些')}</h2><p>{t('用到哪块开哪块。我的档案一直开着。')}</p></div></header>
       {getLang() === 'en' && !mailOff && <small className="modules-note">{t('邮件模块的界面暂时还是中文的。')}</small>}
+      <div className="modules-list">
       {rows.map(([k, name, why]) => (
         <div key={k} className={'modules-row' + (k === 'mail' && mailOff ? ' off' : '')}>
           <label>
@@ -30,6 +32,7 @@ export default function ModulesPanel() {
           {k === 'mail' && m.mail && <div className="modules-sub"><Judgments /></div>}
         </div>
       ))}
+      </div>
     </section>
   )
 }

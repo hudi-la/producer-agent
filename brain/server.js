@@ -24,6 +24,7 @@ import { runCodex } from './engine/codex.js'
 import { handleMcp } from './mcp.js'
 import { localizeSeedTask } from './scoutDefault.js'
 import { z } from 'zod'
+import { Marked } from 'marked'   // 说明书(/mcp-guide)浏览器打开时排成网页;静态导入——字节码编译不认动态 import
 import { read, slice, imageBudget, IMG_CAP } from './files.js'
 // 拼 prompt 的活儿全在 prompt.js —— 纯函数，所以有 prompt.test.js 按着。
 // 那边把一次对话切成三档：静态 systemPrompt（人格 + 档案 + 信息库，跨会话缓存）、
@@ -2115,7 +2116,11 @@ async function dispatch(req, res, origin) {
   // 说明书:怎么接、能做什么、试试这几句。文件随包(打包时拷到字节码旁边),开发时在 packaging/data
   if (req.method === 'GET' && req.url === '/mcp-guide') {
     for (const cand of [fileURLToPath(new URL('./MCP-guide.md', import.meta.url)), fileURLToPath(new URL('../packaging/data/MCP-guide.md', import.meta.url))]) {
-      if (fsExists(cand)) { res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' }); return res.end(readFileSync(cand)) }
+      if (!fsExists(cand)) continue
+      const md = readFileSync(cand, 'utf8')
+      // 浏览器点「怎么接 →」会带 Accept: text/html → 排成一页好读的;桥和工具来取的照旧给原文 markdown
+      if (/text\/html/i.test(req.headers.accept || '')) { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(guidePage(md)) }
+      res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' }); return res.end(md)
     }
     return send(res, 404, { error: '说明书不在' })
   }
@@ -2524,3 +2529,33 @@ function applyTimers() {
   }
 }
 main()
+
+// 说明书网页:居中一栏、跟应用同一套纸墨色,深色跟系统走。只排版,不加内容——内容只有 MCP-guide.md 那一份
+function guidePage(md) {
+  // 说明书里有 <url>、<Fairwind> 这种占位,不是标签——原样 HTML 一律转义成字,不然整段被浏览器吞掉
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const body = new Marked({ renderer: { html: (tok) => esc(typeof tok === 'string' ? tok : tok.text) } }).parse(md)
+  const title = (md.match(/^#\s+(.+)$/m)?.[1] || 'Fairwind').replace(/[<>&"]/g, '')
+  return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title}</title><style>
+:root{--paper:#E8E3D9;--paper-2:#F1ECE3;--paper-3:#DED8CB;--ink:#241F1B;--ink-2:#5C5347;--ink-3:#8E8474;--line:#D6CDBE;--line-2:#C9BFAD;--accent:#A76A24;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root{--paper:#17141A;--paper-2:#211D25;--paper-3:#100E13;--ink:#EBE3D4;--ink-2:#A99E8B;--ink-3:#6F6556;--line:#2B2731;--line-2:#39343F;--accent:#D69A48}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font:15px/1.75 "Avenir Next","Segoe UI",system-ui,"PingFang SC","Hiragino Sans GB",sans-serif;-webkit-font-smoothing:antialiased}
+.top{max-width:720px;margin:0 auto;padding:22px 24px 0;font-family:"Iowan Old Style","Charter","Palatino","Songti SC",Georgia,serif;font-weight:600;font-size:15px;letter-spacing:.01em;color:var(--ink-2)}
+main{max-width:720px;margin:0 auto;padding:12px 24px 96px}
+h1,h2,h3{font-family:"Iowan Old Style","Charter","Palatino","Songti SC",Georgia,serif;font-weight:600;line-height:1.35;letter-spacing:.005em}
+h1{font-size:28px;margin:18px 0 22px}h2{font-size:20px;margin:44px 0 12px;padding-top:24px;border-top:1px solid var(--line)}h3{font-size:16px;margin:30px 0 8px}
+p,ul,ol{margin:0 0 14px}ul,ol{padding-left:22px}li{margin:4px 0}li::marker{color:var(--ink-3)}
+a{color:var(--accent)}strong{font-weight:600}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em;background:var(--paper-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}
+pre{background:var(--paper-2);border:1px solid var(--line-2);border-radius:10px;padding:14px 16px;overflow-x:auto;margin:0 0 16px}
+pre code{background:none;border:none;padding:0;font-size:13px;overflow-wrap:normal;white-space:pre}
+.tbl{overflow-x:auto;margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:9px 10px;border-bottom:1px solid var(--line)}th{font-size:12px;font-weight:600;color:var(--ink-3);letter-spacing:.04em}
+td:first-child{white-space:nowrap}
+blockquote{margin:0 0 16px;padding:10px 16px;border-left:3px solid var(--accent);background:var(--paper-2);border-radius:0 8px 8px 0;color:var(--ink-2)}blockquote p:last-child{margin:0}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+@media (max-width:560px){body{font-size:14.5px}.top,main{padding-left:16px;padding-right:16px}h1{font-size:24px}td:first-child{white-space:normal}}
+</style></head><body><div class="top">Fairwind</div><main>${body.replace(/<table>/g, '<div class="tbl"><table>').replace(/<\/table>/g, '</table></div>')}</main></body></html>`
+}

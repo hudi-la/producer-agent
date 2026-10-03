@@ -125,6 +125,7 @@ const base = {
 
 // ── 批量操作那条横条 + 出厂任务名(数据,t() 兜一下)──
 const backup = {
+  '让它能读写你的档案和机会卡——比如"读我的网站，把作品填进来"。': 'Lets it read and write your profile and opportunity cards, e.g. "read my website and fill in my works".',
   '换一个账号': 'Switch account', '退出登录': 'Sign out',
   '线上版还没开:要先把 Gmail 接到服务器上,下一期做。': 'Not available online yet: Gmail has to be connected to the server first. Coming next.',
   '只存在你的账号里。': 'stored only in your account.', '只存在这台机器上。': 'stored only on this machine.', '走你的 Claude 订阅（Pro / Max）。登录一次，拿到的是一年期令牌，': 'Uses your Claude subscription (Pro / Max). Sign in once to get a one-year token, ',
@@ -151,6 +152,16 @@ const extra = { '已选 {n} 张': '{n} selected', '说给第 {i}/{n} 条': 'Tell
   '让它能读写你的档案、机会卡、判据——比如"读我的网站，把作品填进来"。': 'Let it read and write your profile, pursuit cards and judgments — e.g. "read my website and fill in my works".',
   '本机版那三颗「接入」按钮是替你改这台机器上的配置文件;线上够不着你的机器,换成下面这一行——粘进 Claude 桌面版、Codex、Gemini CLI 的 MCP 配置都行(<Fairwind> 换成你装的位置)。这串里带着你的令牌,别给别人看。': 'The three "Connect" buttons in the desktop version edit config files on your machine; online it can\'t reach your machine, so it becomes this one line — paste it into the MCP config of Claude Desktop, Codex or Gemini CLI (replace <Fairwind> with where you installed it). It carries your token: don\'t show it to anyone.',
   '线上还没开': 'not available online yet',
+  // ── 设置页卡片(2026-10-03 重排)──
+  '用到哪块开哪块。我的档案一直开着。': 'Turn on the parts you use. My profile is always on.',
+  'Fairwind 用哪家的模型想事情。key 只存不回显。': 'Which model Fairwind thinks with. Keys are stored, never shown again.',
+  '已复制': 'Copied', '怎么接 →': 'How to connect →',
+  '在终端里粘这一行，之后每次打开都带着。': 'Paste this line in Terminal once; it stays connected after that.',
+  'ChatGPT 聊天 app 接不上（它只认公网地址），用 ChatGPT 的人走 Codex。': "The ChatGPT chat app can't connect (it only accepts public URLs); ChatGPT users can use Codex.",
+  '把这一行粘进 Claude 桌面版、Codex、Gemini CLI 的 MCP 配置（<Fairwind> 换成你装的位置）。': 'Paste this line into the MCP config of Claude Desktop, Codex or Gemini CLI (replace <Fairwind> with where you installed it).',
+  '这串里带着你的令牌，别给别人看。': "This line carries your token. Don't show it to anyone.",
+  '两种:能带去线上版的 zip,和整台机器的数据目录。': 'Two kinds: a zip you can take to the online version, and a copy of this whole machine\'s data folder.',
+  '先选一个备份目录': 'Choose a backup folder first', '这台机器': 'This machine', '备份': 'Backup',
   '去「展开的卡片」看它。要拿走，在那排卡片上按 ×。': 'See it under Open cards. To remove it, press × on that row of cards.', '展开——今天要弄它。你留在这儿接着挑，挑完点顶栏「展开的卡片」过去。': 'Open: work on it today. Stay here and keep picking; then go to Open cards in the top bar.', '在展开的卡片区': 'In Open cards' }
 
 // 三份分册合进来;base 里的键优先(撞键时以档案层那份为准——别在分册里改 base 的意思)
