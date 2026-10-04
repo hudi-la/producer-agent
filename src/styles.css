@@ -155,7 +155,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--sans); -w
 .tr-fix code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; background: color-mix(in srgb, var(--ink) 9%, transparent); padding: 1px 6px; border-radius: 4px; }
 
 /* ── pipeline board ── */
-.board { flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; gap: 18px; padding: 26px 24px 40px; align-items: stretch; }
+/* 用网格不用 flex：一行网格的高 = 最长那列，每列都被拉到一样高（不够一屏就撑满一屏）。
+   flex 做不到——列会被钉成一屏高、卡片溢出列外，短列的列头一滚就跟着列底走了。
+   列头要一路钉在顶上（.col-h 的 sticky），全靠每列都跟最长的一样长。 */
+.board { flex: 1; min-width: 0; min-height: 0; overflow: auto; display: grid; grid-auto-flow: column; grid-auto-columns: 216px; gap: 18px; padding: 26px 24px 40px; }
 /* 筛没了的时候说人话。「待处理」很稀是真的，不是筛坏了。 */
 .board-empty { display: block; padding: 60px 26px; color: var(--ink-3); font-family: var(--serif); font-size: 14px; }
 /* 给看板补一段右内边距，末尾那几列才滑得出抽屉底下——
@@ -213,7 +216,10 @@ body.resizing .drawer-grip::before { opacity: .75; }
    有一段断不开的长东西（待办里的网址、邮箱），这一列就会被它撑宽——
    而卡是折在叠里的，你一展开列宽就跳。写死 0，列永远是 216。 */
 .col { flex: 0 0 216px; min-width: 0; display: flex; flex-direction: column; }
-.col-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 13px; padding: 0 2px; }
+/* 列头钉在看板顶上，卡片从它底下滚过去。底色跟纸一样，上下各垫 10px 好盖住滚上来的卡；
+   负的上边距把垫出来的那截吃回去，没滚的时候位置跟原来一样。
+   top 是负的 .board 上内边距（26px）：sticky 从内边距底下算起，写 0 的话上头会漏一条缝，卡片从缝里露出来。 */
+.col-h { display: flex; align-items: baseline; justify-content: space-between; margin: -10px 0 3px; padding: 10px 2px; position: sticky; top: -26px; z-index: 3; background: var(--paper); }
 .col-h .cn { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; font-weight: 600; color: var(--ink-2); }
 .col-h .cc { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .col.now .col-h .cn { color: var(--accent); }
