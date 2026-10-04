@@ -97,7 +97,7 @@ export async function handleHostedRoute(req, res, ctx) {
     if (!M.claudeAuth) M.claudeAuth = createClaudeAuth({ onToken: async (token) => {
       M.claudeToken = token
       const who = M.claudeT
-      const r = await save(who, ctx, { oauthToken: token, provider: 'claude-subscription' })
+      const r = await save(who, ctx, { oauthToken: token })
       if (r.error) { console.error(`  ✗ ${who.email} 的 Claude 令牌没存上:${r.error}`); throw new Error('令牌拿到了但没存上:' + r.error) }
       console.log(`  ✓ ${who.email} 连上了 Claude 订阅`)
     } })

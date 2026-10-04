@@ -9,14 +9,8 @@
 import { modelFor } from '../models.js'
 import { envNow } from '../tenant.js'
 
-export const PROVIDERS = {
-  claude: { label: 'Claude' },
-  'chatgpt-subscription': { label: 'ChatGPT 订阅' },
-  // good / cheap 各是一条备选链:第一个是默认;它 404 下线、429 没额度(免费档 key 用不了 pro)、503 挤不上时,
-  // 顺着往下换(engine/openaiCompat.js)。9/25 用免费档 Gemini key 实测:pro 一律 429 没额度,flash 常 503 挤,3.5-flash 和 3-flash-preview 稳。
-  openai: { label: 'GPT', baseURL: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY', good: ['gpt-5', 'gpt-5-mini'], cheap: ['gpt-5-mini', 'gpt-5'] },
-  gemini: { label: 'Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY', good: ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3-flash-preview'], cheap: ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash'] },
-}
+import { PROVIDERS } from '../../src/lib/modelDefaults.js'
+export { PROVIDERS } from '../../src/lib/modelDefaults.js'
 
 /** 现在走哪条。'claude' | 'openai' | 'gemini' | 'chatgpt-subscription' */
 export function engineOf(env = envNow()) {

@@ -2163,3 +2163,34 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .error-center-close { position: absolute; right: 7px; top: 8px; width: 28px; height: 28px; border: 0; background: transparent; color: #613126; font-size: 22px; cursor: pointer; }
 .error-notice .error-notice-id { font-size: 12px; color: #715a53; }
 .error-notice-id code { user-select: all; font-size: 11px; }
+
+/* Model defaults and an explanation usable by keyboard, mouse and touch. */
+.set-model-field { position: relative; min-width: 0; }
+.set-model-field .set-k { padding-right: 28px; }
+.set-model-help { position: relative; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+.set-model-help summary { cursor: pointer; width: fit-content; font-size: 16px; list-style: none; }
+.set-model-help summary::-webkit-details-marker { display: none; }
+.set-model-help summary:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 3px; }
+.set-model-help p { margin: 5px 0 0; line-height: 1.6; }
+.set-model-reset { margin-top: 6px; padding: 0; border: 0; background: transparent; color: var(--ink-3); font-size: 12px; text-decoration: underline; cursor: pointer; }
+
+/* Model choices are selects, never free-text inputs. */
+.set-inline select { flex: 1; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; }
+.set-inline select:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
+
+/* Active configuration stays visible while a separate draft is edited. */
+.model-active > span { margin-left: 12px; font-size: 12px; color: var(--ink-3); }
+.model-active dl { margin: 18px 0 0; }
+.model-active dt { font-size: 12px; color: var(--ink-3); }
+.model-active dd { margin: 5px 0 0; overflow-wrap: anywhere; }
+.model-editor { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; }
+.model-editor > p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.model-editor-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 20px; }
+
+/* Native dialog traps focus and makes the saved settings behind it inert. */
+.model-dialog { box-sizing: border-box; width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 26px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); color: var(--ink); box-shadow: 0 20px 80px #0005; }
+.model-dialog::backdrop { background: #0008; }
+.model-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.model-dialog-head h2 { margin: 0; font-size: 20px; }
+.model-dialog .model-editor { margin-top: 16px; padding-top: 16px; }
+@media (max-width: 560px) { .model-dialog { padding: 18px; } }

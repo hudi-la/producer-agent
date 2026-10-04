@@ -6,6 +6,25 @@ import b from './en.pursuits-b.js'
 import c from './en.misc-c.js'
 
 const base = {
+  '关闭': 'Close',
+  '编辑模型设置': 'Edit model settings',
+  '当前设置已保存，正在使用：{p}': 'Settings saved. Currently using: {p}',
+  '当前正在使用': 'Currently in use',
+  "当前已生效的模型设置": "Your active model settings",
+  "当前使用": "Currently in use",
+  "尚未连接": "Not connected",
+  "已保存并启用": "Saved and activated",
+  "保存并启用": "Save and activate",
+  "正在编辑，尚未生效。保存后将使用：{p}": "Editing \u2014 not active yet. Saving will activate: {p}",
+  "SDK 由 Claude 的连接工具选择默认模型，两档可能使用同一个模型。": "Claude\u2019s SDK chooses the default model. Both tiers may use the same model.",
+
+  '（默认）': ' (default)',
+  '什么是 SDK？': 'What is an SDK?',
+  'SDK 是模型厂商提供的连接工具。这里表示由 Claude SDK 选择默认模型，并不是模型名称；两档可能使用同一个模型。你也可以从下拉菜单选择指定的模型。': 'An SDK is a connection toolkit provided by the model vendor. Here, Claude’s SDK chooses the default model; SDK is not a model name, and both tiers may use the same model. You can also choose a specific model from the menu.',
+  '由 Codex 选择默认模型。': 'Codex chooses the default model.',
+  '恢复默认': 'Reset to default',
+
+
   "登录": "Sign in",
   "复制失败，请手动选中并复制上面的命令。": "Copy failed. Select and copy the command above manually.",
   "部分附件没有恢复。请检查附件列表，保留原备份；不要反复覆盖恢复。": "Some attachments were not restored. Check the attachment list and keep the original backup; do not repeatedly overwrite your data.",

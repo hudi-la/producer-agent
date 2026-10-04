@@ -13,7 +13,8 @@ import { useEffect, useRef, useState } from 'react'
 import { t, getLang } from '../i18n/index.js'
 import { DB_MODE, supa, brainApi, BRAIN } from '../lib/backends.js'
 import ModulesPanel from './ModulesPanel.jsx'
-import ProviderPicker, { Spin } from './ProviderPicker.jsx'
+import { modelDefaults, modelOverride, modelChoices, modelFamily } from '../lib/modelDefaults.js'
+import ProviderPicker, { Spin, PROVIDERS as PROVIDER_OPTIONS } from './ProviderPicker.jsx'
 
 export default function SettingsPage() {
   const local = DB_MODE === 'local'
@@ -110,40 +111,109 @@ function LangCard({ lang }) {
 // key **永远不回显**:brain 只给「设了没有」和末四位,输入框空着 = 不动原来的,填了 = 换掉。改完当场生效。
 // 这张卡底下的「保存」只存这几样(来源、四种凭据、两档),别的卡不跟着存。
 const KEYS = ['apiKey', 'oauthToken', 'openaiKey', 'geminiKey']
-function ModelCard({ cur, reload }) {
-  const fresh = () => ({ provider: cur.provider || 'claude-key', model: cur.model || '', modelCheap: cur.modelCheap || '', apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })
+export function ModelCard({ cur, reload }) {
+  const [active, setActive] = useState(cur)
+  const [editing, setEditing] = useState(false)
+  const dialogRef = useRef(null)
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (editing && !dialog.open) dialog.showModal()
+    if (!editing && dialog.open) dialog.close()
+  }, [editing])
+  useEffect(() => { setActive(cur) }, [cur])
+  const providerLabel = (p) => t(PROVIDER_OPTIONS.find((o) => (o.value || o.key) === p)?.label || p)
+  const fresh = () => ({ provider: active.provider || 'claude-key', model: active.model || modelDefaults(active.provider).model, modelCheap: active.modelCheap || modelDefaults(active.provider).modelCheap, apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })
   const [form, setForm] = useState(fresh)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState({ msg: '', bad: false })
-  const inUse = cur.provider || 'claude-key'
-  const dirty = KEYS.some((k) => form[k]) || form.provider !== inUse || form.model !== (cur.model || '') || form.modelCheap !== (cur.modelCheap || '')
+  const inUse = active.provider || 'claude-key'
+  const defaults = modelDefaults(form.provider)
+  const overrides = { model: modelOverride(form.model, form.provider, 'model'), modelCheap: modelOverride(form.modelCheap, form.provider, 'modelCheap') }
+  const dirty = KEYS.some((k) => form[k]) || form.provider !== inUse || overrides.model !== modelOverride(active.model || '', inUse, 'model') || overrides.modelCheap !== modelOverride(active.modelCheap || '', inUse, 'modelCheap')
   const save = async (e) => {
     e.preventDefault(); setBusy(true); setNote({ msg: '', bad: false })
-    const r = await brainApi.settings.set(form)
-    setBusy(false)
-    if (r?.error) return setNote({ msg: t('没存上:') + r.error.message, bad: true })
-    setNote({ msg: t('存好了,下一次开口就用新的'), bad: false })
-    setForm((f) => ({ ...f, apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' }))
-    await reload()
+    try {
+      const selectedKey = { 'claude-key': 'apiKey', 'claude-subscription': 'oauthToken', openai: 'openaiKey', gemini: 'geminiKey' }[form.provider]
+      const payload = { provider: form.provider, ...overrides }
+      if (selectedKey && form[selectedKey]) payload[selectedKey] = form[selectedKey]
+      const r = await brainApi.settings.set(payload)
+      if (!r || r.error) throw new Error(r?.error?.message || r?.error || t('没存上:'))
+      setActive((previous) => ({ ...previous, ...r, ...payload }))
+      setEditing(false)
+      setNote({ msg: t('已保存并启用'), bad: false })
+      await reload()
+    } catch (error) {
+      setNote({ msg: error.message, bad: true })
+    } finally { setBusy(false) }
   }
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const cancel = () => { if (busy) return; setForm(fresh()); setEditing(false); setNote({ msg: '', bad: false }); reload() }
   return (
-    <Card title={t('模型')} desc={t('Fairwind 用哪家的模型想事情。key 只存不回显。')}>
-      <form className="set-form" onSubmit={save}>
+    <Card title={t('模型')} desc={t('当前已生效的模型设置')} aside={<button type="button" className="b" onClick={() => { setForm(fresh()); setNote({ msg: '', bad: false }); setEditing(true) }}>{t('编辑')}</button>}>
+      <div className="model-active" aria-label={t('当前使用')}>
+        <strong>{providerLabel(inUse)}</strong>
+        <span>{active.ready ? t('当前使用') : t('尚未连接')}</span>
+        <dl className="set-pair">
+          <div><dt>{t('好档模型')}</dt><dd>{active.model || modelDefaults(inUse).model}</dd></div>
+          <div><dt>{t('便宜档模型')}</dt><dd>{active.modelCheap || modelDefaults(inUse).modelCheap}</dd></div>
+        </dl>
+        {(!active.model || !active.modelCheap) && modelDefaults(inUse).model === 'SDK' && <details className="set-model-help"><summary>{t('什么是 SDK？')}</summary><p>{t('SDK 由 Claude 的连接工具选择默认模型，两档可能使用同一个模型。')}</p></details>}
+      </div>
+      {!editing && <Note {...note} context={t('模型')} />}
+      <dialog ref={dialogRef} className="model-dialog" aria-label={t('编辑模型设置')} onCancel={(e) => { e.preventDefault(); cancel() }}>
+        {editing && <>
+        <header className="model-dialog-head"><h2>{t('编辑模型设置')}</h2><button type="button" className="b" aria-label={t('关闭')} disabled={busy} onClick={cancel}>×</button></header>
+        <form className="set-form model-editor" onSubmit={save}>
+        <p role="status">{dirty ? t('正在编辑，尚未生效。保存后将使用：{p}', { p: providerLabel(form.provider) }) : t('当前设置已保存，正在使用：{p}', { p: providerLabel(inUse) })}</p>
+        <fieldset disabled={busy} className="model-editor-fields">
         <ProviderPicker value={form.provider} inUse={inUse}
-          onChange={(v) => setForm((f) => ({ ...f, provider: v, ...((v === 'chatgpt-subscription' || f.provider === 'chatgpt-subscription') ? { model: '', modelCheap: '' } : {}) }))}
+          onChange={(v) => setForm((f) => {
+            const next = modelDefaults(v)
+            const reset = modelFamily(v) !== modelFamily(f.provider)
+            return { ...f, provider: v, apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '',
+              model: (!reset && modelOverride(f.model, f.provider, 'model')) || next.model,
+              modelCheap: (!reset && modelOverride(f.modelCheap, f.provider, 'modelCheap')) || next.modelCheap }
+          })}
           keys={form} onKey={set}
-          hints={{ apiKey: cur.apiKeySet ? cur.apiKeyHint : '', oauthToken: cur.oauthTokenSet ? cur.oauthTokenHint : '', openaiKey: cur.openaiKeySet ? cur.openaiKeyHint : '', geminiKey: cur.geminiKeySet ? cur.geminiKeyHint : '' }} />
+          hints={{ apiKey: active.apiKeySet ? active.apiKeyHint : '', oauthToken: active.oauthTokenSet ? active.oauthTokenHint : '', openaiKey: active.openaiKeySet ? active.openaiKeyHint : '', geminiKey: active.geminiKeySet ? active.geminiKeyHint : '' }} />
         <div className="set-pair">
-          <Field label={t('好档模型')} hint={t('聊天、写信、讲懂用这档')} value={form.model} placeholder={t('空 = 默认')} onChange={(v) => set('model', v)} />
-          <Field label={t('便宜档模型')} hint={t('判断、收信那些小活用这档')} value={form.modelCheap} placeholder={t('空 = 默认')} onChange={(v) => set('modelCheap', v)} />
+          <ModelField label={t('好档模型')} hint={t('聊天、写信、讲懂用这档')} value={form.model} defaultValue={defaults.model} options={modelChoices(form.provider, 'model', form.model)} onChange={(v) => set('model', v)} />
+          <ModelField label={t('便宜档模型')} hint={t('判断、收信那些小活用这档')} value={form.modelCheap} defaultValue={defaults.modelCheap} options={modelChoices(form.provider, 'modelCheap', form.modelCheap)} onChange={(v) => set('modelCheap', v)} />
         </div>
         <footer className="set-foot">
-          <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? <><Spin />{t('存着…')}</> : t('保存')}</button>
+          <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? <><Spin />{t('存着…')}</> : dirty ? t('保存并启用') : t('当前正在使用')}</button>
+          <button type="button" className="b" disabled={busy} onClick={cancel}>{t('取消')}</button>
           <Note {...note} context={t('模型')} />
         </footer>
-      </form>
+        </fieldset>
+      </form></>}
+      </dialog>
     </Card>
+  )
+}
+
+// SDK is a default-selection mode, never a literal model name sent to the provider.
+function ModelField({ label, hint, value, defaultValue, options, onChange }) {
+  const sdk = defaultValue === 'SDK' && (!value.trim() || value.trim() === 'SDK')
+  return (
+    <div className="set-model-field">
+      <label className="set-field">
+        <span className="set-k">{label}</span>
+        <small>{hint}</small>
+        <span className="set-inline">
+          <select value={value} onChange={(e) => onChange(e.target.value)}>
+            {options.map((model) => <option key={model} value={model}>{model}{model === defaultValue ? t('（默认）') : ''}</option>)}
+          </select>
+        </span>
+      </label>
+      {sdk && <details className="set-model-help">
+        <summary aria-label={t('什么是 SDK？')} title={t('什么是 SDK？')}>ⓘ</summary>
+        <p>{t('SDK 是模型厂商提供的连接工具。这里表示由 Claude SDK 选择默认模型，并不是模型名称；两档可能使用同一个模型。你也可以从下拉菜单选择指定的模型。')}</p>
+      </details>}
+      {defaultValue === 'Codex' && <small>{t('由 Codex 选择默认模型。')}</small>}
+      {value !== defaultValue && <button type="button" className="set-model-reset" onClick={() => onChange(defaultValue)}>{t('恢复默认')}</button>}
+    </div>
   )
 }
 
