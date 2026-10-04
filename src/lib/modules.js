@@ -1,3 +1,6 @@
+import { t } from '../i18n/index.js'
+import { reportError } from './reportError.js'
+import { errorText } from './userError.js'
 // src/lib/modules.js —— 前端读/写模块开关(brain 的 /modules)。
 // 脑子没醒时按全开画——跟今天一样,什么都不少;canToggle 为假,设置里不出开关。
 import { BRAIN, brainFetch } from './backends.js'
@@ -5,15 +8,15 @@ import { BRAIN, brainFetch } from './backends.js'
 const ALL_ON = { profile: true, pursuits: true, mail: true, canToggle: false }
 
 export async function fetchModules(fetchImpl = brainFetch) {
-  try { const r = await fetchImpl(`${BRAIN}/modules`); return r.ok ? await r.json() : ALL_ON }
-  catch { return ALL_ON }
+  try { const r = await fetchImpl(`${BRAIN}/modules`); if (!r.ok) { reportError(`HTTP ${r.status}`, t('读取模块设置失败')); return ALL_ON }; return await r.json() }
+  catch (e) { reportError(e, t('读取模块设置失败')); return ALL_ON }
 }
 
 export async function postModules(patch, fetchImpl = brainFetch) {
   // 没存成就抛,别把报错当成新的开关状态——那样整个面板和对应的栏都会消失,还回不来(2026-10-03 线上)
   const r = await fetchImpl(`${BRAIN}/modules`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
   const j = await r.json().catch(() => ({}))
-  if (!r.ok || j.error || typeof j.canToggle !== 'boolean') throw new Error(j.error || `HTTP ${r.status}`)
+  if (!r.ok || j.error || typeof j.canToggle !== 'boolean') throw new Error(errorText(j.error) || `HTTP ${r.status}`)
   return j
 }
 

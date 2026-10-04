@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { checkRules, itemProgress, formProgress } from '../lib/rules.js'
 import { useGrow } from '../lib/useGrow.js'
@@ -275,7 +276,7 @@ export default function Deliverables({ pursuitId, items, files, onChanged, onJum
   return (
     <div className="deliv">
       <p className="secttl">{t('产出')}</p>
-      {err && <div className="dv-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('文件与附件')} />}
 
       {drafts.length === 0 && (
         <p className="empty">

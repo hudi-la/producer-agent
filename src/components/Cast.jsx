@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useState } from 'react'
 import { fetchParties, attachParty, detachParty, fetchCandidates } from '../lib/pursuitCast.js'
 import Veil from './Veil.jsx'
@@ -110,7 +111,7 @@ export default function Cast({ pursuitId, onOpenPerson, onChanged }) {
             </div>
           </div>
         )}
-        {err && <p className="ferr">{err}</p>}
+        {err && <ErrorNotice error={err} context={t('保存更改')} />}
       </div>
     </div>
   )

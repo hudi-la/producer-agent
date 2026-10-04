@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useState } from 'react'
 import { adopt, markThread } from '../lib/mail.js'
 import {
@@ -130,7 +131,7 @@ export default function Groups({ rows = [], onDone }) {
                   onCollect={collect} onSkip={skip} />
       ))}
       {said.map((s, i) => <p className="gr-ok" key={i}>{s}</p>)}
-      {err && <p className="gr-err">{err}</p>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
     </section>
   )
 }

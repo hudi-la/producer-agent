@@ -1,3 +1,4 @@
+import { reportError } from '../lib/reportError.js'
 import { md, day } from '../lib/when.js'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchContactMessages, rewindChat } from '../lib/chat.js'
@@ -50,7 +51,7 @@ function Cell({ label, value, placeholder, onSave, type = 'text', multiline = fa
   const save = async () => {
     setEditing(false)
     if ((v ?? '') === (value ?? '')) return
-    try { await onSave(v) } catch (e) { alert('没存上：' + e.message) }
+    try { await onSave(v) } catch (e) { reportError('没存上：' + e.message) }
   }
   const Tag = multiline ? 'textarea' : 'input'
   return (
@@ -176,7 +177,7 @@ export default function PersonFocus({
     if (!brainUp) {
       setBusy('talk'); if (said == null) setText('')
       try { await logNote(c.id, t); await reload(); onChanged?.() }
-      catch (err) { alert('没记上：' + err.message); if (said == null) setText((cur) => cur || t) }
+      catch (err) { reportError('没记上：' + err.message); if (said == null) setText((cur) => cur || t) }
       finally { setBusy(null) }
       return
     }
@@ -207,7 +208,7 @@ export default function PersonFocus({
       if (rows) setMsgs(rows)
       else setMsgs((m) => (m || []).filter((x) => x.id !== tmp.id))
       if (!landed) setText((cur) => cur || t)   // 期间你要是又打了别的，就别覆盖
-      alert(err.message + (landed
+      reportError(err.message + (landed
         ? '（你的话存下了，Fairwind 没想完 —— 再说一次让它重想）'
         : '（你的话还在框里，没丢）'))
     } finally { setBusy(null); resetLive() }
@@ -225,7 +226,7 @@ export default function PersonFocus({
       await rewindChat(id)
     } catch (e) {
       // 停在编辑态：你改的字还在框里，可以再按一次
-      alert('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
+      reportError('没撤成：' + e.message + '（你改的字还在，可以再按一次重说）')
       return
     }
     setEditId(null)
@@ -247,7 +248,7 @@ export default function PersonFocus({
     if (!t.trim() || busy) return
     setBusy('talk')
     try { await logMeet(c.id, t.trim(), onLine || null); await reload(); onChanged?.(); after?.() }
-    catch (e) { alert('没记上：' + e.message) } finally { setBusy(null) }
+    catch (e) { reportError('没记上：' + e.message) } finally { setBusy(null) }
   }
 
   // 「刚聊过」：**一定顺手写一句**。空打卡只留一个日期，
@@ -267,7 +268,7 @@ export default function PersonFocus({
       // 这条是**退路**，不是主路：要加附件（作品集 PDF）的信走它。
       // 主路是右栏那颗「发送」，那颗直接发，发完当场记进左栏往来。
       alert(`放进草稿箱了${out.to ? `（收信人 ${out.to}）` : ''}。去 Gmail 里挂上附件再按发送。`)
-    } catch (e) { alert(e.message) } finally { setBusy(null) }
+    } catch (e) { reportError(e) } finally { setBusy(null) }
   }
 
   // 真发。两段确认：armed 是「上膛」，再按一下才出去。
@@ -283,7 +284,7 @@ export default function PersonFocus({
     } catch (e) {
       setArmed(null)
       // 授权掉了要说人话，别让你对着一句 HTTP 401 猜
-      alert(e.needsAuth && e.fix ? `${e.message}\n\n${e.fix}` : e.message)
+      reportError(e.needsAuth && e.fix ? `${e.message}\n\n${e.fix}` : e.message)
     } finally { setBusy(null) }
   }
 
@@ -447,7 +448,7 @@ export default function PersonFocus({
                   <button className="lnk" disabled={!claim.trim()}
                           onClick={async () => {
                             try { await claimThread(c.id, claim.trim()); setClaim(''); await reload() }
-                            catch (e) { alert('没认上：' + e.message) }
+                            catch (e) { reportError('没认上：' + e.message) }
                           }}>认领</button>
                 </div>}
                 <div className="pf-note">认领了 {threads.length} 条 thread</div>

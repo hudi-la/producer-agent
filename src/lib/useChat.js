@@ -84,7 +84,8 @@ export function useChat({ owner, reload, rewind, offline = null }) {
       // 脑子是先存你的话、再去想的，所以失败有两种：
       //   连不上 → 一个字都没存 → 把内容还回输入框，别让你白打
       //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
-      const rows = await reload()
+      let rows = null
+      try { rows = await reload() } catch { /* Keep the original failure and the user's input. */ }
       const landed = rows?.some((m) => m.role === 'artist' && m.content === txt)
       if (rows) setMsgs(rows)
       else setMsgs((m) => m.filter((x) => x.id !== tmp.id))
@@ -135,7 +136,7 @@ export function useChat({ owner, reload, rewind, offline = null }) {
     // 打到一半的那段也一起收掉：它不会落库，留在屏幕上等于给你看一份不存在的回复。
     resetLive()
     runIdRef.current = null
-    if (rid) await stopThinking(rid)
+    if (rid) { const result = await stopThinking(rid); if (!result?.ok) setErr(t('停止请求未确认，请检查对话结果；后台任务可能仍在执行。')) }
     return rid
   }, [resetLive])
 

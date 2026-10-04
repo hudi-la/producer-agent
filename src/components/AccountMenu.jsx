@@ -1,3 +1,5 @@
+import { reportError } from '../lib/reportError.js'
+import ErrorNotice from './ErrorNotice.jsx'
 // src/components/AccountMenu.jsx —— 线上版(托管)右上角:你是谁 + 退出 / 换一个账号。
 // 本机版没有登录这回事;他自己的个人版这颗是「展示模式」(给客户看屏幕时盖名字),线上学员用不着。
 import { useEffect, useRef, useState } from 'react'
@@ -7,9 +9,10 @@ import { t } from '../i18n/index.js'
 export default function AccountMenu() {
   const [open, setOpen] = useState(false)
   const [user, setUser] = useState(null)
+  const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const box = useRef(null)
-  useEffect(() => { supa?.auth.getUser().then(({ data }) => setUser(data?.user || null)) }, [])
+  useEffect(() => { supa?.auth.getUser().then(({ data, error }) => { if (error) throw error; setUser(data?.user || null) }).catch(setError) }, [])
   useEffect(() => {
     if (!open) return
     const off = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false) }
@@ -20,11 +23,15 @@ export default function AccountMenu() {
   const meta = user?.user_metadata || {}
   const name = meta.full_name || meta.name || (user?.email || '').split('@')[0] || t('我')
   const pic = meta.avatar_url || meta.picture
-  const signOut = async () => { setBusy(true); await supa.auth.signOut(); location.reload() }
+  const signOut = async () => { setBusy(true); setError(null); try { const r = await supa.auth.signOut(); if (r.error) throw r.error; location.reload() } catch (e) { setError(e); reportError(e, t('登录')) } finally { setBusy(false) } }
   // 换账号:先退出,再直接去 Google 并让它弹出账号选择(不然 Google 会默默用刚才那个)
   const switchAcct = async () => {
-    setBusy(true); await supa.auth.signOut()
-    await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } })
+    setBusy(true); setError(null)
+    try {
+      const out = await supa.auth.signOut({ scope: 'local' }); if (out.error) throw out.error
+      const r = await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } })
+      if (r.error) throw r.error
+    } catch (e) { setError(e); reportError(e, t('登录')) } finally { setBusy(false) }
   }
   return (
     <div className="acct-menu" ref={box}>
@@ -33,6 +40,7 @@ export default function AccountMenu() {
         <span>{name}</span>
       </button>
       {open && <div className="acct-pop" role="menu">
+        <ErrorNotice error={error} context={t('登录')} />
         <div className="acct-who"><b>{name}</b><small>{user?.email}</small></div>
         <button type="button" role="menuitem" disabled={busy} onClick={switchAcct}>{t('换一个账号')}</button>
         <button type="button" role="menuitem" disabled={busy} onClick={signOut}>{t('退出登录')}</button>

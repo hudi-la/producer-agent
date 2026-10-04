@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useState } from 'react'
 import { adoptLetter } from '../lib/letters.js'
 import Md from './Md.jsx'
@@ -49,7 +50,7 @@ export default function LetterCard({ letter, owner, onAdopted }) {
       {/* 信的全文摆在卡里，不摆在上面那段话里。
           两处都写的话，你改了上面那份、发出去的却是这份——而你不会察觉。 */}
       <div className="lcard-body md"><Md>{letter.body}</Md></div>
-      {err && <div className="lcard-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
       {done ? (
         <div className="lcard-ok">
           收进产出了 —— 去右栏改完再发。<b>这儿不发信。</b>

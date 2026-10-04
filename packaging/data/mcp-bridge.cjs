@@ -24,6 +24,7 @@ const health = (port) => new Promise((ok) => {
 async function findUrl() {
   if (FIXED) return argUrl
   const u = new URL(argUrl)
+  if (!['localhost', '127.0.0.1', '[::1]'].includes(u.hostname) || u.username || u.password) return argUrl
   const ports = []; let fromFile = false
   try { const p = Number(fs.readFileSync(path.join(DATA, 'port'), 'utf8').trim()); if (p) { ports.push(p); fromFile = true } } catch {}
   ports.push(Number(u.port || 80))
@@ -43,7 +44,7 @@ async function findUrl() {
 let url = argUrl
 const roots = [path.join(here, 'node_modules'), path.join(here, 'brain', 'node_modules'), path.join(here, '..', 'brain', 'node_modules'), path.join(here, '..', '..', 'brain', 'node_modules')]
 const root = roots.find((r) => fs.existsSync(path.join(r, '@modelcontextprotocol', 'sdk')))
-if (!root) { process.stderr.write('mcp-bridge:找不到 @modelcontextprotocol/sdk\n'); process.exit(1) }
+if (!root) { process.stderr.write('Fairwind MCP Bridge 无法启动：安装文件不完整。请重新安装 Fairwind，再在设置中重新接入 AI 工具。Missing @modelcontextprotocol/sdk.\n'); process.exit(1) }
 const req = (p) => require(path.join(root, '@modelcontextprotocol', 'sdk', 'dist', 'cjs', p))
 
 async function main() {
@@ -51,10 +52,30 @@ async function main() {
   const { StreamableHTTPClientTransport } = req('client/streamableHttp.js')
   const { Server } = req('server/index.js')
   const { StdioServerTransport } = req('server/stdio.js')
-  const { ListToolsRequestSchema, CallToolRequestSchema } = req('types.js')
+  const { ListToolsRequestSchema, CallToolRequestSchema, McpError, ErrorCode } = req('types.js')
 
   const client = new Client({ name: 'fairwind-bridge', version: '1' })
-  const connect = async () => { try { url = await findUrl(); await client.connect(new StreamableHTTPClientTransport(new URL(url))); return true } catch (e) { process.stderr.write(`mcp-bridge:连不上 ${url}(Fairwind 开着吗?)${e.message}\n`); return false } }
+  let lastError = '连接尚未建立 / Connection not established'
+  const explain = (e) => {
+    const raw = String(e?.message || e)
+    const action = /401|403|unauthorized|forbidden/i.test(raw)
+      ? '连接授权失败。请在 Fairwind 设置中检查 MCP 令牌，并更新 AI 工具的连接配置。Authorization failed: update the MCP token in your AI tool.'
+      : '无法连接 Fairwind。请确认 Fairwind 已打开、连接地址和网络正确，再重试。Cannot reach Fairwind: check that it is running and verify the address and network.'
+    // No URL, tokens, or raw transport headers in the AI client's UI or stderr.
+    return action
+  }
+  const connect = async () => { try {
+    url = await findUrl()
+    const endpoint = new URL(url)
+    const headers = {}
+    if (endpoint.username || endpoint.password) {
+      headers.Authorization = 'Basic ' + Buffer.from(decodeURIComponent(endpoint.username) + ':' + decodeURIComponent(endpoint.password)).toString('base64')
+      endpoint.username = ''; endpoint.password = ''
+    }
+    await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }))
+    return true
+  } catch (e) { lastError = explain(e); process.stderr.write(lastError + '\n'); return false } }
+
   let up = await connect()
 
   const server = new Server({ name: 'fairwind', version: '1' }, { capabilities: { tools: { listChanged: true } } })
@@ -74,15 +95,15 @@ async function main() {
   setInterval(poll, 20000).unref()
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     if (!up) up = await connect()
-    if (!up) return { tools: [] }
-    try { return await client.listTools() } catch (e) { up = false; return { tools: [] } }
+    if (!up) throw new McpError(ErrorCode.InternalError, lastError)
+    try { return await client.listTools() } catch (e) { up = false; lastError = explain(e); throw new McpError(ErrorCode.InternalError, lastError) }
   })
   server.setRequestHandler(CallToolRequestSchema, async (r) => {
     if (!up) up = await connect()
-    if (!up) return { content: [{ type: 'text', text: `连不上 Fairwind(${url})。它开着吗?` }], isError: true }
+    if (!up) return { content: [{ type: 'text', text: lastError }], isError: true }
     try { return await client.callTool({ name: r.params.name, arguments: r.params.arguments || {} }) }
-    catch (e) { up = false; return { content: [{ type: 'text', text: '没成:' + e.message }], isError: true } }
+    catch (e) { up = false; return { content: [{ type: 'text', text: explain(e) + ' 操作结果尚未确认，请先检查结果，避免重复写入。Check the result before retrying a write.' }], isError: true } }
   })
   await server.connect(new StdioServerTransport())
 }
-main().catch((e) => { process.stderr.write('mcp-bridge:' + (e.stack || e) + '\n'); process.exit(1) })
+main().catch((e) => { process.stderr.write('mcp-bridge:' + '启动失败，请检查 Fairwind 安装和连接地址。Bridge failed to start; check the installation and connection address.' + '\n'); process.exit(1) })

@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useState } from 'react'
 import { undoMemo } from '../lib/stateMoves.js'
 
@@ -29,7 +30,7 @@ export default function MemoCard({ msgId, memo, onUndone }) {
         </span>
       </div>
       <div className="lcard-sub">{memo.line || memo.text}</div>
-      {err && <div className="lcard-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
       {!undone && (
         <button className="lnk" disabled={busy} onClick={undo}>
           {busy ? '撤着……' : '撤回'}

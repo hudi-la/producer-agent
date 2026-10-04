@@ -1,3 +1,5 @@
+import ErrorNotice from './ErrorNotice.jsx'
+import { errorText } from '../lib/userError.js'
 // src/components/Judgments.jsx —— 「我的判据」:开关 + 判据目录在哪 + 「看看会怎么变」。
 // 本机:判据文档住在数据目录里,住在邮件开关底下;托管(2026-10-02 起):住在库里那个人的几行,
 // 住在账号块里,目录那句不出(没有目录)。骨架在代码里,这儿只管口味那一层。
@@ -8,6 +10,7 @@ import { brainApi } from '../lib/backends.js'
 const fmt = (v) => (v == null || v === '' ? '—' : String(v).replace('T', ' ').slice(0, 16))
 
 export default function Judgments() {
+  const [error, setError] = useState(null)
   const [s, setS] = useState(null)
   const [busy, setBusy] = useState(false)
   const [out, setOut] = useState(null)
@@ -15,14 +18,14 @@ export default function Judgments() {
   const [editing, setEditing] = useState(null)  // 正在改哪个文件
   const [draft, setDraft] = useState('')
   const [saveMsg, setSaveMsg] = useState('')
-  const loadFiles = () => brainApi.judgments.files().then((r) => setFiles(r.files || {}))
+  const loadFiles = () => brainApi.judgments.files().then((r) => r.error ? setError(r.error) : setFiles(r.files || {}))
   useEffect(() => { loadFiles() }, [])
   const openFile = (f) => { setEditing(f); setDraft(files?.[f] || ''); setSaveMsg('') }
-  const saveFile = async () => { const r = await brainApi.judgments.write(editing, draft); setSaveMsg(r.ok ? (r.lints?.length ? t('存好了；但这几句不生效：') + r.lints.join('；') : t('存好了，下一次判断就用新的')) : t('没存上:') + r.error); await loadFiles() }
-  const load = () => brainApi.settings.get().then(setS)
+  const saveFile = async () => { const r = await brainApi.judgments.write(editing, draft); setSaveMsg(r.ok ? (r.lints?.length ? t('存好了；但这几句不生效：') + r.lints.join('；') : t('存好了，下一次判断就用新的')) : t('没存上:') + errorText(r.error)); await loadFiles() }
+  const load = () => brainApi.settings.get().then((r) => { if (r.error) setError(r.error); else setS(r) })
   useEffect(() => { load() }, [])
-  if (!s) return null
-  const flip = async () => { await brainApi.settings.set({ judgmentsEnabled: !s.judgmentsEnabled }); await load() }
+  if (!s) return <ErrorNotice error={error} onRetry={load} />
+  const flip = async () => { const r = await brainApi.settings.set({ judgmentsEnabled: !s.judgmentsEnabled }); if (r.error) { setError(r.error); return }; setError(null); await load() }
   const preview = async () => {
     setBusy(true); setOut(null)
     const r = await brainApi.judgments.preview(20)
@@ -30,6 +33,7 @@ export default function Judgments() {
   }
   return (
     <section className="judgments">
+      <ErrorNotice error={error} />
       <div className="kind-h la-h">{t('我的判据')}<small>{t('Fairwind 每次判断都读这些;骨架在程序里,口味在你这儿')}</small></div>
       <div className="jd-row">
         <label className="jd-switch">
@@ -55,12 +59,12 @@ export default function Judgments() {
           <div className="la-acts">
             <button type="button" className="b primary" onClick={saveFile}>{t('保存')}</button>
             <button type="button" className="b" onClick={() => setEditing(null)}>{t('收起')}</button>
-            {saveMsg && <span className={'la-note' + (saveMsg.startsWith(t('没存上:')) ? ' bad' : '')}>{saveMsg}</span>}
+            {saveMsg && (saveMsg.startsWith(t('没存上:')) ? <ErrorNotice error={saveMsg} /> : <span className="la-note">{saveMsg}</span>)}
           </div>
         </div>
       )}
       {out && (out.error
-        ? <div className="la-note bad">{t('没跑成:')}{out.error}</div>
+        ? <ErrorNotice error={out.error} />
         : out.n === 0
           ? <div className="jd-empty">{t('还没有判过的事——收几封信、记几笔之后再来看。')}</div>
           : (
@@ -73,7 +77,7 @@ export default function Judgments() {
                     <tr key={r.id} className={r.changed ? 'changed' : ''}>
                       <td><b>{r.subject}</b><br /><small>{r.who} · {fmt(r.when)} · {r.situation}</small></td>
                       <td><Tag t={r.old} /></td>
-                      <td>{r.new ? <Tag t={r.new} /> : <small className="bad">{r.note || t('没判出来')}</small>}</td>
+                      <td>{r.new ? <Tag t={r.new} /> : <ErrorNotice error={r.note || t('没判出来')} />}</td>
                     </tr>
                   ))}
                 </tbody>

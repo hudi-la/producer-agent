@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { t } from '../i18n/index.js'
 import { useVeiled } from '../lib/veil.js'
@@ -60,7 +61,7 @@ function Actions({ d }) {
       <button className="ed-no" onMouseDown={(e) => e.preventDefault()} onClick={d.cancel} disabled={d.saving}>
         {t('取消')}
       </button>
-      {d.err && <span className="ed-err">{t('没存上：')}{d.err}</span>}
+      {d.err && <ErrorNotice error={d.err} />}
     </div>
   )
 }

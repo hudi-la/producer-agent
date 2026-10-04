@@ -1,3 +1,4 @@
+import { reportError } from './reportError.js'
 // 产出（右栏）—— 要交出去的东西。
 //
 // 分工跟 chat.js 一样，而且更严：
@@ -84,7 +85,7 @@ export async function uploadAttachment(pursuitId, file) {
   })
   if (error) {
     // 字节传上去了但登记失败：把刚传的那份收掉，别在桶里留无主的东西。
-    await supa.storage.from(BUCKET).remove([key]).catch(() => {})
+    await supa.storage.from(BUCKET).remove([key]).then((r) => { if (r.error) reportError(r.error, t('附件记录已移除，但文件清理失败，请联系管理员清理存储。')) }).catch((e) => reportError(e, t('文件清理失败')))
     throw new Error(t('登记失败：') + error.message)
   }
   return data
@@ -101,13 +102,13 @@ export async function attachmentUrl(storageKey, seconds = 60) {
 /**
  * 删。先删行拿回 key，再删桶里的字节——反过来做的话，行没了就再也不知道
  * 该删哪个对象，桶里留一具查不到的无名尸。
- * 桶里那步失败不报错：留个孤儿对象没人看得见，比让你以为没删掉强。
+ * 存储清理失败单独提示，避免把记录删除成功误报为全部成功。
  */
 export async function deleteAttachment(id) {
   if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data: key, error } = await supa.rpc('pa_delete_attachment', { p_id: id })
   if (error) throw new Error(error.message)
-  if (key) await supa.storage.from(BUCKET).remove([key]).catch(() => {})
+  if (key) await supa.storage.from(BUCKET).remove([key]).then((r) => { if (r.error) reportError(r.error, t('附件记录已移除，但文件清理失败，请联系管理员清理存储。')) }).catch((e) => reportError(e, t('文件清理失败')))
   return { ok: true }
 }
 

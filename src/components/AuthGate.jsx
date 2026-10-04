@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 // 大门。三种放行:
 //   没配库(.env.local 空着)→ 直接进,App 自己回落到种子数据——演示模式照旧
 //   配了库 + 有会话        → 进
@@ -13,6 +14,9 @@ import { setLang, getLang } from '../i18n/index.js'
 
 export default function AuthGate({ children }) {
   // undefined = 还在问,null = 没登录,对象 = 会话
+  const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
+  const retry = () => { setError(null); setAttempt((n) => n + 1) }
   const [session, setSession] = useState(undefined)
   // 云端 / 托管:语言在脑子的 /me 里(member_settings.lang),得带着会话去问。问完记下是替谁问的——
   // 令牌刷新会换一个 session 对象但人没换,不能因此把 App 卸了重装(桌上开着的东西会丢)。
@@ -23,26 +27,28 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (!DB_CONFIGURED) return
     // 本机模式还没初始化(没填邮箱和 key):data.local 为真、session 为空 → 首次启动页,不是登录页
-    supa.auth.getSession().then(({ data }) => { if (data.lang) setLang(data.lang); setSession(data.session ?? (data.local ? 'first-run' : null)) })
-    const { data: sub } = supa.auth.onAuthStateChange((_ev, s) => setSession(s ?? null))
+    supa.auth.getSession().then(({ data, error }) => { if (error) throw error; if (data.lang) setLang(data.lang); setSession(data.session ?? (data.local ? 'first-run' : null)) }).catch(setError)
+    const { data: sub } = supa.auth.onAuthStateChange((_ev, s) => { setError(null); setSession(s ?? null) })
     return () => sub.subscription.unsubscribe()
-  }, [])
+  }, [attempt])
 
   const uid = session && session !== 'first-run' ? session.user?.id || null : null
   useEffect(() => {
     if (DB_MODE !== 'cloud' || !uid) return
     let on = true
-    brainFetch('/me').then((r) => (r.ok ? r.json() : null)).catch(() => null).then((me) => {
+    brainFetch('/me').then(async (r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }).then((me) => {
+      if (me?.error) throw me.error
       if (!on) return
       const lang = me?.lang === 'en' ? 'en' : 'zh'
       setOrient(me?.mode === 'hosted' && me.onboarded === false)
       if (lang !== getLang()) { setLang(lang); if (shown.current) { location.reload(); return } }
       setLangFor(uid)
-    })
+    }).catch((e) => { if (on) setError(e) })
     return () => { on = false }
-  }, [uid])
+  }, [uid, attempt])
 
   if (!DB_CONFIGURED) return children
+  if (error) return <div className="login-page"><div className="login-card"><h1>Fairwind</h1><ErrorNotice error={error} onRetry={retry} /></div></div>
   if (session === undefined) return <div className="loading">…</div>
   if (session === 'first-run') return <FirstRun onDone={() => location.reload()} />
   if (!session) return <Login />

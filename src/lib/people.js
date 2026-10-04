@@ -1,3 +1,5 @@
+import { reportError } from './reportError.js'
+import { errorText } from './userError.js'
 import { supa, BRAIN, brainFetch } from './backends.js'
 import { streamChat, NoStream } from './chat.js'
 
@@ -72,7 +74,7 @@ export const markIntroThanked = (contactId) =>
 export async function fetchUnknownSenders() {
   if (!supa) return []
   const { data, error } = await supa.from('v_pa_unknown_senders').select('*')
-  return error ? [] : (data || [])
+  if (error) reportError(error, t('读取联系人或往来失败')); return error ? [] : (data || [])
 }
 
 /**
@@ -96,7 +98,7 @@ export async function fetchThreads(contactId) {
   if (!supa) return []
   const { data, error } = await supa
     .from('v_pa_threads').select('*').eq('contact_id', contactId).order('created_at')
-  return error ? [] : (data || [])
+  if (error) reportError(error, t('读取联系人或往来失败')); return error ? [] : (data || [])
 }
 
 /**
@@ -110,7 +112,7 @@ export async function fetchContactDeliverables(contactId) {
   if (!supa) return []
   const { data, error } = await supa
     .from('v_pa_deliverables').select('*').eq('contact_id', contactId).eq('kind', 'email')
-  return error ? [] : (data || [])
+  if (error) reportError(error, t('读取联系人或往来失败')); return error ? [] : (data || [])
 }
 
 // ── 走 sidecar 的那几件 ─────────────────────────────────────────
@@ -127,7 +129,7 @@ const post = async (path, body) => {
     throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
   }
   const out = await res.json().catch(() => ({}))
-  if (!res.ok || out?.error) throw new Error(out?.error || `脑子出错了（${res.status}）`)
+  if (!res.ok || out?.error) throw new Error(errorText(out?.error) || `脑子出错了（${res.status}）`)
   return out
 }
 

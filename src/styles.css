@@ -2145,3 +2145,21 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 /* .prov label 是给 key 框的竖排;药丸也是 label,别让它跟着变成两行(「在用」掉到第二行,药丸被撑高) */
 .set-card .prov .prov-opt { display: inline-flex; gap: 6px; padding: 6px 12px; font-size: 12.5px; }
 .set-rows.set-divided { padding-top: 14px; border-top: 1px solid var(--line); }
+
+
+/* Shared, persistent error surface: readable at normal size and on narrow screens. */
+.error-notice { box-sizing: border-box; display: block; flex: 1 1 100%; width: 100%; min-width: 0; margin: 12px 0; padding: 16px 18px; border: 1px solid #d7a7a0; border-left: 4px solid #a63d30; border-radius: 10px; background: #fff5f2; color: #613126; font-size: 14px; line-height: 1.65; text-align: left; overflow-wrap: anywhere; }
+.error-notice-title { display: flex; align-items: center; gap: 9px; font-size: 15px; }
+.error-notice-title > span { display: inline-grid; place-items: center; flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: #a63d30; color: white; font-weight: 700; }
+.error-notice p { margin: 7px 0; color: inherit; font-size: 14px; }
+.error-notice .error-notice-context { font-weight: 600; }
+.error-notice summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.error-notice pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 monospace; max-height: 180px; overflow: auto; padding: 10px; background: #fff; border-radius: 6px; }
+.error-notice .b { margin-top: 10px; }
+.set-foot:has(.error-notice), .la-acts:has(.error-notice) { flex-wrap: wrap; }
+.error-center { position: fixed; right: 20px; bottom: 20px; z-index: 10000; width: min(460px, calc(100vw - 32px)); max-height: 70vh; overflow-y: auto; box-shadow: 0 12px 40px #0002; border-radius: 10px; }
+.error-center-item { position: relative; }
+.error-center-item .error-notice { margin: 0 0 8px; padding-right: 38px; }
+.error-center-close { position: absolute; right: 7px; top: 8px; width: 28px; height: 28px; border: 0; background: transparent; color: #613126; font-size: 22px; cursor: pointer; }
+.error-notice .error-notice-id { font-size: 12px; color: #715a53; }
+.error-notice-id code { user-select: all; font-size: 11px; }

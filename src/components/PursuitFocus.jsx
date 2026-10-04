@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchMessages, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
 import { useChat } from '../lib/useChat.js'
@@ -576,7 +577,7 @@ export default function PursuitFocus({
         </div>
       </div>
 
-      {err && <div className="composer-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('Fairwind 对话')} />}
       {/* 一个框两种落法（0125）：脑子醒着 = 聊天，Fairwind 顺便判该记成什么；
           脑子没开 = 直接记成一笔。「记一笔」按钮退场了。 */}
       <div className="composer-dock">

@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { useGrow } from '../lib/useGrow.js'
 import { TASK_DESC } from '../data/schema.js'
@@ -62,7 +63,7 @@ function PromptBox({ value, onSave }) {
         <div className="ed-act">
           <button className="ed-ok" onMouseDown={(e) => e.preventDefault()} onClick={commit} disabled={saving}>{saving ? t('存……') : t('确定')}</button>
           <button className="ed-no" onMouseDown={(e) => e.preventDefault()} onClick={cancel} disabled={saving}>{t('取消')}</button>
-          {err && <span className="ed-err">{t('没存上：')}{err}</span>}
+          {err && <ErrorNotice error={err} context={t('保存更改')} />}
         </div>
       </div>
     )
@@ -138,7 +139,7 @@ function Scheduled({ task, tz, brainUp, onChanged }) {
           {!brainUp ? t('脑子没开 · 到点不会跑；开了会立刻补跑') : st.text || (every === 'manual' ? t('不排期，想跑就按上面那颗') : '')}
         </div>
       )}
-      {err && <div className="ed-err">{t('没存上：')}{err}</div>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
 
       <div className="tk-k tk-k2">{t('提示词')}</div>
       <PromptBox value={task.prompt} onSave={(prompt) => save({ prompt })} />
@@ -201,7 +202,7 @@ export default function TasksPanel({ tasks, open, onClose, brain = null, tz, onC
         {brain && !brainUp && (
           <div className="tk-warn">{t('脑子没开——到点的任务不会跑。另开一个终端跑 ')}<code>npm run brain</code>{t('，开了会立刻补跑。')}</div>
         )}
-        {flipErr && <div className="ed-err">{t('没存上：')}{flipErr}</div>}
+        {flipErr && <ErrorNotice error={flipErr} />}
 
         {/* ── 一、真的会自己跑的 ── */}
         <div className="tm-sec">{t('定时跑的')}</div>

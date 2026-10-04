@@ -1,3 +1,4 @@
+import { reportError } from './lib/reportError.js'
 import React, { useEffect, useRef, useState } from 'react'
 import { t } from './i18n/index.js'
 import { loadLibrary } from './lib/loadLibrary.js'
@@ -155,7 +156,8 @@ export default function App() {
       try {
         await sendMessage(owner, text, meta)
         setQueue((q) => enqueue(q, [{ ...owner, via: 'say' }]))
-      } catch (_) {
+      } catch (e) {
+        reportError(e, t('批量对话失败：') + keys[i])
         failed++
       }
     }
@@ -218,7 +220,7 @@ export default function App() {
       if (!cur) return cur
       return { ...cur, pursuits: cur.pursuits.map((p) => (p.id === id ? { ...p, unread: false, seen_at: p.seen_at ?? at } : p)) }
     })
-    markSeenDb(id).catch(() => {})
+    markSeenDb(id).catch((e) => reportError(e, t('阅读进度没有保存')))
   }
 
   // 人卡的「已看」（0124）。跟机会线那份一个道理：先就地把红点关掉再写库，
@@ -227,7 +229,7 @@ export default function App() {
     const hit = ct?.contacts?.find((c) => c.id === id)
     if (!hit || !hit.unread) return
     setCt((cur) => (cur ? { ...cur, contacts: cur.contacts.map((c) => (c.id === id ? { ...c, unread: false } : c)) } : cur))
-    markContactSeenDb(id).catch(() => {})
+    markContactSeenDb(id).catch((e) => reportError(e, t('阅读进度没有保存')))
   }
 
   const reloadContacts = () => loadContacts().then(setCt)
@@ -358,17 +360,17 @@ export default function App() {
       let out = notes
       if (out?.stale?.length) { await rejudge(out.stale.slice(0, REJUDGE_BATCH)); out = await pullNotes() }
       else if (out?.unjudged?.length) { await triage(out.unjudged.slice(0, 20)); await pullNotes() }
-    } finally { setJudging(false) }
+    } catch (e) { reportError(e, t('模型判断未完成')) } finally { setJudging(false) }
   }
 
   // 【已处理】= 记一笔（进时间线，留痕迹），不是把提醒抹掉。
   const handleNote = async (it) => {
-    try { await markHandled(it) } catch (e) { console.warn('已处理没记上：', e.message) }
+    try { await markHandled(it) } catch (e) { reportError(e, t('已处理状态没有保存')) }
     await pullNotes()
   }
   // 改一条等待的到点日（「说好周四再催」这类结论的落笔口）
   const rescheduleNote = async (it, due) => {
-    try { await rescheduleWait(it, due) } catch (e) { console.warn('改期没成：', e.message) }
+    try { await rescheduleWait(it, due) } catch (e) { reportError(e, t('改期没有保存')) }
     await pullNotes()
   }
 
@@ -612,7 +614,7 @@ export default function App() {
       await setStage(id, stage)
     } catch (e) {
       setPl({ ...pl, pursuits: prev })
-      alert(t('移动没保存：') + e.message)
+      reportError(t('移动没保存：') + e.message)
     }
   }
 
@@ -628,7 +630,7 @@ export default function App() {
       await setJot(p.id, jot)
     } catch (e) {
       setPl({ ...pl, pursuits: prev })
-      alert(t('这一笔没记上：') + e.message + t('\n\n你写的是：') + jot)
+      reportError(t('这一笔没记上：') + e.message + t('\n\n你写的是：') + jot)
     }
   }
 
@@ -642,7 +644,7 @@ export default function App() {
       await setBall(id, ball)
     } catch (e) {
       setPl({ ...pl, pursuits: prev })
-      alert(t('球权没保存：') + e.message)
+      reportError(t('球权没保存：') + e.message)
     }
   }
 

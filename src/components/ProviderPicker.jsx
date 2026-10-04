@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 // src/components/ProviderPicker.jsx —— 模型来源:首次启动页和账号块共用这一块。
 //
 // 模型来源:Claude API key / Claude 订阅(Claude Code 登录令牌)走 Agent SDK;
@@ -31,7 +32,7 @@ export default function ProviderPicker({ value, onChange, keys, onKey, hints = {
   useEffect(() => {
     if (DB_MODE !== 'cloud' || !brainApi) return
     let on = true
-    brainApi.chatgpt.status().then((r) => { if (on && r?.error) setOff((o) => ({ ...o, 'chatgpt-subscription': r.error.message })) })
+    brainApi.chatgpt.status().then((r) => { if (on && r?.error && /hosted|线上|托管|not supported/i.test(r.error.message)) setOff((o) => ({ ...o, 'chatgpt-subscription': r.error.message })) })
     return () => { on = false }
   }, [])
   return (
@@ -83,7 +84,7 @@ function ChatGPTLogin() {
         <button type="button" className="b" disabled={busy || status?.pending} onClick={login}>{busy ? t('正在连接…') : t('登录 ChatGPT')}</button>
         {status?.authUrl && <p><a href={status.authUrl} target="_blank" rel="noopener noreferrer">{t('打开 ChatGPT 登录页面')}</a><small>{t('登录完成后回到这里，再保存或开始。')}</small></p>}
       </>}
-    {error && <p role="alert">{error}</p>}
+    {error && <ErrorNotice error={error} context={t('模型来源')} />}
   </div>
 }
 
@@ -97,7 +98,7 @@ function ClaudeLogin({ hint, keys, onKey }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [manual, setManual] = useState(false)
-  useEffect(() => { let on = true; brainApi.claude.status().then((r) => { if (on) setStatus(r) }); return () => { on = false } }, [])
+  useEffect(() => { let on = true; brainApi.claude.status().then((r) => { if (on) { setStatus(r); if (r.error) setError(r.error.message) } }); return () => { on = false } }, [])
   const login = async () => {
     setBusy('start'); setError(''); setCode('')
     const r = await brainApi.claude.login(); setBusy(''); setStatus(r)
@@ -136,7 +137,7 @@ function ClaudeLogin({ hint, keys, onKey }) {
       </li>
     </ol>}
 
-    {error && <p className="cl-err" role="alert">{error}</p>}
+    {error && <ErrorNotice error={error} context={t('模型来源')} />}
 
     <div className="cl-manual">
       <a href="#" onClick={(e) => { e.preventDefault(); setManual((m) => !m) }}>{manual ? t('收起') : t('已经有令牌？自己粘')}</a>

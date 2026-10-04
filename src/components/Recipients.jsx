@@ -1,3 +1,4 @@
+import { reportError } from '../lib/reportError.js'
 import React, { useEffect, useState } from 'react'
 import { replyRecipients, setRecipients } from '../lib/letters.js'
 import Veil from './Veil.jsx'
@@ -34,9 +35,8 @@ export default function Recipients({ d, onChanged, onErr }) {
     if (!replyTo) { setBook(null); return }
     replyRecipients(replyTo)
       .then((r) => { if (!dead) setBook(r) })
-      // 账本查不到不是错，只是没有额外的人可勾。别把它变成一条红字，
-      // 那会让你以为这封信有毛病。
-      .catch(() => { if (!dead) setBook(null) })
+      // 没有额外收件人与读取失败分开：失败时提示，避免误以为名单完整。
+      .catch((e) => { if (!dead) { setBook(null); reportError(e, t('读取收件人失败')) } })
     return () => { dead = true }
   }, [replyTo])
 

@@ -1,3 +1,5 @@
+import ErrorNotice from './ErrorNotice.jsx'
+import { errorText } from '../lib/userError.js'
 // src/components/SettingsPage.jsx —— 「设置」:一张张卡片,一张管一件事。
 //   装了哪些 · 语言 · 模型 · 接给你的 AI 工具 · 备份 ·(本机)这台机器
 //
@@ -9,17 +11,18 @@
 // /settings 只在这一层读一次,往下传;谁改了就叫 reload 重读。
 import { useEffect, useRef, useState } from 'react'
 import { t, getLang } from '../i18n/index.js'
-import { DB_MODE, supa, brainApi, brainFetch, BRAIN } from '../lib/backends.js'
+import { DB_MODE, supa, brainApi, BRAIN } from '../lib/backends.js'
 import ModulesPanel from './ModulesPanel.jsx'
 import ProviderPicker, { Spin } from './ProviderPicker.jsx'
 
 export default function SettingsPage() {
   const local = DB_MODE === 'local'
   const [cur, setCur] = useState(null)
+  const [loadError, setLoadError] = useState(null)
   const [asked, setAsked] = useState(false)   // 问过 /settings 了(没答 → 得说一句,不能空着)
   const load = () => (brainApi ? brainApi.settings.get() : Promise.resolve(null))
-    .then((s) => { if (s && !s.error) setCur(s); setAsked(true) })
-    .catch(() => setAsked(true))
+    .then((s) => { if (!s || s.error) setLoadError(s?.error || 'Fairwind connection unavailable'); else { setCur(s); setLoadError(null) }; setAsked(true) })
+    .catch((e) => { setLoadError(e); setAsked(true) })
   useEffect(() => { load() }, [])
   return (
     // 外层 .page 是各区共用的滚动层(.wrap 固定高度不滚);里层限宽
@@ -27,7 +30,8 @@ export default function SettingsPage() {
       <div className="settings-inner">
         <header className="lib-head"><h1>{t('设置')}</h1></header>
         <ModulesPanel />
-        {!cur ? (asked && <div className="set-card set-empty">{t('设置读不到:脑子没应,或它不是托管的那个。')}</div>) : <>
+        <ErrorNotice error={loadError} context={t('设置')} onRetry={load} />
+        {!cur ? (!asked && <Spin />) : <>
           <LangCard lang={cur.lang || getLang() || 'zh'} />
           <ModelCard cur={cur} reload={load} />
           {local ? <LocalMcpCard /> : <HostedMcpCard token={cur.mcpToken || ''} onRotated={load} />}
@@ -62,32 +66,37 @@ const CheckIcon = () => <Icon d="M20 6 9 17l-5-5" />
 // 命令框:等宽一行,复制钮在框里右边。复制完变一个勾 + 「已复制」,一秒半后回去
 function CmdBox({ cmd }) {
   const [copied, setCopied] = useState(false)
-  const copy = async () => { try { await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (_) {} }
+  const [error, setError] = useState(null)
+  const copy = async () => { try { setError(null); await navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch (e) { setError(t('复制失败，请手动选中并复制上面的命令。')) } }
   return (
-    <div className="cmd-box">
+    <div><div className="cmd-box">
       <code>{cmd}</code>
       <button type="button" className={'cmd-copy' + (copied ? ' done' : '')} onClick={copy} aria-label={t('复制')} title={t('复制')}>
         {copied ? <><CheckIcon /><span>{t('已复制')}</span></> : <CopyIcon />}
       </button>
-    </div>
+    </div><ErrorNotice error={error} /></div>
   )
 }
 
-const Note = ({ msg, bad }) => msg ? <span className={'la-note' + (bad ? ' bad' : '')} role="status">{msg}</span> : null
+const Note = ({ msg, bad, context }) => msg ? (bad ? <ErrorNotice error={msg} context={context} /> : <span className="la-note" role="status">{msg}</span>) : null
 
 // ── 语言 ──────────────────────────────────────────────
 // 点了当场存、整页按新语言重开——之前要先点保存,提示又说"刷新生效",他刷新了当然没变
 function LangCard({ lang }) {
   const [on, setOn] = useState(lang)
+  const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const pick = async (l) => {
     if (l === on || busy) return
     setOn(l); setBusy(true)
-    await brainApi.settings.set({ lang: l })
+    setError(null)
+    const r = await brainApi.settings.set({ lang: l })
+    if (r.error) { setError(r.error); setOn(lang); setBusy(false); return }
     location.reload()
   }
   return (
     <Card title={t('语言')} desc={t('选完页面会按新语言重开')}>
+      <ErrorNotice error={error} context={t('语言')} />
       <div className="fr-lang set-lang" role="radiogroup" aria-label="Language / 语言">
         <button type="button" role="radio" aria-checked={on === 'zh'} className={on === 'zh' ? 'on' : ''} onClick={() => pick('zh')}>中文</button>
         <button type="button" role="radio" aria-checked={on === 'en'} className={on === 'en' ? 'on' : ''} onClick={() => pick('en')}>English</button>
@@ -131,7 +140,7 @@ function ModelCard({ cur, reload }) {
         </div>
         <footer className="set-foot">
           <button type="submit" className="b primary" disabled={busy || !dirty}>{busy ? <><Spin />{t('存着…')}</> : t('保存')}</button>
-          <Note {...note} />
+          <Note {...note} context={t('模型')} />
         </footer>
       </form>
     </Card>
@@ -163,18 +172,20 @@ function LocalMcpCard() {
   const [busy, setBusy] = useState('')
   const url = `${location.origin}/mcp`
   const cmd = `claude mcp add --transport http fairwind ${url}`
-  const load = () => supa.mcpTargets.list().then(setTargets)
+  const [loadError, setLoadError] = useState(null)
+  const load = () => supa.mcpTargets.list().then((r) => { if (r.error) setLoadError(r.error); else { setTargets(r); setLoadError(null) } })
   useEffect(() => { load() }, [])
   const RESTART = { 'claude-desktop': 'Claude', codex: 'Codex', 'gemini-cli': 'Gemini CLI' }
   const install = async (target) => {
     setBusy(target)
     const r = await supa.mcpTargets.install(target)
     setBusy('')
-    setMsg((m) => ({ ...m, [target]: r.ok ? t('写好了。把 {app} 完全退出再打开，对话里就有 Fairwind 的工具了', { app: RESTART[target] || t('它') }) : t('没成:') + r.error }))
+    setMsg((m) => ({ ...m, [target]: r.ok ? t('写好了。把 {app} 完全退出再打开，对话里就有 Fairwind 的工具了', { app: RESTART[target] || t('它') }) : t('没成:') + errorText(r.error) }))
     await load()
   }
   return (
     <Card title={t('接给你的 AI 工具')} desc={t(MCP_DESC)} aside={<GuideLink base={location.origin} />}>
+      <ErrorNotice error={loadError} context="MCP" onRetry={load} />
       <div className="set-rows">
         {targets.map((x) => (
           <div className="set-row" key={x.target}>
@@ -210,9 +221,8 @@ function HostedMcpCard({ token, onRotated }) {
   const rotate = async () => {
     setBusy(true); setMsg({ msg: '', bad: false })
     try {
-      const r = await brainFetch('/settings/mcp-token/rotate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
-      const body = await r.json().catch(() => ({}))
-      if (!r.ok || body?.error) throw new Error(body?.error?.message || body?.error || `${r.status}`)
+      const body = await brainApi.settings.rotateMcpToken()
+      if (body.error) throw new Error(errorText(body.error))
       setMsg({ msg: t('换好了。旧的那串从现在起不认;接着的工具要重新粘一次。'), bad: false }); await onRotated?.()
     } catch (e) { setMsg({ msg: t('没换成:') + e.message, bad: true }) }
     setBusy(false)
@@ -247,28 +257,30 @@ function BackupCard({ local, backupDir, reload }) {
 function MyBackup({ showDesc }) {
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
+  const [error, setError] = useState(null)
   const fileRef = useRef(null)
   const api = brainApi
   const download = async () => {
     if (!api) return
-    setBusy('export'); setMsg('')
+    setBusy('export'); setMsg(''); setError(null)
     try {
       const blob = await api.backup.export()
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `fairwind-${new Date().toISOString().slice(0, 10)}.zip`; a.click()
       setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
       setMsg(t('下好了:{mb} MB', { mb: (blob.size / 1048576).toFixed(1) }))
-    } catch (e) { setMsg(t('没打成:') + e.message) }
+    } catch (e) { setError(e) }
     setBusy('')
   }
   const restore = async (file) => {
     if (!file || !api) return
     if (!confirm(t('用这份备份换掉现在的全部?现在库里我名下的行会先清掉,再导进这份。附件同名的覆盖。'))) { fileRef.current.value = ''; return }
-    setBusy('import'); setMsg('')
+    setBusy('import'); setMsg(''); setError(null)
     const r = await api.backup.import(file, { wipe: true })
     setBusy(''); fileRef.current.value = ''
-    if (!r.ok) { setMsg(t('没导成:') + (r.error || '')); return }
+    if (!r.ok) { setError(r.error); return }
     const rows = Object.values(r.tables || {}).reduce((a, b) => a + b, 0)
     setMsg(t('导好了:{rows} 行、{files} 个文件{failed}', { rows, files: r.files, failed: r.failed?.length ? t(';{n} 个文件没传上', { n: r.failed.length }) : '' }))
+    if (r.failed?.length) { setError(t('部分附件没有恢复。请检查附件列表，保留原备份；不要反复覆盖恢复。') + '\n' + r.failed.map(errorText).join('\n')); return }
     setTimeout(() => location.reload(), 1200)
   }
   return (
@@ -279,7 +291,7 @@ function MyBackup({ showDesc }) {
         <input ref={fileRef} type="file" accept=".zip,application/zip" hidden onChange={(e) => restore(e.target.files?.[0])} />
         <button type="button" className="b" disabled={!!busy} onClick={() => fileRef.current?.click()}>{busy === 'import' ? <><Spin />{t('在导入…')}</> : t('用备份恢复…')}</button>
       </div>
-      <Note msg={msg} bad={/^(没|Couldn|Export failed|Import failed)/.test(msg)} />
+      <Note msg={msg} /><ErrorNotice error={error} context={t('备份')} />
     </div>
   )
 }
@@ -301,12 +313,12 @@ function MachineBackup({ backupDir, reload }) {
     if (r?.error) return setMsg(t('没存上:') + r.error.message)
     await reload()
   }
-  const now = async () => { setBusy(true); setMsg(''); const r = await supa.backup.now(); setBusy(false); setMsg(r.ok ? t('备好了:{f}', { f: r.file.split('/').pop() }) : t('没备成:') + r.error); load() }
+  const now = async () => { setBusy(true); setMsg(''); const r = await supa.backup.now(); setBusy(false); setMsg(r.ok ? t('备好了:{f}', { f: r.file.split('/').pop() }) : t('没备成:') + errorText(r.error)); load() }
   const last = list?.files?.[0]
   const dirty = dir.trim() !== backupDir
   return (
     <div className="set-sub">
-      <div className="set-sub-h"><b>{t('机器备份')}</b><small>{backupDir ? (last ? t('最近一次 {when}', { when: last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') }) : t('还没备过')) : t('先选一个备份目录')}</small></div>
+      <div className="set-sub-h"><b>{t('机器备份')}</b><small>{backupDir ? (list?.error ? t('备份记录读取失败') : last ? t('最近一次 {when}', { when: last.name.replace('fairwind-', '').replace('.tar.gz', '').replace(/-(\d\d)(\d\d)(\d\d)$/, ' $1:$2') }) : t('还没备过')) : t('先选一个备份目录')}</small></div>
       <Field label={t('备份目录')} hint={t('选一个在 iCloud Drive 或 Google Drive 里的')} value={dir} onChange={setDir}
              placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind">
         {dirty && <button type="button" className="b" disabled={saving} onClick={saveDir}>{saving ? <Spin /> : null}{t('保存')}</button>}
@@ -315,6 +327,7 @@ function MachineBackup({ backupDir, reload }) {
         <button type="button" className="b" disabled={busy || !backupDir || dirty} onClick={now}>{busy ? <><Spin />{t('在备…')}</> : t('现在备份')}</button>
       </div>
       <Note msg={msg} bad={/^(没|Backup failed|Couldn)/.test(msg)} />
+      <ErrorNotice error={list?.error} context={t('机器备份')} onRetry={load} />
     </div>
   )
 }
@@ -365,10 +378,10 @@ function UpdateRow() {
   const apply = async () => {
     setBusy(true); setMsg('')
     const r = await supa.update.apply(); setBusy(false)
-    setMsg(r.ok ? t('装好了 {v}:关掉再打开就是新版', { v: r.version }) : t('没更成:') + r.error)
+    setMsg(r.ok ? t('装好了 {v}:关掉再打开就是新版', { v: r.version }) : t('没更成:') + errorText(r.error))
   }
   const state = info?.canUpdate ? t(' · 有新版本 {v}', { v: info.latest }) + (info.note ? ':' + info.note : '')
-    : info?.error ? (checked ? t(' · 刚查过') : '') + ` · ${t(info.error)}`
+    : info?.error ? (checked ? t(' · 刚查过') : '')
     : info ? (checked ? t(' · 刚查过，已是最新') : t(' · 已是最新')) : ''
   return (
     <div className="set-row">
@@ -376,6 +389,7 @@ function UpdateRow() {
         <b>{t('版本')}</b>
         <small>{(info?.current || '') + state}</small>
         <Note msg={msg} bad={/^(没|Update failed)/.test(msg)} />
+        <ErrorNotice error={info?.error} context={t('检查更新')} onRetry={check} />
       </div>
       <div className="set-acts">
         <button type="button" className="b" disabled={busy} onClick={check}>{busy ? <><Spin />{t('在看…')}</> : t('检查更新')}</button>
@@ -387,10 +401,12 @@ function UpdateRow() {
 
 function QuitRow() {
   const [gone, setGone] = useState(false)
-  const quit = async () => { if (!confirm(t('退出 Fairwind？定时任务和接给 AI 工具的门都会停，再双击 Fairwind 就回来。'))) return; try { await supa.quit() } catch (_) {} setGone(true) }
+  const [error, setError] = useState(null)
+  const quit = async () => { if (!confirm(t('退出 Fairwind？定时任务和接给 AI 工具的门都会停，再双击 Fairwind 就回来。'))) return; setError(null); const r = await supa.quit(); if (r.error) setError(r.error); else setGone(true) }
   return (
     <div className="set-row">
       <div className="set-row-l"><b>{t('退出')}</b><small>{gone ? t('已退出。要再开，双击 Fairwind。') : t('关掉网页不等于退出，它在后台跑着。')}</small></div>
+      <ErrorNotice error={error} context={t('退出 Fairwind')} />
       {!gone && <button type="button" className="b" onClick={quit}>{t('退出 Fairwind')}</button>}
     </div>
   )

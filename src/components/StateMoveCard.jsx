@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useState } from 'react'
 import { undoStateMove } from '../lib/stateMoves.js'
 import { t } from '../i18n/index.js'
@@ -34,7 +35,7 @@ export default function StateMoveCard({ msgId, move, onUndone }) {
       </div>
       <div className="lcard-sub">{move.line}</div>
       {move.why && <div className="scard-why">{t('凭什么：{why}', { why: move.why })}</div>}
-      {err && <div className="lcard-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
       {!undone && (
         <button className="lnk" disabled={busy} onClick={undo}>
           {busy ? t('撤着……') : t('撤回')}

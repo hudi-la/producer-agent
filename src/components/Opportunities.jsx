@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   LANES, STATUS_LABEL, REACH_LABEL,
@@ -144,7 +145,7 @@ export default function Opportunities({ open, onClose, pool, onChanged, lastRun 
           />
         </div>
 
-        {err && <div className="ed-err">{t('没成：')}{err}</div>}
+        {err && <ErrorNotice error={err} context={t('保存更改')} />}
 
         <div className="op-wrap">
           <table className="op-table">

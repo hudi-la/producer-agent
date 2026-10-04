@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef } from 'react'
 import { t } from '../i18n/index.js'
 import { useChat } from '../lib/useChat.js'
@@ -120,7 +121,7 @@ export default function EntryChat({ entry, onClose }) {
         <div ref={endRef} />
       </div>
 
-      {err && <div className="echat-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('Fairwind 对话')} />}
       {/* 输入框跟机会卡那边是同一套：同样的胶囊、同样那颗圆按钮（.composer .ph / .send）。
           原来这儿是一颗写着「说」的方按钮 —— 同一个动作在两处长两个样，没有道理。 */}
       <div className="echat-composer">

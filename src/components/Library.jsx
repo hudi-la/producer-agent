@@ -1,3 +1,5 @@
+import { reportError } from '../lib/reportError.js'
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { t } from '../i18n/index.js'
 import { KINDS, subInfo, CREDIT_ORDER, CREDIT_LABEL, CREDIT_GROUPS, EDITABLE } from '../data/schema.js'
@@ -59,7 +61,7 @@ function BoxAdd({ onAdd }) {
       <div className="ed-act">
         <button type="button" className="ed-ok" onMouseDown={(ev) => ev.preventDefault()} onClick={commit} disabled={saving || !k.trim() || !v.trim()}>{saving ? t('存……') : t('确定')}</button>
         <button type="button" className="ed-no" onMouseDown={(ev) => ev.preventDefault()} onClick={close} disabled={saving}>{t('取消')}</button>
-        {err && <span className="ed-err">{t('没存上：')}{err}</span>}
+        {err && <ErrorNotice error={err} context={t('文件与附件')} />}
       </div>
     </div>
   )
@@ -86,17 +88,17 @@ function BoxFiles({ entry, onSaved }) {
         const r = await supa.storage.from(BOX_BUCKET).upload(key, f, { contentType: f.type || 'application/octet-stream' })
         if (r.error) throw new Error(r.error.message || String(r.error))
         next.push({ name: f.name, key, size: f.size, type: f.type || '', at: new Date().toISOString() })
+        await setEntryBoxJson(entry.id, 'files', next)
       }
-      await setEntryBoxJson(entry.id, 'files', next)
       await onSaved?.()
-    } catch (e) { setErr(e.message) }
-    setBusy(false); if (inp.current) inp.current.value = ''
+    } catch (e) { setErr(e.message); try { await onSaved?.() } catch (refreshError) { reportError(refreshError, t('文件与附件')) } }
+    finally { setBusy(false); if (inp.current) inp.current.value = '' }
   }
   const remove = async (f) => {
     if (!confirm(t('删掉「{name}」？文件本体一起删。', { name: f.name }))) return
     setBusy(true); setErr(null)
     try {
-      await supa.storage.from(BOX_BUCKET).remove([f.key]).catch(() => {})
+      const removed = await supa.storage.from(BOX_BUCKET).remove([f.key]); if (removed.error) throw removed.error
       const next = files.filter((x) => x.key !== f.key)
       await setEntryBoxJson(entry.id, 'files', next.length ? next : null)
       await onSaved?.()
@@ -117,13 +119,13 @@ function BoxFiles({ entry, onSaved }) {
         {busy ? t('传……') : t('+ 丢进材料（文件）')}
       </label>
       <small className="bx-hint">{t('高清图、旧申请稿、PDF……存在你这台机器上。Fairwind 看得到文件名，不读内容。')}</small>
-      {err && <span className="ed-err">{t('没存上：')}{err}</span>}
+      {err && <ErrorNotice error={err} context={t('文件与附件')} />}
     </div>
   )
 }
 function FileLink({ f }) {
   const [url, setUrl] = useState(null)
-  useEffect(() => { let on = true; supa.storage.from(BOX_BUCKET).createSignedUrl(f.key, 3600).then((r) => { if (on && r?.data?.signedUrl) setUrl(r.data.signedUrl) }).catch(() => {}); return () => { on = false } }, [f.key])
+  useEffect(() => { let on = true; supa.storage.from(BOX_BUCKET).createSignedUrl(f.key, 3600).then((r) => { if (on) { if (r.error) reportError(r.error, f.name); else if (r?.data?.signedUrl) setUrl(r.data.signedUrl) } }).catch((e) => { if (on) reportError(e, f.name) }); return () => { on = false } }, [f.key])
   return url ? <a className="v" href={url} target="_blank" rel="noreferrer">{f.name}</a> : <span className="v">{f.name}</span>
 }
 

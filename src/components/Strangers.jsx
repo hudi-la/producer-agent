@@ -1,3 +1,5 @@
+import ErrorNotice from './ErrorNotice.jsx'
+import { reportError } from '../lib/reportError.js'
 import React, { useRef, useState } from 'react'
 import { useGrow } from '../lib/useGrow.js'
 import {
@@ -59,13 +61,13 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         await markOrgMailbox(email, f.org || who.org || '未具名机构', '共享信箱', who.notes || null)
         // 立刻搬它名下的信 —— 不等每小时的兜底（Stanford 那封确认信
         // 干等过一小时）。搬完线上的归属、转移表判断都在下一轮自然跟上。
-        try { await carryMailbox(email) } catch (_) {}
+        try { await carryMailbox(email) } catch (e) { reportError(e, '后续整理未完成，请检查联系人和邮件归属。') }
         // 人跟着信一起归位：这个信箱的信已经在哪条线上，就挂成那条线的
         // 相关方。真事：adavi290 的信早就在 ASU 线上，认领后却没人挂 —— 他手动的。
         try {
           const lines = await attachAddressLines(email, { mailbox: email })
           if (lines?.length) console.log('顺手挂到了：' + lines.join('、'))
-        } catch (_) {}
+        } catch (e) { reportError(e, '后续整理未完成，请检查联系人和邮件归属。') }
       } else {
         let id = matched?.id
         if (how === 'new') {
@@ -84,16 +86,16 @@ function Proposal({ who, email, contacts, onDone, onCancel }) {
         try {
           const lines = await attachAddressLines(email, { contactId: id })
           if (lines?.length) console.log('顺手挂到了：' + lines.join('、'))
-        } catch (_) {}
+        } catch (e) { reportError(e, '后续整理未完成，请检查联系人和邮件归属。') }
         // 顺手认领它读到的那几条 thread，以后按「收信」就跟着走
         for (const t of who.threads || []) {
-          try { await claimThread(id, t) } catch (_) {}
+          try { await claimThread(id, t) } catch (e) { reportError(e, '后续整理未完成，请检查联系人和邮件归属。') }
         }
-        if (who.threads?.length) { try { await refreshContact(id) } catch (_) {} }
+        if (who.threads?.length) { try { await refreshContact(id) } catch (e) { reportError(e, '后续整理未完成，请检查联系人和邮件归属。') } }
       }
       onDone?.()
     } catch (e) {
-      alert('没弄成：' + e.message)
+      reportError(e, '联系人整理失败')
     } finally { setBusy(false) }
   }
 
@@ -242,7 +244,7 @@ function One({ email, meta, contacts, onDone, onCancel }) {
       {meta?.出现在哪些机会线?.length > 0 && (
         <div className="pf-note">出现在：{meta.出现在哪些机会线.join(' · ')}</div>
       )}
-      {err && <p className="pf-note" style={{ color: 'var(--g2)' }}>没认成：{err}</p>}
+      {err && <ErrorNotice error={err} />}
       {who && <Proposal who={who} email={email} contacts={contacts}
                         onDone={onDone} onCancel={() => { setWho(null); onCancel?.() }} />}
     </div>

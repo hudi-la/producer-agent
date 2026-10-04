@@ -62,3 +62,37 @@ test('from:is / or / count+head 也序列化', async () => {
   assert.equal(body.count, 'exact'); assert.equal(body.head, true); assert.deepEqual(body.filters, [['is', 'x', null], ['or', 'a.ilike.%q%', null]])
   assert.equal(r.count, 3)
 })
+
+test('HTTP failures with empty JSON cannot masquerade as successful writes', async () => {
+  const c = brainClient('http://b', async () => ({ ok: false, status: 403, json: async () => ({}) }))
+  for (const r of [await c.settings.set({ lang: 'en' }), await c.storage.from('x').remove(['x']), await c.setup({})]) {
+    assert.equal(r.ok, false); assert.match(r.error.message, /403/)
+  }
+})
+
+test('read failures stay errors rather than empty backup/tool lists or first-run sessions', async () => {
+  const c = brainClient('http://b', async () => { throw new Error('Failed to fetch') })
+  for (const r of [await c.backup.list(), await c.mcpTargets.list(), await c.judgments.files(), await c.settings.get(), await c.auth.getSession()]) {
+    assert.match(r.error.message, /Failed to fetch/)
+  }
+})
+
+test('malformed responses and nested service errors remain readable', async () => {
+  const malformed = brainClient('http://b', async () => ({ ok: false, status: 502, json: async () => { throw new Error('Unexpected token') } }))
+  assert.match((await malformed.claude.login()).error.message, /502: invalid response/)
+  const nested = brainClient('http://b', fakeFetch({ error: { message: 'invalid token' } }))
+  assert.equal((await nested.chatgpt.login()).error.message, 'invalid token')
+})
+
+test('backup export rejects HTTP errors and import preserves partial-success details', async () => {
+  const broken = brainClient('http://b', async () => ({ ok: false, status: 401, json: async () => ({ error: 'expired token' }) }))
+  await assert.rejects(() => broken.backup.export(), /401.*expired token/)
+  const partial = { ok: true, files: 1, failed: [{ key: 'image.png', error: 'disk full' }] }
+  assert.deepEqual(await brainClient('http://b', fakeFetch(partial)).backup.import(new Blob()), partial)
+})
+
+test('null service payload is a readable error, not a broken component', async () => {
+  const c = brainClient('http://b', fakeFetch(null))
+  assert.match((await c.settings.get()).error.message, /invalid response/)
+  assert.match((await c.auth.getSession()).error.message, /invalid response/)
+})

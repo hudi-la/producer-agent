@@ -1,3 +1,5 @@
+import { reportError } from '../lib/reportError.js'
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useState } from 'react'
 import Cast from './Cast.jsx'
 import { fetchPursuitMail } from '../lib/pursuitCast.js'
@@ -109,7 +111,7 @@ function Files({ items, onUpload, onOpen, onDelete }) {
         />
         {busy ? '传着……' : items.length ? '+ 再丢一份（也可以直接拖进来）' : '把 PDF / MD / Excel 拖进来，或点这儿选'}
       </label>
-      {err && <div className="ferr">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
     </div>
   )
 }
@@ -125,7 +127,7 @@ export default function Dossier({
   const [castV, setCastV] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchPursuitMail(p.id).then((d) => { if (alive) setDerived(d) }).catch(() => {})
+    fetchPursuitMail(p.id).then((d) => { if (alive) setDerived(d) }).catch((e) => reportError(e, t('读取邮件失败')))
     return () => { alive = false }
   }, [p.id, castV])
   const stars = p.match_stars ? '★'.repeat(p.match_stars) : null

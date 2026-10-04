@@ -1,8 +1,10 @@
+import { configureErrorLogging } from './lib/errorTelemetry.js'
+import ErrorCenter from './components/ErrorCenter.jsx'
 import React, { Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import AuthGate from './components/AuthGate.jsx'
 import { ModulesProvider } from './lib/ModulesContext.jsx'
-import { supa, DB_MODE } from './lib/backends.js'
+import { supa, DB_MODE, BRAIN } from './lib/backends.js'
 import { setLang } from './i18n/index.js'
 import './styles.css'
 
@@ -15,6 +17,7 @@ import './styles.css'
 const App = React.lazy(() => import('./App.jsx'))
 
 async function boot() {
+  if (DB_MODE !== 'none') configureErrorLogging(`${BRAIN}/diagnostics/errors`)
   if (DB_MODE === 'local') {
     try { const me = await supa.whoami(); if (me?.lang) setLang(me.lang) } catch (_) {}
   }
@@ -22,6 +25,7 @@ async function boot() {
   if (DB_MODE === 'cloud') setLang('en')
   createRoot(document.getElementById('root')).render(
     <React.StrictMode>
+      <ErrorCenter />
       <AuthGate>
         <ModulesProvider>
           <Suspense fallback={<div className="loading">…</div>}>

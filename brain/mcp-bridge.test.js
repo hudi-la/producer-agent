@@ -15,12 +15,13 @@ import { makeLocalDb } from './local/localdb.js'
 import { handleMcp } from './mcp.js'
 
 const UID = '11111111-1111-4111-8111-111111111111'
-let dir, pg, srv, decoy, client
+let dir, pg, srv, decoy, client, lastAuth
 before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'fw-bridge-'))
   pg = await openLocalDb(dir); await applyMigrations(pg, { fresh: true }); await setLocalUid(pg, UID); await registerLocalUser(pg, { id: UID, email: 'a@b.c' }); await assumeUser(pg)
   const db = await makeLocalDb({ pg, dataDir: dir, user: { id: UID, email: 'a@b.c' } })
   srv = http.createServer((req, res) => {
+    lastAuth = req.headers.authorization
     if (req.url === '/health') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ ok: true, mode: 'local', version: '1.2.3' })) }
     handleMcp(req, res, { db, version: '1.2.3', dataDir: dir, modules: { profile: true } })
   })
@@ -40,7 +41,7 @@ test('--fixed:配置指哪台就是哪台,不探(哪怕它不是本机模式)', 
   // decoy 那台 mode=cloud、没有 /mcp——固定模式下桥就该老老实实连它,列不到工具而不是偷偷跳去别台
   const c2 = new Client({ name: 't2', version: '1' })
   await c2.connect(new StdioClientTransport({ command: process.execPath, args: [resolve(ROOT, 'packaging/data/mcp-bridge.cjs'), `http://127.0.0.1:${decoy.address().port}/mcp`, '--fixed'], cwd: ROOT, env: { ...process.env, FAIRWIND_DATA_DIR: dir } }))
-  const { tools } = await c2.listTools(); assert.equal(tools.length, 0)
+  await assert.rejects(() => c2.listTools(), /无法连接 Fairwind|Cannot reach Fairwind/)
   await c2.close()
 })
 
@@ -55,4 +56,15 @@ test('桥:配置指错端口、端口文件指对 → 跳过冒牌云端版,连�
   assert.ok(tools.some((t) => t.name === 'fairwind_info'))
   const r = await client.callTool({ name: 'fairwind_info', arguments: {} })
   assert.equal(JSON.parse(r.content[0].text).version, '1.2.3')
+})
+
+
+test('credential-bearing bridge URLs use the specified endpoint and send Basic auth', async () => {
+  const c = new Client({ name: 'auth-test', version: '1' })
+  try {
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [resolve(ROOT, 'packaging/data/mcp-bridge.cjs'), `http://user:test-token@127.0.0.1:${srv.address().port}/mcp`], cwd: ROOT, env: { ...process.env, FAIRWIND_DATA_DIR: dir } }))
+    const result = await c.callTool({ name: 'fairwind_info', arguments: {} })
+    assert.equal(JSON.parse(result.content[0].text).version, '1.2.3')
+    assert.equal(lastAuth, 'Basic ' + Buffer.from('user:test-token').toString('base64'))
+  } finally { await c.close() }
 })

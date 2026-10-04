@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React from 'react'
 import { t } from '../i18n/index.js'
 import { FELL_BACK } from '../lib/backends.js'
@@ -51,26 +52,10 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
 
   return (
     <div className="trouble">
-      {mailBad && (
-        <div className="tr-row danger">
-          <span className="tr-dot" aria-hidden="true" />
-          <span className="tr-txt">
-            <b>{mailBad.note}</b>
-            {mailBad.fix && <span className="tr-fix">{mailBad.fix}</span>}
-          </span>
-        </div>
-      )}
-      {bad && (
-        <div className="tr-row danger">
-          <span className="tr-dot" aria-hidden="true" />
-          <span className="tr-txt">
-            <b>{bad.title}</b>
-            {(detail || bad.fix) && <span className="tr-fix">{detail || bad.fix}</span>}
-          </span>
-        </div>
-      )}
+      {mailBad && <ErrorNotice error={[mailBad.note, mailBad.fix].filter(Boolean).join(' · ')} context={t('邮件')} />}
+      {bad && <ErrorNotice error={detail || bad.fix || bad.title} context={bad.title} />}
       {fresh && (
-        <div className="tr-row warn">
+        <div className="tr-row warn" role="status">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
             <b>{fresh.title}</b>
@@ -79,7 +64,7 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
         </div>
       )}
       {brainDown && (
-        <div className="tr-row warn">
+        <div className="tr-row warn" role="status">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
             <b>{t('Fairwind 的脑子没开')}</b>
@@ -93,7 +78,7 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
       {/* 脑子开着，但跑的是旧代码。这个最阴：一切看着都正常，只是新加的行为
           （比如后台读卡）根本没生效，而且没有任何迹象。 */}
       {brainStale && !brainDown && !HOSTED && (
-        <div className="tr-row warn">
+        <div className="tr-row warn" role="status">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
             <b>{t('脑子跑的是旧代码')}</b>
@@ -108,12 +93,12 @@ export default function Trouble({ fellBack, detail, brainDown, brainStale, batch
           只是有几条这轮没轮到——静默失败是最坏的，所以哪怕只挂一条也要在这儿说话。
           两种批量合并成一句：对你来说都是「刚才那批有几条没成」，分开报只是多两行噪音。 */}
       {batchFailed > 0 && (
-        <div className="tr-row warn">
+        <div className="tr-row warn" role="status">
           <span className="tr-dot" aria-hidden="true" />
           <span className="tr-txt">
             <b>{t('有 {n} 条线这轮没跑成', { n: batchFailed })}</b>
             <span className="tr-fix">
-              {t('信没丢、话也没记错——它们只是这轮没轮到。brain 的终端里有每条的报错，')}
+              {t('部分任务未完成，请查看错误提示并检查结果，再重试失败的项目。')}
               {t('再跑一次会重试（要群发的话就再勾一次）。')}
             </span>
           </span>

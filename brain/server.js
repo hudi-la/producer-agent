@@ -1,3 +1,5 @@
+import { createErrorLog, createDiagnosticsHandler, observeRequest } from './errorLog.js'
+import { ERROR_LOG_RELEASE } from './errorEvents.js'
 // Fairwind 的脑子 —— 跑在本机的 sidecar，挂 Claude 订阅（不烧 API）。
 //
 // 前端 POST /chat → ①你的话先落库 ②读这条线的全部往来拼成上下文
@@ -90,7 +92,7 @@ import { recordSent } from './send-record.js'
 // 它就一直跑着旧的——而界面完全看不出来。这已经害过一次：把「讲懂」改成后台扫
 // 之后，前端的触发器删了、后台的扫描没跑起来，于是整整一天没有一张新卡被读过，
 // 谁也没发现。和「迁移写了没跑」是同一个病。
-export const BRAIN_BUILD = '2026-10-01-watchlist'
+export const BRAIN_BUILD = '2026-10-04-error-logs'
 
 const PORT = Number(process.env.BRAIN_PORT || 8788)
 // 邮件多久收一次。别调太快：收信本身很便宜，但每轮可能带一次判地址。
@@ -2045,16 +2047,24 @@ const send = (res, code, obj) => {
 const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 const allowOrigin = (o) => (o && (LOCAL.test(o) || o === ORIGIN) ? o : ORIGIN)
 
+const errorLog = createErrorLog({ dir: pathJoin(process.env.FAIRWIND_DATA_DIR || process.cwd(), 'error-logs') })
+setInterval(() => { void errorLog.prune() }, 3600000).unref()
+void errorLog.prune()
+const handleDiagnostics = createDiagnosticsHandler({ log: errorLog, allowOrigin: (o) => Boolean(o && (o === ORIGIN || (!HOSTED && LOCAL.test(o)))) })
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin
   res.setHeader('access-control-allow-origin', allowOrigin(origin))
   res.setHeader('vary', 'origin')
+  res.setHeader('access-control-expose-headers', 'x-fairwind-request-id')
   res.setHeader('access-control-allow-headers', 'content-type, authorization')
   res.setHeader('access-control-allow-methods', 'POST, GET, PUT, DELETE, OPTIONS')
   if (origin && !LOCAL.test(origin) && origin !== ORIGIN) {
     console.warn(`⚠️ 拦下一个外部来源：${origin}`)
   }
   if (req.method === 'OPTIONS') return res.writeHead(204).end()
+  // Public intake accepts only bounded, allowlisted anonymous diagnostics (including sign-in failures).
+  if (req.url.split('?')[0] === '/diagnostics/errors') return handleDiagnostics(req, res)
+  observeRequest(req, res, errorLog)
   if (!HOSTED) return dispatch(req, res, origin)
   // 下面每条 return 都 await:不然 dispatch 里抛的错落不进这个 catch,整个进程会被一个请求带倒
 
@@ -2151,7 +2161,7 @@ async function dispatch(req, res, origin) {
     const { lastSweep } = await import('./mail/loop.js')
     // scout = 定时造卡那一轮。面板靠它说「脑子没开 · 到点不会跑」。
     // version:更新那一步拿它跟发布位比;mode/modules:界面按它画,少一次 /modules
-    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, mode: DB_MODE, modules: currentTenant()?.modules || null, update: lastUpdateCheck(), mail: lastSweep(), scout: scoutState() })
+    return send(res, 200, { ok: true, build: BRAIN_BUILD, version: VERSION, diagnostics: ERROR_LOG_RELEASE, mode: DB_MODE, modules: currentTenant()?.modules || null, update: lastUpdateCheck(), mail: lastSweep(), scout: scoutState() })
   }
 
   if (req.method === 'POST' && req.url === '/chat') {
@@ -2162,7 +2172,7 @@ async function dispatch(req, res, origin) {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}` +
                     (body.entry_id ? '（书桌）' : ''))
-        console.log(`  ${String(body.text).slice(0, 50)}`)
+        // Do not print the user's conversation text into server logs.
         send(res, 200, await handleChat(body))
       } catch (err) {
         console.error('✗', err.message)
@@ -2197,9 +2207,10 @@ async function dispatch(req, res, origin) {
         body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} 来自 ${origin || '(无 origin)'}` +
                     (body.entry_id ? '（书桌，流）' : '（流）'))
-        console.log(`  ${String(body.text).slice(0, 50)}`)
+        // Do not print the user's conversation text into server logs.
       } catch (err) {
-        frame({ t: 'error', error: '请求读不动：' + err.message })
+        void res.recordStreamFailure?.()
+        frame({ t: 'error', error: '请求读不动：' + err.message, requestId: res.diagnosticRequestId })
         return res.end()
       }
 
@@ -2219,7 +2230,8 @@ async function dispatch(req, res, origin) {
       } catch (err) {
         done = true
         console.error('✗', err.message)
-        frame({ t: 'error', error: err.message })
+        void res.recordStreamFailure?.()
+        frame({ t: 'error', error: err.message, requestId: res.diagnosticRequestId })
       }
       res.end()
     })

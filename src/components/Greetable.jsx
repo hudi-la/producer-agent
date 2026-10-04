@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   fetchGreetable, searchArchive, archiveTally, overrideVerdict, adopt, markGreeted, mailState,
@@ -196,7 +197,7 @@ export default function Greetable({ onChanged }) {
           <p className="gr-ok">{busy.size} 个正在认领——各跑各的，互不打断，点别的不会打断它们。</p>
         )}
         {done.map((d, i) => <p className="gr-ok" key={i}>{d}</p>)}
-        {err && <p className="gr-err">{err}</p>}
+        {err && <ErrorNotice error={err} context={t('保存更改')} />}
       </section>
 
       {/* 档案柜：判掉的一个都不删。你不需要清空它——它在这儿是为了万一冤枉了谁。 */}

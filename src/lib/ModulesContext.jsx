@@ -1,3 +1,4 @@
+import { reportError } from './reportError.js'
 // src/lib/ModulesContext.jsx —— 模块开关的 context。整个 App 包在里面,门控就是读它。
 import { createContext, useContext, useEffect, useState } from 'react'
 import { fetchModules, postModules } from './modules.js'
@@ -12,7 +13,7 @@ export function ModulesProvider({ children }) {
   const set = async (patch) => {
     const before = mods
     setMods((m) => ({ ...m, ...patch }))
-    try { setMods(await postModules(patch)) } catch (e) { setMods(before); alert?.(e.message) }   // 没存成:退回原样
+    try { setMods(await postModules(patch)) } catch (e) { setMods(before); reportError(e) }   // 没存成:退回原样
   }
   return <Ctx.Provider value={{ ...mods, set }}>{children}</Ctx.Provider>
 }

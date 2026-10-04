@@ -1,3 +1,4 @@
+import ErrorNotice from './ErrorNotice.jsx'
 import React, { useState } from 'react'
 import { adoptForm } from '../lib/forms.js'
 import { t } from '../i18n/index.js'
@@ -54,7 +55,7 @@ export default function FormCard({ form, owner, onAdopted }) {
           )
         })}
       </ul>
-      {err && <div className="lcard-err">{err}</div>}
+      {err && <ErrorNotice error={err} context={t('保存更改')} />}
       {done ? (
         <div className="lcard-ok">{t('收进产出了 —— 去右栏一格一格改。')}</div>
       ) : (

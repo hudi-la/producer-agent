@@ -1,3 +1,5 @@
+import { reportError } from './reportError.js'
+import { errorText } from './userError.js'
 // 分工：
 //  · 读 + 「你自己改自己卡上的字段」(stage / ball) —— 浏览器直连，走 anon。
 //    后者靠 security definer 函数，能改的列是写死的，anon 拿不到别的写权限。
@@ -24,7 +26,7 @@ export async function fetchMessages(pursuitId) {
     .select('*')
     .eq('pursuit_id', pursuitId)
     .order('created_at')
-  if (error) return null
+  if (error) { reportError(error, t('读取数据失败')); return null }
   return data
 }
 
@@ -42,7 +44,7 @@ export async function fetchPursuitDetail(pursuitId) {
   if (!supa || !pursuitId) return null
   const { data, error } = await supa
     .from('v_pa_pursuits').select('why,notes').eq('id', pursuitId).maybeSingle()
-  if (error) return null
+  if (error) { reportError(error, t('读取数据失败')); return null }
   return data
 }
 
@@ -61,7 +63,7 @@ export async function fetchContactMessages(contactId) {
     .select('*')
     .eq('contact_id', contactId)
     .order('created_at')
-  if (error) return null
+  if (error) { reportError(error, t('读取数据失败')); return null }
   return data
 }
 
@@ -97,7 +99,7 @@ export async function sendMessage(owner, text, meta, runId) {
     throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
   }
   const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.error || t('脑子出错了（{status}）', { status: res.status }))
+  if (!res.ok) throw new Error(errorText(body.error) || t('脑子出错了（{status}）', { status: res.status }))
   return body   // { mine, reply } —— 你按了终止的话 reply 是 null、带 aborted: true
 }
 
@@ -134,7 +136,7 @@ export async function streamChat(body, onEvent) {
   if (res.status === 404) throw new NoStream()
   if (!res.ok) {
     const b = await res.json().catch(() => ({}))
-    throw new Error(b.error || t('脑子出错了（{status}）', { status: res.status }))
+    throw new Error(errorText(b.error) || t('脑子出错了（{status}）', { status: res.status }))
   }
 
   const reader = res.body.getReader()
@@ -147,7 +149,7 @@ export async function streamChat(body, onEvent) {
     if (!e) return
     if (e.t === 'mine') mine = e.row
     else if (e.t === 'done') { reply = e.reply || null; aborted = !!e.aborted }
-    else if (e.t === 'error') err = e.error
+    else if (e.t === 'error') err = errorText(e.error) + (/^[0-9a-f-]{36}$/i.test(e.requestId || '') ? ` [request:${e.requestId}]` : '')
     onEvent?.(e)
   }
 
@@ -160,7 +162,7 @@ export async function streamChat(body, onEvent) {
 
   // 流断在半路上（脑子挂了、网线拔了）：没有 done 帧就是没想完，
   // 不能静悄悄返回一个空回复——那看起来像它想完了但什么都没说。
-  if (err) throw new Error(err)
+  if (err) throw new Error(errorText(err))
   if (!reply && !aborted) throw new Error(t('Fairwind 那边断了 —— 再说一次让它重想'))
   return { mine, reply, aborted }
 }
@@ -217,7 +219,7 @@ export async function stopThinking(runId) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ run_id: runId }),
     })
-    return await res.json().catch(() => ({ ok: true, stopped: false }))
+    if (!res.ok) return { ok: false, stopped: false }; return await res.json().catch(() => ({ ok: false, stopped: false }))
   } catch (_) {
     return { ok: false, stopped: false }
   }
