@@ -25,7 +25,8 @@ export async function loadContacts() {
       .from('v_pa_contacts').select('*')
       .order('last_touch_at', { ascending: false, nullsFirst: false })
     if (ce) return empty(FELL_BACK.QUERY_FAILED, ce.message)
-    if (!contacts?.length) return empty(FELL_BACK.EMPTY)
+    // 通讯录空着**不能就此返回**(2026-10-08):原来这里一看没人就直接回空,后面「等你点头的新联系人」
+    // 根本没去查——新用户通讯录一定是空的,于是收完信判出的 116 个人一个都看不见。照常往下查,最后再标空
 
     // 他挂在哪几条机会线上 —— 这是「人是独立一层、两区共用同一张名片」
     // 落地之后你**看得见**的样子。
@@ -91,7 +92,7 @@ export async function loadContacts() {
     const { data: groups } = await supa.rpc('pa_group_threads', { p_min_people: 5 })
 
     return {
-      contacts: contacts.map((c) => ({
+      contacts: (contacts || []).map((c) => ({
         ...c,
         pursuits: lines[c.id] || [],
         emails: emailsOf[c.id] || (c.email ? [{ email: c.email, is_primary: true }] : []),
@@ -100,7 +101,7 @@ export async function loadContacts() {
       orgs: orgRows || [],
       strangers: [...copied, ...(strangers || [])],
       groups: Array.isArray(groups) ? groups : [],
-      source: 'live', reason: null, detail: null,
+      ...(contacts?.length ? { source: 'live', reason: null, detail: null } : { source: 'empty', reason: FELL_BACK.EMPTY, detail: null }),
     }
   } catch (e) {
     return empty(FELL_BACK.QUERY_FAILED, e.message)

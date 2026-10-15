@@ -292,8 +292,9 @@ function haltLine(halts, en) {
 /** 三步各说一句。写进 tasks.last_result，面板上「上次」就是它。按 FAIRWIND_LANG 写中文或英文(学员首启选的语言)。 */
 export function report3({
   today,
-  checked = [], opened = [], closedNow = [], leftToCheck = 0,
-  found = [], dupFound = [], skipped = [],
+  checked = [], checkedTotal = checked.length, opened = [], openedTotal = opened.length,
+  closedNow = [], closedTotal = closedNow.length, leftToCheck = 0,
+  found = [], foundTotal = found.length, dupFound = [], skipped = [],
   judged = [], made = [], overCap = [], held = [], cardCap = 12, halts = [],
 }) {
   const en = envNow().FAIRWIND_LANG === 'en'
@@ -301,10 +302,10 @@ export function report3({
   const hl = haltLine(halts, en); if (hl) L.push(hl)
   const sk = (s) => `${s.title}${s.why ? `（${brief(s.why)}）` : ''}`
   if (en) {
-    L.push(checked.length
-      ? `Rechecked ${checked.length}: ${opened.length} opened${opened.length ? ` (${names(opened)})` : ''}, ${closedNow.length} closed, ${checked.length - opened.length - closedNow.length} unchanged; ${leftToCheck} still waiting.`
+    L.push(checkedTotal
+      ? `Rechecked ${checkedTotal}: ${openedTotal} opened${opened.length === openedTotal && openedTotal ? ` (${names(opened)})` : ''}, ${closedTotal} closed, ${checkedTotal - openedTotal - closedTotal} unchanged; ${leftToCheck} still waiting.`
       : 'Recheck: nothing due this round.')
-    L.push(found.length ? `Found ${found.length} new, added to the pool: ${names(found)}.` : 'Search: nothing new this round.')
+    L.push(foundTotal ? `Found ${foundTotal} new, added to the pool${found.length === foundTotal ? `: ${names(found)}` : ''}.` : 'Search: nothing new this round.')
     if (dupFound.length) L.push(`Already in the pool, skipped ${dupFound.length}: ${names(dupFound)}.`)
     if (skipped.length) L.push(`Looked at but not added, ${skipped.length}: ${skipped.map(sk).join(' · ')}.`)
     if (judged.length) L.push(`Judged reach for ${judged.length}: ${judged.map((j) => `${j.title} → ${j.label}${j.why ? ` (${j.why})` : ''}`).join('; ')}.`)
@@ -313,11 +314,11 @@ export function report3({
     if (held.length) L.push(`${held.length} open but below the card threshold, kept in the pool — pick them up yourself if you want: ${names(held)}.`)
     return L.join('\n')
   }
-  L.push(checked.length
-    ? `复查 ${checked.length} 行：${opened.length} 个开了${opened.length ? `（${names(opened)}）` : ''}，${closedNow.length} 个关了，${checked.length - opened.length - closedNow.length} 个没变；还有 ${leftToCheck} 行没轮到。`
+  L.push(checkedTotal
+    ? `复查 ${checkedTotal} 行：${openedTotal} 个开了${opened.length === openedTotal && openedTotal ? `（${names(opened)}）` : ''}，${closedTotal} 个关了，${checkedTotal - openedTotal - closedTotal} 个没变；还有 ${leftToCheck} 行没轮到。`
     : `复查：这轮没有该查的行。`)
-  L.push(found.length
-    ? `找到 ${found.length} 个新的进表：${names(found)}。`
+  L.push(foundTotal
+    ? `找到 ${foundTotal} 个新的进表${found.length === foundTotal ? `：${names(found)}` : ''}。`
     : '找新的：这轮没有新的。')
   if (dupFound.length) L.push(`表里已有、跳过 ${dupFound.length} 个：${names(dupFound)}。`)
   if (skipped.length) L.push(`查了没收 ${skipped.length} 个：${skipped.map(sk).join(' · ')}。`)

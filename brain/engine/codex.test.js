@@ -136,3 +136,65 @@ test('tool budget: over the limit the model is told to answer now instead of the
   assert.match(c.sent[1].result.contentItems[0].text, /Tool budget \(1 calls\)/)
   assert.deepEqual(r.blocks.map((b) => b.type), ['tool_use', 'text'])
 })
+
+test('device authorization exposes only the user code and survives polling, isolated per account', async () => {
+  const clients = []
+  const factory = () => {
+    const c = fake(); const request = c.request.bind(c)
+    c.request = async (method, params) => {
+      if (method === 'account/login/start') {
+        assert.equal(params.type, 'chatgptDeviceCode')
+        return { verificationUrl: 'https://auth.openai.com/codex/device', userCode: `CODE-${clients.length}`, loginId: 'private-id', accessToken: 'never-expose' }
+      }
+      return request(method, params)
+    }
+    clients.push(c); return c
+  }
+  const a = await chatgptLogin('device-a', factory, { deviceCode: true })
+  const b = await chatgptLogin('device-b', factory, { deviceCode: true })
+  assert.equal(a.userCode, 'CODE-1'); assert.equal(b.userCode, 'CODE-2')
+  assert.deepEqual(await chatgptStatus('device-a', () => assert.fail()), { connected: false, ...a })
+  assert.deepEqual(await chatgptLogin('device-a', () => assert.fail(), { deviceCode: true }), a)
+  assert.equal(a.accessToken, undefined); assert.equal(a.loginId, undefined)
+  clients[0].emit('account/login/completed', { success: true })
+  assert.equal((await chatgptStatus('device-a', () => fake())).connected, true)
+  assert.equal((await chatgptStatus('device-b', () => assert.fail())).pending, true)
+  clients[1].emit('account/login/completed', { success: false, error: 'expired' })
+  assert.equal((await chatgptStatus('device-b', () => assert.fail())).error.message, 'expired')
+})
+
+test('restart replaces only this account device login and ignores old completion events', async () => {
+  const make = (code) => {
+    const c = fake(); const request = c.request.bind(c)
+    c.request = async (method, params) => method === 'account/login/start'
+      ? { verificationUrl: 'https://auth.openai.com/codex/device', userCode: code }
+      : request(method, params)
+    return c
+  }
+  const old = make('OLD'), other = make('OTHER'), fresh = make('NEW')
+  await chatgptLogin('restart-a', () => old, { deviceCode: true })
+  await chatgptLogin('restart-b', () => other, { deviceCode: true })
+  const result = await chatgptLogin('restart-a', () => fresh, { deviceCode: true, restart: true })
+  assert.equal(old.closed, true); assert.equal(other.closed, false)
+  assert.equal(result.userCode, 'NEW')
+  old.emit('account/login/completed', { success: false, error: 'late old failure' })
+  assert.equal((await chatgptStatus('restart-a', () => assert.fail())).userCode, 'NEW')
+  assert.equal((await chatgptStatus('restart-b', () => assert.fail())).userCode, 'OTHER')
+  fresh.emit('account/login/completed', { success: true })
+  other.emit('account/login/completed', { success: true })
+  assert.equal((await chatgptStatus('restart-a', () => fake())).connected, true)
+})
+
+test('restart failure clears the old code and permits another attempt', async () => {
+  const old = fake()
+  await chatgptLogin('retry-fail', () => old)
+  const broken = fake(); broken.init = async () => { throw new Error('network unavailable') }
+  await assert.rejects(chatgptLogin('retry-fail', () => broken, { restart: true }), /network unavailable/)
+  const status = await chatgptStatus('retry-fail', () => assert.fail())
+  assert.equal(status.pending, undefined); assert.equal(status.userCode, undefined)
+  assert.match(status.error.message, /network unavailable/)
+  assert.ok(old.closed && broken.closed)
+  const fresh = fake()
+  assert.equal((await chatgptLogin('retry-fail', () => fresh, { restart: true })).pending, true)
+  fresh.emit('account/login/completed', { success: true })
+})

@@ -4,7 +4,7 @@
 import { envNow } from '../tenant.js'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, chmodSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { VERSION } from '../version.js'
@@ -19,9 +19,10 @@ export function codexBinary() {
 }
 
 export function codexOptions(dataDir, env = process.env) {
-  if (!dataDir) throw new Error('ChatGPT 订阅需要 Fairwind 本机数据目录 / ChatGPT subscription requires local mode')
+  if (!dataDir) throw new Error('ChatGPT 订阅需要独立数据目录 / ChatGPT subscription requires a private data directory')
   const home = resolve(dataDir, 'chatgpt'), cwd = join(home, 'workspace')
   mkdirSync(cwd, { recursive: true, mode: 0o700 })
+  chmodSync(home, 0o700)
   // Only forward OS/proxy/certificate variables, never other providers' keys or Codex settings.
   const childEnv = Object.fromEntries(Object.entries(env).filter(([k]) => /^(HOME|USER|LOGNAME|PATH|TMPDIR|TMP|TEMP|SystemRoot|LANG|LC_.*|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|https?_proxy|all_proxy|no_proxy|SSL_CERT_FILE|SSL_CERT_DIR|NODE_EXTRA_CA_CERTS)$/.test(k)))
   childEnv.CODEX_HOME = home
@@ -86,18 +87,20 @@ const authErrors = new Map()
 const accountView = (a) => ({ connected: a?.type === 'chatgpt', email: a?.type === 'chatgpt' ? a.email : '', plan: a?.type === 'chatgpt' ? a.planType : '' })
 export async function chatgptStatus(dataDir, factory = createClient) {
   const session = authSessions.get(dataDir)
-  if (session) return { connected: false, pending: true, authUrl: session.authUrl || '' }
+  if (session) return { connected: false, pending: true, ...session.view }
   if (authErrors.has(dataDir)) return { connected: false, error: { message: authErrors.get(dataDir) } }
   const c = factory(dataDir)
   try { await c.init(); return accountView((await c.request('account/read', { refreshToken: false })).account) }
   finally { c.close() }
 }
-export async function chatgptLogin(dataDir, factory = createClient) {
-  if (authSessions.has(dataDir)) return { authUrl: authSessions.get(dataDir).authUrl || '', pending: true }
+export async function chatgptLogin(dataDir, factory = createClient, { deviceCode = false, restart = false } = {}) {
+  if (restart) authSessions.get(dataDir)?.stop()
+  if (authSessions.has(dataDir)) return { ...authSessions.get(dataDir).view, pending: true }
   authErrors.delete(dataDir)
-  const c = factory(dataDir), session = { client: c, authUrl: '' }
+  const c = factory(dataDir), session = { client: c, view: {} }
   authSessions.set(dataDir, session)
   const stop = (error) => { if (authSessions.get(dataDir) !== session) return; authSessions.delete(dataDir); if (error) authErrors.set(dataDir, error.message); clearTimeout(session.timer); c.close() }
+  session.stop = stop
   session.timer = setTimeout(() => stop(new Error('登录已超时，请重试 / Sign-in timed out; please try again')), 10 * 60_000); session.timer.unref()
   c.listeners.add((m) => {
     if (m.method === 'account/login/completed') stop(m.params?.success ? null : new Error(m.params?.error || '登录未完成，请重试 / Sign-in did not complete; please try again'))
@@ -105,9 +108,10 @@ export async function chatgptLogin(dataDir, factory = createClient) {
   })
   try {
     await c.init()
-    const r = await c.request('account/login/start', { type: 'chatgpt' })
-    session.authUrl = r.authUrl
-    return { authUrl: r.authUrl, pending: true }
+    const r = await c.request('account/login/start', { type: deviceCode ? 'chatgptDeviceCode' : 'chatgpt' })
+    session.view = deviceCode ? { authUrl: r.verificationUrl, userCode: r.userCode } : { authUrl: r.authUrl }
+    if (!session.view.authUrl || (deviceCode && !session.view.userCode)) throw new Error('登录信息不完整，请重试 / Incomplete sign-in response; please retry')
+    return { ...session.view, pending: true }
   } catch (e) { stop(e); throw e }
 }
 

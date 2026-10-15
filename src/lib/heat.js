@@ -5,6 +5,7 @@
 // 断掉的那几天；原来那种排法你得滚三屏才知道上个月有没有停过。
 //
 // 这儿只算格子，不碰颜色也不碰 DOM：给一份「哪天有几件」，还一份周×7 的表。
+import { t, getLang } from '../i18n/index.js'
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -79,7 +80,7 @@ export function monthMarks(weeks) {
   for (const col of weeks) {
     const first = col.find(Boolean)
     const m = first ? Number(first.day.slice(5, 7)) : null
-    if (m && m !== last) { out.push(`${m}月`); last = m } else out.push(null)
+    if (m && m !== last) { out.push(getLang() === 'en' ? new Date(2000, m - 1, 1).toLocaleString('en', { month: 'short' }) : t('{m}月', { m })); last = m } else out.push(null)
   }
   return out
 }

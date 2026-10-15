@@ -38,6 +38,7 @@ import path from 'node:path'
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { google } from 'googleapis'
+import { currentTenant } from '../tenant.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 // 本机模式(FAIRWIND_DATA_DIR)下 token 住在数据目录——应用目录更新时整个换掉,不能放东西。
@@ -46,9 +47,12 @@ const TOKENS = process.env.FAIRWIND_DATA_DIR
   ? path.join(process.env.FAIRWIND_DATA_DIR, 'gmail', 'tokens.json')
   : path.join(HERE, '..', '.mail-tokens.json')
 
-const SCOPES = [
+export const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
+  // 建草稿(2026-10-06):线上「放进 Gmail 草稿箱」走脑子自己的授权,不再借 claude.ai 连接器。
+  // 个人版老钥匙里没有这一格也不碍事——个人版的草稿还走连接器;要用就重跑一次 mail:auth
+  'https://www.googleapis.com/auth/gmail.compose',
 ]
 
 // 授权回调听在哪个口。默认 8789（brain 自己是 8788，别撞上）。
@@ -71,14 +75,55 @@ export class MailAuthError extends Error {
     super(msg)
     this.name = 'MailAuthError'
     this.cause = cause
-    this.fix = '在 brain 目录下跑一次 `npm run mail:auth` 重新授权'
+    this.fix = hostedTenant()
+      ? '去「设置」里重新连接 Gmail / Reconnect Gmail in Settings'
+      : '在 brain 目录下跑一次 `npm run mail:auth` 重新授权'
   }
+}
+
+// ── 线上(托管)：每人自己的钥匙 ─────────────────────────────────
+// 设计稿 2026-10-06 D5。OAuth 应用(client id / secret)是运营方配置,在 /etc/fairwind/env;
+// 每个人的 refresh token 在他那一行 member_settings 里,随租户上下文来。
+// 不是 hosted 的(个人版、本机版、CLI)一个字不变,还是那个文件。
+function hostedTenant() {
+  const t = currentTenant()
+  return t?.mode === 'hosted' ? t : null
+}
+
+/** Google 授权完把人送回哪儿。Web application 类型的 client 上要逐字登记这一条。 */
+export function webRedirect() {
+  const o = String(process.env.BRAIN_ORIGIN || '').replace(/\/+$/, '')
+  if (!o) throw new MailAuthError('服务器没配 BRAIN_ORIGIN,Gmail 回调没地方回')
+  return `${o}/oauth/gmail/callback`
+}
+
+export function webClient() {
+  const { id, secret } = creds()
+  return new google.auth.OAuth2(id, secret, webRedirect())
+}
+
+function clientForTenant(t) {
+  const rt = t.settings?.gmailRefreshToken
+  if (!rt) throw new MailAuthError('还没连 Gmail / Gmail is not connected')
+  const M = t.marks || {}
+  if (M.gmail?.rt === rt) return M.gmail.c          // 同一把钥匙:复用,access token 不用每次换
+  const c = webClient()
+  c.setCredentials({ refresh_token: rt })
+  c.on('tokens', async (tok) => {
+    // Google 偶尔换发新的 refresh token:写回他那一行,不然下次进程重启拿的是作废的那把
+    if (!tok.refresh_token || tok.refresh_token === rt) return
+    const { error } = await t.db.rpc('pa_set_gmail', { p_address: t.settings.gmailAddress, p_refresh_token: tok.refresh_token })
+    if (error) console.error(`  ✗ ${t.email} 的新 Gmail 钥匙没存上:${error.message}`)
+  })
+  M.gmail = { rt, c }
+  return c
 }
 
 function creds() {
   const id = process.env.GMAIL_CLIENT_ID
   const secret = process.env.GMAIL_CLIENT_SECRET
   if (!id || !secret) {
+    if (hostedTenant()) throw new MailAuthError('服务器还没配 Gmail 应用(GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET)/ Gmail is not set up on this server yet')
     throw new MailAuthError(
       'brain/.env 里还没有 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET。' +
       '按 brain/README.md 里「接上 Gmail」那节，在 Google Cloud 建一个 Desktop app 的 OAuth 客户端。')
@@ -119,6 +164,8 @@ function writeTokens(t) {
  * 又得重新授权，而重新授权是要你人在场点浏览器的，那就没法无人值守了。
  */
 export async function client() {
+  const t = hostedTenant()
+  if (t) return clientForTenant(t)
   const c = newClient()
   const saved = readTokens()
   if (!saved.refresh_token) {
@@ -156,9 +203,19 @@ export async function whoami() {
  */
 export function asAuthErrorIfItIs(err) {
   const code = err?.response?.status ?? err?.code
-  const body = String(err?.response?.data?.error || err?.message || '')
+  const e = err?.response?.data?.error
+  // Google 回的 error 两种形状:换钥匙那边是字符串('invalid_grant');Gmail 接口这边是对象 { code, message, errors:[{reason}] }。
+  // 原来一律 String() → 对象变成「[object Object]」,日志里看不出 Google 到底说了什么(2026-10-07 线上第一次回填)
+  const body = typeof e === 'string' ? e : String(e?.message || err?.message || '')
+  const reason = typeof e === 'object' ? (e?.errors?.[0]?.reason || e?.status || '') : ''
+  // 403 不全是授权掉了:限流、配额也是 403。那些该退避重试(gmail.js 的 retry),不该吼「重新授权」——
+  // 原来这里把所有 403 都判成授权掉了,于是第一轮回填并发拉信头一碰限流就整轮作废
+  if (code === 403 && /rate|quota|limit|backendError/i.test(reason + ' ' + body)) return err
+  if (/insufficient.*(scope|permission)|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(body + ' ' + reason)) {
+    return new MailAuthError('Gmail 已连接，但未授予此操作所需权限（发送或管理草稿），请重新授权 / Gmail is connected, but this operation requires additional permissions.', err)
+  }
   if (code === 401 || code === 403 || /invalid_grant|invalid_token|unauthorized/i.test(body)) {
-    return new MailAuthError(`Gmail 授权掉了（${body || code}）`, err)
+    return new MailAuthError(`Gmail 授权掉了（${[code, reason, body].filter(Boolean).join(' · ')}）`, err)
   }
   return err
 }

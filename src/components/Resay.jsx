@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useGrow } from '../lib/useGrow.js'
 import Md from './Md.jsx'
 import { canRewind, wipeCount } from '../lib/rewind.js'
+import { t } from '../i18n/index.js'
 
 // 你说过的那句气泡，外加「改这句」。
 //
@@ -20,8 +21,8 @@ import { canRewind, wipeCount } from '../lib/rewind.js'
 /** 「重说之后会没掉什么」——说清楚，别让人自己猜。 */
 function warnText(msgs, id) {
   const n = wipeCount(msgs, id)
-  if (!n) return '重说之后，这句会换成你改的版本'
-  return `重说之后，这句和它后面的 ${n} 条对话就没了（邮件和你记的都留着）`
+  if (!n) return t('重说之后，这句会换成你改的版本')
+  return t('重说之后，这句和它后面的 {n} 条对话就没了（邮件和你记的都留着）', { n })
 }
 
 /**
@@ -75,9 +76,9 @@ export default function SayBubble({ m, msgs, editing, disabled, onStart, onCance
         />
         <div className="ed-act">
           <button className="ed-ok" onClick={() => onResay?.(m.id, draft)} disabled={!draft.trim()}>
-            重说
+            {t('重说')}
           </button>
-          <button className="ed-no" onClick={onCancel}>取消</button>
+          <button className="ed-no" onClick={onCancel}>{t('取消')}</button>
         </div>
         <div className="resay-warn">{warnText(msgs, m.id)}</div>
       </div>
@@ -89,8 +90,8 @@ export default function SayBubble({ m, msgs, editing, disabled, onStart, onCance
       <div className="bubble md"><Md>{m.content}</Md></div>
       {canRewind(m) && !disabled && (
         <button className="resay-btn" onClick={() => onStart?.(m.id)}
-                title="改这句重说——这句和它之后的对话会撤掉">
-          <span aria-hidden="true">✎</span> 改这句
+                title={t('改这句重说——这句和它之后的对话会撤掉')}>
+          <span aria-hidden="true">✎</span> {t('改这句')}
         </button>
       )}
     </div>

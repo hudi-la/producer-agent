@@ -1,259 +1,151 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadLedger, KIND_LABEL, isMine } from '../lib/ledger.js'
+import GoogleCalendar, { useGoogleCalendar } from './GoogleCalendar.jsx'
+import { googleRows, sourceKey } from '../lib/googleCalendar.js'
+import { useEffect, useMemo, useState } from 'react'
+import { loadLedger, kindLabel } from '../lib/ledger.js'
+import { stateLine } from '../lib/stateText.js'
 import { md } from '../lib/when.js'
 import { weeksOf, monthMarks, levelOf, dayKey } from '../lib/heat.js'
 import Veil from './Veil.jsx'
-
-// 「时间线」——两半：日历（你动的手）和流水（不是你动的手）。
-//
-// 这一页最早叫「流水」，只有一条往下排的账（2026-08-20）：系统自己比对出
-// 「这事办到了」的时候他想要一点心安，但不要提醒 —— 所以是 pull 不是 push。
-// 8/22 排法换成 GitHub 那种年度方格：流水回答的是**形状**问题（这阵子动没动、
-// 哪几周连着、哪几天断了），一天一段往下排的话，想知道「上个月有没有停过」
-// 得滚三屏。
-//
-// 8/23 再分两半（他拍的）。分的不是时间，是**谁动的手**：
-//   日历 —— 你发出的信、你记的一笔、办到了的那些（已办），
-//           加上还没到点的那些（待办，v_pa_state 的 due_at）。方格。
-//   流水 —— 收到的信、Fairwind 到点干的事、系统开的等待。一条流。
-// 两个问题本来就不一样：「这个月我干了多少、还欠着什么」是形状，
-// 「刚刚发生了什么」是顺序。一种排法答不好两个问题。
-//
-// 每一行都是现算的，永远不会跟事实分叉；点名字进卡对证。
+import { t } from '../i18n/index.js'
 
 // 人名过展示模式；机会线的标题不用——演示的正是这些机会（见 Veil.jsx）
 const 谁 = (r) => r.subject_kind === 'pursuit'
-  ? (r.subject_name || '（没名字）')
-  : <Veil>{r.subject_name || '（没名字）'}</Veil>
+  ? (r.subject_name || t("（没名字）"))
+  : <Veil>{r.subject_name || t("（没名字）")}</Veil>
 
 function Row({ r, onOpen }) {
   return (
     <div className={'lg-row ' + r.kind}>
-      <span className="lg-kind">{KIND_LABEL[r.kind] || r.kind}</span>
+      <span className="lg-kind">{kindLabel(r.kind) || r.kind}</span>
       <div className="lg-b">
         <button className="nname" onClick={() => onOpen(r)}>{谁(r)}</button>
         <div className="lg-what">{r.what}</div>
-        {r.why && r.kind === 'wait_close' && <div className="lg-why">凭什么算办到：{r.why}</div>}
+        {r.why && r.kind === 'wait_close' && <div className="lg-why">{t("凭什么算办到：")}{r.why}</div>}
       </div>
       <span className="lg-at">{new Date(r.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   )
 }
 
-const WEEKDAY = ['一', '', '三', '', '五', '', '']   // 跟 GitHub 一样隔行标，七行都标太吵
+
+const weekdays = () => [t("周一"), t("周二"), t("周三"), t("周四"), t("周五"), t("周六"), t("周日")]
+const dateOf = (key) => new Date(key + 'T12:00:00')
+const shift = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + n, 12)
+const monday = (date) => shift(date, -((date.getDay() + 6) % 7))
+const timeOf = (at) => new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+const eventLabel = (r) => r.google ? (r.allDay ? t('全天') : timeOf(r.due_at)) : r.state === 'MEETING_SET' ? timeOf(r.due_at)
+  : r.state === 'WAITING_REPLY' ? t("跟进") : r.state === 'NEEDS_REPLY' ? t("待回复") : t("待办")
 
 export default function Timeline({ states = [], onOpen, tick = 0 }) {
-  // 日历 / 流水：看哪一半。切换从导航带子搬进页里（2026-09-02）——它不是「去哪儿」，
-  // 是「看哪一半」；两半都得看得见，撤掉切换让日历不可见就是丢信息。
   const [tab, setTab] = useState('cal')
-  const [data, setData] = useState(null)
+  const [view, setView] = useState('month')
+  const [anchor, setAnchor] = useState(() => dayKey(new Date()))
+  const [selected, setSelected] = useState(() => dayKey(new Date()))
+  const [flowDay, setFlowDay] = useState(null)
   const [span, setSpan] = useState(365)
-  const [pickedDay, setPickedDay] = useState(null)
-  const gridRef = useRef(null)
-  // tick 是 App 那个「现在」的心跳（App.jsx 的 FACTS_MS）。挂上它，流水和
-  // 通知栏就是同一个时刻的两半 —— 不挂的话反过来也一样会分叉：面板刷新了、
-  // 一个等待关掉不见了，这边的流水却还没记上那一笔。
-  useEffect(() => { loadLedger(span).then(setData) }, [span, tick])
-
-  // 已办：你动的手那几种（发出 / 记一笔 / 办到了）。
-  // 收到的信和 Fairwind 干的事不进日历 —— 那不是你办的，堆进来只会
-  // 把「我这个月干了多少」这个问题答歪。
-  const doneByDay = useMemo(() => {
-    const m = new Map()
-    for (const [d, rows] of data?.days || []) {
-      const mine = rows.filter(isMine)
-      if (mine.length) m.set(d, mine)
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    let active = true
+    loadLedger(span).then((result) => { if (active) setData(result) })
+      .catch((error) => { if (active) setData({ days: [], reason: error.message }) })
+    return () => { active = false }
+  }, [span, tick])
+  const today = dayKey(new Date())
+  const cursor = dateOf(anchor)
+  const start = view === 'month' ? monday(new Date(cursor.getFullYear(), cursor.getMonth(), 1, 12)) : monday(cursor)
+  const dates = Array.from({ length: view === 'month' ? 42 : 7 }, (_, i) => shift(start, i))
+  const rangeMin = new Date(start.getFullYear(), start.getMonth(), start.getDate()).toISOString()
+  const rangeEnd = shift(start, dates.length)
+  const rangeMax = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate()).toISOString()
+  const calendar = useGoogleCalendar(rangeMin, rangeMax, tick)
+  const external = useMemo(() => googleRows(calendar.events, new Date(rangeMin), new Date(rangeMax)), [calendar.events, rangeMin, rangeMax])
+  const openItem = (r) => { if (r.google) { if (r.htmlLink) window.open(r.htmlLink, '_blank', 'noopener,noreferrer') } else onOpen(r) }
+  const scheduled = useMemo(() => {
+    const map = new Map()
+    const synced = new Set(external.map((r) => r.source).filter(Boolean))
+    for (const r of states) {
+      if (synced.has(sourceKey(r))) continue
+      if (!r.due_at || !Number.isFinite(new Date(r.due_at).getTime())) continue
+      const key = dayKey(new Date(r.due_at))
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(r)
     }
-    return m
-  }, [data])
-
-  // 待办：还没到点的那些，按 due_at 落到日子上（v_pa_state，跟 🔔 同一份）。
-  const todoByDay = useMemo(() => {
-    const m = new Map()
-    for (const r of states || []) {
-      if (!r.due_at) continue
-      const d = dayKey(new Date(r.due_at))
-      if (!m.has(d)) m.set(d, [])
-      m.get(d).push(r)
-    }
-    return m
-  }, [states])
-
-  const counts = useMemo(() => {
-    const m = new Map()
-    for (const [d, rows] of doneByDay) m.set(d, rows.length)
-    for (const [d, rows] of todoByDay) m.set(d, (m.get(d) || 0) + rows.length)
-    return m
-  }, [doneByDay, todoByDay])
-
-  // 往后伸到最远的那个待办 —— 日历不该在今天截断，你欠着的事就在下个月。
-  const ahead = useMemo(() => {
-    const today = dayKey(new Date())
-    const last = [...todoByDay.keys()].filter((d) => d > today).sort().at(-1)
-    if (!last) return 0
-    return Math.min(120, Math.round((new Date(last + 'T12:00') - new Date(today + 'T12:00')) / 86400000))
-  }, [todoByDay])
-
-  const weeks = useMemo(() => weeksOf(counts, span, new Date(), ahead), [counts, span, ahead])
-  const marks = useMemo(() => monthMarks(weeks), [weeks])
-
-  // 默认停在今天 —— 日历现在两头都有（左边已办、右边待办），今天是那条界。
-  const day = pickedDay || dayKey(new Date())
-
-  if (!data) return <div className="page"><div className="page-inner"><p className="pnone">在翻账…</p></div></div>
-  const { summary, reason } = data
-  const done = doneByDay.get(day) || []
-  const todo = todoByDay.get(day) || []
-  const flow = (data.days || []).filter(([, rows]) => rows.some((r) => !isMine(r)))
-  const total = [...counts.values()].reduce((a, b) => a + b, 0)
-
-  // 键盘在格子里走：左右一天、上下一周。**焦点跟着选中的那格走**
-  // （roving tabindex）——一年 365 个按钮全进 Tab 队列的话，这一页就没法用键盘绕过去了。
-  const move = (e) => {
-    const d = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]
-    if (!d) return
-    e.preventDefault()
-    const all = weeks.flat().filter(Boolean).map((c) => c.day)
-    const i = all.indexOf(day)
-    const next = all[Math.min(all.length - 1, Math.max(0, i + d))]
-    if (next) {
-      setPickedDay(next)
-      gridRef.current?.querySelector(`[data-day="${next}"]`)?.focus()
-    }
+    for (const r of external) { if (!map.has(r.day)) map.set(r.day, []); map.get(r.day).push(r) }
+    for (const rows of map.values()) rows.sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
+    return map
+  }, [states, external])
+  const counts = useMemo(() => new Map((data?.days || []).map(([d, rows]) => [d, rows.length])), [data])
+  const weeks = useMemo(() => weeksOf(counts, span), [counts, span])
+  const marks = monthMarks(weeks)
+  const summary = data?.summary
+  const rows = scheduled.get(selected) || []
+  const navigate = (direction) => {
+    const next = view === 'month'
+      ? new Date(cursor.getFullYear(), cursor.getMonth() + direction, 1, 12)
+      : shift(cursor, direction * 7)
+    setAnchor(dayKey(next)); setSelected(dayKey(next))
   }
-
-  return (
-    <div className="page">
-      <div className="page-inner lg-inner">
-        <header className="page-head">
-          <h1>时间线</h1>
-          <div className="tabs" role="group" aria-label="看哪一半">
-            {[['cal', '日历'], ['flow', '流水']].map(([k, label]) => (
-              <button key={k} type="button" className={'tab' + (tab === k ? ' on' : '')}
-                      aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>
-            ))}
-          </div>
-          <p className="note">
-            {tab === 'cal'
-              ? <>你动的手：发出去的信、你记的一笔、办到了的那些（<b>已办</b>），
-                  加上还没到点的那些（<b>待办</b>）。今天是中间那条界，右边是还欠着的。</>
-              : <>不是你动的手：收到的信、Fairwind 到点干了什么、系统替你开的等待。</>}
-            <b>每一行都是从事实现算的</b>，点名字进卡对证。
-          </p>
-        </header>
-
-        {summary && (
-          <p className="lg-week">
-            近 7 天：发出 <b>{summary.sent}</b> 封 · 收到 <b>{summary.got}</b> 封
-            · 关掉 <b>{summary.closed}</b> 个等待 · 新开 <b>{summary.opened}</b> 个
-            {summary.notes > 0 && <> · 记了 <b>{summary.notes}</b> 笔</>}
-            {summary.fairwind > 0 && <> · Fairwind 到点动了 <b>{summary.fairwind}</b> 次</>}
-          </p>
-        )}
-
-        {reason && <p className="pnone">读不出来：{reason}。这不是「什么都没发生」。</p>}
-
-        {tab === 'cal' ? (
-          <>
-            {/* ── 方格 ──
-                窄窗口横着滚（跟 GitHub 一样），不压缩格子：格子一小就分不出深浅，
-                那是这张图唯一在说的话。 */}
-            <div className="lg-cal">
-              <div className="lg-cal-scroll">
-                <div className="lg-months">
-                  {marks.map((m, i) => <span key={i} className="lg-mon">{m}</span>)}
-                </div>
-                <div className="lg-grid-wrap">
-                  <div className="lg-wd">{WEEKDAY.map((w, i) => <span key={i}>{w}</span>)}</div>
-                  <div className="lg-grid" ref={gridRef} role="grid" aria-label="日历">
-                    {weeks.map((col, wi) => (
-                      <div className="lg-col" key={wi} role="row">
-                        {col.map((cell, di) => (cell ? (
-                          <button
-                            key={cell.day}
-                            type="button"
-                            role="gridcell"
-                            data-day={cell.day}
-                            /* 还没到的那几天画成空心：染成实心就等于说「这事办了」 */
-                            className={'lg-cell lv' + levelOf(cell.n)
-                              + (cell.future ? ' ahead' : '') + (cell.day === day ? ' on' : '')}
-                            // 一年 365 格只留一个 Tab 停靠点，其余靠方向键走
-                            tabIndex={cell.day === day ? 0 : -1}
-                            aria-label={`${md(cell.day)} ${cell.n} 件${cell.future ? '（待办）' : ''}`}
-                            aria-selected={cell.day === day}
-                            title={`${md(cell.day)} · ${cell.n} 件${cell.future ? '（待办）' : ''}`}
-                            onClick={() => setPickedDay(cell.day)}
-                            onKeyDown={move}
-                          />
-                        ) : <span className="lg-cell blank" key={di} aria-hidden="true" />))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="lg-legend">
-                <span>{span === 365 ? '这一年' : `这 ${span} 天`}共 {total} 件</span>
-                <span className="sp" />
-                少
-                {[0, 1, 2, 3, 4].map((l) => <i key={l} className={'lg-cell lv' + l} aria-hidden="true" />)}
-                多
-                <i className="lg-cell lv2 ahead" aria-hidden="true" style={{ marginLeft: 10 }} />
-                待办
-              </div>
-            </div>
-
-            {/* 点哪天看哪天。空的日子也说话——「这天没动静」跟「没查到」不是一回事。 */}
-            <section className="lg-day">
-              <h2>{md(day)}
-                {done.length + todo.length > 0 && <span className="lg-n">{done.length + todo.length} 件</span>}
-              </h2>
-              {todo.map((r, i) => (
-                <div className="lg-row todo" key={'t' + i}>
-                  <span className="lg-kind">待办</span>
-                  <div className="lg-b">
-                    <button className="nname" onClick={() => onOpen({
-                      subject_kind: r.subject_kind, subject_id: r.subject_id,
-                    })}>{谁(r)}</button>
-                    <div className="lg-what">{r.what}</div>
-                  </div>
-                </div>
-              ))}
-              {done.map((r, i) => <Row key={day + i} r={r} onOpen={onOpen} />)}
-              {!done.length && !todo.length && <p className="pnone">这天没有你办的事，也没有欠着的。</p>}
-            </section>
-
-            <p className="nnone">
-              看多久：
-              {[90, 365].map((d) => (
-                <button key={d} className={'lnk' + (span === d ? ' on' : '')}
-                        onClick={() => setSpan(d)}> {d === 365 ? '一年' : `${d} 天`}</button>
-              ))}
-            </p>
-          </>
-        ) : (
-          /* 流水：一条往下排。这一半问的是「刚刚发生了什么」——顺序问题，
-             不是形状问题，所以不摆方格。 */
-          <>
-            {flow.map(([d, rows]) => {
-              const mine = rows.filter((r) => !isMine(r))
-              return (
-                <section key={d} className="lg-day">
-                  <h2>{md(d)}<span className="lg-n">{mine.length} 件</span></h2>
-                  {mine.map((r, i) => <Row key={d + i} r={r} onOpen={onOpen} />)}
-                </section>
-              )
-            })}
-            {!flow.length && <p className="pnone">这 {span === 365 ? '一年' : span + ' 天'}没有收到什么，Fairwind 也没到点动过。</p>}
-            <p className="nnone">
-              看多久：
-              {[90, 365].map((d) => (
-                <button key={d} className={'lnk' + (span === d ? ' on' : '')}
-                        onClick={() => setSpan(d)}> {d === 365 ? '一年' : `${d} 天`}</button>
-              ))}
-            </p>
-          </>
-        )}
+  const selectDay = (key) => { setSelected(key); setAnchor(key) }
+  return <div className="page"><div className="page-inner lg-inner">
+    <header className="page-head">
+      <h1>{t("时间线")}</h1>
+      <div className="tabs" role="group" aria-label={t("时间线视图")}>
+        {[['cal', t("日历")], ['flow', t("Fairwind 动态")]].map(([key, label]) =>
+          <button key={key} className={'tab' + (tab === key ? ' on' : '')} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}
       </div>
-    </div>
-  )
+      <p className="note">{tab === 'cal' ? t("你的会议、邮件回复和待办安排。点开事项，查看详情。") : t("Fairwind 的工作、邮件往来和事项进展，都记录在这里。")}</p>
+    </header>
+    {tab === 'cal' ? <>
+      <GoogleCalendar value={calendar} />
+      <div className="schedule-toolbar">
+        <h2 aria-live="polite">{view === 'month' ? t("{v0} 年 {v1} 月", {v0: cursor.getFullYear(), v1: cursor.getMonth() + 1}) : `${md(dayKey(start))} — ${md(dayKey(shift(start, 6)))} · ${cursor.getFullYear()}`}</h2>
+        <div className="schedule-controls">
+          <button aria-label={view === 'month' ? t("上个月") : t("上一周")} onClick={() => navigate(-1)}>‹</button>
+          <button onClick={() => selectDay(today)}>{t("今天")}</button>
+          <button aria-label={view === 'month' ? t("下个月") : t("下一周")} onClick={() => navigate(1)}>›</button>
+        </div>
+        <div className="schedule-controls" role="group" aria-label={t("日历范围")}>
+          {[['month', t("月")], ['week', t("周")]].map(([key, label]) => <button key={key} aria-pressed={view === key} className={view === key ? 'on' : ''} onClick={() => setView(key)}>{label}</button>)}
+        </div>
+      </div>
+      <div className="schedule-scroll">
+        <div className={'schedule-grid ' + view}>
+          {weekdays().map((d) => <div className="schedule-weekday" key={d}>{d}</div>)}
+          {dates.map((date) => {
+            const key = dayKey(date), events = scheduled.get(key) || []
+            return <div key={key} className={'schedule-day' + (date.getMonth() !== cursor.getMonth() ? ' outside' : '') + (key === selected ? ' selected' : '')}>
+              <button className={'schedule-date' + (key === today ? ' today' : '')} aria-label={t("{v0}{v1}，{v2} 项安排", {v0: key, v1: key === today ? t(" 今天") : '', v2: events.length})} aria-pressed={key === selected} onClick={() => selectDay(key)}>{date.getDate()}</button>
+              {events.slice(0, view === 'month' ? 3 : events.length).map((r, i) => <button key={i} className={'schedule-event' + (r.google ? ' google' : r.state === 'MEETING_SET' ? ' meeting' : '')} onClick={() => openItem(r)}>
+                <span className="schedule-event-meta">{eventLabel(r)}</span>
+                <strong>{谁(r)}</strong><span>{r.google ? r.what : r.what || stateLine(r)}</span>
+              </button>)}
+              {view === 'month' && events.length > 3 && <button className="schedule-more" onClick={() => selectDay(key)}>{t("还有 ")}{events.length - 3}{t(" 项")}</button>}
+            </div>
+          })}
+        </div>
+      </div>
+      <section className="lg-day" aria-label={t("所选日期的安排")}>
+        <h2>{md(selected)}{selected === today ? t(" · 今天") : ''}<span className="lg-n">{rows.length}{t(" 项安排")}</span></h2>
+        {rows.map((r, i) => <div className="lg-row todo" key={i}><span className="lg-kind">{eventLabel(r)}</span><div className="lg-b"><button className="nname" onClick={() => openItem(r)}>{谁(r)}</button><div className="lg-what">{r.google ? r.what : r.what || stateLine(r)}</div></div>{!r.google && calendar.status?.connected && calendar.status?.target && <button className="lnk" disabled={calendar.busy} onClick={() => calendar.act('sync', { key: sourceKey(r) })}>{t('写入 Google 日历')}</button>}</div>)}
+        {!rows.length && <p className="pnone">{t("这一天没有已安排的事项。")}</p>}
+      </section>
+      <p className="nnone">{t("显示已记录日期的安排；会议标注时间，其他事项按待办或跟进日期显示。")}</p>
+    </> : <>
+      {summary && <p className="lg-week">{t("近 7 天：Fairwind 处理 ")}<b>{summary.fairwind}</b>{t(" 次 · 发出 ")}<b>{summary.sent}</b>{t(" 封 · 收到 ")}<b>{summary.got}</b>{t(" 封 · 完成 ")}<b>{summary.closed}</b>{t(" 项 · 新增 ")}<b>{summary.opened}</b>{t(" 个等待")}</p>}
+      {!data && <p className="pnone">{t("正在读取动态…")}</p>}
+      {data?.reason && <p className="pnone">{t("暂时无法读取动态：")}{data.reason}</p>}
+      <div className="lg-cal">
+        <div className="lg-cal-scroll">
+          <div className="lg-months">{marks.map((m, i) => <span key={i} className="lg-mon">{m}</span>)}</div>
+          <div className="lg-grid-wrap"><div className="lg-wd">{[t("一"), '', t("三"), '', t("五"), '', ''].map((d, i) => <span key={i}>{d}</span>)}</div>
+            <div className="lg-grid" aria-label={t("活动热力图")}>{weeks.map((week, i) => <div className="lg-col" key={i}>{week.map((cell, j) => cell ? <button key={cell.day} className={'lg-cell lv' + levelOf(cell.n) + (flowDay === cell.day ? ' on' : '')} aria-label={t("{v0}，{v1} 条动态", {v0: cell.day, v1: cell.n})} aria-pressed={flowDay === cell.day} title={t("{v0} · {v1} 条动态", {v0: cell.day, v1: cell.n})} onClick={() => setFlowDay(cell.day)} /> : <span key={j} className="lg-cell blank" />)}</div>)}</div>
+          </div>
+        </div>
+        <div className="lg-legend"><span>{t("近 ")}{span}{t(" 天 · ")}{[...counts.values()].reduce((a, b) => a + b, 0)}{t(" 条动态")}</span><span className="sp" />{t("少")}{[0, 1, 2, 3, 4].map((n) => <i key={n} className={'lg-cell lv' + n} />)}{t("多")}</div>
+      </div>
+      <p className="nnone">{[90, 365].map((n) => <button key={n} className={'lnk' + (span === n ? ' on' : '')} onClick={() => { setSpan(n); setFlowDay(null) }}>{n === 365 ? t("一年") : t("90 天")} </button>)}{flowDay && <button className="lnk" onClick={() => setFlowDay(null)}>{t("显示全部动态")}</button>}</p>
+      {(data?.days || []).filter(([d]) => !flowDay || d === flowDay).map(([d, entries]) => <section className="lg-day" key={d}><h2>{md(d)}<span className="lg-n">{entries.length}{t(" 件")}</span></h2>{entries.map((r, i) => <Row key={i} r={r} onOpen={onOpen} />)}</section>)}
+      {data && !data.reason && !(data.days || []).some(([d]) => !flowDay || d === flowDay) && <p className="pnone">{flowDay ? t("这一天没有动态。") : t("这段时间没有动态。")}</p>}
+    </>}
+  </div></div>
 }

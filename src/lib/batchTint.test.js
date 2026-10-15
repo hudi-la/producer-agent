@@ -55,3 +55,11 @@ test('空的不炸', () => {
   assert.equal(tintSlots([]).size, 0)
   assert.equal(slotOf(null, new Map()), null)
 })
+
+test('explicit stacks override task and scout grouping, with stable independent colors', () => {
+ const a={id:'a',stack_id:'s1',task_id:'old-task',source:'scout_custom'}
+ const b={id:'b',stack_id:'s1',task_id:null}
+ const c={id:'c',stack_id:'s2',task_id:'old-task'}
+ assert.equal(inBatch(a),true);assert.equal(inBatch(b),true)
+ const slots=tintSlots([a,b,c]);assert.equal(slotOf(a,slots),slotOf(b,slots));assert.notEqual(slotOf(a,slots),slotOf(c,slots))
+})

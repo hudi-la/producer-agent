@@ -77,11 +77,12 @@ export const FELL_BACK = {
 // 而界面完全看不出来——这已经害过一次：把「讲懂」改成后台扫之后，前端触发器删了、
 // 后台扫描没跑起来，整整一天没有一张新卡被读过，谁也没发现。
 // 所以两边各存一个日期，对不上就提示重启。改 brain/server.js 的行为时两处一起改。
-export const BRAIN_BUILD = '2026-10-04-error-logs'
+export const BRAIN_BUILD = '2026-10-14-release-candidate'
 
 export async function checkBrain() {
   try {
-    const res = await fetch(`${BRAIN}/health`, { method: 'GET' })
+    // 带上登录身份:线上后台按人记收信进度,不带身份问到的是一份空的(2026-10-07 测试账号连上 Gmail,右下角小窗不出来就是这个)
+    const res = await brainFetch(`${BRAIN}/health`, { method: 'GET' })
     if (!res.ok) return { up: false, stale: false, mail: null }
     const body = await res.json().catch(() => ({}))
     // mail = 邮件那一轮的状态。**收信只发生在脑子里**，所以脑子没开

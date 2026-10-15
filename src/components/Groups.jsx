@@ -5,6 +5,7 @@ import {
   cleanSubject, groupLine, memberNote, unknownMembers, knownMembers, genericMembers,
 } from '../lib/groupText.js'
 import Veil from './Veil.jsx'
+import { t } from '../i18n/index.js'
 
 // 一伙人（0122）：一串信里好几个人来回说话，其中还有人没进通讯录。
 //
@@ -29,15 +30,15 @@ function GroupRow({ g, onCollect, onSkip, busy, run }) {
       <div className="gr-body">
         <div className="gr-top">
           <b><Veil>{cleanSubject(g.subject)}</Veil></b>
-          <span className="gr-kind is-group">一伙人</span>
+          <span className="gr-kind is-group">{t('一伙人')}</span>
           {g.on_line && <span className="gr-kind"><Veil>{g.on_line}</Veil></span>}
         </div>
         <p className="gr-why"><Veil>{groupLine(g)}</Veil></p>
         {known.length > 0 && (
-          <div className="gr-meta">已经认识的：<Veil>{names(known).join('、')}</Veil></div>
+          <div className="gr-meta">{t('已经认识的：')}<Veil>{names(known).join(t('、'))}</Veil></div>
         )}
         <div className="gr-names">
-          还没进通讯录的 {unknown.length} 个：
+          {t('还没进通讯录的 {n} 个：', { n: unknown.length })}
           {unknown.map((m) => (
             <span className={`gr-name ${m.name ? '' : 'is-bare'}`} key={m.email} title={m.email}>
               <Veil>{m.name || m.email}</Veil>
@@ -46,20 +47,20 @@ function GroupRow({ g, onCollect, onSkip, busy, run }) {
         </div>
         {generic.length > 0 && (
           <div className="gr-meta">
-            <Veil>{names(generic).join('、')}</Veil> 看着是共享信箱，不跟着一起收，留在下面单独认。
+            <Veil>{names(generic).join(t('、'))}</Veil> {t('看着是共享信箱，不跟着一起收，留在下面单独认。')}
           </div>
         )}
         <label className="gr-event">
-          在哪个活动里合作过
+          {t('在哪个活动里合作过')}
           <input value={event} onChange={(e) => setEvent(e.target.value)} disabled={busy} />
         </label>
       </div>
       <div className="gr-act">
         <button className="lnk" disabled={busy || !event.trim() || !unknown.length}
                 onClick={() => onCollect(g, event.trim())}>
-          {run ? `收着 ${run.i}/${run.n}` : busy ? '收着…' : `把这 ${unknown.length} 个都收进通讯录`}
+          {run ? t('收着 {i}/{n}', { i: run.i, n: run.n }) : busy ? t('收着…') : t('把这 {n} 个都收进通讯录', { n: unknown.length })}
         </button>
-        <button className="lnk gr-no" disabled={busy} onClick={() => onSkip(g)}>这串不算</button>
+        <button className="lnk gr-no" disabled={busy} onClick={() => onSkip(g)}>{t('这串不算')}</button>
       </div>
     </div>
   )
@@ -94,14 +95,14 @@ export default function Groups({ rows = [], onDone }) {
         ok++; mails += out.promoted || 0
       } catch (e) {
         bad++
-        if (e.needsAuth) { setErr(`${e.message}——${e.fix || '重新授权一次'}`); break }
-        if (/fetch|Failed to fetch|ECONNREFUSED/i.test(String(e.message))) { setErr('脑子没开（npm run brain），收人要它去 Gmail 拉正文'); break }
+        if (e.needsAuth) { setErr(`${e.message}——${e.fix || t('重新授权一次')}`); break }
+        if (/fetch|Failed to fetch|ECONNREFUSED/i.test(String(e.message))) { setErr(t('脑子没开（npm run brain），收人要它去 Gmail 拉正文')); break }
       }
     }
     setRun(null); setBusy(null)
     if (ok) {
       try { await markThread(g.thread, 'collected', event) } catch (e) { setErr(e.message) }
-      say(`「${event}」这一伙：收了 ${ok} 个，搬进来 ${mails} 封${bad ? `；${bad} 个没成，这串还在上面` : ''}`)
+      say(t('「{event}」这一伙：收了 {ok} 个，搬进来 {mails} 封', { event, ok, mails }) + (bad ? t('；{n} 个没成，这串还在上面', { n: bad }) : ''))
     }
     onDone?.()
   }
@@ -116,13 +117,13 @@ export default function Groups({ rows = [], onDone }) {
   return (
     <section className="psect">
       <div className="psect-h">
-        <h2>一伙人</h2>
-        {rows.length > 0 && <span className="pcount">{rows.length} 串</span>}
+        <h2>{t('一伙人')}</h2>
+        {rows.length > 0 && <span className="pcount">{t('{n} 串', { n: rows.length })}</span>}
       </div>
       {rows.length > 0 && (
         <p className="pnone" style={{ paddingTop: 0 }}>
-          这几串信里<b>好几个人来回说过话</b>——同期的驻地、一个展的参展者、一个工作坊的学员。
-          写上在哪个活动里合作过，一下全收进通讯录，每张名片上都会记着这句。
+          {t('这几串信里')}<b>{t('好几个人来回说过话')}</b>{t('——同期的驻地、一个展的参展者、一个工作坊的学员。')}
+          {' '}{t('写上在哪个活动里合作过，一下全收进通讯录，每张名片上都会记着这句。')}
         </p>
       )}
       {rows.map((g) => (

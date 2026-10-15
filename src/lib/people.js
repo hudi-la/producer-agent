@@ -1,5 +1,6 @@
 import { reportError } from './reportError.js'
 import { errorText } from './userError.js'
+import { t } from '../i18n/index.js'
 import { supa, BRAIN, brainFetch } from './backends.js'
 import { streamChat, NoStream } from './chat.js'
 
@@ -11,7 +12,7 @@ import { streamChat, NoStream } from './chat.js'
 // 好处跟当初一样：sidecar 开不开、是不是最新的，都不影响你整理自己的名片。
 
 const rpc = async (fn, args) => {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc(fn, args)
   if (error) throw new Error(error.message)
   return data
@@ -111,7 +112,7 @@ export async function fetchThreads(contactId) {
 export async function fetchContactDeliverables(contactId) {
   if (!supa) return []
   const { data, error } = await supa
-    .from('v_pa_deliverables').select('*').eq('contact_id', contactId).eq('kind', 'email')
+    .from('v_pa_deliverables').select('*').eq('contact_id', contactId)
   if (error) reportError(error, t('读取联系人或往来失败')); return error ? [] : (data || [])
 }
 
@@ -126,10 +127,10 @@ const post = async (path, body) => {
       body: JSON.stringify(body),
     })
   } catch (_) {
-    throw new Error('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain')
+    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
   }
   const out = await res.json().catch(() => ({}))
-  if (!res.ok || out?.error) throw new Error(errorText(out?.error) || `脑子出错了（${res.status}）`)
+  if (!res.ok || out?.error) throw new Error(errorText(out?.error) || t('脑子出错了（{status}）', { status: res.status }))
   return out
 }
 

@@ -57,7 +57,7 @@ export function splitStates(rows) {
  * 是按钮按的）。不打的话要等 brain 下一轮判那条笔，提醒会多挂几分钟。
  * OWE_THANKS 另有一个落笔处（contacts.intro_thanked_at），一并落。
  */
-export async function markHandled(it, note = '已处理（在通知栏按的）') {
+export async function markHandled(it, note = '已处理（在通知栏按的）') { // i18n-ok 存进库的笔记原文（进时间线、brain 读它），跟库里已有的同一句
   const { data: row, error } = await supa.rpc(
     it.subject_kind === 'pursuit' ? 'pa_add_pursuit_note' : 'pa_add_contact_message',
     it.subject_kind === 'pursuit'
@@ -68,8 +68,8 @@ export async function markHandled(it, note = '已处理（在通知栏按的）'
   const noteId = row?.id
   if (noteId) {
     await supa.rpc('pa_tag_message', {
-      p_message_id: noteId, p_situation: '已处理按钮',
-      p_resolves: true, p_resolves_why: '你按了【已处理】', p_gist: note,
+      p_message_id: noteId, p_situation: '已处理按钮', // i18n-ok 存进库的标签值
+      p_resolves: true, p_resolves_why: '你按了【已处理】', p_gist: note, // i18n-ok 存进库的依据原文，跟 brain 写的同一列
     })
   }
   if (it.state === 'OWE_THANKS') {

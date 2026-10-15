@@ -1,4 +1,5 @@
 import { supa, BRAIN, brainFetch } from './backends.js'
+import { t } from '../i18n/index.js'
 
 // 全局邮件同步的前端侧。
 //
@@ -10,7 +11,7 @@ import { supa, BRAIN, brainFetch } from './backends.js'
 // 案照样翻得了；只有「认」那个按钮点不动。这比整页瞎掉强得多。
 
 const rpc = async (fn, args) => {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc(fn, args)
   if (error) throw new Error(error.message)
   return data

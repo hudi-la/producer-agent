@@ -100,7 +100,7 @@ export function rekey(key, { from, to }) {
   if (from && key.startsWith(`${from}/`)) return `${to}/${key.slice(from.length + 1)}`
   return `${to}/${key}`
 }
-function rekeyTables(tables, opt) {
+export function rekeyTables(tables, opt) {
   if (!opt.to) return tables
   const out = { ...tables }
   if (Array.isArray(out.attachments)) out.attachments = out.attachments.map((r) => ({ ...r, storage_key: rekey(r.storage_key, opt) }))

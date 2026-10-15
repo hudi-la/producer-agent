@@ -22,6 +22,7 @@
 // 来路三处都写：名片 notes（界面「关系记忆」）、名片 meta.source、
 // 线上那一行的 note（卡片「相关的人」下面一行小字）。
 
+import { outputLang } from '../prompt.js'
 import { db, putVerdict } from './store.js'
 import { gmailFor, getMetadata } from './gmail.js'
 import { client as authClient } from './auth.js'
@@ -70,8 +71,27 @@ const md = (t) => {
  * pursuit_id 为空 = 人脉往来，**没有线**（0126）。那就别说「在『X』那条线」——
  * 那条线不存在，编一个出来比不说更坏。改说「跟谁的往来里」。
  */
-export function provenance(r) {
+export function provenance(r, lang = outputLang()) {
   const d = md(r.sent_at)
+  // 英文版(2026-10-08):这几句是规则写的,不过模型,所以得自己出一份英文
+  if (lang === 'en') {
+    const via = r.via_name || r.via_email || ''
+    const line = r.pursuit_id ? ` on "${r.pursuit_title}"` : ''
+    let base, party
+    if (r.kind === 'reply') {
+      base = r.pursuit_id ? `Replied on ${d} in the "${r.pursuit_title}" thread; same organization as people on that pursuit`
+        : `Replied on ${d} in your thread; same organization as someone you already know`
+      party = `Replied in this pursuit's thread on ${d}, same organization`
+    } else {
+      const verb = r.kind === 'to' ? 'also sent to' : 'copied'
+      if (r.via_direction === 'out') { base = `You ${verb} this address when writing to ${via} on ${d}${line}`; party = `You ${verb} them when writing to ${via} on ${d}` }
+      else {
+        base = r.pursuit_id ? `${via} ${verb} this address when replying${line} on ${d}` : `${via} ${verb} this address in an email to you on ${d}`
+        party = `${via} ${verb} them when replying on ${d}`
+      }
+    }
+    return { base, note: `${base} (added to contacts automatically)`, party }
+  }
   const onLine = r.pursuit_id ? `在「${r.pursuit_title}」` : ''
   const via = r.via_name || r.via_email || ''
   let base, party
@@ -192,7 +212,9 @@ export async function copiedPass({ apply = true, log = console.log } = {}) {
       if (r.verdict === d.verdict && r.business) { skipped.push({ email: r.email, why: '已在等你点头' }); continue }
       if (r.decided_by === 'you') { skipped.push({ email: r.email, why: '你定过的' }); continue }
       if (!r.name_checked) { skipped.push({ email: r.email, why: '署名还没补' }); continue }
-      const why = p.base + (d.unsure ? '。信头上没有署名，看不出是人还是共享信箱' : '') + '，还没进通讯录'
+      const why = outputLang() === 'en'
+        ? p.base + (d.unsure ? '. No name in the header, so it is unclear whether this is a person or a shared inbox' : '') + '. Not in your contacts yet'
+        : p.base + (d.unsure ? '。信头上没有署名，看不出是人还是共享信箱' : '') + '，还没进通讯录'
       if (!apply) { greeted.push({ email: r.email, verdict: d.verdict, why, dry: true }); continue }
       try {
         await putVerdict({ email: r.email, verdict: d.verdict, business: true, why,

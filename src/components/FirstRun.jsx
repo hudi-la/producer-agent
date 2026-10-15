@@ -17,6 +17,10 @@ export default function FirstRun({ onDone, hosted = false }) {
   const [provider, setProvider] = useState('claude-key')
   const [keys, setKeys] = useState({ apiKey: '', oauthToken: '', openaiKey: '', geminiKey: '' })
   const [backupDir, setBackupDir] = useState('')
+  // 已经接上一种模型(填了 key,或订阅已登录):「先跳过」那颗就不出了——没东西可跳(2026-10-08 他说的)
+  const [subOk, setSubOk] = useState(false)
+  const KEY_OF = { 'claude-key': 'apiKey', openai: 'openaiKey', gemini: 'geminiKey' }
+  const hasModel = provider === 'chatgpt-subscription' || provider === 'claude-subscription' ? subOk : Boolean(keys[KEY_OF[provider]]?.trim())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   // 还没初始化也能更新:有新版本就在最上面给一颗按钮,不用先填完三样
@@ -36,7 +40,7 @@ export default function FirstRun({ onDone, hosted = false }) {
       const r = await saveHosted({ provider, ...Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, v.trim()])) })
       setBusy(false)
       if (r.error) return setErr(errorText(r.error))
-      if (!r.ready) return setErr(provider === 'claude-subscription' ? t('先登录 Claude,或者点下面「先跳过」') : t('填一个 key,或者点下面「先跳过」'))
+      if (!r.ready) return setErr(provider === 'chatgpt-subscription' ? t('先登录 ChatGPT,或者点下面「先跳过」') : provider === 'claude-subscription' ? t('先登录 Claude,或者点下面「先跳过」') : t('填一个 key,或者点下面「先跳过」'))
       return onDone?.()
     }
     const r = await supa.setup({ lang, email: email.trim(), provider, ...Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, v.trim()])), backupDir: backupDir.trim() })
@@ -49,8 +53,8 @@ export default function FirstRun({ onDone, hosted = false }) {
   return (
     <div className="first-run">
       <form onSubmit={submit}>
-        <div className="fr-lang" role="radiogroup" aria-label="Language / 语言">
-          <button type="button" className={lang === 'zh' ? 'on' : ''} onClick={() => pick('zh')}>中文</button>
+        <div className="fr-lang" role="radiogroup" aria-label="Language / 语言">   {/* i18n-ok 语言开关本来就两种文字 */}
+          <button type="button" className={lang === 'zh' ? 'on' : ''} onClick={() => pick('zh')}>中文</button>   {/* i18n-ok 语言开关本来就两种文字 */}
           <button type="button" className={lang === 'en' ? 'on' : ''} onClick={() => pick('en')}>English</button>
         </div>
         {upd && <div className="fr-upd">{t(' · 有新版本 {v}', { v: upd.latest }).replace(/^ · /, '')}{upd.note ? ':' + upd.note : ''} <button type="button" className="b" onClick={applyUpdate}>{t('更新到 {v}', { v: upd.latest })}</button>{updMsg && (updMsg.startsWith(t('没更成:')) ? <ErrorNotice error={updMsg} /> : <small>{updMsg}</small>)}</div>}
@@ -62,14 +66,14 @@ export default function FirstRun({ onDone, hosted = false }) {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>}
         <section className="fr-sec">
           <div className="fr-sec-h">{t('模型')}</div>
-          <ProviderPicker value={provider} onChange={setProvider} keys={keys} onKey={(k, v) => setKeys((s) => ({ ...s, [k]: v }))} />
+          <ProviderPicker value={provider} onChange={(p) => { setProvider(p); setSubOk(false) }} keys={keys} onKey={(k, v) => setKeys((s) => ({ ...s, [k]: v }))} onConnected={setSubOk} />
         </section>
         {!hosted && <label>{t('备份放哪个文件夹')}<small>{t('选一个在 iCloud Drive 或 Google Drive 里的，备份就自动上了你自己的云。可以先空着')}</small>
           <input value={backupDir} onChange={(e) => setBackupDir(e.target.value)} placeholder="/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Fairwind" /></label>}
         {err && <ErrorNotice error={err} context={t('开始使用')} />}
         <footer className="fr-foot">
           <button className="fr-go" disabled={busy}>{busy ? <><Spin />{t('正在保存…')}</> : t('开始使用')}</button>
-          {hosted && <button type="button" className="fr-skip" disabled={busy} onClick={skip}>{t('先跳过,以后在设置里接')}</button>}
+          {hosted && !hasModel && <button type="button" className="fr-skip" disabled={busy} onClick={skip}>{t('先跳过,以后在设置里接')}</button>}
         </footer>
       </form>
     </div>

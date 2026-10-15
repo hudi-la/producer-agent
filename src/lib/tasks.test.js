@@ -28,6 +28,13 @@ test('状态：正在跑 > 排上了 > 下次 > 没排期', () => {
   assert.match(runState({ running_since: '2026-09-07T12:00:00Z' }, { now }).text, /可能卡住了/)
 })
 
+test('分批搜索暂停时显示续跑而非普通下次排期；再次触发显示排队', () => {
+  const task = { config: { scout_progress: { status: 'paused' } }, enabled: true, next_run_at: '2026-09-14T15:00:00Z' }
+  assert.equal(runState(task, { tz: 'America/Los_Angeles' }).kind, 'paused')
+  assert.match(runState(task, { tz: 'America/Los_Angeles' }).text, /9\/14 08:00/)
+  assert.equal(runState({ ...task, run_now: true }).kind, 'queued')
+})
+
 test('「新」= seen_at 明确是 null；种子没这个键不算', () => {
   assert.equal(isFresh({ seen_at: null }), true)
   assert.equal(isFresh({ seen_at: '2026-08-08T00:00:00Z' }), false)

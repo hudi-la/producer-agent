@@ -9,16 +9,19 @@
 //   POST /settings | /setup   改设置(只改传了的;空串清掉;填错栏的 key 拦下)
 //   GET/POST /judgments/files 判据文档(跟本机版同一套界面)
 //   /claude/*                 Claude 订阅一键登录,各人一个 HOME
-//   /chatgpt/*                线上第一期不开(Codex 的 Linux 登录流程下一期验)
+//   /chatgpt/*                按用户隔离的 Codex 设备码登录
 //   GET  /backup/export       我名下所有行 + 附件 → 一个 zip(brain/backup,跟本机版同一种包)
 //   POST /backup/import       上传同样的 zip 写回;?wipe=1 先清我名下的行
 //   POST /settings/mcp-token/rotate  换一串 MCP 令牌
+//   POST /gmail/connect       连接 Gmail:回 Google 授权网址(回调在 server.js,认人那道门之前)
+//   POST /gmail/disconnect    断开:Google 那边撤销 + 清钥匙 + 邮件关。已经收进库的信不删
 //   GET 静态文件               dist/ 里真有的才出,/ 回 index.html
 import { existsSync, statSync, readFileSync, mkdirSync } from 'node:fs'
 import { resolve, normalize, extname } from 'node:path'
 import { currentTenant, rowFromSettings } from '../tenant.js'
 import { wrongKey, PROVIDERS } from '../local/settings.js'
 import { FILES as JUDGMENT_FILES, lintJudgments } from '../judgments.js'
+import { chatgptStatus, chatgptLogin } from '../engine/codex.js'
 import { createClaudeAuth } from '../local/claudeAuth.js'
 import { SCOUT_DEFAULT, isSeedPrompt } from '../scoutDefault.js'
 
@@ -49,7 +52,7 @@ export function publicSettingsOf(s) {
            model: s.model || '', modelCheap: s.modelCheap || '', backupDir: '', judgmentsEnabled: s.judgmentsEnabled !== false, lang: s.lang === 'zh' ? 'zh' : 'en',
            ready: Boolean(readyOf(s)), mcpToken: s.mcpToken || '' }
 }
-const readyOf = (s) => s.provider === 'claude-subscription' ? s.oauthToken : s.provider === 'openai' ? s.openaiKey : s.provider === 'gemini' ? s.geminiKey : s.provider === 'chatgpt-subscription' ? false : s.apiKey
+const readyOf = (s) => s.provider === 'claude-subscription' ? s.oauthToken : s.provider === 'openai' ? s.openaiKey : s.provider === 'gemini' ? s.geminiKey : s.provider === 'chatgpt-subscription' ? s.chatgptConnected : s.apiKey
 
 /** 处理了返回 true;不是这儿的事返回 false。ctx = { hosted, distDir } */
 export async function handleHostedRoute(req, res, ctx) {
@@ -57,8 +60,15 @@ export async function handleHostedRoute(req, res, ctx) {
   const p = url.pathname
   const t = currentTenant()
   // 没带身份的只能看静态文件;别的路 server.js 已经拦了(401),这里再守一道
-  const needsMe = (req.method === 'GET' && p === '/me') || p === '/settings' || p === '/setup' || p.startsWith('/claude/') || p.startsWith('/chatgpt/') || p === '/judgments/files' || p.startsWith('/backup/') || p === '/settings/mcp-token/rotate'
+  const needsMe = (req.method === 'GET' && p === '/me') || p === '/settings' || p === '/setup' || p.startsWith('/claude/') || p.startsWith('/chatgpt/') || p === '/judgments/files' || p.startsWith('/backup/') || p === '/settings/mcp-token/rotate' || p.startsWith('/gmail/')
   if (needsMe && !t) { json(res, 401, { error: '请先登录 / sign in first' }); return true }
+
+  const auth = ctx.chatgptAuth || { status: chatgptStatus, login: (dir, options) => chatgptLogin(dir, undefined, { ...options, deviceCode: true }) }
+  // Recheck the actual per-user credentials; never trust a browser-supplied connected flag.
+  if (req.method === 'GET' && (p === '/me' || p === '/settings') && t.settings.provider === 'chatgpt-subscription') {
+    try { t.settings = { ...t.settings, chatgptConnected: Boolean((await auth.status(t.dataDir)).connected) } }
+    catch { t.settings = { ...t.settings, chatgptConnected: false } }
+  }
 
   if (req.method === 'GET' && p === '/me') {
     const s = t.settings
@@ -78,10 +88,20 @@ export async function handleHostedRoute(req, res, ctx) {
     if (PROVIDERS.includes(body.provider)) patch.provider = body.provider
     if (typeof body.judgmentsEnabled === 'boolean') patch.judgmentsEnabled = body.judgmentsEnabled
     if (body.lang === 'zh' || body.lang === 'en') patch.lang = body.lang
+    if ((patch.provider || t.settings.provider) === 'chatgpt-subscription' && !(p === '/setup' && body.skip === true && !body.provider)) {
+      try {
+        if (!t.dataDir) throw new Error('服务器未配置账号数据目录 / Account data directory is not configured')
+        const status = await auth.status(t.dataDir)
+        if (!status.connected) { json(res, 400, { error: { message: '请先完成 ChatGPT 登录，再保存 / Complete ChatGPT sign-in before saving' } }); return true }
+        patch.chatgptConnected = true
+      } catch (e) { json(res, 503, { error: { message: e.message } }); return true }
+    }
     // 进门那页走过了:要么真接上了模型,要么学员明说「先跳过」。没接上就点「开始使用」不算——不然那页再也不出来
     if (body.onboarded === true && (body.skip === true || readyOf({ ...t.settings, ...patch }))) patch.onboarded = true
-    if ((patch.provider || t.settings.provider) === 'chatgpt-subscription') { json(res, 400, { error: { message: 'ChatGPT 订阅线上还没开;用 API key 或 Claude 订阅 / ChatGPT subscription is not available online yet' } }); return true }
+
     const r = await save(t, ctx, patch)
+    // 刚接上模型:收信那边要是正等着(没模型认不了人),马上接着,不等五分钟那一拍
+    if (r.ready && t.modules?.mail) ctx.kickMail?.(t.owner)
     if (patch.lang) { t.marks.seedLang = null; try { await localizeSeedTask(t) } catch (_) {} }
     if (r.error) { json(res, 500, { error: { message: r.error } }); return true }
     json(res, 200, { ok: true, ready: r.ready, ...r.pub })
@@ -112,7 +132,16 @@ export async function handleHostedRoute(req, res, ctx) {
     } catch (e) { if (p !== '/claude/status') console.warn(`  ⚠️ ${t.email} 登录 Claude:${e.message.slice(0, 200)}`); json(res, p === '/claude/status' ? 200 : 400, { ...a.view(), ...connected(), error: { message: e.message } }) }
     return true
   }
-  if (p === '/chatgpt/status' || p === '/chatgpt/login') { json(res, p === '/chatgpt/status' ? 200 : 501, { connected: false, error: { message: 'ChatGPT 订阅线上还没开 / not available online yet' } }); return true }
+  if (p === '/chatgpt/status' || p === '/chatgpt/login') {
+    if (req.method !== (p.endsWith('/login') ? 'POST' : 'GET')) { json(res, 405, { error: { message: 'Method not allowed' } }); return true }
+    res.setHeader('Cache-Control', 'no-store')
+    try {
+      if (!t.dataDir) throw new Error('服务器未配置账号数据目录 / Account data directory is not configured')
+      const body = p.endsWith('/login') ? await readJson(req) : {}
+      json(res, 200, await (p.endsWith('/login') ? auth.login(t.dataDir, { restart: body.restart === true }) : auth.status(t.dataDir)))
+    } catch (e) { json(res, 503, { connected: false, error: { message: e.message } }) }
+    return true
+  }
 
   // 判据文档:库里那个人的几行,页面上的编辑器跟本机版同一套(文件名是键)
   if (req.method === 'GET' && p === '/judgments/files') {
@@ -147,6 +176,24 @@ export async function handleHostedRoute(req, res, ctx) {
     ctx.hosted.invalidate(t.owner)
     t.settings = { ...t.settings, mcpToken: data }
     json(res, 200, { ok: true, mcpToken: data })
+    return true
+  }
+
+  // 连接 / 断开 Gmail(设计稿 2026-10-06 D4)
+  if (req.method === 'POST' && p === '/gmail/connect') {
+    try { json(res, 200, { url: ctx.gmail.start(t.owner, { loginHint: t.email }).url }) }
+    catch (e) { json(res, 500, { error: { message: e.message } }) }
+    return true
+  }
+  if (req.method === 'POST' && p === '/gmail/disconnect') {
+    const rt = t.settings.gmailRefreshToken
+    const { error } = await t.db.rpc('pa_set_gmail', { p_address: null, p_refresh_token: null })
+    if (error) { json(res, 500, { error: { message: error.message } }); return true }
+    await ctx.gmail.revoke(rt)
+    ctx.hosted.invalidate(t.owner)
+    t.marks.gmail = null
+    console.log(`  · ${t.email} 断开了 Gmail`)
+    json(res, 200, { ok: true })
     return true
   }
 

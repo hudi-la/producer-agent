@@ -45,9 +45,15 @@ test('库里那一行 ↔ settings 对象', () => {
   assert.deepEqual(rowFromSettings({ apiKey: 'k', lang: 'en', backupDir: '/x' }), { api_key: 'k', lang: 'en' })   // 机器级的字段不进库
 })
 
-test('modulesFor:档案永远开,邮件线上第一期不开也不提供', () => {
-  assert.deepEqual(modulesFor({ modules: { pursuits: false, mail: true } }), { profile: true, pursuits: false, mail: false, canToggle: true, mailOffered: false })
+test('modulesFor:档案永远开;邮件 = 连上 Gmail 且开着且机会线开着', () => {
+  assert.deepEqual(modulesFor({ modules: { pursuits: false, mail: true } }), { profile: true, pursuits: false, mail: false, canToggle: true, mailOffered: true, gmailAddress: '' })
   assert.equal(modulesFor({}).pursuits, true)
+  assert.equal(modulesFor({ modules: { mail: true } }).mail, false, '没连 Gmail,开关拨着也不算开')
+  const on = modulesFor({ modules: { mail: true }, gmailRefreshToken: 'rt', gmailAddress: 'a@gmail.com' })
+  assert.equal(on.mail, true); assert.equal(on.gmailAddress, 'a@gmail.com')
+  assert.equal(modulesFor({ modules: { mail: false }, gmailRefreshToken: 'rt', gmailAddress: 'a@gmail.com' }).mail, false)
+  assert.equal(modulesFor({ modules: { pursuits: false, mail: true }, gmailRefreshToken: 'rt' }).mail, false, '机会线关了邮件跟着关')
+  assert.equal(settingsFromRow({ gmail_address: 'a@gmail.com', gmail_refresh_token: 'rt' }).gmailRefreshToken, 'rt')
 })
 
 test('parseBearer / jwtPayload', () => {

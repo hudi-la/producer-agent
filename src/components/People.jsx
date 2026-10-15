@@ -4,6 +4,7 @@ import Strangers from './Strangers.jsx'
 import { useModules } from '../lib/ModulesContext.jsx'
 import Groups from './Groups.jsx'
 import Veil from './Veil.jsx'
+import { t } from '../i18n/index.js'
 import { goldLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
 
@@ -24,8 +25,9 @@ import { key as qKey } from '../lib/queue.js'
 //
 // **这儿也没有过卡。** 队列是「你还欠着几件事」，那是项目争取那边的形状。
 
-const SRC = { email: '来自那封信', checkin: '你打的卡', meet: '你记的一笔' }
-const CH  = { email: '邮箱', wechat: '微信', sms: '短信', whatsapp: 'WhatsApp', ig: 'IG', phone: '电话' }
+// 函数而不是常量：标签要在渲染时按当前语言取
+const SRC = () => ({ email: t('来自那封信'), checkin: t('你打的卡'), meet: t('你记的一笔') })
+const CH  = () => ({ email: t('邮箱'), wechat: t('微信'), sms: t('短信'), whatsapp: 'WhatsApp', ig: 'IG', phone: t('电话') })
 
 
 /** 用什么找他。channels 空着就退回 email 那一列——它一直是主渠道。 */
@@ -46,6 +48,11 @@ export default function People({
 }) {
   const mods = useModules()
   const [q, setQ] = useState('')
+  // 有人等着认的时候,「新联系人」那一格自己出来(2026-10-07 他定:别等人去点按钮才看见)。
+  // 你按了「收起」就先收着;等的人数变了(来了新的)再自己出来
+  const waiting = (mods.mail ? strangers.length : 0) + groups.length
+  const [collapsedAt, setCollapsedAt] = useState(null)
+  const showAdd = addOpen || (waiting > 0 && collapsedAt !== waiting)
 
   // 通讯录装的是**你会写信的对象**，不是只装人。机构和它的共享信箱也在里面。
   const entries = useMemo(() => [
@@ -80,7 +87,7 @@ export default function People({
   const nowOrg = (c) => {
     const cur = (c.orgs || []).find((o) => !o.until)
     return cur ? [cur.org, cur.role].filter(Boolean).join(' · ')
-      : ((c.orgs || []).length ? '（现在没挂机构）' : [c.org, c.role].filter(Boolean).join(' · '))
+      : ((c.orgs || []).length ? t('（现在没挂机构）') : [c.org, c.role].filter(Boolean).join(' · '))
   }
 
   // ── 一张名片 ──
@@ -121,17 +128,17 @@ export default function People({
         {能勾 && <span className="pc-check" aria-hidden="true" />}
 
         <div className="pc-t">
-          <Veil>{isOrg ? e.o.org : (e.c.name || '未具名联系人')}</Veil>
-          {isOrg && <span className="pchip org">机构</span>}
+          <Veil>{isOrg ? e.o.org : (e.c.name || t('未具名联系人'))}</Veil>
+          {isOrg && <span className="pchip org">{t('机构')}</span>}
           {/* 名片角上的记号：这张今天挑了。跟看板上那张卡同一套。 */}
-          {desk.has(isOrg ? qKey('org', e.o.org) : k) && <span className="pc-desk" aria-label="在展开的卡片区">在展开的卡片区</span>}
+          {desk.has(isOrg ? qKey('org', e.o.org) : k) && <span className="pc-desk" aria-label={t('在展开的卡片区')}>{t('在展开的卡片区')}</span>}
         </div>
 
         <div className="pc-p ghost">
           <Veil>
             {isOrg
-              ? (e.o.mailboxes?.[0]?.email || '没有共享信箱')
-              : (nowOrg(e.c) || '（没挂机构）')}
+              ? (e.o.mailboxes?.[0]?.email || t('没有共享信箱'))
+              : (nowOrg(e.c) || t('（没挂机构）'))}
           </Veil>
         </div>
 
@@ -141,13 +148,13 @@ export default function People({
         <div className="pc-m">
           {isOrg ? (
             <>
-              <span className="pchip">{e.o.people_now} 人{e.o.people_past ? ` · 走了 ${e.o.people_past}` : ''}</span>
-              {e.o.mail_count > 0 && <span className="pchip">{e.o.mail_count} 封</span>}
+              <span className="pchip">{t('{n} 人', { n: e.o.people_now })}{e.o.people_past ? t(' · 走了 {n}', { n: e.o.people_past }) : ''}</span>
+              {e.o.mail_count > 0 && <span className="pchip">{t('{n} 封', { n: e.o.mail_count })}</span>}
             </>
           ) : (
             <>
-              {channelsOf(e.c).map((x, i) => <span key={i} className="pchip">{CH[x.kind] || x.kind}</span>)}
-              {e.c.pursuits?.length > 0 && <span className="pchip">{e.c.pursuits.length} 条线</span>}
+              {channelsOf(e.c).map((x, i) => <span key={i} className="pchip">{CH()[x.kind] || x.kind}</span>)}
+              {e.c.pursuits?.length > 0 && <span className="pchip">{t('{n} 条线', { n: e.c.pursuits.length })}</span>}
             </>
           )}
           <span className="sp" />
@@ -182,29 +189,30 @@ export default function People({
             <circle cx="6" cy="6" r="4.4" /><path d="M9.3 9.3 13 13" />
           </svg>
           <input value={q} onChange={(e) => setQ(e.target.value)}
-                 placeholder="找谁？名字、机构、邮箱" autoComplete="off" />
-          <span className="pcount">{contacts.length} 人 · {orgs.length} 机构</span>
+                 placeholder={t('找谁？名字、机构、邮箱')} autoComplete="off" />
+          <span className="pcount">{t('{a} 人 · {b} 机构', { a: contacts.length, b: orgs.length })}</span>
         </div>
 
         {/* 加人收进带子上那颗「新联系人」后面。它是**偶尔一次**的动作
             （粘个邮箱、让它去读信、你点头），而这一页九成时间是在查人；
             常驻在页面顶上，等于每天替一件偶尔的事付一段版面。 */}
-        {addOpen && (
+        {showAdd && (
           <section className="ppl-add">
             <div className="psect-h">
-              <h2>新联系人</h2>
+              <h2>{t('新联系人')}</h2>
               <span className="sp" />
-              <button className="lnk" onClick={() => onCloseAdd?.()}>收起</button>
+              <button className="lnk" onClick={() => { setCollapsedAt(waiting); onCloseAdd?.() }}>{t('收起')}</button>
             </div>
-            {/* 一伙人（0122）先于单个地址：一串信里十几个人，一下收完 */}
-            <Groups rows={groups} onDone={onAdded} />
+            {/* 一个个的人排前面(2026-10-08 他说「一个一个地审」):新用户第一次收完信有上百个,
+                「一伙人」排在前面会把它们顶到很下面。一伙人(0122)跟在后面,一串信里十几个人一下收完 */}
             {mods.mail && <Strangers rows={strangers} contacts={contacts} onDone={onAdded} />}
+            <Groups rows={groups} onDone={onAdded} />
           </section>
         )}
 
         {found && (
           <div className="psect-h">
-            <h2>找到的</h2><span className="pcount">{shown.length} 个</span>
+            <h2>{t('找到的')}</h2><span className="pcount">{t('{n} 个', { n: shown.length })}</span>
           </div>
         )}
 
@@ -213,15 +221,16 @@ export default function People({
             {shown.map((e) => <Card key={e.kind + e.id} e={e} />)}
           </div>
         ) : found ? (
-          <p className="pnone">没有叫这个的。上面「新联系人」里粘他的邮箱加进来。</p>
+          <p className="pnone">{t('没有叫这个的。上面「新联系人」里粘他的邮箱加进来。')}</p>
         ) : null}
 
         {/* 空页可以，骗人不行 —— 说清是「库里真没有」还是「没连上」。 */}
         {!contacts.length && (
           <p className="pnone">
-            {fellBack === 'no-config' ? '没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。'
-             : fellBack === 'query-failed' ? '连上了但查询报错——名片读不出来，不是库里没人。'
-             : '库里一个人都没有。右上角「新联系人」，粘个邮箱，我去信箱里查他是谁。'}
+            {fellBack === 'no-config' ? t('没连上数据库（.env.local 里的 VITE_SUPABASE_* 没填）。')
+             : fellBack === 'query-failed' ? t('连上了但查询报错——名片读不出来，不是库里没人。')
+             : waiting > 0 ? t('通讯录还是空的。上面是收信时认出来的人，看一个加一个就行。')
+             : t('库里一个人都没有。右上角「新联系人」，粘个邮箱，我去信箱里查他是谁。')}
           </p>
         )}
 

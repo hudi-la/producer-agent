@@ -5,6 +5,10 @@ import { useVeiled } from '../lib/veil.js'
 import { useGrow } from '../lib/useGrow.js'
 import { Flower } from './Veil.jsx'
 
+// 手机上没有双击（iOS 把双击留给缩放了，2026-10-07 手机版调试时发现档案一格都改不了）：
+// 触屏就点一下进编辑。存照旧要按「确定」，所以误触最多是打开一个框，跟双击的初衷不冲突。
+const TOUCH = typeof matchMedia === 'function' && matchMedia('(hover: none)').matches
+
 // 页面上「能改的字」——两种长相，一套规矩。
 //
 //   EditRow    左边字段名、右边值的那种行（关于你、条目的小字段）
@@ -77,7 +81,7 @@ function keyHandler(d, long) {
   }
 }
 
-const asText = (v, list) => (v == null ? '' : list && Array.isArray(v) ? v.join('、') : String(v))
+const asText = (v, list) => (v == null ? '' : list && Array.isArray(v) ? v.join(t('、')) : String(v))
 const asValue = (s, list) =>
   list ? s.split(/[、,，]/).map((x) => x.trim()).filter(Boolean) : s.trim()
 
@@ -122,9 +126,10 @@ export function EditRow({ label, value, hint, long, list, ro, veil, onSave }) {
           </>
         ) : (
           <div className={'idval' + (empty ? ' empty' : '') + (ro ? ' ro' : '')}
+               onClick={!ro && TOUCH ? d.start : undefined}
                onDoubleClick={ro ? undefined : d.start}
-               title={ro ? undefined : t('双击改')}>
-            {empty ? (ro ? '—' : t('双击填一下')) : asText(value, list)}
+               title={ro ? undefined : TOUCH ? t('点一下改') : t('双击改')}>
+            {empty ? (ro ? '—' : TOUCH ? t('点一下填') : t('双击填一下')) : asText(value, list)}
           </div>
         )}
         {hint && <div className="idhint">{hint}</div>}
@@ -170,9 +175,9 @@ export function InlineText({ value, cls, long, ro, placeholder, onSave }) {
   return (
     <div
       className={cls + (empty ? ' inl-empty' : '') + (ro ? '' : ' inl-can')}
-      onClick={ro ? undefined : stop}
+      onClick={ro ? undefined : (e) => { stop(e); if (TOUCH) d.start() }}
       onDoubleClick={ro ? undefined : (e) => { stop(e); d.start() }}
-      title={ro ? undefined : t('双击改')}
+      title={ro ? undefined : TOUCH ? t('点一下改') : t('双击改')}
     >
       {empty ? placeholder : asText(value)}
     </div>

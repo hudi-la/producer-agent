@@ -32,9 +32,11 @@
  */
 // 「scout_」开头的来源都是联网捞回来的各不相同的机会（聚合源那条、Open Call 那条），
 // 一律散着铺。判前缀不判具体值：再加一条 scout 任务不用回来改这儿。
-const 是一摊里的 = (p) => Boolean(p?.task_id) && !String(p?.source || '').startsWith('scout_')
+const 是一摊里的 = (p) => Boolean(p?.stack_id) || (Boolean(p?.task_id) && !String(p?.source || '').startsWith('scout_'))
 
 /** 给看板用：这张卡该不该跟同任务的折成一叠。跟上色是同一个判断。 */
+export const batchKey = (p) => p?.stack_id ? `stack:${p.stack_id}` : p?.task_id
+
 export const inBatch = 是一摊里的
 
 /** 有几号色可用。今天四摊，留两个富余；摊多过这个数就绕回来，
@@ -49,13 +51,13 @@ export const SLOTS = 6
  * 每摊必不同色；而且顺序只跟 id 有关，刷新、换机器都是同一个色。
  */
 export function tintSlots(pursuits) {
-  const tasks = [...new Set((pursuits || []).filter(是一摊里的).map((p) => p.task_id))].sort()
+  const tasks = [...new Set((pursuits || []).filter(是一摊里的).map(batchKey))].sort()
   return new Map(tasks.map((id, i) => [id, i % SLOTS]))
 }
 
 /** 这张卡用几号色。不上色的返回 null。 */
 export function slotOf(p, slots) {
   if (!p || !slots || !是一摊里的(p)) return null
-  const s = slots.get(p.task_id)
+  const s = slots.get(batchKey(p))
   return s === undefined ? null : s
 }

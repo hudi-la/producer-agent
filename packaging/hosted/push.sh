@@ -16,7 +16,7 @@ rsync -az --delete \
 echo "· 前端的环境(云端配置:直连 Supabase,脑子同源)"
 printf 'VITE_SUPABASE_URL=%s\nVITE_SUPABASE_ANON_KEY=%s\n' "$URL" "$ANON" | ssh "$HOST" 'cat > producer-agent/.env.production'
 echo "· 脑子的环境 → /etc/fairwind/env(只有 fairwind 和 root 能读)"
-grep -E '^(FAIRWIND_MODE|SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY|BRAIN_ORIGIN)=' "$ENVF" | ssh "$HOST" 'sudo tee /etc/fairwind/env >/dev/null && sudo chmod 640 /etc/fairwind/env && printf "BRAIN_PORT=8788\nBRAIN_HOST=127.0.0.1\nNODE_ENV=production\n" | sudo tee -a /etc/fairwind/env >/dev/null'
+grep -E '^(FAIRWIND_MODE|SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY|BRAIN_ORIGIN|GMAIL_CLIENT_ID|GMAIL_CLIENT_SECRET)=' "$ENVF" | ssh "$HOST" 'sudo tee /etc/fairwind/env >/dev/null && sudo chmod 640 /etc/fairwind/env && printf "BRAIN_PORT=8788\nBRAIN_HOST=127.0.0.1\nNODE_ENV=production\n" | sudo tee -a /etc/fairwind/env >/dev/null'
 echo "· 服务器上:装依赖、打前端、装 systemd、重启"
 ssh "$HOST" 'set -e; export PATH="$HOME/node/bin:$PATH"; cd producer-agent
   npm ci --no-audit --no-fund >/dev/null

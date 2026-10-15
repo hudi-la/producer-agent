@@ -211,7 +211,7 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
     } catch (e) {
       setArmed(false)
       // 授权掉了要说人话，别让你对着一句 HTTP 401 猜
-      onErr?.(e.needsAuth && e.fix ? `${e.message}（${e.fix}）` : e.message)
+      onErr?.(e.needsAuth && e.fix ? t('{message}（{fix}）', { message: e.message, fix: e.fix }) : e.message)
     } finally { setBusy(null) }
   }
 

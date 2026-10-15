@@ -1,0 +1,21 @@
+{
+  "tests": 42,
+  "productionVerification": [
+    {
+      "card": "Descanso Gardens",
+      "emails": 16,
+      "messages": 55,
+      "tenantIsolation": true
+    },
+    {
+      "card": "Book Arts Institute",
+      "emails": 11,
+      "messages": 51,
+      "tenantIsolation": true
+    }
+  ],
+  "liveModelReplyTested": false,
+  "release": "/home/fairwind/releases/context-20261014",
+  "databaseBeforeSHA256": "e679c9dd388ce06fe7e786f37ce623ab34536218ebae247ca7f046aaa0e5f366",
+  "databaseAfterSHA256": "55c3d60b84970a599142c4ac14cc6ab30185f7e4b29639636ae980c0d2ae2408"
+}

@@ -4,6 +4,7 @@ import { supa } from '../lib/backends.js'
 import Veil from './Veil.jsx'
 import DeskToggle from './DeskToggle.jsx'
 import { useVeiled } from '../lib/veil.js'
+import { t } from '../i18n/index.js'
 
 // 机构卡。
 //
@@ -43,12 +44,12 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit, var
       <div className="focus-top">
         <div className="ft-head">
           {variant === 'drawer' ? (
-            <button className="back" onClick={onBack} aria-label="收起" title="收起"><span aria-hidden="true">✕</span><span className="t"> 收起</span></button>
+            <button className="back" onClick={onBack} aria-label={t('收起')} title={t('收起')}><span aria-hidden="true">✕</span><span className="t"> {t('收起')}</span></button>
           ) : (
-            <button className="back" onClick={onBack}><span aria-hidden="true">←</span><span className="t"> 通讯录</span></button>
+            <button className="back" onClick={onBack}><span aria-hidden="true">←</span><span className="t"> {t('通讯录')}</span></button>
           )}
           <h1 className="ft-title" title={veiled ? undefined : org.org}><Veil>{org.org}</Veil></h1>
-          <span className="pchip org">机构</span>
+          <span className="pchip org">{t('机构')}</span>
           {variant === 'drawer' && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
       </div>
@@ -56,7 +57,7 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit, var
       <div className="focus-cols">
         <aside className="fc-l">
           <div className="pf-cell">
-            <div className="pf-k">共享信箱</div>
+            <div className="pf-k">{t('共享信箱')}</div>
             {org.mailboxes?.length ? org.mailboxes.map((b, i) => (
               <div key={i} className="pf-v pf-hist">
                 <span className="pf-mail"><Veil>{b.email}</Veil></span>
@@ -66,30 +67,30 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit, var
                 {b.notes && <div className="pf-note">{b.notes}</div>}
               </div>
             )) : (
-              <div className="pf-empty">还没记它的共享信箱。你跟这里的往来都走个人邮箱。</div>
+              <div className="pf-empty">{t('还没记它的共享信箱。你跟这里的往来都走个人邮箱。')}</div>
             )}
           </div>
 
           <div className="pf-cell">
-            <div className="pf-k">这里有谁</div>
+            <div className="pf-k">{t('这里有谁')}</div>
             {now.length ? now.map((p) => (
               <button key={p.contact_id} className="pf-v pf-hist pf-link"
                       onClick={() => onOpenPerson?.(p.contact_id)}>
                 <Veil>{p.name}</Veil>{p.role ? <span className="pf-note"> · {p.role}</span> : null}
               </button>
-            )) : <div className="pf-empty">库里还没有这里的人</div>}
+            )) : <div className="pf-empty">{t('库里还没有这里的人')}</div>}
           </div>
 
           {/* 走了的人不删。旧关系解释旧往来 —— Stacy 那四封信为什么是她的，
               答案就在这一行。 */}
           {past.length > 0 && (
             <div className="pf-cell">
-              <div className="pf-k">以前在这儿</div>
+              <div className="pf-k">{t('以前在这儿')}</div>
               {past.map((p) => (
                 <button key={p.contact_id} className="pf-v pf-hist past pf-link"
                         onClick={() => onOpenPerson?.(p.contact_id)}>
                   <Veil>{p.name}</Veil>{p.role ? <span className="pf-note"> · {p.role}</span> : null}
-                  <span className="pf-past-tag">到 {p.until} 为止</span>
+                  <span className="pf-past-tag">{t('到 {date} 为止', { date: p.until })}</span>
                 </button>
               ))}
             </div>
@@ -99,25 +100,25 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit, var
         <section className="fc-m">
           {org.pursuits?.length > 0 && (
             <div className="pf-lines">
-              <span className="pf-k">这个机构的机会线</span>
+              <span className="pf-k">{t('这个机构的机会线')}</span>
               {org.pursuits.map((p) => (
                 <button key={p.id} className="lnk" onClick={() => onOpenPursuit?.(p.id)}>{p.title}</button>
               ))}
             </div>
           )}
 
-          <div className="pf-sect-h"><span>走共享信箱的往来</span></div>
-          {msgs === null ? <p className="pf-note">读着…</p>
+          <div className="pf-sect-h"><span>{t('走共享信箱的往来')}</span></div>
+          {msgs === null ? <p className="pf-note">{t('读着…')}</p>
            : msgs.length === 0
              ? <p className="pf-note">
-                 没有走共享信箱的往来。跟这个机构的信都是跟具体某个人来回的——去他的名片上看。
+                 {t('没有走共享信箱的往来。跟这个机构的信都是跟具体某个人来回的——去他的名片上看。')}
                </p>
              : (
                <div className="pf-msgs">
                  {msgs.map((m) => (
                    <div key={m.id} className="pf-msg">
                      <div className="pf-who">
-                       {m.role === 'artist' ? '你' : <Veil>{org.org}</Veil>}
+                       {m.role === 'artist' ? t('你') : <Veil>{org.org}</Veil>}
                        <span className="pf-note"> · {day(m.created_at)}</span>
                        <span className="pf-tag"><Veil>{m.counterpart_email}</Veil></span>
                      </div>
@@ -127,17 +128,16 @@ export default function OrgFocus({ org, onBack, onOpenPerson, onOpenPursuit, var
                </div>
              )}
           <p className="pf-note">
-            这些信**不归任何一张名片**——共享信箱署的是一组人，摆在某个人卡上就是撒谎。
-            它们全都还挂在上面那条机会线上。
+            {t('这些信**不归任何一张名片**——共享信箱署的是一组人，摆在某个人卡上就是撒谎。')}
+            {t('它们全都还挂在上面那条机会线上。')}
           </p>
         </section>
 
         <aside className="fc-r">
-          <div className="pf-sect-h"><span>这个机构是什么</span></div>
+          <div className="pf-sect-h"><span>{t('这个机构是什么')}</span></div>
           <p className="pf-note">
-            机构条目答的是人卡答不了的一件事：<b>这里有谁，谁已经走了</b>。
-            {past.length > 0 && <> 比如 <Veil>{past[0].name}</Veil> {past[0].until} 离开，
-              所以她在这儿留下的旧地址仍然认得回她本人。</>}
+            {t('机构条目答的是人卡答不了的一件事：')}<b>{t('这里有谁，谁已经走了')}</b>{t('。')}
+            {past.length > 0 && <> {t('比如')} <Veil>{past[0].name}</Veil> {t('{date} 离开，所以她在这儿留下的旧地址仍然认得回她本人。', { date: past[0].until })}</>}
           </p>
         </aside>
       </div>

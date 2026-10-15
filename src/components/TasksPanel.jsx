@@ -122,14 +122,17 @@ function Scheduled({ task, tz, brainUp, onChanged }) {
         </button>
       </div>
       {/* 脑子没开时「下次 9/7」是假话——那时候要说的是「到点不会跑」。 */}
-      {st.kind === 'queued' || st.kind === 'running' ? (
+      {['queued', 'running', 'paused', 'failed'].includes(st.kind) ? (
         <div className={'tk-progress ' + st.kind + (!brainUp ? ' off' : '')} role="status" aria-live="polite">
           <span className="tk-progress-icon" aria-hidden="true" />
           <div>
-            <strong>{st.kind === 'queued'
+            <strong>{st.kind === 'failed' ? t('搜索遇到问题，进度已保留')
+              : st.kind === 'paused' ? t('搜索已暂停，等待续跑')
+              : st.kind === 'queued'
               ? (brainUp ? t('已排队，等待开始') : t('已排队，等待 Fairwind 启动'))
               : t('正在找机会')}</strong>
-            <div className="tk-progress-detail">{st.kind === 'queued'
+            <div className="tk-progress-detail">{st.kind === 'paused' || st.kind === 'failed' ? st.text
+              : st.kind === 'queued'
               ? (brainUp ? t('通常 30 秒内开始；整轮预计 5–20 分钟，取决于网页和模型响应。') : t('Fairwind 启动后会接着运行；整轮预计 5–20 分钟。'))
               : t('通常需要 5–20 分钟，机会多时可能更久。{elapsed}', { elapsed: st.text })}</div>
           </div>
@@ -145,6 +148,11 @@ function Scheduled({ task, tz, brainUp, onChanged }) {
       <PromptBox value={task.prompt} onSave={(prompt) => save({ prompt })} />
       <div className="tk-hint">
         {t('今天几号、表里已有哪些机会、按什么格式报——系统跑的时候补在后面，这儿不用写。「复查表里哪几行、判几个够不够得着、最多造几张卡」在这条任务的 config 里。')}
+        {task.type?.startsWith('scout') && <div>{t('每批最多 {n} 次模型调用；每个来源先挑最多 {c} 个候选逐个核实。未完成的进度会保存，通常约 {m} 分钟后续跑。修改提示词会重新生成尚未完成的搜索队列。', {
+          n: task.config?.model_calls_per_run || task.config?.search_calls_per_run || 6,
+          c: task.config?.candidates_per_source || 4,
+          m: task.config?.search_resume_minutes || 180,
+        })}</div>}
       </div>
 
       {task.last_result && (

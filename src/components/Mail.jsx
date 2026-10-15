@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { md } from '../lib/when.js'
 import Veil from './Veil.jsx'
+import { t } from '../i18n/index.js'
 
 // 往来里的一条。**机会线的卷宗和人的名片共用这一份。**
 //
@@ -17,7 +18,7 @@ export default function Mail({ m, onJump }) {
   const mine = m.role === 'artist'
   const isNote = m.role === 'note'
   const hasRaw = !!m.body_raw
-  const who = isNote ? '你记的' : mine ? '你' : (m.meta?.from_name || m.who || '对方')
+  const who = isNote ? t('你记的') : mine ? t('你') : (m.meta?.from_name || m.who || t('对方'))
 
   return (
     <div id={'dmail-' + m.id} className={'mail' + (open ? ' open' : '') + (isNote ? ' note' : '')}>
@@ -28,18 +29,18 @@ export default function Mail({ m, onJump }) {
         </span>
         <span className="when">{md(m.created_at)}</span>
         {/* 不是邮件的那种得标出来源，否则你分不清这条是从信箱来的还是你自己写的 */}
-        {isNote && <span className="flag soft">{m.meta?.how || '当面 / 电话 / 微信'}</span>}
-        {m.meta?.unanswered && <span className="flag">未回</span>}
+        {isNote && <span className="flag soft">{m.meta?.how || t('当面 / 电话 / 微信')}</span>}
+        {m.meta?.unanswered && <span className="flag">{t('未回')}</span>}
       </div>
       <div className="mail-sum">{m.content}</div>
       {(hasRaw || onJump) && (
         <div className="mail-acts">
           {hasRaw && (
             <button className="lnk" onClick={() => setOpen((o) => !o)}>
-              {open ? '收起 ▴' : '原文 ▾'}
+              {open ? t('收起 ▴') : t('原文 ▾')}
             </button>
           )}
-          {onJump && <button className="lnk" onClick={() => onJump(m.id)}>在时间线上定位</button>}
+          {onJump && <button className="lnk" onClick={() => onJump(m.id)}>{t('在时间线上定位')}</button>}
         </div>
       )}
       {open && hasRaw && (
@@ -70,7 +71,7 @@ export function MailList({ items, head = 3, onJump }) {
     <div className="mails">
       {hidden > 0 && (
         <button className="lnk pf-more" onClick={() => setAll((v) => !v)}>
-          {all ? `只看最新 ${head} 条` : `还有 ${hidden} 条更早的 · 看全部 ${items.length} 条`}
+          {all ? t('只看最新 {n} 条', { n: head }) : t('还有 {hidden} 条更早的 · 看全部 {total} 条', { hidden, total: items.length })}
         </button>
       )}
       {shown.map((m) => <Mail key={m.id} m={m} onJump={onJump} />)}

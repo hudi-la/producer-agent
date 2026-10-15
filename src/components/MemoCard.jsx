@@ -1,6 +1,7 @@
 import ErrorNotice from './ErrorNotice.jsx'
 import React, { useState } from 'react'
 import { undoMemo } from '../lib/stateMoves.js'
+import { t } from '../i18n/index.js'
 
 // 它在聊天里记住了一句（0125）—— 出现的时候已经记完了，卡上只有【撤回】。
 // 记忆不是事件：不动提醒栏。线上是一条「记忆」笔；人身上是关系记忆末尾多一段。
@@ -26,14 +27,14 @@ export default function MemoCard({ msgId, memo, onUndone }) {
     <div className={`lcard scard${undone ? ' scard-undone' : ''}`}>
       <div className="lcard-h">
         <span className="lcard-tag">
-          {undone ? '撤回了' : memo.to === 'person' ? '记进了关系记忆' : '记住了'}
+          {undone ? t('撤回了') : memo.to === 'person' ? t('记进了关系记忆') : t('记住了')}
         </span>
       </div>
       <div className="lcard-sub">{memo.line || memo.text}</div>
       {err && <ErrorNotice error={err} context={t('保存更改')} />}
       {!undone && (
         <button className="lnk" disabled={busy} onClick={undo}>
-          {busy ? '撤着……' : '撤回'}
+          {busy ? t('撤着……') : t('撤回')}
         </button>
       )}
     </div>

@@ -7,6 +7,8 @@
 // 规则没过 → 「定稿」是灰的。所以这一层不是提醒，是闸。
 // 判断层（"你把 liminal 换成 threshold 了"）是另一回事，那个不拦人。
 
+import { t } from '../i18n/index.js'
+
 const WORD_RE = /\S+/g
 
 export function countWords(s) {
@@ -40,7 +42,7 @@ export function checkRules(rules, body, meta, opts = {}) {
   if (opts.needsBody) {
     const n = countChars(String(body || '').trim())
     if (n === 0) {
-      checks.push({ key: 'empty', label: '还是空的', ok: false, detail: '写点东西才谈得上定稿' })
+      checks.push({ key: 'empty', label: t('还是空的'), ok: false, detail: t('写点东西才谈得上定稿') })
       return { checks, allOk: false }
     }
   }
@@ -50,9 +52,9 @@ export function checkRules(rules, body, meta, opts = {}) {
     const n = countChars(body)
     checks.push({
       key: 'chars',
-      label: `${n} / ${max} 字符`,
+      label: t('{n} / {max} 字符', { n, max }),
       ok: n >= (min || 0) && n <= max,
-      detail: min ? `要求 ${min}–${max}` : `上限 ${max}`,
+      detail: min ? t('要求 {min}–{max}', { min, max }) : t('上限 {max}', { max }),
     })
   }
 
@@ -61,9 +63,9 @@ export function checkRules(rules, body, meta, opts = {}) {
     const n = countWords(body)
     checks.push({
       key: 'words',
-      label: `${n} 词`,
+      label: t('{n} 词', { n }),
       ok: n >= (min || 0) && n <= max,
-      detail: `要求 ${min}–${max}`,
+      detail: t('要求 {min}–{max}', { min, max }),
     })
   }
 
@@ -71,9 +73,9 @@ export function checkRules(rules, body, meta, opts = {}) {
     const n = m.pages
     checks.push({
       key: 'pages',
-      label: n == null ? `页数未填` : `${n} 页`,
+      label: n == null ? t('页数未填') : t('{n} 页', { n }),
       ok: typeof n === 'number' && n <= r.pages,
-      detail: `≤ ${r.pages} 页`,
+      detail: t('≤ {n} 页', { n: r.pages }),
     })
   }
 
@@ -81,7 +83,7 @@ export function checkRules(rules, body, meta, opts = {}) {
     const n = m.mb
     checks.push({
       key: 'mb',
-      label: n == null ? '大小未填' : `${n} MB`,
+      label: n == null ? t('大小未填') : `${n} MB`,
       ok: typeof n === 'number' && n <= r.mb,
       detail: `≤ ${r.mb} MB`,
     })
@@ -104,7 +106,7 @@ export function checkRules(rules, body, meta, opts = {}) {
       // 你不逐格点开就不知道该去写还是去删。
       if (!has) {
         checks.push({ key: 'field:' + f.key, q: f.q, field: true,
-          label: f.q, ok: false, detail: '还没填' })
+          label: f.q, ok: false, detail: t('还没填') })
         continue
       }
       const [kind, lim] = Array.isArray(f.words) ? ['words', f.words]
@@ -119,9 +121,9 @@ export function checkRules(rules, body, meta, opts = {}) {
       const n = kind === 'words' ? countWords(text) : countChars(text)
       checks.push({
         key: 'field:' + f.key, q: f.q, field: true,
-        label: `${n} ${kind === 'words' ? '词' : '字符'}`,
+        label: kind === 'words' ? t('{n} 词', { n }) : t('{n} 字符', { n }),
         ok: n >= (min || 0) && n <= max,
-        detail: min ? `要求 ${min}–${max}` : `上限 ${max}`,
+        detail: min ? t('要求 {min}–{max}', { min, max }) : t('上限 {max}', { max }),
       })
     }
   }

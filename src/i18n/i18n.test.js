@@ -26,3 +26,12 @@ test('查不到就原样;插值;切回中文', () => {
   setLang('en'); assert.equal(t('这句没翻'), '这句没翻'); assert.equal(t('更新到 {v}', { v: '1.2' }), 'Update to 1.2')
   setLang('zh'); assert.equal(t('我的档案'), '我的档案')
 })
+
+// 界面代码里不许有「没过 t() 的中文」——英文版里它会原样露出来(2026-10-08 他说:没做好就是 bug)。
+// 真该留中文的那一行标 // i18n-ok 并写清为什么。扫描规则见 scripts/untranslated.mjs
+test('界面代码里没有漏翻的中文', async () => {
+  const { execFileSync } = await import('node:child_process')
+  const out = JSON.parse(execFileSync('node', ['scripts/untranslated.mjs', '--json'], { encoding: 'utf8' }))
+  const list = out.flatMap((f) => f.hits.map((h) => `${f.file}:${h.line} ${h.text}`))
+  assert.deepEqual(list, [], `这些中文没过 t():\n${list.join('\n')}`)
+})

@@ -45,3 +45,9 @@ npm run dev
 - **从网站自动读**：无头浏览器渲染 hudiworks.com → Claude structured output 抽成 works → upsert `producer.works`
 - **机会线 / 找机会**：`producer.opportunities` + `producer.pursuits`，scout（移植现有 cron）落成提案卡
 - **主界面**：把 `design/home-mockup.html` 的 pipeline 主页 + 点开专注做成真页面
+
+
+## 正式发布
+
+正式站点：https://fairwind.hudiworks.com/ 。用户说“上线 / 发布”默认指此站点，不需重复询问地址。
+服务器、构建、验证和回滚步骤见 [部署文档](docs/deployment.md)。线上源码可能领先本地版本，发布前先检查当前线上文件。

@@ -4,10 +4,17 @@
 //   POST /backup/import?wipe=1   body 是整个 zip(application/zip);wipe=1 先清我名下的行
 //
 // 身份由调用方给(本机 = settings.json 里那个人;托管 = 请求上的租户),这里不认人。
-import { exportBackup, importBackup } from './roundtrip.js'
+import { exportBackup } from './roundtrip.js'
+import { importDiskBackup, LIMITS } from './diskImport.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pipeline } from 'node:stream/promises'
+import { Transform } from 'node:stream'
+let importing = false
 
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)) }
-const readAll = (req) => new Promise((ok, no) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); req.on('error', no) })
 const stamp = (d) => d.toISOString().slice(0, 10)
 
 /**
@@ -37,9 +44,19 @@ export async function handleBackupRoute(req, res, { db, owner, email, prefix = '
   if (req.method === 'POST' && p === '/backup/import') {
     const wipe = ['1', 'true', 'yes'].includes(url.searchParams.get('wipe') || '')
     try {
-      const bytes = await readAll(req)
-      if (!bytes.length) { json(res, 400, { ok: false, error: '没收到文件' }); return true }
-      json(res, 200, await importBackup({ db, bytes, wipe, prefix }))
+      if (importing) { json(res, 409, { ok: false, error: '服务器正在导入另一份备份，请完成后再试' }); return true }
+      importing = true
+      let dir
+      try {
+        dir = await mkdtemp(join(tmpdir(), 'fairwind-import-'))
+        const path = join(dir, 'upload.zip'); let received = 0
+        const limit = new Transform({ transform(chunk, enc, cb) { received += chunk.length; cb(received > LIMITS.upload ? new Error('备份文件超过 4GB 限制') : null, chunk) } })
+        await pipeline(req, limit, createWriteStream(path, { mode: 0o600 }))
+        if (!received) throw new Error('没收到文件')
+        json(res, 200, await importDiskBackup({ db, path, dir, wipe, prefix }))
+      } finally {
+        try { if (dir) await rm(dir, { recursive: true, force: true }) } finally { importing = false }
+      }
     } catch (e) { json(res, 400, { ok: false, error: e.message }) }
     return true
   }

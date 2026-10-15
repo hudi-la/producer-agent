@@ -6,9 +6,10 @@
 //  · **要动 Gmail 的**（真发）—— 走本机 sidecar。钥匙在它手上，
 //    浏览器这头永远拿不到。
 import { supa, BRAIN, brainFetch } from './backends.js'
+import { t } from '../i18n/index.js'
 
 const need = () => {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
 }
 
 /**
@@ -19,7 +20,7 @@ const need = () => {
  * 数据库那道才是真的。
  */
 export async function adoptLetter(owner, letter, body) {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_adopt_letter', {
     p_pursuit_id: owner?.pursuitId || null,
     p_contact_id: owner?.contactId || null,

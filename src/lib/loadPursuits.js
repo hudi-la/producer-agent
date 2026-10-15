@@ -36,7 +36,7 @@ export async function loadPursuits() {
   if (!DB_CONFIGURED) return seed(FELL_BACK.NO_CONFIG)
   try {
     const { data: pursuits, error: pe } = await supa
-      .from('v_pa_pursuit_cards').select('*').order('created_at')
+      .from('v_pa_stack_cards').select('*').order('created_at')
     if (pe) return seed(FELL_BACK.QUERY_FAILED, pe.message)
     // 空 = 真的空(新账号的常态),不再拿种子顶
     if (!pursuits || !pursuits.length) {

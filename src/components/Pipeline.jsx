@@ -5,7 +5,7 @@ import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, openLine } from '../lib/nextAction.js'
 import { goldLine } from '../lib/stateText.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
-import { tintSlots, slotOf, inBatch } from '../lib/batchTint.js'
+import { tintSlots, slotOf, inBatch, batchKey } from '../lib/batchTint.js'
 import Veil from './Veil.jsx'
 // 「新」= 从来没点开过（seen_at 是 null）。不是新状态，是 pursuit_seen 早就有的事实。
 import { isFresh } from '../lib/tasks.js'
@@ -290,15 +290,15 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
   // 撒出去的一批，折起来反而把「这是七个不同的机会」这件事藏了。
   const layout = (items) => {
     const counts = {}
-    for (const p of items) if (inBatch(p)) counts[p.task_id] = (counts[p.task_id] || 0) + 1
+    for (const p of items) if (inBatch(p)) counts[batchKey(p)] = (counts[batchKey(p)] || 0) + 1
     const out = []
     const seen = new Set()
     for (const p of items) {
-      const tid = inBatch(p) ? p.task_id : null
-      if (tid && counts[tid] >= STACK_MIN) {
+      const tid = inBatch(p) ? batchKey(p) : null
+      if (tid && (p.stack_id || counts[tid] >= STACK_MIN)) {
         if (seen.has(tid)) continue
         seen.add(tid)
-        out.push({ stack: tid, items: items.filter((x) => x.task_id === tid) })
+        out.push({ stack: tid, name: p.stack_name, items: items.filter((x) => batchKey(x) === tid).sort((a,b) => (a.stack_position ?? 0) - (b.stack_position ?? 0)) })
       } else {
         out.push({ card: p })
       }
@@ -328,7 +328,7 @@ export default function Pipeline({ pursuits, tasks = [], states = null, audit = 
               row.stack ? (
                 <Stack
                   key={row.stack}
-                  name={taskName(row.stack)}
+                  name={row.name || taskName(row.stack)}
                   items={row.items}
                   states={states}
                   audit={audit}

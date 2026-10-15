@@ -25,11 +25,11 @@ import DrawerGrip from './DrawerGrip.jsx'
 // 60 条一条没少，你始终知道它在哪、有几条。
 
 const CONCERN_ORDER = ['intimacy', 'systems', 'body_space_time']
-const BOX_LABELS = { why_now: t('为什么是现在'), reach_out: t('想触达'), hidden_links: t('隐线'), materials: t('材料'), note: t('备注') }
+const boxLabel = (k) => ({ why_now: t('为什么是现在'), reach_out: t('想触达'), hidden_links: t('隐线'), materials: t('材料'), note: t('备注') })[k]
 
 // 盒子里的文本格。files 那一格是文件清单,另画(见 BoxFiles)
 const boxEntries = (box) => Object.entries(box || {}).filter(([k, v]) => k !== 'files' && v != null && v !== '')
-const BOX_HINTS = ['为什么是现在', '想触达', '隐线', '材料', '备注']
+const BOX_HINTS = ['为什么是现在', '想触达', '隐线', '材料', '备注'] // i18n-ok t() 的键，用的地方 t(h) 再翻
 
 /**
  * 盒子里补一条。名字 + 内容两格,都填了才给存。名字是自由文本,BOX_HINTS 只是提示
@@ -192,7 +192,8 @@ function Entry({ e, open, active, onToggle, onSaved }) {
         {imgs.length > 0 && <img className="w-thumb" src={imgs[0]} alt="" loading="lazy" />}
         <div className="work-main">
           {/* 库里新建的默认标题是中文「（未命名）」(pa_add_entry);英文界面上按语言显示,存回去还是你打的字 */}
-          <InlineText value={e.title === '（未命名）' ? t('（未命名）') : e.title} cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
+          <InlineText value={e.title === '（未命名）' ? t('（未命名）') : e.title} // i18n-ok 左边比的是库里的默认标题
+                      cls="w-t" ro={ro} onSave={(v) => save({ title: v })} />
           <InlineText value={e.body} cls="w-d" long ro={ro}
                       placeholder={open ? t('双击写点描述') : null}
                       onSave={(v) => save({ body: v })} />
@@ -250,7 +251,7 @@ function Entry({ e, open, active, onToggle, onSaved }) {
           {entries.length === 0 && !(e.box?.files?.length) && <div className="bx-empty">{t('还没补东西。为什么是现在 / 想触达谁 / 隐线 / 高清图、旧申请稿……都往这丢。')}</div>}
           {/* 盒子里每一条都能改(双击);底下能补一条、能丢文件。以前这儿是纯文字 + 一行死的「+ 补一条 / 丢进材料」 */}
           {entries.map(([k, v]) => (
-            <EditRow key={k} label={BOX_LABELS[k] || k} long ro={ro} value={String(v)} onSave={(nv) => saveBox(k, nv)} />
+            <EditRow key={k} label={boxLabel(k) || k} long ro={ro} value={String(v)} onSave={(nv) => saveBox(k, nv)} />
           ))}
           {!ro && <BoxAdd onAdd={saveBox} />}
           {!ro && <BoxFiles entry={e} onSaved={onSaved} />}

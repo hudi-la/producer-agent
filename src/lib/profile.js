@@ -57,15 +57,15 @@ export function heldLabel(profile) {
 /** 给 Fairwind 拼上下文用：把档案里会影响判断的事实摊成几行人话。 */
 export function profileLines(profile) {
   const d = profile?.data || {}
-  const j = (x) => (Array.isArray(x) ? x.join('、') : x)
+  const j = (x) => (Array.isArray(x) ? x.join(t('、')) : x)
   return [
-    profile?.name && `艺术家：${profile.name}${profile.website ? `（${profile.website}）` : ''}`,
-    d.visa && `身份：${d.visa}`,
-    d.location && `常住：${j(d.location)}`,
-    d.career_stage && `阶段：${d.career_stage}`,
-    d.funding_pref && `资助偏好：${d.funding_pref}`,
-    d.exclude_rule && `排除规则：${d.exclude_rule}`,
-    d.watch_rule && `关注规则：${d.watch_rule}`,
-    d.directions && `创作方向：${j(d.directions)}`,
+    profile?.name && (profile.website ? t('艺术家：{name}（{website}）', { name: profile.name, website: profile.website }) : t('艺术家：{name}', { name: profile.name })),
+    d.visa && t('身份：{v}', { v: d.visa }),
+    d.location && t('常住：{v}', { v: j(d.location) }),
+    d.career_stage && t('阶段：{v}', { v: d.career_stage }),
+    d.funding_pref && t('资助偏好：{v}', { v: d.funding_pref }),
+    d.exclude_rule && t('排除规则：{v}', { v: d.exclude_rule }),
+    d.watch_rule && t('关注规则：{v}', { v: d.watch_rule }),
+    d.directions && t('创作方向：{v}', { v: j(d.directions) }),
   ].filter(Boolean).join('\n')
 }

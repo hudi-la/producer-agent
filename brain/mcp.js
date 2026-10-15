@@ -8,6 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
+import { registerWorkspaceTools } from './mcp-workspace.js'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { FILES as JUDGMENT_FILES, readJudgmentFiles, writeJudgmentFile } from './judgments.js'
@@ -41,7 +42,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
 
   server.registerTool('fairwind_profile_set', {
     title: '改「关于你」', description: '只改传进来的字段,没传的不动。location / directions 是数组。',
-    inputSchema: { name: z.string().optional(), website: z.string().optional(), visa: z.string().optional(), location: z.array(z.string()).optional(), career_stage: z.string().optional(), funding_pref: z.string().optional(), exclude_rule: z.string().optional(), watch_rule: z.string().optional(), directions: z.array(z.string()).optional() },
+    inputSchema: { name: z.string().optional(), website: z.string().optional(), visa: z.string().optional(), location: z.array(z.string()).optional(), career_stage: z.string().optional(), funding_pref: z.string().optional(), exclude_rule: z.string().optional(), watch_rule: z.string().optional(), directions: z.array(z.string()).optional(), tz: z.string().refine(v => { try { new Intl.DateTimeFormat('en', { timeZone: v }); return true } catch { return false } }, 'Invalid timezone').optional() },
   }, async ({ name, website, ...data }) => {
     try {
       const patch = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
@@ -55,7 +56,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
     inputSchema: { kind: z.string().optional().describe('不传 = 全部') },
   }, async ({ kind }) => {
     try {
-      let q = db.from('v_pa_entries').select('id, kind, title, medium, year, body, meta, images, site_path, draft')
+      let q = db.from('v_pa_entries').select('id, kind, title, medium, year, body, meta, images, site_path, draft, box, sort')
       if (kind) q = q.eq('kind', kind)
       const { data, error } = await q; if (error) throw new Error(error.message)
       return text(data)
@@ -77,7 +78,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
   })
 
   server.registerTool('fairwind_entry_set', {
-    title: '改一条档案', description: '只改传进来的字段。meta 是整块换(先 list 拿到旧的合并了再传)。',
+    title: '改一条档案', description: '只改传进来的字段。meta 按键合并，未传入的键保留。',
     inputSchema: { id: z.string(), title: z.string().optional(), body: z.string().optional(), medium: z.string().optional(), year: z.string().optional(), meta: z.record(z.string(), z.any()).optional(), images: z.array(z.string()).optional(), site_path: z.string().optional(), draft: z.boolean().optional() },
   }, async ({ id, title, body, medium, year, meta, images, site_path, draft }) => {
     try {
@@ -138,7 +139,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
       inputSchema: { stage: z.enum(STAGES).optional() },
     }, async ({ stage }) => {
       try {
-        let q = db.from('v_pa_pursuit_cards').select('id, title, kind, org, location, url, funding, deadline, deadline_at, opens_at, match_stars, eligible, stage, next_action, jot, work_title, created_at')
+        let q = db.from('v_pa_stack_cards').select('*')
         if (stage) q = q.eq('stage', stage)
         const { data, error } = await q; if (error) throw new Error(error.message)
         return text(data)
@@ -151,17 +152,6 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
       try {
         const r = await rpc('pa_create_pursuit', { p_title: a.title, p_kind: a.kind ?? null, p_org: a.org ?? null, p_location: a.location ?? null, p_funding: a.funding ?? null, p_deadline: a.deadline ?? null, p_deadline_at: a.deadline_at ?? null, p_opens_at: a.opens_at ?? null, p_url: a.url ?? null, p_match_stars: a.match_stars ?? null, p_why: a.why ?? null, p_notes: a.notes ?? null, p_eligible: a.eligible ?? true, p_source: 'mcp', p_task_id: null })
         return text({ ok: true, ...(r && typeof r === 'object' ? r : { id: r }), ...(modules?.pursuits ? {} : { note: '卡已进库。机会线模块还没开——Fairwind 设置 → 装了哪些 → 打开「机会线」就能在看板上看到' }) })
-      } catch (e) { return fail(e) }
-    })
-    server.registerTool('fairwind_pursuit_set', {
-      title: '改一张机会卡', description: '改链接/截止/资格/开放日、挪阶段、写小记。只改传进来的。' + STAGE_DOC,
-      inputSchema: { id: z.string(), url: z.string().optional(), deadline: z.string().optional(), deadline_at: z.string().optional(), opens_at: z.string().optional(), eligible: z.boolean().optional(), stage: z.enum(STAGES).optional(), jot: z.string().optional().describe('卡上的小记(一句话)') },
-    }, async ({ id, url, deadline, deadline_at, opens_at, eligible, stage, jot }) => {
-      try {
-        if ([url, deadline, deadline_at, opens_at, eligible].some((v) => v !== undefined)) await rpc('pa_set_fields', { p_pursuit_id: id, p_url: url ?? null, p_deadline: deadline ?? null, p_eligible: eligible ?? null, p_opens_at: opens_at ?? null, p_deadline_at: deadline_at ?? null })
-        if (stage) await rpc('pa_set_stage', { p_pursuit_id: id, p_stage: stage })
-        if (jot !== undefined) await rpc('pa_set_jot', { p_pursuit_id: id, p_jot: jot })
-        return text({ ok: true })
       } catch (e) { return fail(e) }
     })
     server.registerTool('fairwind_pursuit_note', {
@@ -204,6 +194,7 @@ export function buildMcpServer({ db, version, dataDir, modules, previewJudgments
   }, async ({ limit }) => { try { return text(await previewJudgments({ limit: limit || 10 })) } catch (e) { return fail(e) } })
   }
 
+  registerWorkspaceTools(server, { db, rpc })
   return server
 }
 
@@ -214,6 +205,6 @@ export async function handleMcp(req, res, ctx) {
   res.on('close', () => { transport.close().catch(() => {}); server.close().catch(() => {}) })
   await server.connect(transport)
   let body
-  if (req.method === 'POST') { const chunks = []; for await (const c of req) chunks.push(c); try { body = JSON.parse(Buffer.concat(chunks).toString() || '{}') } catch { body = {} } }
+  if (req.method === 'POST') { const chunks = []; let size = 0; for await (const c of req) { size += c.length; if (size > 12 * 1024 * 1024) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'MCP request exceeds 12 MiB' })); await server.close(); return } chunks.push(c) }; try { body = JSON.parse(Buffer.concat(chunks).toString() || '{}') } catch { body = {} } }
   await transport.handleRequest(req, res, body)
 }

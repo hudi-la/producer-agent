@@ -99,13 +99,15 @@ export async function carryPass({ touched = null, log = console.log } = {}) {
   // 没有截断就别报——「这轮推迟了 0 个」是噪音。有截断必须报：
   // 悄悄砍掉一半，日志看起来就跟全搬完了一模一样。
   if (deferred.length) log(`  ↳ 这轮先搬 ${take.length} 个地址，还剩 ${deferred.length} 个下一轮`)
-  if (!take.length) return { addresses: 0, promoted: 0, added: 0, failed: [], deferred: deferred.length }
+  if (!take.length) return { addresses: 0, promoted: 0, added: 0, failed: [], succeeded: [], deferred: deferred.length }
 
   let promoted = 0, added = 0
   const failed = []
+  const succeeded = []
   for (const email of take) {
     try {
       const r = await promote(email, { log: () => {} })
+      succeeded.push(email)
       promoted += r.promoted || 0
       added += r.added || 0
       if (r.added) log(`  ✓ ${email}：搬进对话表 ${r.added} 封`)
@@ -116,5 +118,5 @@ export async function carryPass({ touched = null, log = console.log } = {}) {
       log(`  ✗ ${email} 没搬成：${err.message}`)
     }
   }
-  return { addresses: take.length, promoted, added, failed, deferred: deferred.length }
+  return { addresses: take.length, promoted, added, failed, succeeded, deferred: deferred.length }
 }

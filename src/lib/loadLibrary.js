@@ -22,7 +22,7 @@ export async function loadLibrary() {
       return { entries: [], concerns: CONCERNS_SEED, source: 'live', reason: FELL_BACK.EMPTY }
     }
     return {
-      entries, concerns: meta?.[0]?.concerns ?? CONCERNS_SEED, source: 'live', reason: null,
+      entries: entries.filter(e => !e.meta?.mcp_archived), concerns: meta?.[0]?.concerns ?? CONCERNS_SEED, source: 'live', reason: null,
     }
   } catch (e) {
     return seed(FELL_BACK.QUERY_FAILED, e.message)

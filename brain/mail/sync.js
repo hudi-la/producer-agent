@@ -11,6 +11,9 @@
 //   · 每一步都报数，包括 0。
 
 import { gmailFor, currentHistoryId, listIds, getMetadata, historySince } from './gmail.js'
+import { readFile, mkdir, writeFile, rename, unlink } from 'node:fs/promises'
+import { join } from 'node:path'
+import { currentTenant } from '../tenant.js'
 import { classify, mineSet } from './addr.js'
 import { db, myAccounts, putHeaders, setCursor } from './store.js'
 import { client as authClient, whoami } from './auth.js'
@@ -91,7 +94,7 @@ export async function auditPass({ log = console.log } = {}) {
  * q 默认排掉 Hangouts/Chat 记录（`-in:chats`）——那不是邮件，混进来只会
  * 让「还不认识的地址」多出一堆聊天对象。
  */
-export async function backfill({ q = '-in:chats', log = console.log } = {}) {
+export async function backfill({ q = '-in:chats', log = console.log, onProgress = () => {} } = {}) {
   const auth = await authClient()
   const gmail = gmailFor(auth)
   const me = await whoami()
@@ -99,30 +102,45 @@ export async function backfill({ q = '-in:chats', log = console.log } = {}) {
   const acct = await accountFor(me, accounts)
   const mine = mineSet(accounts.map((a) => a.address))
 
-  // **先记游标，再拉信。** 顺序反了的话，回填期间新到的信会永远漏掉：
-  // 它既不在你拉到的那批里，也不在「之后的增量」里。
-  const { historyId } = await currentHistoryId(gmail)
-  log(`回填 ${me.address}：信箱里 ${me.total} 封，游标先记在 ${historyId}`)
-
-  const ids = await listIds(gmail, {
-    q,
-    onPage: ({ page, got }) => log(`  列清单 第 ${page} 页，累计 ${got} 封`),
-  })
-  log(`  清单齐了：${ids.length} 封`)
-
-  const msgs = await getMetadata(gmail, ids, {
-    onBatch: ({ done, total }) => log(`  拉信头 ${done}/${total}`),
-    onGone: (n) => log(`  ↳ ${n} 封在 Gmail 里已经不存在了（删了或移走了），跳过`),
-  })
-
-  const { rows, dropped } = toRows(msgs, acct.id, mine)
-  if (dropped) log(`  ⚠️ ${dropped} 封认不出发件人或时间，没入库（宁可少一封，不要假数据）`)
-
-  const written = await flush(rows, log)
+  // Persist only IDs and an offset; each committed batch can be replayed safely after a crash.
+  const root = currentTenant()?.dataDir || process.env.FAIRWIND_DATA_DIR
+  const file = root ? join(root, 'mail-backfill', `${acct.id}.json`) : null
+  let checkpoint
+  if (file) {
+    try { checkpoint = JSON.parse(await readFile(file, 'utf8')) }
+    catch (e) { if (e.code !== 'ENOENT') throw e }
+    if (checkpoint && (checkpoint.q !== q || checkpoint.account !== acct.id)) checkpoint = null
+  }
+  const save = async () => {
+    if (!file) return
+    await mkdir(join(root, 'mail-backfill'), { recursive: true, mode: 0o700 })
+    await writeFile(file + '.tmp', JSON.stringify(checkpoint), { mode: 0o600 })
+    await rename(file + '.tmp', file)
+  }
+  if (!checkpoint) {
+    const { historyId } = await currentHistoryId(gmail)
+    const ids = await listIds(gmail, {
+      q, onPage: ({ page, got }) => { log(`  列清单 第 ${page} 页，累计 ${got} 封`); onProgress({ phase: 'listing', got }) },
+    })
+    checkpoint = { account: acct.id, q, historyId, ids, offset: 0, written: 0, parsed: 0, dropped: 0 }
+    await save()
+  }
+  const { ids, historyId } = checkpoint
+  const since = new Date().toISOString()
+  onProgress({ phase: 'fetching', done: checkpoint.offset, total: ids.length, since })
+  for (let start = checkpoint.offset; start < ids.length; start += 200) {
+    const msgs = await getMetadata(gmail, ids.slice(start, start + 200))
+    const { rows, dropped } = toRows(msgs, acct.id, mine)
+    checkpoint.written += await flush(rows, log)
+    checkpoint.parsed += rows.length; checkpoint.dropped += dropped
+    checkpoint.offset = Math.min(start + 200, ids.length)
+    await save()
+    onProgress({ phase: 'fetching', done: checkpoint.offset, total: ids.length, since })
+  }
   await setCursor(acct.id, historyId, true)
+  if (file) await unlink(file).catch(e => { if (e.code !== 'ENOENT') throw e })
+  return { account: me.address, listed: ids.length, parsed: checkpoint.parsed, dropped: checkpoint.dropped, written: checkpoint.written, historyId }
 
-  log(`回填完：拉到 ${ids.length} 封，入库 ${rows.length} 行，其中新增 ${written}`)
-  return { account: me.address, listed: ids.length, parsed: rows.length, dropped, written, historyId }
 }
 
 /**

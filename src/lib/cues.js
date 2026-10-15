@@ -1,4 +1,5 @@
 import { md, day as dayOf } from './when.js'
+import { t } from '../i18n/index.js'
 
 // 由头 —— 「现在为什么该动这个人 / 这条线」。
 //
@@ -89,9 +90,9 @@ function repliedCue(f, today) {
     via: 'replied', at: dayOf(f.last_in_at),
     // 压到今天才冒出来的那种，得说得出为什么是今天
     why: f.not_before
-      ? `${md(f.last_in_at)} 他回你了，说好 ${md(f.not_before)} 再聊，到了`
-      : d <= 0 ? `${md(f.last_in_at)} 他回你了，还没回`
-       : `${md(f.last_in_at)} 他回你了，${d} 天没回`,
+      ? t('{in} 他回你了，说好 {nb} 再聊，到了', { in: md(f.last_in_at), nb: md(f.not_before) })
+      : d <= 0 ? t('{in} 他回你了，还没回', { in: md(f.last_in_at) })
+       : t('{in} 他回你了，{d} 天没回', { in: md(f.last_in_at), d }),
   }
 }
 
@@ -111,14 +112,14 @@ function bumpCue(f, today) {
   if (bumps >= BUMP_WAIT.length) {
     return {
       via: 'bump', stopped: true, at: dayOf(f.unanswered_at),
-      why: `已经碰过 ${bumps} 次，停了（最后一次 ${md(f.unanswered_at)}）`,
+      why: t('已经碰过 {n} 次，停了（最后一次 {last}）', { n: bumps, last: md(f.unanswered_at) }),
     }
   }
   const waited = daysSince(f.unanswered_at, today)
   if (waited < BUMP_WAIT[bumps]) return null
   return {
     via: 'bump', at: dayOf(f.unanswered_at),
-    why: `${md(f.unanswered_at)} 发出去，${waited} 天没回音（第 ${bumps + 1} 次碰）`,
+    why: t('{at} 发出去，{d} 天没回音（第 {k} 次碰）', { at: md(f.unanswered_at), d: waited, k: bumps + 1 }),
   }
 }
 
@@ -144,10 +145,10 @@ function circlebackCue(f, today) {
   // 根本不是你定的。**说不出出处的时候闭嘴，别挑一个说。**
   const 出处 = f.next_touch_why || f.next_action
   if (!出处) return null
-  const 谁 = f.next_action_by === 'fairwind' && !f.next_touch_why ? '（它提的）' : ''
+  const 谁 = f.next_action_by === 'fairwind' && !f.next_touch_why ? t('（它提的）') : ''
   return {
     via: 'circleback', at: f.next_touch_at,
-    why: `${出处}${谁} → ${md(f.next_touch_at)} 到了`,
+    why: t('{src}{who} → {at} 到了', { src: 出处, who: 谁, at: md(f.next_touch_at) }),
   }
 }
 
@@ -162,7 +163,7 @@ function thanksCue(f) {
   return {
     // 依据是「他回过你了」，锚在他最后那封回信上
     via: 'thanks', at: dayOf(f.last_in_at),
-    why: `跟 ${f.name || '他'} 聊上了，还没回谢 ${f.intro_by_name}`,
+    why: t('跟 {name} 聊上了，还没回谢 {by}', { name: f.name || t('他'), by: f.intro_by_name }),
   }
 }
 
@@ -177,8 +178,8 @@ function metCue(f, today) {
   return {
     via: 'met', at: dayOf(f.last_meet_at),
     why: hrs > MEET_HOURS
-      ? `${md(f.last_meet_at)} 见的，已经过 ${MEET_HOURS} 小时了，follow-up 还没发`
-      : `${md(f.last_meet_at)} 见过，48 小时信还没发`,
+      ? t('{at} 见的，已经过 {h} 小时了，follow-up 还没发', { at: md(f.last_meet_at), h: MEET_HOURS })
+      : t('{at} 见过，48 小时信还没发', { at: md(f.last_meet_at) }),
   }
 }
 

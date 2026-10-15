@@ -10,14 +10,16 @@ import { t } from '../i18n/index.js'
  *
  * 名字不认得就不说话，好过瞎报一个。
  */
+// 存成函数：t() 要在用到时才调（模块加载时语言还没定）
 const TOOL_SAY = {
-  WebSearch: '在网上找资料…',
-  WebFetch: '在读一个网页…',
-  mcp__pursuit_files__open_file: '在翻这条线上的文件…',
-  mcp__studio_works__open_work_image: '在看那件作品的图…',
+  mcp__mailbox__read_mail: () => t('在查找邮箱里的邮件…'),
+  WebSearch: () => t('在网上找资料…'),
+  WebFetch: () => t('在读一个网页…'),
+  mcp__pursuit_files__open_file: () => t('在翻这条线上的文件…'),
+  mcp__studio_works__open_work_image: () => t('在看那件作品的图…'),
 }
 const toolSay = (name) =>
-  TOOL_SAY[name] || (name?.startsWith('mcp__gmail') ? '在翻信箱…' : null)
+  TOOL_SAY[name]?.() || (name?.startsWith('mcp__gmail') ? t('在翻信箱…') : null)
 
 /**
  * 接住「边想边出的字」。机会线和名片两处共用。

@@ -14,7 +14,8 @@ import {
   uploadAttachment, attachmentUrl, deleteAttachment,
 } from '../lib/deliverables.js'
 import Dossier from './Dossier.jsx'
-import Deliverables from './Deliverables.jsx'
+import ArtifactEditor from './ArtifactEditor.jsx'
+import ArtifactCard from './ArtifactCard.jsx'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏产出。
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
@@ -158,7 +159,7 @@ function Letter({ m }) {
   )
 }
 
-function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay, owner, onAdopted }) {
+function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay, owner, onAdopted, items, editorOpen }) {
   // 备注不是谁在说话。role='note' 是这条线上的一笔记录（线下发生的事、一个决定），
   // 原来它也走「其余一律显示 Fairwind」那条路，于是你自己记的事看起来像 Fairwind 说的。
   // 真信单独一种长相，跟商量分开。见 Letter 上面那段。
@@ -224,13 +225,13 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
       {m.meta?.letter && (
         <LetterCard
           letter={m.meta.letter}
-          owner={owner} onAdopted={onAdopted}
+          owner={owner} onAdopted={onAdopted} messageId={m.id} items={items} editorOpen={editorOpen}
         />
       )}
       {/* 它填的是一张申请表 —— 一格一个字数上限，那些上限就是这张卡的意义。
           复制走的话上限会丢，你到提交前一刻才发现某格超了。 */}
       {m.meta?.form && (
-        <FormCard form={m.meta.form} owner={owner} onAdopted={onAdopted} />
+        <FormCard form={m.meta.form} owner={owner} onAdopted={onAdopted} messageId={m.id} items={items} editorOpen={editorOpen} />
       )}
       {/* 它在聊天里改了提醒（0123）—— 出现的时候已经改完了，卡上只有【撤回】。
           只画落上了的（applied）：没落上的，日志里有原因，界面不画一张骗人的卡。 */}
@@ -342,6 +343,9 @@ export default function PursuitFocus({
   // 三栏只给整页。抽屉窄，塞不下卷宗和产出，保持单栏不动。
   const threeCol = !inDrawer
   const [deliv, setDeliv] = useState([])
+  const [artifactId, setArtifactId] = useState(null)
+  useEffect(() => setArtifactId(null), [p.id])
+  const selectedArtifact = deliv.find(d => d.id === artifactId)
   const [atts, setAtts] = useState([])
 
   // 「在想」不能靠猜。
@@ -409,7 +413,6 @@ export default function PursuitFocus({
 
   // 产出和附件。只有整页要，抽屉不拉——省一次往返。
   async function reloadDeliv() {
-    if (!threeCol) return
     const [d, a] = await Promise.all([fetchDeliverables(p.id), fetchAttachments(p.id)])
     if (d) setDeliv(d)
     if (a) setAtts(a)
@@ -524,6 +527,9 @@ export default function PursuitFocus({
             {notes && <div className="pf-notes md"><Md>{notes}</Md></div>}
           </div>
 
+          {deliv.filter(d => !d.meta?.artifact_message_id && d.status === 'draft').map(d =>
+            <ArtifactCard key={d.id} existing={d} editorOpen={!!selectedArtifact} owner={{ pursuitId: p.id }}
+              onAdopted={async id => { await reloadDeliv(); if (id) setArtifactId(id) }} />)}
           {msgs.length === 0 && !busy ? (
             <div className="empty-thread">{emptyText(p.stage)}</div>
           ) : (
@@ -540,7 +546,7 @@ export default function PursuitFocus({
                   <Message
                     m={m} msgs={msgs} key={m.id || i}
                     owner={{ pursuitId: p.id }}
-                    onAdopted={reloadDeliv}
+                    items={deliv} editorOpen={!!selectedArtifact} onAdopted={async (id) => { await reloadDeliv(); if (id) setArtifactId(id) }}
                     editing={editId === m.id}
                     /* 在想的时候不给改：那会撤掉一条它还在写的回复 */
                     canEdit={!busy}
@@ -675,7 +681,7 @@ export default function PursuitFocus({
       </div>
 
       {threeCol ? (
-        <div className="focus-cols">
+        <div className={"focus-cols" + (selectedArtifact ? "" : " without-editor")}>
           <aside className="fc-l">
             <Dossier
               p={p}
@@ -691,17 +697,12 @@ export default function PursuitFocus({
             />
           </aside>
           <div className="fc-m">{body}</div>
-          <aside className="fc-r">
-            <Deliverables
-              pursuitId={p.id}
-              items={deliv}
-              files={deliv.filter((d) => d.status === 'final')}
-              onChanged={reloadDeliv}
-              onJump={jumpTo}
-            />
-          </aside>
+          {selectedArtifact && <ArtifactEditor key={selectedArtifact.id} d={selectedArtifact}
+            onChanged={reloadDeliv} onClose={() => setArtifactId(null)} />}
+
         </div>
-      ) : body}
+      ) : <>{body}{selectedArtifact && <ArtifactEditor key={selectedArtifact.id} d={selectedArtifact}
+        onChanged={reloadDeliv} onClose={() => setArtifactId(null)} />}</>}
     </div>
   )
 }

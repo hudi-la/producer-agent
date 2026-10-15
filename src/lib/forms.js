@@ -7,9 +7,10 @@
 // （letters.js 有后半段「真发」要走 brain，因为 Gmail 的钥匙在它手上。
 //   表单没有那一步：填完你自己去网页表单里粘。）
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 
 const need = () => {
-  if (!supa) throw new Error('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）')
+  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
 }
 
 /**

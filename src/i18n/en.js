@@ -1,11 +1,30 @@
+import artifacts from './en.artifacts.js'
+import googleCalendar from './en.google-calendar.js'
+import calendar from './en.calendar.js'
 // src/i18n/en.js —— 英文。键是中文原文(见 index.js)。
 // 2026-09-17 先覆盖第一个包露面的那一层(我的档案 + 首次启动 + 账号 + 判据 + 模块开关 + 顶栏);
 // 9/24 机会线模块翻完了(字典拆在 en.pursuits-a/b、en.misc-c 里,底下合进来);邮件模块的界面还没翻——ModulesPanel 里明说。
 import a from './en.pursuits-a.js'
 import b from './en.pursuits-b.js'
 import c from './en.misc-c.js'
+import uiFocus from './en.ui-focus.js'
+import uiContacts from './en.ui-contacts.js'
+import uiTimeline from './en.ui-timeline.js'
+import uiMisc from './en.ui-misc.js'
 
 const base = {
+  "刚去 ChatGPT 开启了设备码登录权限？": "Just enabled device code login in ChatGPT?",
+  "开启权限后还没有连接成功。请回到这里点下面的按钮，获取新的验证码，再打开 ChatGPT 登录页面输入新验证码并授权。": "Enabling permission does not finish connecting. Return here and click the button below to get a new code. Then open the ChatGPT sign-in page, enter the new code and authorize.",
+  "已开启权限，重新连接 ChatGPT": "Permission enabled \u2014 reconnect ChatGPT",
+  "请使用重新连接后显示的新验证码。等这里显示「已连接 ChatGPT」，再点「开始使用」或保存。": "Use the new code shown after reconnecting. When this page says \u201cChatGPT connected\u201d, click Start or save.",
+
+  "等待你在 ChatGPT 完成授权…": "Waiting for you to authorize in ChatGPT\u2026" ,
+  "一次性验证码": "One-time code" ,
+  "打开下面的登录页面，输入此验证码。请勿分享给他人。": "Open the sign-in page below and enter this code. Do not share it." ,
+  "授权凭据保存在 Fairwind 服务器上你的独立账号目录，用于运行你的任务。": "Authorization credentials are stored in your private account directory on the Fairwind server to run your tasks." ,
+  "如提示设备码登录未开启，请在 ChatGPT 的安全设置中开启后重试。": "If device code login is disabled, enable it in ChatGPT security settings and try again." ,
+  "先登录 ChatGPT,或者点下面「先跳过」": "Sign in to ChatGPT first, or choose Skip for now below." ,
+
   '关闭': 'Close',
   '编辑模型设置': 'Edit model settings',
   '当前设置已保存，正在使用：{p}': 'Settings saved. Currently using: {p}',
@@ -23,7 +42,6 @@ const base = {
   'SDK 是模型厂商提供的连接工具。这里表示由 Claude SDK 选择默认模型，并不是模型名称；两档可能使用同一个模型。你也可以从下拉菜单选择指定的模型。': 'An SDK is a connection toolkit provided by the model vendor. Here, Claude’s SDK chooses the default model; SDK is not a model name, and both tiers may use the same model. You can also choose a specific model from the menu.',
   '由 Codex 选择默认模型。': 'Codex chooses the default model.',
   '恢复默认': 'Reset to default',
-
 
   "登录": "Sign in",
   "复制失败，请手动选中并复制上面的命令。": "Copy failed. Select and copy the command above manually.",
@@ -187,6 +205,12 @@ const backup = {
   '下载我的备份': 'Download my backup', '用备份恢复…': 'Restore from a backup…',
 }
 const extra = { '已选 {n} 张': '{n} selected', '说给第 {i}/{n} 条': 'Telling {i}/{n}', '说一句…': 'Say something…', '全部展开': 'Open all', '批量操作': 'Batch', '每周找机会': 'Weekly opportunity scout', '没配发布位': 'No release source configured', '退出': 'Quit', '没划上：': "Couldn't draw the line: ", '从这儿重开的': 'New round from here', '重开一轮': 'Start a new round', '从这儿重开一轮：上面的话还在，但它不再带着它们想': 'Start a new round here: what\'s above stays, but it no longer thinks with it', '终止': 'Stop', '终止——停掉它这次的回复': 'Stop this reply', '发送': 'Send', '收起字段、盒子和右边的对话（改好的字早存下了，这儿不管存）': 'Fold the fields, the box and the chat on the right (edits are already saved; this doesn\'t save)', '展开这一条：字段、盒子，右边开这一条的对话。里面的字都是双击改': 'Open this entry: fields, box, and a chat about it on the right. Double-click any text to edit', '新版本 {v}': 'New version {v}', '+ 补一条': '+ Add a note', '叫什么（为什么是现在 / 隐线 / …）': 'Name it (why now / hidden links / …)', '写什么': 'What to write', '为什么是现在': 'Why now', '想触达': 'Who to reach', '隐线': 'Hidden links', '材料': 'Materials', '备注': 'Notes', '删掉「{name}」？文件本体一起删。': 'Delete "{name}"? The file itself is deleted too.', '删掉这个文件': 'Delete this file', '传……': 'Uploading…', '+ 丢进材料（文件）': '+ Drop in a file', '高清图、旧申请稿、PDF……存在你这台机器上。Fairwind 看得到文件名，不读内容。': 'Hi-res images, old application drafts, PDFs… stored on this machine. Fairwind sees the file names, not the contents.', '（未命名）': '(untitled)', '在写 · 写申请时不用': 'In progress · not used yet', '{n} 条在写：Fairwind 写申请时不用它们。看过没问题就点「写完了」。': '{n} in progress: Fairwind won\'t use them when writing applications. Once you\'ve checked them, mark them finished.', '全部标成写完': 'Mark all finished', '标着…': 'Marking…', '把这栏 {n} 条都标成写完？之后 Fairwind 写申请时就会用它们。': 'Mark all {n} in this section as finished? Fairwind will then use them when writing applications.', '+ 加一栏': '+ Add a section', '自己起个名，比如「驻地日志」': 'Name your own, e.g. "residency log"', '新类目的名字': 'Name of the new section', '建': 'Create', '类目不定死：你维护什么就有什么栏。一条都没有的栏不显示。': 'Sections aren\'t fixed: whatever you keep becomes a section. Empty ones don\'t show.', 'Fairwind 懂你的一切，都收在这里 · {n} 条。左边「+ 加一栏」一条条补；或者让你的 AI 工具从你的网站读进来（设置 → 接给你的 AI 工具）。每条下面的': 'Everything Fairwind knows about you lives here · {n} entries. Add them one by one with "+ Add a section" on the left, or let your AI tool read them in from your website (Settings → Connect your AI tool). Under each entry, the ', '退出 Fairwind': 'Quit Fairwind', '关掉网页不等于退出，它在后台跑着。': 'Closing the tab doesn\'t quit it; it keeps running in the background.', '退出 Fairwind？定时任务和接给 AI 工具的门都会停，再双击 Fairwind 就回来。': 'Quit Fairwind? Scheduled tasks and the door for AI tools stop; double-click Fairwind to come back.', '已退出。要再开，双击 Fairwind。': 'Quit. Double-click Fairwind to reopen.',
+  // ── 托管接入改成一段话粘给 Codex / Claude Code(2026-10-05)──
+  '帮我把 Fairwind 接进你的 MCP 配置：名字叫 fairwind，类型是 streamable HTTP，地址 {url}，每次请求都带请求头 Authorization: Bearer {token}。已经有叫 fairwind 的就换成这个。另外，Codex、Claude Code（各个范围都看一遍）、Claude 桌面版、Gemini CLI 的配置里如果还有叫 fairwind、指向 localhost 的旧设置，也一并换成上面这个——我已经不用本机版了。改之前先备份原来的配置；改完告诉我要不要重启你才能用上。': 'Please connect Fairwind to your MCP config: name it fairwind, type streamable HTTP, URL {url}, and send the header Authorization: Bearer {token} with every request. If one called fairwind already exists, replace it with this. Also, if the configs of Codex, Claude Code (check every scope), Claude Desktop or Gemini CLI still have an old fairwind entry pointing at localhost, replace those with this one too — I no longer use the local version. Back up the current config before changing it; when you\'re done, tell me whether I need to restart you for it to take effect.',
+  '用过本机版？在本机版设置里点「下载我的备份」，再到这页下面的「备份」点「用备份恢复…」，档案和机会卡就搬过来了。趁线上还没填东西时做——恢复会换掉线上现有的内容。': 'Used the local version? In its Settings, click "Download my backup", then come to Backup further down this page and click "Restore from a backup…" to bring your profile and opportunity cards over. Do it before you add anything online — restoring replaces what\'s here.',
+  '把下面这段话原样粘给 Codex 或 Claude Code，它会自己接好。': 'Paste this whole message into Codex or Claude Code and it will connect itself.',
+  '这段话里带着你的令牌，别给别人看。': "This message carries your token. Don't show it to anyone.",
+  '换好了。旧的那串从现在起不认;把新的这段话再粘给你的工具一次。': 'Rotated. The old token no longer works; paste the new message into your tool again.',
   // ── 托管(云端)的设置页:账号块、带令牌的接入命令(2026-10-02)──
   '设置读不到:脑子没应,或它不是托管的那个。': "Couldn't read settings: the brain didn't answer, or it isn't the hosted one.",
   '<令牌>': '<token>', '换好了。旧的那串从现在起不认;接着的工具要重新粘一次。': 'Rotated. The old token no longer works; paste the new line into your tools again.',
@@ -207,4 +231,4 @@ const extra = { '已选 {n} 张': '{n} selected', '说给第 {i}/{n} 条': 'Tell
   '去「展开的卡片」看它。要拿走，在那排卡片上按 ×。': 'See it under Open cards. To remove it, press × on that row of cards.', '展开——今天要弄它。你留在这儿接着挑，挑完点顶栏「展开的卡片」过去。': 'Open: work on it today. Stay here and keep picking; then go to Open cards in the top bar.', '在展开的卡片区': 'In Open cards' }
 
 // 三份分册合进来;base 里的键优先(撞键时以档案层那份为准——别在分册里改 base 的意思)
-export default { ...a, ...b, ...c, ...extra, ...backup, ...base }
+export default { ...artifacts, ...googleCalendar, ...calendar, ...uiFocus, ...uiContacts, ...uiTimeline, ...uiMisc, ...a, ...b, ...c, ...extra, ...backup, ...base }

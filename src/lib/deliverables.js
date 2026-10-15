@@ -40,7 +40,7 @@ export async function editDeliverable(id, { title, body } = {}) {
 }
 
 /** 你自己新建一份空的。 */
-export async function newDeliverable(pursuitId, kind = 'file', title = '未命名') {
+export async function newDeliverable(pursuitId, kind = 'file', title = t('未命名')) {
   if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
   const { data, error } = await supa.rpc('pa_new_deliverable', {
     p_pursuit_id: pursuitId, p_kind: kind, p_title: title,

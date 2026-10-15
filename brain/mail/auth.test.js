@@ -75,3 +75,16 @@ test('Google 说不行的时候，当场失败并把原因带出来', async () =
   assert.ok(err, '本该失败的')
   assert.match(err.message, /access_denied/)
 })
+
+import { asAuthErrorIfItIs, MailAuthError as MAE } from './auth.js'
+test('403 限流不是授权掉了;真的掉了要把 Google 的原话带出来', () => {
+  const api = (status, reason, message) => Object.assign(new Error('x'), { response: { status, data: { error: { code: status, message, errors: [{ reason }] } } } })
+  const rl = api(403, 'userRateLimitExceeded', 'User-rate limit exceeded')
+  assert.equal(asAuthErrorIfItIs(rl), rl)
+  const denied = asAuthErrorIfItIs(api(403, 'insufficientPermissions', 'Request had insufficient authentication scopes.'))
+  assert.ok(denied instanceof MAE)
+  assert.match(denied.message, /insufficientPermissions/)
+  assert.doesNotMatch(denied.message, /object Object/)
+  const grant = asAuthErrorIfItIs(Object.assign(new Error('x'), { response: { status: 400, data: { error: 'invalid_grant' } } }))
+  assert.match(grant.message, /invalid_grant/)
+})

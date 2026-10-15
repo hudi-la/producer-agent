@@ -66,3 +66,17 @@ test('空的、缺字段的、没有 id 的，都不炸也不混进来', () => {
   assert.deepEqual(idsFromHistory([{ id: '1', messages: [{ threadId: 't' }] }]), [])
   assert.deepEqual(idsFromHistory([{ id: '1', labelsAdded: [{ labelIds: ['X'] }] }]), [])
 })
+
+import { getMetadata, isPerMinuteQuota } from './gmail.js'
+test('限速:每分钟额度用完认得出;一封碰额度,等过之后整批照样拿全', async (t) => {
+  const quota = Object.assign(new Error('q'), { response: { status: 403, data: { error: { message: "Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'", errors: [{ reason: 'rateLimitExceeded' }] } } } })
+  assert.equal(isPerMinuteQuota(quota), true)
+  assert.equal(isPerMinuteQuota(Object.assign(new Error('x'), { response: { status: 500 } })), false)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  let hit = false
+  const gmail = { users: { messages: { get: async ({ id }) => { if (id === 'b' && !hit) { hit = true; throw quota } return { data: { id } } } } } }
+  const p = getMetadata(gmail, ['a', 'b', 'c'])
+  for (let i = 0; i < 200; i++) { await Promise.resolve(); t.mock.timers.tick(1000); await new Promise((r) => setImmediate(r)) }
+  const got = await p
+  assert.deepEqual(got.map((m) => m.id), ['a', 'b', 'c'])
+})

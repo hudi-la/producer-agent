@@ -20,7 +20,8 @@ const B = '0000000b-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 //   pa_tasks_due_all        脑子跨所有人找到点的任务(0155;只读,只授 service_role)
 //   pa_briefs_due_all       脑子跨所有人找要读的新机会(0155;只读,只授 service_role)
 //   pa_owner_of_mcp_token   查 MCP 令牌是谁的——查的时候还没有身份(0156;只读,只授 service_role)
-const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token'])
+//   pa_mail_due_all         脑子跨所有人找连了 Gmail 的人去收信(0162;只读,只授 service_role)
+const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token', 'pa_mail_due_all'])
 
 const PA_FUNCTIONS = `
   select p.proname as name, p.oid::regprocedure::text as sig, p.prosecdef as definer,
@@ -164,5 +165,43 @@ test('找活:pa_briefs_due_all 跨所有人返回待读的新机会;以 authenti
     await asUser(pg, B, async () => {
       await assert.rejects(pg.query(`select * from public.pa_briefs_due_all()`), /permission denied/i)
     })
+  } finally { await close() }
+})
+
+test('Gmail:各连各的;pa_set_gmail 只动自己那一行,pa_mail_due_all 只列连上且开着的', async () => {
+  const { pg, close } = await freshDb()
+  try {
+    await registerLocalUser(pg, { id: A, email: 'a@test.local' })
+    await registerLocalUser(pg, { id: B, email: 'b@test.local' })
+    const pub = await asUser(pg, A, async () => {
+      const { rows: [r] } = await pg.query(`select public.pa_set_gmail(' A@Gmail.com ', 'rt-a') as s`)
+      return r.s
+    })
+    assert.equal(pub.gmail_address, 'a@gmail.com')
+    assert.equal(pub.gmail_connected, true)
+    assert.equal(pub.modules.mail, true)
+    assert.ok(!('gmail_refresh_token' in pub), '页面那支不许带钥匙')
+
+    await asUser(pg, A, async () => {
+      const { rows: [{ s }] } = await pg.query(`select public.pa_member_secrets() as s`)
+      assert.equal(s.gmail_refresh_token, 'rt-a')
+    })
+    await asUser(pg, B, async () => {
+      const { rows: [{ s }] } = await pg.query(`select public.pa_member_secrets() as s`)
+      assert.equal(s?.gmail_refresh_token ?? null, null, 'B 看不见 A 的钥匙')
+      await assert.rejects(pg.query(`select public.pa_set_gmail('b@gmail.com', null)`), /要么都给/)
+    })
+
+    let { rows } = await pg.query(`select owner from public.pa_mail_due_all()`)
+    assert.deepEqual(rows.map((r) => r.owner), [A])
+
+    await asUser(pg, A, () => pg.query(`select public.pa_set_gmail(null, null)`))
+    ;({ rows } = await pg.query(`select owner from public.pa_mail_due_all()`))
+    assert.deepEqual(rows, [])
+    const { rows: [after] } = await pg.query(`select gmail_address, gmail_refresh_token, modules from producer.member_settings where owner = $1`, [A])
+    assert.equal(after.gmail_refresh_token, null)
+    assert.equal(after.modules.mail, false)
+
+    await asUser(pg, A, async () => { await assert.rejects(pg.query(`select * from public.pa_mail_due_all()`)) })
   } finally { await close() }
 })

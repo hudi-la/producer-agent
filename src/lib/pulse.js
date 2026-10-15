@@ -1,4 +1,5 @@
 import { supa } from './backends.js'
+import { t } from '../i18n/index.js'
 
 // 改动计数器 —— 轮询照旧，但每一跳从「整包数据」换成一行几列（几十字节）。
 //
@@ -75,7 +76,7 @@ export function makePulse(read, { visible = () => true } = {}) {
   function onPulse(area, fn) {
     if (!AREAS.includes(area)) {
       throw new Error(
-        `没有「${area}」这一区 —— 区名要跟库里 producer.pulse_areas 对得上（现有：${AREAS.join('、')}）`)
+        t('没有「{area}」这一区 —— 区名要跟库里 producer.pulse_areas 对得上（现有：{list}）', { area, list: AREAS.join(t('、')) }))
     }
     if (!subs.has(area)) subs.set(area, new Set())
     subs.get(area).add(fn)

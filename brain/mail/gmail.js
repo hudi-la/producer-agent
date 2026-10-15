@@ -22,11 +22,39 @@ export function gmailFor(auth) {
   return google.gmail({ version: 'v1', auth })
 }
 
-/** 退避重试。只重试「再试一次可能就好」的那几种，别的直接抛。 */
-async function retry(fn, what) {
+// ── 限速(2026-10-07)───────────────────────────────────────────
+// Gmail 每个信箱每分钟有额度(15000 单位,messages.get 一次 5 单位 → 一分钟最多 3000 封)。
+// 回填并发 10 路不加节制,几秒就冲穿——线上第一轮回填就这么整轮作废了。而且额度按「Google 项目 + 信箱」算,
+// 个人版和线上版用同一个项目、同一个信箱时是**共用**一份。所以这儿留足余量:每秒最多 RATE 次(25 次时线上还是频频撞额度,10/7 降到 10)。
+const RATE = Number(process.env.GMAIL_RATE || 10)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const pacers = new WeakMap()                     // gmail 客户端 → { next, pauseUntil }
+function pacerOf(gmail) {
+  if (!gmail || typeof gmail !== 'object') return null
+  if (!pacers.has(gmail)) pacers.set(gmail, { next: 0, pauseUntil: 0 })
+  return pacers.get(gmail)
+}
+async function pace(p) {
+  if (!p) return
+  const now = Date.now()
+  const at = Math.max(now, p.next, p.pauseUntil)
+  p.next = at + 1000 / RATE
+  if (at > now) await sleep(at - now)
+}
+/** 「每分钟额度用完」:等几秒没用,要等到下一分钟 */
+export function isPerMinuteQuota(err) {
+  const e = err?.response?.data?.error
+  const text = `${e?.errors?.[0]?.reason || ''} ${e?.message || err?.message || ''}`
+  return /per minute|rateLimitExceeded|userRateLimitExceeded/i.test(text)
+}
+
+/** 退避重试。只重试「再试一次可能就好」的那几种，别的直接抛。gmail 给了就按它限速(同一个客户端的并发共用一个节拍) */
+async function retry(fn, what, gmail = null) {
+  const p = pacerOf(gmail)
   let last
   for (let i = 0; i < MAX_TRIES; i++) {
     try {
+      await pace(p)
       return await fn()
     } catch (err) {
       const authed = asAuthErrorIfItIs(err)
@@ -36,9 +64,17 @@ async function retry(fn, what) {
         || ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN'].includes(code)
       if (!retryable) throw err
       last = err
+      if (isPerMinuteQuota(err)) {
+        // 一分钟的额度用完了:整个客户端一起停到下一分钟(不然别的几路接着撞),再接着来
+        const wait = 61_000 + Math.floor(Math.random() * 4000)
+        if (p) p.pauseUntil = Math.max(p.pauseUntil, Date.now() + wait)
+        console.warn(`  ↻ ${what} 碰到每分钟额度，停 ${Math.round(wait / 1000)} 秒再接着（第 ${i + 1} 次）`)
+        await sleep(wait)
+        continue
+      }
       const wait = Math.min(2 ** i * 500 + Math.floor(Math.random() * 400), 20000)
       console.warn(`  ↻ ${what} 第 ${i + 1} 次没成（${code}），${wait}ms 后重试`)
-      await new Promise((r) => setTimeout(r, wait))
+      await sleep(wait)
     }
   }
   throw last
@@ -76,7 +112,7 @@ export async function listIds(gmail, { q = '-in:chats', onPage } = {}) {
   do {
     const { data } = await retry(
       () => gmail.users.messages.list({ userId: 'me', q, maxResults: 500, pageToken }),
-      'messages.list')
+      'messages.list', gmail)
     for (const m of data.messages || []) ids.push(m.id)
     pageToken = data.nextPageToken
     page++
@@ -99,7 +135,7 @@ export async function getMetadata(gmail, ids, { onBatch, onGone } = {}) {
         () => gmail.users.messages.get({
           userId: 'me', id, format: 'metadata', metadataHeaders: WANT_HEADERS,
         }),
-        `messages.get ${id}`)
+        `messages.get ${id}`, gmail)
     } catch (err) {
       // **一封拿不到不能拖垮整轮。**
       //
@@ -123,7 +159,7 @@ export async function getMetadata(gmail, ids, { onBatch, onGone } = {}) {
 /** 一封信的正文。只有认领之后才会走到这儿。 */
 export async function getFull(gmail, id) {
   const { data } = await retry(
-    () => gmail.users.messages.get({ userId: 'me', id, format: 'full' }), `messages.get(full) ${id}`)
+    () => gmail.users.messages.get({ userId: 'me', id, format: 'full' }), `messages.get(full) ${id}`, gmail)
   return data
 }
 
@@ -185,7 +221,7 @@ export async function historySince(gmail, startHistoryId) {
         () => gmail.users.history.list({
           userId: 'me', startHistoryId, maxResults: 500, pageToken,
         }),
-        'history.list')
+        'history.list', gmail)
       for (const id of idsFromHistory(data.history)) ids.add(id)
       if (data.historyId) latest = String(data.historyId)
       pageToken = data.nextPageToken

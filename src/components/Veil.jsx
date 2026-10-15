@@ -1,5 +1,6 @@
 import React from 'react'
 import { useVeiled } from '../lib/veil.js'
+import { t } from '../i18n/index.js'
 
 // 盖在私人信息上的那朵小花。
 //
@@ -29,5 +30,5 @@ export function Flower({ size = 13 }) {
 export default function Veil({ children }) {
   const veiled = useVeiled()
   if (!veiled) return children ?? null
-  return <span className="veil" title="展示模式盖住了"><Flower /></span>
+  return <span className="veil" title={t('展示模式盖住了')}><Flower /></span>
 }

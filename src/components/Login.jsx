@@ -9,7 +9,7 @@ import { supa } from '../lib/backends.js'
 import { t } from '../i18n/index.js'
 import { Spin } from './ProviderPicker.jsx'
 
-export default function Login() {
+export default function Login({ expired = false }) {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState(null)
 
@@ -23,6 +23,18 @@ export default function Login() {
     window.addEventListener('pageshow', reset)
     return () => window.removeEventListener('pageshow', reset)
   }, [])
+
+  // 测试账号的登录(2026-10-07):scripts/test-user-link.mjs 给的链接带 ?token_hash=…&type=magiclink。
+  // 不直接用 Supabase 那条 verify 链接——聊天窗口、浏览器预览会先「偷偷点开」一次,一次性的链接就作废了
+  // (他第一次点就是「链接无效或已过期」)。这里要人按一下按钮才真的换登录,预览不会按按钮。
+  const testToken = new URLSearchParams(location.search).get('token_hash')
+  async function testLogin() {
+    if (busy) return
+    setBusy(true); setNote(null)
+    const { error } = await supa.auth.verifyOtp({ token_hash: testToken, type: 'magiclink' })
+    if (error) { setNote(error.message); setBusy(false); return }
+    location.replace(location.origin + '/')
+  }
 
   // 跳去 Google 登录,回来落在同一个地址,AuthGate 接手。Supabase 后台没配 Google 时会报
   // 「provider is not enabled」,照实说——这不是学员能修的。
@@ -44,11 +56,12 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <h1 className="login-title">Fairwind</h1>
-        <p className="login-sub">{t('你的 producer。先认一下人。')}</p>
+        <p className="login-sub">{expired ? t('登录过期了，再登一次就好。') : t('你的 producer。先认一下人。')}</p>
         <button type="button" className="login-google" disabled={busy} onClick={google}>
           {busy ? <Spin /> : <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.8 6C12.3 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6C6.5 42.6 14.6 48 24 48z"/></svg>}
           {busy ? t('正在去 Google…') : t('用 Google 登录')}
         </button>
+        {testToken && <button type="button" className="login-google" disabled={busy} onClick={testLogin}>{busy ? <Spin /> : null}{t('以测试账号登录')}</button>}
         {note && <ErrorNotice error={note} context={t('登录')} />}
         <p className="login-fine">{t('第一次登录会自动开好你的账号。')}<a href="/privacy.html" target="_blank" rel="noreferrer">{t('隐私说明')}</a></p>
       </div>

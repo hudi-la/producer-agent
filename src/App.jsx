@@ -37,6 +37,9 @@ import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDG
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import DeskTabs from './components/DeskTabs.jsx'
 import MailState from './components/MailState.jsx'
+import BackfillToast from './components/BackfillToast.jsx'
+import TaskToast from './components/TaskToast.jsx'
+import ScoutToast from './components/ScoutToast.jsx'
 import PickBar from './components/PickBar.jsx'
 import Notifications from './components/Notifications.jsx'
 import Timeline from './components/Timeline.jsx'
@@ -248,6 +251,13 @@ export default function App() {
     loadContacts().then(setCt)
   }, [])
 
+  // Keep the right-corner scout notice current even when its panel is closed.
+  // Pulse already handles reconnects without repeatedly downloading full tasks.
+  useEffect(() => {
+    const refresh = () => loadTasks().then(setTk).catch(() => {})
+    return onPulse('tasks', refresh)
+  }, [])
+
   // 从这儿复制走的东西，不该把这儿的皮肤也带走 —— 粘进 Gmail 不该是一块纸色底。
   // 挂在 document 上而不是某个组件里：对话、草稿、卷宗，凡是你会拿去粘的地方
   // 都该一视同仁，一处漏了你就得记住「哪儿能直接粘、哪儿要先清格式」。
@@ -435,6 +445,14 @@ export default function App() {
     const iv = setInterval(ping, 20000)
     return () => { alive = false; clearInterval(iv) }
   }, [])
+  // 第一次收信(回填)在跑的时候问勤一点:右下角那个进度条 20 秒才动一下,看着像卡住了
+  const backfilling = Boolean((brain?.mail?.backfill && brain.mail.backfill.phase !== 'done') || (brain?.mail?.judging && !brain.mail.judging.done))
+  useEffect(() => {
+    if (!backfilling) return
+    let alive = true
+    const iv = setInterval(() => checkBrain().then((r) => { if (alive) setBrain(r) }), 5000)
+    return () => { alive = false; clearInterval(iv) }
+  }, [backfilling])
 
   // 正看着的这张，随时算已看。
   //
@@ -516,7 +534,11 @@ export default function App() {
   useEffect(() => {
     if (!restoredRef.current) return
     const cur = area === 'desk' ? deskView(queue, deskData) : view
-    const next = toUrl(area, cur)
+    // Keep the OAuth result until the calendar component has consumed it.
+    const target = new URL(toUrl(area, cur), window.location.origin)
+    const calendarResult = new URLSearchParams(window.location.search).get('calendar')
+    if (calendarResult) target.searchParams.set('calendar', calendarResult)
+    const next = target.pathname + target.search
     if (next !== window.location.pathname + window.location.search) {
       window.history.replaceState(null, '', next)
     }
@@ -805,10 +827,10 @@ export default function App() {
             setBellOpen(false)
             if (it.subject_kind === 'pursuit') {
               const p = pl.pursuits.find((x) => x.id === it.subject_id)
-              if (p) { setArea('pursue'); openPursuit(p) }
+              if (p) { closeDrawer(); openOnDesk('pursuit', p.id) }
             } else {
               const c = ct?.contacts?.find((x) => x.id === it.subject_id)
-              if (c) { setArea('people'); openPerson(c) }
+              if (c) { closeDrawer(); openOnDesk('contact', c.id) }
             }
           }}
         />
@@ -871,7 +893,7 @@ export default function App() {
                    onStart={() => setPicking(true)} onCancel={cancelPick}
                    onSay={() => setSayOpen(true)} onPickAll={pickAll}>
             <button className="wbtn" onClick={() => setAddOpen(true)}>
-              {t('＋ 新联系人')}{ct?.groups?.length ? t(' · {n} 伙人等着收', { n: ct.groups.length }) : ''}
+              {t('＋ 新联系人')}{mods.mail && ct?.strangers?.length ? t(' · {n} 个等你点头', { n: ct.strangers.length }) : ''}{ct?.groups?.length ? t(' · {n} 伙人等着收', { n: ct.groups.length }) : ''}
             </button>
           </PickBar>
           <People
@@ -991,6 +1013,12 @@ export default function App() {
         open={poolOpen} onClose={() => setPoolOpen(false)} pool={pool}
         onChanged={() => loadPool().then(setPool)}
         lastRun={tk.tasks.find((t) => t.prompt)?.last_result?.split('\n')[1] || null} />
+    </div>
+    {/* 右下角一摞小窗:收信整理、批量加人(2026-10-08) */}
+    <div className="toast-stack">
+      <ScoutToast tasks={tk?.tasks?.filter(isPursuitTask) || []} />
+  {mods.mail && <BackfillToast mail={brain?.mail} waiting={ct?.strangers?.length || 0} onGoPeople={() => { reloadContacts(); setArea('people') }} onGoSettings={() => setArea('settings')} />}
+      <TaskToast />
     </div>
    </VeilContext.Provider>
    </ProfileContext.Provider>

@@ -178,7 +178,7 @@ async function probes(u, other, otherIds) {
  */
 // 白名单(definer 但只授 service_role、只读):pa_tasks_due_all / pa_briefs_due_all 是 0155 脑子找活的口;
 // pa_owner_of_mcp_token 是 0156 查「这串令牌是谁的」——查的时候还没有身份。
-const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token'])
+const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token', 'pa_mail_due_all'])   // pa_mail_due_all:0162 找连了 Gmail 的人
 
 async function catalogChecks() {
   const { rows: fns } = await client.query(

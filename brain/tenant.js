@@ -100,6 +100,7 @@ export function settingsFromRow(r = {}) {
     provider: r.provider || 'claude-key', apiKey: r.api_key || '', oauthToken: r.oauth_token || '', openaiKey: r.openai_key || '', geminiKey: r.gemini_key || '',
     model: r.model || '', modelCheap: r.model_cheap || '', lang: r.lang === 'zh' ? 'zh' : 'en', judgmentsEnabled: r.judgments_enabled !== false,
     modules: r.modules || null, mcpToken: r.mcp_token || '', email: r.email || '', onboarded: r.onboarded === true,
+    gmailAddress: r.gmail_address || '', gmailRefreshToken: r.gmail_refresh_token || '',
   }
 }
 
@@ -111,10 +112,16 @@ export function rowFromSettings(patch = {}) {
   return out
 }
 
-/** 模块开关:hosted 下从那一行来;邮件在线上第一期不开(D9)。 */
+/**
+ * 模块开关:hosted 下从那一行来。邮件(2026-10-06 设计稿 D3):连上 Gmail 才算开——
+ * 连上时库里顺手把 modules.mail 拨成 true,断开拨 false;没连就永远关着,页面上那一行是「连接 Gmail」。
+ * 邮件要机会线(DEPS):机会线关了邮件跟着关。
+ */
 export function modulesFor(s) {
   const m = { profile: true, pursuits: true, mail: false, ...(s.modules || {}) }
-  return { ...m, profile: true, mail: false, canToggle: true, mailOffered: false }
+  const connected = Boolean(s.gmailRefreshToken)
+  return { ...m, profile: true, mail: Boolean(connected && m.mail === true && m.pursuits !== false), canToggle: true, mailOffered: true,
+           gmailAddress: connected ? (s.gmailAddress || '') : '' }
 }
 
 /** Authorization: Bearer xxx → xxx;没有就 null。 */

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import ErrorNotice from './ErrorNotice.jsx'
 import { errorText } from '../lib/userError.js'
-import { getLang } from '../i18n/index.js'
+import { t } from '../i18n/index.js'
 
 export default function ErrorCenter() {
   const [items, setItems] = useState([])
@@ -15,10 +15,10 @@ export default function ErrorCenter() {
     return () => window.removeEventListener('fairwind-error', receive)
   }, [])
   if (!items.length) return null
-  return <aside className="error-center" aria-label={getLang() === 'en' ? 'Operation errors' : '操作错误'}>
+  return <aside className="error-center" aria-label={t('操作错误')}>
     {items.map((item) => <div key={item.key} className="error-center-item">
       <ErrorNotice error={item.error} context={item.context} />
-      <button type="button" className="error-center-close" aria-label={getLang() === 'en' ? 'Dismiss' : '关闭提示'} onClick={() => setItems((all) => all.filter((i) => i.key !== item.key))}>×</button>
+      <button type="button" className="error-center-close" aria-label={t('关闭提示')} onClick={() => setItems((all) => all.filter((i) => i.key !== item.key))}>×</button>
     </div>)}
   </aside>
 }

@@ -49,6 +49,10 @@ export function runState(task, { now = Date.now(), tz } = {}) {
     return { kind: 'running', text: t('正在找……（{ago}）', { ago }) }
   }
   if (task?.run_now) return { kind: 'queued', text: t('排上了，脑子一分钟内接手') }
+  if (['paused', 'failed'].includes(task?.config?.scout_progress?.status)) {
+    const next = task.enabled && task.next_run_at ? t('下次 {when}', { when: fmtLocal(task.next_run_at, tz) }) : t('可手动续跑')
+    return { kind: task.config.scout_progress.status, text: t('进度已保存；{next}', { next }) }
+  }
   if (task?.enabled && task?.next_run_at) return { kind: 'next', text: t('下次 {when}', { when: fmtLocal(task.next_run_at, tz) }) }
   return { kind: 'none', text: '' }
 }
@@ -91,7 +95,7 @@ export function groupTasks(tasks = []) {
   const timed = [], ran = [], origins = [], notYet = []
   for (const task of tasks) {
     if (task.prompt) timed.push(task)
-    else if (task.last_run_at || (task.last_result && task.last_result !== '未接')) ran.push(task)
+    else if (task.last_run_at || (task.last_result && task.last_result !== '未接')) ran.push(task) // i18n-ok: 库里存的状态值，拿来比对
     else if (task.type === 'manual') origins.push(task)
     else notYet.push(task)
   }

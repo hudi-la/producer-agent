@@ -5,6 +5,7 @@
 // 不来敲你（push）。一行都不新存，全从事实现算（pa_ledger，0105）。
 
 import { supa, DB_CONFIGURED } from './backends.js'
+import { t } from '../i18n/index.js'
 
 export async function loadLedger(days = 14) {
   if (!DB_CONFIGURED) return { days: [], summary: null, reason: 'no-config' }
@@ -30,11 +31,11 @@ export async function loadLedger(days = 14) {
   return { days: [...byDay.entries()], summary, reason: null }
 }
 
-/** 每种事一个词 —— 行首的小标。 */
-export const KIND_LABEL = {
-  sent: '发出', got: '收到', note: '记了一笔',
-  wait_open: '开始等', wait_close: '关掉一个等待', fairwind: 'Fairwind',
-}
+/** 每种事一个词 —— 行首的小标。渲染时取（t() 要在语言定下来之后才查）。 */
+export const kindLabel = (k) => ({
+  sent: t('发出'), got: t('收到'), note: t('记了一笔'),
+  wait_open: t('开始等'), wait_close: t('关掉一个等待'), fairwind: 'Fairwind',
+})[k]
 
 /**
  * 「时间线」分两半（2026-08-23 他拍的）。分的不是时间，是**谁动的手**：

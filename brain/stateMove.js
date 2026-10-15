@@ -20,6 +20,7 @@
 // 设计稿：docs/specs/2026-09-04-chat-moves-the-state-design.md 第三节
 
 import { takeTag, clean1 } from './tag.js'
+import { envNow } from './tenant.js'
 
 export const MOVES = ['resolved', 'wait', 'reschedule', 'park', 'needs_reply', 'meeting', 'met', 'done']
 
@@ -131,6 +132,21 @@ const 月日 = (iso) => {
 
 /** 小卡第一行，也是那条笔的正文、标签的 gist —— 三处一个字不差。 */
 export function moveLine(mv) {
+  // 英文版(2026-10-08):这一行会落进库、显示在时间线和卡上,按这个人的语言写。
+  // 读 envNow 不读 prompt.js 的 outputLang——prompt.js 反过来 import 这个文件,会转圈
+  if (envNow().FAIRWIND_LANG === 'en') {
+    switch (mv.move) {
+      case 'wait':        return `${mv.awaiting} · until ${月日(mv.due)}`
+      case 'reschedule':  return `Follow-up moved to ${月日(mv.due)}`
+      case 'park':        return `Parked until ${月日(mv.due)}`
+      case 'resolved':    return mv.needs_reply ? 'No need to wait anymore, but this one needs a reply' : 'No need to wait anymore'
+      case 'needs_reply': return 'This one needs a reply'
+      case 'meeting':     return `Meeting on ${月日(mv.meet_at)}`
+      case 'met':         return 'The meeting happened'
+      case 'done':        return 'Nothing more to do here'
+      default:            return ''
+    }
+  }
   switch (mv.move) {
     case 'wait':        return `${mv.awaiting} · 到 ${月日(mv.due)}`
     case 'reschedule':  return `到点日改到 ${月日(mv.due)}`

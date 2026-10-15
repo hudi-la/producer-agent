@@ -728,6 +728,7 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 .tk-progress-detail { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--ink-2); }
 .tk-progress-icon { flex: none; width: 15px; height: 15px; margin-top: 2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; color: var(--accent); animation: tk-spin 1s linear infinite; }
 .tk-progress.queued .tk-progress-icon { color: var(--wait); }
+.tk-progress.paused .tk-progress-icon, .tk-progress.failed .tk-progress-icon { animation: none; border-right-color: currentColor; color: var(--wait); }
 .tk-progress.off .tk-progress-icon { animation: none; border-right-color: currentColor; }
 @keyframes tk-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .tk-progress-icon { animation: none; border-right-color: currentColor; } }
@@ -1894,7 +1895,7 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .modules-panel { margin: 28px 0 8px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); }
 .modules-panel h3 { margin: 0 0 12px; font-family: var(--serif); font-size: 15px; font-weight: 600; }
 .modules-panel label { display: grid; grid-template-columns: auto auto 1fr; gap: 2px 10px; align-items: baseline; padding: 6px 0; font-size: 13px; cursor: pointer; }
-.modules-panel small { grid-column: 3; color: var(--ink-2); }
+.modules-panel label > small { grid-column: 3; color: var(--ink-2); }
 .modules-panel input:disabled + b { color: var(--ink-2); }
 
 /* ── 本机模式的账号块（关于你 · 最底下）──────────────────────── */
@@ -2108,6 +2109,7 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 /* 命令框:等宽一行在框里横滚,复制钮贴在框里右边 */
 .cmd-box { position: relative; display: flex; align-items: center; min-width: 0; background: var(--paper); border: 1px solid var(--line-2); border-radius: 8px; }
 .cmd-box code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; color: var(--ink); user-select: all; scrollbar-width: thin; }
+.cmd-box.cmd-msg code { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: visible; font-family: inherit; font-size: 13px; line-height: 1.6; }
 .cmd-copy { flex: none; display: inline-flex; align-items: center; gap: 5px; align-self: stretch; padding: 0 12px; font: inherit; font-size: 12px; color: var(--ink-2);
   background: transparent; border: none; border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; cursor: pointer; }
 .cmd-copy:hover { color: var(--ink); background: var(--paper-3); }
@@ -2145,7 +2147,6 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 /* .prov label 是给 key 框的竖排;药丸也是 label,别让它跟着变成两行(「在用」掉到第二行,药丸被撑高) */
 .set-card .prov .prov-opt { display: inline-flex; gap: 6px; padding: 6px 12px; font-size: 12.5px; }
 .set-rows.set-divided { padding-top: 14px; border-top: 1px solid var(--line); }
-
 
 /* Shared, persistent error surface: readable at normal size and on narrow screens. */
 .error-notice { box-sizing: border-box; display: block; flex: 1 1 100%; width: 100%; min-width: 0; margin: 12px 0; padding: 16px 18px; border: 1px solid #d7a7a0; border-left: 4px solid #a63d30; border-radius: 10px; background: #fff5f2; color: #613126; font-size: 14px; line-height: 1.65; text-align: left; overflow-wrap: anywhere; }
@@ -2194,3 +2195,214 @@ a.op-title:hover { color: var(--accent); text-decoration: underline; }
 .model-dialog-head h2 { margin: 0; font-size: 20px; }
 .model-dialog .model-editor { margin-top: 16px; padding-top: 16px; }
 @media (max-width: 560px) { .model-dialog { padding: 18px; } }
+
+/* 线上「连接 Gmail」(2026-10-06):邮件那一行底下 */
+.gm-connect { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 2px; }
+.gm-connect > *, .gm-connect small { grid-column: 1 / -1; }
+.gm-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gm-row small, .gm-hint { color: var(--ink-3); font-size: 12px; line-height: 1.55; }
+.gm-connect .cl-ok b { font-weight: 500; }
+.gm-connect .cl-ok small { font-family: inherit; flex-basis: 100%; order: 3; }
+
+/* 第一次收信的进度小窗(2026-10-07):右下角,不挡主区 */
+.bf-toast { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 60; width: min(340px, calc(100vw - 36px));
+  display: grid; gap: 8px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--paper);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .12); font-size: 13px; color: var(--ink); }
+.bf-h { display: flex; align-items: center; gap: 9px; }
+.bf-h b { font-weight: 600; flex: 1; }
+.bf-ico.ok { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--good, #4a7); color: #fff; }
+.bf-ico.ok svg { width: 12px; height: 12px; }
+.bf-x { border: none; background: transparent; color: var(--ink-3); cursor: pointer; padding: 2px; display: inline-grid; place-items: center; border-radius: 6px; }
+.bf-x:hover { color: var(--ink); background: var(--paper-2); }
+.bf-toast p { margin: 0; color: var(--ink-2); line-height: 1.5; }
+.bf-toast small { color: var(--ink-3); font-size: 11.5px; line-height: 1.5; }
+.bf-bar { height: 5px; border-radius: 99px; background: var(--paper-2); overflow: hidden; }
+.bf-bar i { display: block; height: 100%; background: var(--ink); border-radius: inherit; transition: width .6s ease; }
+
+/* 新联系人:收信时判好的,直接问加不加(2026-10-07) */
+.ask-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 2px 0 10px; }
+.ask { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); }
+.ask-x { margin-top: 3px; accent-color: var(--ink); }
+.ask:not(:has(.ask-x)) { grid-template-columns: minmax(0, 1fr) auto; }
+.ask-body { display: grid; gap: 3px; min-width: 0; }
+.ask-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ask-top b { font-weight: 600; font-size: 13.5px; }
+.ask-org { font-size: 12.5px; color: var(--ink-2); }
+.ask-kind { font-size: 10.5px; padding: 1px 6px; border-radius: 5px; background: var(--paper-2); color: var(--ink-3); border: 1px solid var(--line); }
+.ask-kind.is-org { background: color-mix(in srgb, var(--mark-blue, #6a8bd8) 18%, transparent); color: var(--ink-2); }
+.ask-mail { font-size: 12px; color: var(--ink-3); }
+.ask-why { margin: 2px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.ask-meta { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+.ask-act { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ask-deep { color: var(--ink-3); font-size: 11.5px; }
+.ask-busy { opacity: .6; }
+.ask-gone { display: flex; gap: 12px; align-items: center; color: var(--ink-3); font-size: 12.5px; grid-template-columns: none; }
+@media (max-width: 560px) {
+  .ask { grid-template-columns: auto minmax(0, 1fr); }
+  .ask-act { grid-column: 2; flex-direction: row; align-items: center; }
+}
+.bf-toast.small { gap: 0; }
+.bf-step { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.bf-step-h { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 12.5px; }
+.spin.sm { width: 11px; height: 11px; border-width: 1.6px; }
+.bf-ico.wait { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: color-mix(in srgb, var(--bad, #b85) 18%, transparent); color: var(--bad, #a44); }
+.bf-ico.idle { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 1.6px solid var(--line-2); }
+.bf-step .bf-ico.ok { width: 14px; height: 14px; }
+.bf-alert { margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; color: var(--ink); background: color-mix(in srgb, var(--bad, #a44) 9%, transparent); }
+.bf-go { justify-self: start; border: none; background: none; padding: 0; color: var(--accent, var(--ink)); font: inherit; font-weight: 600; cursor: pointer; }
+.bf-go:hover { text-decoration: underline; }
+.jd-lead { margin: 2px 0 8px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+
+/* ══ 手机（≤ 640px，2026-10-07）════════════════════════════════════
+   桌面那一行顶栏到了手机上折成四行、占掉小半屏，第五个区「时间线」被挤出屏外点不到；
+   档案页 208px 的左栏把正文挤成一字一行；抽屉 400px 比屏宽还宽，打开后看板被让位让成零宽。
+   这一段只管窄屏，桌面一个像素不动。 */
+@media (max-width: 640px) {
+  /* 顶栏两行：上面 牌子 · 收信 · 🔔 · 设置 · 头像；下面一条能横滑的区。 */
+  .app-top, .wrap.drawered .app-top { flex-wrap: wrap; gap: 4px 6px; padding: 8px 12px 0; }
+  .brand { gap: 8px; }
+  .brand .mark { width: 26px; height: 26px; }
+  .brand .name { display: none; }   /* 第一行只放得下羽标；字留着的话头像会被挤到第二行 */
+  /* 收信状态吃掉剩下的宽、太长就省略——不然 flex 先折行不先缩，头像掉下去 */
+  .app-top .sp { display: none; }
+  .app-top .mailst { flex: 1 1 0; text-align: right; }
+  .app-top .bellbtn, .app-top .veilbtn { padding: 6px 8px; }
+  .acct-btn > span:not(.acct-dot) { display: none; }   /* 名字收进头像，点开菜单里有全名 */
+  .app-top .areas { order: 9; flex: 0 0 100%; box-sizing: border-box; min-width: 0; margin: 0; padding: 4px 0 8px; gap: 2px;
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .areas::-webkit-scrollbar { display: none; }
+  .area { flex: none; padding: 7px 12px; }
+  .subbar, .areabar, .wrap.drawered .areabar { padding: 8px 12px; }
+  /* 各处的筛选签（机会池「全部 / 开着的 / 关注中…」等）：挤不下就横滑，别把字挤成竖排 */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; white-space: nowrap; }
+
+  /* 看板：一列差不多一屏宽，左右滑一列一停 */
+  .board, .wrap.drawered .board { grid-auto-columns: calc(100vw - 48px); gap: 12px; padding: 14px 12px 32px;
+    scroll-snap-type: x mandatory; scroll-padding-left: 12px; }
+  .col { scroll-snap-align: start; }
+  .col-h { top: -14px; }
+
+  /* 抽屉在手机上就是整屏，拉宽度那条边用不上 */
+  .drawer { width: 100%; border-left: 0; }
+  .drawer-grip { display: none; }
+
+  .page-inner { padding: 20px 16px 64px; }
+  .page-head h1 { font-size: 22px; }
+
+  /* 档案：左栏变成头上一排可折行的签，正文占满宽 */
+  .lib-two { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+  .lib-rail { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .lib-rail .rail-b { width: auto; }
+  .rail-add { flex-basis: 100%; margin-top: 2px; }
+  .idrow { grid-template-columns: 60px minmax(0, 1fr); gap: 10px; }
+
+  .taskmodal, .opmodal { width: calc(100vw - 20px); max-height: calc(100dvh - 32px); padding: 18px 16px; }
+}
+/* iOS 输入框字小于 16px 会在点进去时把整页放大、回不来。触屏手机上一律 16。 */
+@media (max-width: 640px) and (hover: none) {
+  input:not([type=checkbox]):not([type=radio]), textarea, select { font-size: 16px !important; }
+}
+/* 已连上之后「登录另一个账户」:小链接,不抢眼(2026-10-08) */
+.prov-login .lnk.prov-switch { font-size: 12.5px; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; background: none; border: none; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.prov-login .lnk.prov-switch:hover { color: var(--ink); }
+.cl-ok .lnk.prov-switch { margin-left: auto; }
+.bf-sub { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+.bf-ok { justify-self: start; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); cursor: pointer; }
+.bf-ok:hover { filter: brightness(1.15); }
+/* 右下角一摞小窗(收信整理 + 批量加人),叠着放 */
+.toast-stack { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 60; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; pointer-events: none; }
+.toast-stack > * { pointer-events: auto; }
+.toast-stack .bf-toast { position: static; }
+/* 判据编辑区:里面每样东西各占一整行。外面 .modules-panel small { grid-column: 3 } 是给开关行用的,
+   漏进来会把这里撑成三列、输入框挤成一条缝(2026-10-08,英文下更窄) */
+.modules-panel .judgments > *, .modules-panel .jd-editor > *, .judgments .jd-editor > * { grid-column: 1 / -1; }
+.jd-editor textarea { width: 100%; box-sizing: border-box; min-height: 9em; }
+/* Personal schedule: familiar month/week calendar; activity lives in its own tab. */
+.schedule-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 24px 0 16px; }
+.schedule-toolbar h2 { margin: 0 auto 0 0; font-size: 21px; font-weight: 600; }
+.schedule-controls { display: flex; gap: 3px; }
+.schedule-controls button { background: transparent; border: 1px solid var(--line-2); border-radius: 6px; padding: 6px 12px; color: var(--ink-2); cursor: pointer; }
+.schedule-controls button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.schedule-scroll { overflow-x: auto; border: 1px solid var(--line-2); border-radius: 8px; }
+.schedule-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-width: 630px; }
+.schedule-weekday { padding: 10px; text-align: center; font-size: 12px; color: var(--ink-3); border-bottom: 1px solid var(--line-2); }
+.schedule-day { min-height: 126px; padding: 6px; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+.schedule-day:nth-child(7n) { border-right: 0; }
+.schedule-day:nth-last-child(-n+7) { border-bottom: 0; }
+.schedule-day.outside { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.schedule-day.outside .schedule-date { color: var(--ink-3); }
+.schedule-day.selected { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.schedule-date { display: block; width: 27px; height: 27px; margin: 0 0 5px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
+.schedule-date.today { color: var(--paper); background: var(--accent); }
+.schedule-event { display: flex; flex-direction: column; width: 100%; gap: 2px; text-align: left; margin: 4px 0; padding: 5px 6px; background: color-mix(in srgb, var(--accent) 11%, var(--paper)); border: 0; border-left: 2px solid var(--accent); border-radius: 3px; color: var(--ink-2); cursor: pointer; font-size: 11px; }
+.schedule-event.meeting { background: color-mix(in srgb, #668278 13%, var(--paper)); border-left-color: #668278; }
+.schedule-event strong, .schedule-event > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.schedule-event-meta { color: var(--ink-3); font-size: 10px; }
+.schedule-event:hover { filter: brightness(.96); }
+.schedule-more { border: 0; background: none; color: var(--accent); font-size: 11px; cursor: pointer; }
+.schedule-grid.week .schedule-day { min-height: 340px; }
+.schedule-grid.week .schedule-event > span:last-child { white-space: normal; }
+.schedule-controls button:focus-visible, .schedule-date:focus-visible, .schedule-event:focus-visible, .schedule-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) { .schedule-toolbar { gap: 10px; } .schedule-toolbar h2 { flex-basis: 100%; font-size: 18px; } }
+
+/* Google Calendar connection and per-user preferences */
+.google-calendar { margin: 16px 0; padding: 14px; border: 1px solid var(--line-2); border-radius: 8px; font-size: 12px; }
+.google-calendar-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.google-calendar-head > span { color: var(--ink-3); flex: 1; overflow-wrap: anywhere; }
+.google-calendar button, .google-calendar select { border: 1px solid var(--line-2); border-radius: 5px; padding: 5px 9px; color: var(--ink); background: var(--paper); cursor: pointer; }
+.google-calendar button:disabled { opacity: .5; cursor: wait; }
+.google-calendar-settings { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 16px; }
+.google-calendar-settings fieldset { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid var(--line-2); width: 100%; }
+.google-calendar-settings label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.google-calendar-settings p { margin: 0; color: var(--ink-3); }
+.google-calendar-error { color: #a44537; }
+.schedule-event.google { border-left-color: #5275ad; background: color-mix(in srgb, #5275ad 10%, var(--paper)); }
+/* The editor occupies space only while an artifact is being edited. */
+.focus.page .focus-cols.without-editor { grid-template-columns: clamp(280px, 25vw, 520px) minmax(0, 1fr); }
+.artifact-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.artifact-card .lcard-body { max-height: 360px; overflow: auto; }
+.artifact-card section + section { margin-top: 16px; }
+.artifact-confirm { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.artifact-editor label { display: block; margin: 16px 0; }
+.artifact-editor input, .artifact-editor textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; padding: 10px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.artifact-editor textarea { resize: vertical; line-height: 1.6; }
+@media (max-width: 900px) { .focus.page .focus-cols.without-editor { grid-template-columns: minmax(0, 1fr); } }
+aside.drawer:has(.artifact-editor) { width: min(1200px, 96vw); }
+.focus.drawer:has(.artifact-editor) { width: 100%; padding-right: 480px; box-sizing: border-box; }
+.focus.drawer:has(.artifact-editor) .composer { right: 480px; }
+.focus.drawer .artifact-editor { position: absolute; top: 0; bottom: 0; right: 0; width: min(480px, 90vw); overflow-y: auto; padding-bottom: 24px; z-index: 3; box-sizing: border-box; background: var(--paper); box-shadow: -12px 0 36px #0002; }
+
+@media (max-width: 700px) { .focus.drawer:has(.artifact-editor) { padding-right: 0; } .focus.drawer .artifact-editor { width: 100%; } }
+.artifact-editor > .artifact-actions { position: sticky; bottom: 0; padding: 12px 0; background: var(--paper); }
+.artifact-actions .b, .artifact-confirm .b { border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px; font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); cursor: pointer; }
+.artifact-actions .b.primary, .artifact-confirm .b.primary { color: var(--accent); border-color: var(--accent); }
+.artifact-actions .b:disabled, .artifact-confirm .b:disabled { opacity: .5; cursor: default; }
+.focus.drawer:has(.artifact-editor) .composer-dock { left: 0; transform: none; margin-left: var(--focus-pad); width: calc(100% - 480px - 2 * var(--focus-pad)); }
+@media (max-width: 700px) { .focus.drawer:has(.artifact-editor) .composer-dock { display: none; } }
+
+/* Inline deliverables share the conversation width and have a distinct document surface. */
+.lcard.artifact-card {
+  width: 100%; max-width: none; min-width: 0;
+  padding: 16px 18px; border: 1px solid #A9C3BE; border-left: 4px solid #54867D;
+  background: #E5EFEB; color: var(--ink); border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.artifact-card .lcard-h { color: #476C64; gap: 10px; }
+.artifact-card .lcard-tag { color: #315F55; background: #CFDFD8; padding: 3px 8px; border-radius: 5px; }
+.artifact-card .lcard-sub { font-size: 14px; margin: 10px 0 8px; }
+.artifact-card .lcard-to { color: var(--ink-2); margin-bottom: 12px; }
+.artifact-card .lcard-body { padding: 14px 16px; background: #F5F9F6; border: 1px solid #CCDDD6; border-radius: 7px; }
+.artifact-card .artifact-actions { padding-top: 12px; border-top: 1px solid #BBD0C7; }
+@media (prefers-color-scheme: dark) {
+  .lcard.artifact-card { background: #202E2A; border-color: #4C6A60; border-left-color: #89B9A7; }
+  .artifact-card .lcard-h { color: #B5D3C7; }
+  .artifact-card .lcard-tag { color: #D5E9DF; background: #354C42; }
+  .artifact-card .lcard-body { background: #19231F; border-color: #3D554B; }
+  .artifact-card .artifact-actions { border-color: #4C6A60; }
+}
+@media (max-width: 640px) {
+  .lcard.artifact-card { padding: 12px; }
+  .artifact-card .lcard-body { padding: 12px; }
+}

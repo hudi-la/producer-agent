@@ -10,7 +10,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
   // Keep the existing result contract, but never turn failed reads into empty data.
   const request = async (path, init = {}, binary = false) => {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), /backup|files|judgments\/preview/.test(path) ? 180000 : 30000)
+    const timeout = setTimeout(() => controller.abort(), path.startsWith('/backup/') ? 30 * 60_000 : /files|judgments\/preview/.test(path) ? 180000 : 30000)
     try {
       const r = await fetchImpl(`${base}${path}`, { ...init, signal: controller.signal })
       if (binary && r.ok) return await r.blob()
@@ -81,7 +81,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
     },
     chatgpt: {
       async status() { return request(`/chatgpt/status`) },
-      login: () => post('/chatgpt/login', {}),
+      login: ({ restart = false } = {}) => post('/chatgpt/login', { restart }),
     },
     setup: (body) => post('/setup', body),
     /** 「关于你」底下的账号那块用:读到的永远没有 key 本身,只有「设了没有」和末四位 */

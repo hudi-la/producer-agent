@@ -14,6 +14,7 @@
 
 import { rulePass, candidates, putVerdict } from './store.js'
 import { ask } from './ask.js'
+import { modelFailure } from './modelFailure.js'
 
 const BATCH = 50
 
@@ -124,13 +125,14 @@ export async function classify({ rounds = Infinity, log = console.log } = {}) {
       calls++
     } catch (err) {
       log(`  ✗ 这批没问成（${err.message}），停在这儿——已判的都在库里，再跑一次接着来`)
-      break
+      // 额度用完了:带回去,收信那一轮记下来,界面右下角说「X 点重置,到点自己接着」
+      return { rule, rounds: round, calls, ...tally, blocked: modelFailure(err) }
     }
 
     const verdicts = parse(text, batch)
     if (!verdicts) {
       log('  ✗ 回话格式不对，这批不写库。停。')
-      break
+      return { rule, rounds: round, calls, ...tally, blocked: modelFailure(new Error('Invalid classification response')) }
     }
 
     for (const v of verdicts) {
@@ -145,5 +147,5 @@ export async function classify({ rounds = Infinity, log = console.log } = {}) {
         `｜认不出 ${verdicts.filter((v) => v.verdict === 'unsure').length}`)
   }
 
-  return { rule, rounds: round, calls, ...tally }
+  return { rule, rounds: round, calls, ...tally }   // tally 的 person/bulk/machine/unsure 加起来就是这次判了几个
 }

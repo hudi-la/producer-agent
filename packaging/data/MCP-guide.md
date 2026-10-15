@@ -75,3 +75,13 @@ Seven default kinds, plus **any kind name of your own**. The UI grows a section 
 ### 每周搜机会 · Weekly watchlist intake
 
 先列关注表和卡片查重；官方核实后用 `fairwind_watchlist_add` 加行。资格不符设 `eligible=false`；高匹配但已关闭设 `status=closed`，`notes` 以 `🟡 Watch · Next round expected...` 开头。没有可靠预计日期就省略 `opens_at`。此工具不创建卡片，也不覆盖旧行的状态或资格；后续复查和筛选仍由现有机会池流程处理。
+
+## Card stacks、联系人和申请材料
+
+除了档案和机会卡，现在可以直接通过 MCP 管理独立 card stack、联系人与见面记录、项目材料、申请表、真实附件、机会池和搜寻任务。
+
+例如：“把这几家机构放进一个叫洛杉矶空间的 card stack”“把写好的陈述存回这张卡”“只更新 biography 那题”“把这份 PDF 放到项目材料里”。
+
+先读取再修改；工具会返回记录 ID。新增列表支持分页，看到 `has_more` 时继续用 `next_offset` 读取。批量创建失败会整批回滚；移出卡组不删除卡片，归档条目可以恢复。申请材料只写草稿。
+
+文件上传接受标准 Base64，单文件上限 8 MiB。搜寻任务默认停用，排期采用个人资料中的 `tz` 时区。完整工具清单和约定见项目文档 `docs/mcp-workspace.md`。

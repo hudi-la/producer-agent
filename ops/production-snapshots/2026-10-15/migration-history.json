@@ -1,0 +1,614 @@
+[
+  {
+    "version": "0001",
+    "name": "producer_init"
+  },
+  {
+    "version": "0003",
+    "name": "pursuits"
+  },
+  {
+    "version": "0005",
+    "name": "tasks"
+  },
+  {
+    "version": "0007",
+    "name": "entries"
+  },
+  {
+    "version": "0009",
+    "name": "brain_rpc"
+  },
+  {
+    "version": "0010",
+    "name": "gaps_from_direct_apply"
+  },
+  {
+    "version": "0011",
+    "name": "outreach"
+  },
+  {
+    "version": "0013",
+    "name": "ball"
+  },
+  {
+    "version": "0015",
+    "name": "stages"
+  },
+  {
+    "version": "0017",
+    "name": "ball_no_stage"
+  },
+  {
+    "version": "0019",
+    "name": "next_action"
+  },
+  {
+    "version": "0021",
+    "name": "ball_two_states"
+  },
+  {
+    "version": "0023",
+    "name": "jot"
+  },
+  {
+    "version": "0025",
+    "name": "brain_context_meta"
+  },
+  {
+    "version": "0027",
+    "name": "deliverables_and_threads"
+  },
+  {
+    "version": "0029",
+    "name": "next_action_digest"
+  },
+  {
+    "version": "0030",
+    "name": "unread_and_profile"
+  },
+  {
+    "version": "0031",
+    "name": "message_meta"
+  },
+  {
+    "version": "0032",
+    "name": "people_layer_contacts"
+  },
+  {
+    "version": "0033",
+    "name": "people_layer_own_threads"
+  },
+  {
+    "version": "0034",
+    "name": "people_layer_rpc"
+  },
+  {
+    "version": "0035",
+    "name": "people_layer_lock_brain_ports"
+  },
+  {
+    "version": "0036",
+    "name": "deliverables_only_email_belong_to_people"
+  },
+  {
+    "version": "0037",
+    "name": "emails_orgs_and_true_attribution"
+  },
+  {
+    "version": "0038",
+    "name": "attribution_by_address"
+  },
+  {
+    "version": "0039",
+    "name": "orgs_in_the_address_book"
+  },
+  {
+    "version": "0040",
+    "name": "expose_counterpart_email"
+  },
+  {
+    "version": "0041",
+    "name": "unknown_sender_name_from_their_side"
+  },
+  {
+    "version": "0042",
+    "name": "address_book_digest"
+  },
+  {
+    "version": "0043",
+    "name": "address_alone_is_enough_ownership"
+  },
+  {
+    "version": "0044",
+    "name": "attachment_files"
+  },
+  {
+    "version": "0045",
+    "name": "global_mail_sync"
+  },
+  {
+    "version": "0046",
+    "name": "mail_account_state"
+  },
+  {
+    "version": "0047",
+    "name": "rule_pass_ambiguous_name"
+  },
+  {
+    "version": "0048",
+    "name": "rule_pass_keep_machine_reason"
+  },
+  {
+    "version": "0049",
+    "name": "shared_box_is_not_trash_and_not_me"
+  },
+  {
+    "version": "0050",
+    "name": "dont_promote_what_is_already_there"
+  },
+  {
+    "version": "0051",
+    "name": "merge_contacts"
+  },
+  {
+    "version": "0052",
+    "name": "a_line_has_a_cast"
+  },
+  {
+    "version": "0053",
+    "name": "one_line_person_everything_is_that_line"
+  },
+  {
+    "version": "0054",
+    "name": "rfc_threading_headers"
+  },
+  {
+    "version": "0055",
+    "name": "replies_find_their_line"
+  },
+  {
+    "version": "0056",
+    "name": "cards_see_the_cast_and_the_ball"
+  },
+  {
+    "version": "0057",
+    "name": "orphan_inbound"
+  },
+  {
+    "version": "0058",
+    "name": "four_signals"
+  },
+  {
+    "version": "0059",
+    "name": "demo_flag_and_guard"
+  },
+  {
+    "version": "0060",
+    "name": "contact_threads_from_the_ledger"
+  },
+  {
+    "version": "0061",
+    "name": "dates_in_your_timezone"
+  },
+  {
+    "version": "0062",
+    "name": "recompute_meet_dates_too"
+  },
+  {
+    "version": "0063",
+    "name": "a_person_sees_every_line_they_are_on"
+  },
+  {
+    "version": "0064",
+    "name": "notes_can_also_hang_on_a_line"
+  },
+  {
+    "version": "0065",
+    "name": "edit_entries_in_the_page"
+  },
+  {
+    "version": "0066",
+    "name": "say_it_again"
+  },
+  {
+    "version": "0068",
+    "name": "a_letter_lands_in_the_page"
+  },
+  {
+    "version": "0069",
+    "name": "a_form_lands_field_by_field"
+  },
+  {
+    "version": "0070",
+    "name": "who_you_are_replying_to_comes_from_the_ledger"
+  },
+  {
+    "version": "0071",
+    "name": "recipients_are_a_list_you_tick"
+  },
+  {
+    "version": "0072",
+    "name": "cue_facts"
+  },
+  {
+    "version": "0073",
+    "name": "letter_verdicts_and_cue_marks"
+  },
+  {
+    "version": "0074",
+    "name": "letters_for_triage"
+  },
+  {
+    "version": "0075",
+    "name": "a_draft_is_not_a_letter"
+  },
+  {
+    "version": "0076",
+    "name": "a_letter_is_a_letter"
+  },
+  {
+    "version": "0077",
+    "name": "say_where_the_date_came_from"
+  },
+  {
+    "version": "0078",
+    "name": "judging_has_a_moment"
+  },
+  {
+    "version": "0079",
+    "name": "dirty_is_computed"
+  },
+  {
+    "version": "0080",
+    "name": "rejudge_reads_the_same_mail"
+  },
+  {
+    "version": "0081",
+    "name": "the_no_subject_guess_was_wrong"
+  },
+  {
+    "version": "0082",
+    "name": "the_ledger_answers_to_gmail"
+  },
+  {
+    "version": "0083",
+    "name": "last_touch_is_recomputed"
+  },
+  {
+    "version": "0084",
+    "name": "a_letter_announces_itself"
+  },
+  {
+    "version": "0085",
+    "name": "a_summary_is_not_the_letter"
+  },
+  {
+    "version": "0086",
+    "name": "a_line_reads_its_own_letters"
+  },
+  {
+    "version": "0087",
+    "name": "record_labels_at_ingestion"
+  },
+  {
+    "version": "0088",
+    "name": "selfcheck"
+  },
+  {
+    "version": "0089",
+    "name": "read_faces_never_show_drafts"
+  },
+  {
+    "version": "0090",
+    "name": "counting_letters_means_counting_letters"
+  },
+  {
+    "version": "0091",
+    "name": "i_wrote_to_them_counts_too"
+  },
+  {
+    "version": "0092",
+    "name": "a_fact_carries_its_tags"
+  },
+  {
+    "version": "0093",
+    "name": "a_line_can_be_noted"
+  },
+  {
+    "version": "0094",
+    "name": "state_is_replayed"
+  },
+  {
+    "version": "0095",
+    "name": "facts_line_up_to_be_judged"
+  },
+  {
+    "version": "0096",
+    "name": "due_means_act_once"
+  },
+  {
+    "version": "0097",
+    "name": "meetings_close_their_loop"
+  },
+  {
+    "version": "0098",
+    "name": "states_carry_their_names"
+  },
+  {
+    "version": "0099",
+    "name": "a_meeting_survives_the_reply"
+  },
+  {
+    "version": "0100",
+    "name": "naive_times_live_in_your_timezone"
+  },
+  {
+    "version": "0101",
+    "name": "the_view_answers_its_own_timezone"
+  },
+  {
+    "version": "0102",
+    "name": "a_scheduled_send_is_not_yet_an_event"
+  },
+  {
+    "version": "0103",
+    "name": "a_wait_can_be_rescheduled"
+  },
+  {
+    "version": "0104",
+    "name": "due_is_a_date_not_an_instant"
+  },
+  {
+    "version": "0105",
+    "name": "the_ledger_of_done_things"
+  },
+  {
+    "version": "0106",
+    "name": "a_claimed_address_joins_its_lines"
+  },
+  {
+    "version": "0107",
+    "name": "a_registered_mailbox_is_recognized"
+  },
+  {
+    "version": "0108",
+    "name": "followups_arrive_the_evening_before"
+  },
+  {
+    "version": "0109",
+    "name": "paused_lines_stay_quiet"
+  },
+  {
+    "version": "0110",
+    "name": "a_watch_column"
+  },
+  {
+    "version": "0111",
+    "name": "the_pulse"
+  },
+  {
+    "version": "0112",
+    "name": "the_pulse_only_counts_real_changes"
+  },
+  {
+    "version": "0114",
+    "name": "rule_pass_only_writes_real_verdicts"
+  },
+  {
+    "version": "0115",
+    "name": "pulse_by_area"
+  },
+  {
+    "version": "0116",
+    "name": "the_board_stops_hauling_long_text"
+  },
+  {
+    "version": "0117",
+    "name": "needs_reply_is_not_shadowed"
+  },
+  {
+    "version": "0118",
+    "name": "scheduled_sends_get_audited"
+  },
+  {
+    "version": "0119",
+    "name": "retag_replays_in_order"
+  },
+  {
+    "version": "0120",
+    "name": "the_clock_follows_your_last_letter"
+  },
+  {
+    "version": "0121",
+    "name": "a_replying_sibling_mailbox_lets_itself_in"
+  },
+  {
+    "version": "0122",
+    "name": "a_reply_is_not_silence"
+  },
+  {
+    "version": "0123",
+    "name": "the_nth_follow_up"
+  },
+  {
+    "version": "0124",
+    "name": "three_letters_then_change_tack"
+  },
+  {
+    "version": "0125",
+    "name": "a_task_runs_on_a_schedule"
+  },
+  {
+    "version": "0126",
+    "name": "a_pool_of_opportunities"
+  },
+  {
+    "version": "0127",
+    "name": "copied_people_join_the_line"
+  },
+  {
+    "version": "0128",
+    "name": "a_thread_full_of_people"
+  },
+  {
+    "version": "0129",
+    "name": "a_chat_moves_the_state"
+  },
+  {
+    "version": "0130",
+    "name": "only_a_note_resets_the_count"
+  },
+  {
+    "version": "0131",
+    "name": "a_person_can_have_unread_too"
+  },
+  {
+    "version": "0132",
+    "name": "say_it_and_fairwind_files_it"
+  },
+  {
+    "version": "0133",
+    "name": "an_introduction_has_a_third_person"
+  },
+  {
+    "version": "0134",
+    "name": "a_desk_in_the_archive"
+  },
+  {
+    "version": "0135",
+    "name": "the_voice_is_data"
+  },
+  {
+    "version": "0136",
+    "name": "the_four_the_repo_could_not_build"
+  },
+  {
+    "version": "0137",
+    "name": "many_artists_one_database"
+  },
+  {
+    "version": "0138",
+    "name": "the_pulse_belongs_to_someone"
+  },
+  {
+    "version": "0139",
+    "name": "a_curator_belongs_to_each_address_book"
+  },
+  {
+    "version": "0140",
+    "name": "no_key_remembers_the_single_user"
+  },
+  {
+    "version": "0141",
+    "name": "scout_reads_your_profile"
+  },
+  {
+    "version": "0142",
+    "name": "judged_facts_for_preview"
+  },
+  {
+    "version": "0143",
+    "name": "a_scout_task_for_everyone"
+  },
+  {
+    "version": "0144",
+    "name": "an_entry_can_carry_images"
+  },
+  {
+    "version": "0145",
+    "name": "the_box_can_be_written"
+  },
+  {
+    "version": "0146",
+    "name": "files_in_the_box"
+  },
+  {
+    "version": "0147",
+    "name": "scout_default_without_sources"
+  },
+  {
+    "version": "0148",
+    "name": "a_line_across_the_desk"
+  },
+  {
+    "version": "0149",
+    "name": "link_thread_matches_its_index"
+  },
+  {
+    "version": "0150",
+    "name": "member_settings"
+  },
+  {
+    "version": "0151",
+    "name": "judgment_docs"
+  },
+  {
+    "version": "0152",
+    "name": "no_more_definers"
+  },
+  {
+    "version": "0153",
+    "name": "files_belong_to_their_owner"
+  },
+  {
+    "version": "0154",
+    "name": "pulse_per_owner"
+  },
+  {
+    "version": "0155",
+    "name": "finding_work_across_owners"
+  },
+  {
+    "version": "0156",
+    "name": "who_holds_this_mcp_token"
+  },
+  {
+    "version": "0157",
+    "name": "backup_roundtrip"
+  },
+  {
+    "version": "0158",
+    "name": "pulse_does_not_resurrect_the_departed"
+  },
+  {
+    "version": "0159",
+    "name": "every_update_names_its_owner"
+  },
+  {
+    "version": "0160",
+    "name": "hosted_speaks_english_first"
+  },
+  {
+    "version": "0161",
+    "name": "orientation_once"
+  },
+  {
+    "version": "0162",
+    "name": "each_one_connects_their_own_gmail"
+  },
+  {
+    "version": "0163",
+    "name": "strangers_come_with_who_they_are"
+  },
+  {
+    "version": "0164",
+    "name": "ask_who_you_are_once"
+  },
+  {
+    "version": "0165",
+    "name": "judge_from_a_month_before_you_connected"
+  },
+  {
+    "version": "0166",
+    "name": "decided_in_chat_speaks_your_language"
+  },
+  {
+    "version": "0167",
+    "name": "mcp_workspace"
+  },
+  {
+    "version": "0168",
+    "name": "scout_search_checkpoints"
+  }
+]

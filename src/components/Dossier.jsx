@@ -7,6 +7,7 @@ import Pool from './Pool.jsx'
 import Mail from './Mail.jsx'
 import { isLetter } from '../lib/letter.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
+import { t } from '../i18n/index.js'
 
 // 左栏：卷宗。
 //
@@ -16,8 +17,8 @@ import { heldLabel, useProfile } from '../lib/profile.js'
 // 你和机构的信是不可撤销的。两种东西混在一条流里人会看错——这个错已经犯过了
 // （role='org' 的来信在界面上全挂着 Fairwind 的名字）。
 
-const srcLabel = (s) => (s === 'manual' ? '你丢的' : 'scout')
-const PAYOFF = { paid: '给钱', access: '给圈子', both: '钱 + 圈子' }
+const srcLabel = (s) => (s === 'manual' ? t('你丢的') : 'scout')
+const payoffLabel = (k) => ({ paid: t('给钱'), access: t('给圈子'), both: t('钱 + 圈子') })[k]
 
 function fmtDate(s) {
   if (!s) return ''
@@ -33,7 +34,9 @@ function Aside({ items, onJump }) {
   return (
     <div className="aside">
       <button className="lnk aside-t" onClick={() => setOpen((o) => !o)}>
-        {open ? '收起' : `还有 ${items.length} 封跟${who.slice(0, 2).join('、')}${who.length > 2 ? '等' : ''}的其他往来`}
+        {open ? t('收起') : who.length > 2
+          ? t('还有 {n} 封跟{who}等的其他往来', { n: items.length, who: who.slice(0, 2).join(t('、')) })
+          : t('还有 {n} 封跟{who}的其他往来', { n: items.length, who: who.slice(0, 2).join(t('、')) })}
       </button>
       {open && <div className="mails">{items.map((m) => <Mail m={m} key={m.id} onJump={onJump} />)}</div>}
     </div>
@@ -88,16 +91,16 @@ function Files({ items, onUpload, onOpen, onDelete }) {
             <b>{a.filename}</b>
             <span className="m">
               {fmtSize(a.bytes)}
-              {a.source === 'mail' || a.from_msg ? ' · 从一封信的附件来' : ''}
+              {a.source === 'mail' || a.from_msg ? t(' · 从一封信的附件来') : ''}
             </span>
           </span>
           <span className="acts">
-            <button className="lnk" onClick={() => onOpen?.(a)}>打开</button>
+            <button className="lnk" onClick={() => onOpen?.(a)}>{t('打开')}</button>
             <button
               className="lnk del"
-              onClick={() => { if (confirm(`删掉《${a.filename}》？桶里那份字节也一起没了，撤不回来。`)) onDelete?.(a) }}
+              onClick={() => { if (confirm(t('删掉《{name}》？桶里那份字节也一起没了，撤不回来。', { name: a.filename }))) onDelete?.(a) }}
             >
-              删
+              {t('删')}
             </button>
           </span>
         </div>
@@ -109,7 +112,7 @@ function Files({ items, onUpload, onOpen, onDelete }) {
           disabled={busy}
           onChange={(e) => { take(e.target.files); e.target.value = '' }}
         />
-        {busy ? '传着……' : items.length ? '+ 再丢一份（也可以直接拖进来）' : '把 PDF / MD / Excel 拖进来，或点这儿选'}
+        {busy ? t('传着……') : items.length ? t('+ 再丢一份（也可以直接拖进来）') : t('把 PDF / MD / Excel 拖进来，或点这儿选')}
       </label>
       {err && <ErrorNotice error={err} context={t('保存更改')} />}
     </div>
@@ -152,14 +155,14 @@ export default function Dossier({
   const profile = useProfile()
 
   const facts = [
-    p.kind && ['类型', p.kind],
-    p.org && ['机构', p.org],
-    p.location && ['地点', p.location],
-    p.opens_at && ['开放', p.opens_at],
-    p.funding && ['资助', p.funding],
-    p.payoff && ['回报', PAYOFF[p.payoff] || p.payoff],
-    stars && ['匹配', stars],
-    ['来源', srcLabel(p.source)],
+    p.kind && [t('类型'), p.kind],
+    p.org && [t('机构'), p.org],
+    p.location && [t('地点'), p.location],
+    p.opens_at && [t('开放'), p.opens_at],
+    p.funding && [t('资助'), p.funding],
+    p.payoff && [t('回报'), payoffLabel(p.payoff) || p.payoff],
+    stars && [t('匹配'), stars],
+    [t('来源'), srcLabel(p.source)],
   ].filter(Boolean)
 
   return (
@@ -167,19 +170,19 @@ export default function Dossier({
       {/* 不是每条线都有的提醒。它们是这条线特有的约束，所以留在这儿，
           不往卡头挤——卡头上只放每张卡都有的那两样（截止、球权）。 */}
       {p.next_touch_at && (
-        <div className="cue">⏰ <b>{p.next_touch_at}</b> 该再碰一次</div>
+        <div className="cue">⏰ <b>{p.next_touch_at}</b> {t('该再碰一次')}</div>
       )}
       {!p.eligible && <div className="cue held">{heldLabel(profile)}</div>}
 
       <div className="dsect">
-        <Pool title="事实" count={`${facts.length + (p.url ? 1 : 0)} 项`} defaultOpen>
+        <Pool title={t('事实')} count={t('{n} 项', { n: facts.length + (p.url ? 1 : 0) })} defaultOpen>
           <div className="facts">
             {facts.map(([k, v]) => (
               <div className="fact" key={k}><i>{k}</i><span>{v}</span></div>
             ))}
             {p.url && (
-              <div className="fact"><i>链接</i>
-                <span><a href={p.url} target="_blank" rel="noreferrer">官方页面 ↗</a></span>
+              <div className="fact"><i>{t('链接')}</i>
+                <span><a href={p.url} target="_blank" rel="noreferrer">{t('官方页面 ↗')}</a></span>
               </div>
             )}
           </div>
@@ -189,10 +192,10 @@ export default function Dossier({
       <Cast pursuitId={p.id} onOpenPerson={onOpenPerson} onChanged={() => setCastV((v) => v + 1)} />
 
       <div className="dsect">
-        <p className="secttl">往来</p>
+        <p className="secttl">{t('往来')}</p>
         <Pool
-          title="邮件"
-          count={mails.length ? `${mails.length} 封` : '0 封'}
+          title={t('邮件')}
+          count={t('{n} 封', { n: mails.length })}
           defaultOpen={mails.length > 0}
           /* 「收信」按钮删了。它只拉这条线登记过的 thread——而这一格现在
              显示的是**推导出来的**往来（班底的信 + 已认亲的串）。两者对不上：
@@ -200,8 +203,7 @@ export default function Dossier({
              收信现在在脑子里每 5 分钟自己跑，不该在这儿再放一个按钮。 */
         >
           {mails.length === 0 ? (
-            <p className="empty">暂时没有。上面「相关的人」挂一个人上来，
-              跟他的往来就会长在这儿。</p>
+            <p className="empty">{t('暂时没有。上面「相关的人」挂一个人上来，跟他的往来就会长在这儿。')}</p>
           ) : (
             <div className="mails">
               {mails.map((m) => <Mail m={m} key={m.id} onJump={onJump} />)}
@@ -216,7 +218,7 @@ export default function Dossier({
             跟邮件分开摆是因为两种材料分量不一样：邮件有原文可查，
             我记的只有你那一句。写申请时你得分得清哪句有凭据。 */}
         {notes.length > 0 && (
-          <Pool title="我记的" count={`${notes.length} 条`}>
+          <Pool title={t('我记的')} count={t('{n} 条', { n: notes.length })}>
             <div className="mails">
               {notes.map((m) => <Mail m={m} key={m.id} onJump={onJump} />)}
             </div>
@@ -229,10 +231,10 @@ export default function Dossier({
           留着就是同一个人在同一栏里出现两次。删。 */}
 
       <div className="dsect">
-        <p className="secttl">文件</p>
-        <Pool title="定稿" count={`${files.length} 份`} defaultOpen={files.length > 0}>
+        <p className="secttl">{t('文件')}</p>
+        <Pool title={t('定稿')} count={t('{n} 份', { n: files.length })} defaultOpen={files.length > 0}>
           {files.length === 0 ? (
-            <p className="empty">还没有定稿的东西。右边定一份，这儿就多一份。</p>
+            <p className="empty">{t('还没有定稿的东西。右边定一份，这儿就多一份。')}</p>
           ) : (
             <div className="files">
               {files.map((d) => (
@@ -241,12 +243,12 @@ export default function Dossier({
                   <span className="body">
                     <b>{d.title}</b>
                     <span className="m">
-                      {d.finalized_at ? fmtDate(d.finalized_at) + ' 定稿' : '已定稿'}
+                      {d.finalized_at ? t('{date} 定稿', { date: fmtDate(d.finalized_at) }) : t('已定稿')}
                       {d.source ? ' · ' + d.source : ''}
                     </span>
                   </span>
-                  <button className="undo" onClick={() => onUnfinal?.(d.id)} title="退回右栏继续改">
-                    取消定稿
+                  <button className="undo" onClick={() => onUnfinal?.(d.id)} title={t('退回右栏继续改')}>
+                    {t('取消定稿')}
                   </button>
                 </div>
               ))}
@@ -255,7 +257,7 @@ export default function Dossier({
         </Pool>
         {/* 这一格永远在，哪怕一份都没有——原来是「有附件才显示」，
             于是「往这条线丢个文件」这件事在界面上根本不存在，你无从发现。 */}
-        <Pool title="附件" count={attachments.length ? `${attachments.length} 份` : '空'}>
+        <Pool title={t('附件')} count={attachments.length ? t('{n} 份', { n: attachments.length }) : t('空')}>
           <Files
             items={attachments}
             onUpload={onUpload}

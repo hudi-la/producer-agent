@@ -89,6 +89,7 @@ export async function promote(email, { log = console.log } = {}) {
 
   let added = 0
   const done = []
+  const failed = []
   for (const m of items) {
     const summary = sums.get(m.gmail_message_id)
     const { data, error } = await db().rpc('pa_add_mail', {
@@ -103,12 +104,17 @@ export async function promote(email, { log = console.log } = {}) {
       p_meta: { subject: m.subject || null, from_name: m.from_name || null },
       p_created_at: m.sent_at || null,
     })
-    if (error) { log(`    ⚠️ 一封没写进去：${error.message}`); continue }
+    if (error) { failed.push(m.gmail_message_id); log(`    ⚠️ 一封没写进去：${error.message}`); continue }
     if (data?.inserted) added++
     done.push(m.gmail_message_id)
   }
 
   await markPromoted(done)
+  if (failed.length) {
+    const error = new Error(`${failed.length} email(s) could not be archived`)
+    error.failedCount = failed.length
+    throw error
+  }
   const threads = [...new Set(rows.map((r) => r.gmail_thread_id).filter(Boolean))]
   return { email, promoted: done.length, added, threads }
 }

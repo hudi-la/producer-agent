@@ -25,9 +25,9 @@ export const canEdit = (entry) => Boolean(entry?.id)
  */
 export function patchFor(kind, key, value) {
   const fields = EDITABLE[kind]
-  if (!fields) throw new Error(`不认识 ${kind} 这类条目，不知道「${key}」该往哪存`)
+  if (!fields) throw new Error(t('不认识 {kind} 这类条目，不知道「{key}」该往哪存', { kind, key }))
   const f = fields.find((x) => x.key === key)
-  if (!f) throw new Error(`${kind} 没有「${key}」这个能改的字段`)
+  if (!f) throw new Error(t('{kind} 没有「{key}」这个能改的字段', { kind, key }))
   return f.col ? { [key]: value } : { meta: { [key]: value } }
 }
 

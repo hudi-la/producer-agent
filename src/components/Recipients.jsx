@@ -2,6 +2,7 @@ import { reportError } from '../lib/reportError.js'
 import React, { useEffect, useState } from 'react'
 import { replyRecipients, setRecipients } from '../lib/letters.js'
 import Veil from './Veil.jsx'
+import { t } from '../i18n/index.js'
 
 // 这封信到底发给谁 —— 一份摆全了的名单，你自己勾。
 //
@@ -57,7 +58,7 @@ export default function Recipients({ d, onChanged, onErr }) {
 
   return (
     <div className="rcp">
-      <div className="rcp-h">发给</div>
+      <div className="rcp-h">{t('发给')}</div>
       <ul className="rcp-list">
         {savedTo.map((a) => (
           <li key={a}>
@@ -67,7 +68,7 @@ export default function Recipients({ d, onChanged, onErr }) {
                 onChange={() => toggle(a, false)} />
               <span><Veil>{a}</Veil></span>
             </label>
-            {savedTo.length === 1 && <span className="rcp-m">主要收件人</span>}
+            {savedTo.length === 1 && <span className="rcp-m">{t('主要收件人')}</span>}
           </li>
         ))}
         {savedCc.map((a) => (
@@ -76,7 +77,7 @@ export default function Recipients({ d, onChanged, onErr }) {
               <input type="checkbox" checked disabled={busy} onChange={() => toggle(a, true)} />
               <span><Veil>{a}</Veil></span>
             </label>
-            <span className="rcp-m">抄送</span>
+            <span className="rcp-m">{t('抄送')}</span>
           </li>
         ))}
       </ul>
@@ -84,7 +85,7 @@ export default function Recipients({ d, onChanged, onErr }) {
       {(others.length > 0 || ccLeft.length > 0) && (
         <>
           {/* 这句话是给你看的凭据：名单是从原信信头里读出来的，不是谁猜的 */}
-          <div className="rcp-h2">原信上还有这些人 —— 要一起回就勾上</div>
+          <div className="rcp-h2">{t('原信上还有这些人 —— 要一起回就勾上')}</div>
           <ul className="rcp-list">
             {others.map((a) => (
               <li key={a}>
@@ -93,7 +94,7 @@ export default function Recipients({ d, onChanged, onErr }) {
                     onChange={() => toggle(a, false)} />
                   <span><Veil>{a}</Veil></span>
                 </label>
-                <span className="rcp-m">原信收件人</span>
+                <span className="rcp-m">{t('原信收件人')}</span>
               </li>
             ))}
             {ccLeft.map((a) => (
@@ -103,7 +104,7 @@ export default function Recipients({ d, onChanged, onErr }) {
                     onChange={() => toggle(a, true)} />
                   <span><Veil>{a}</Veil></span>
                 </label>
-                <span className="rcp-m">原信抄送</span>
+                <span className="rcp-m">{t('原信抄送')}</span>
               </li>
             ))}
           </ul>
@@ -114,12 +115,12 @@ export default function Recipients({ d, onChanged, onErr }) {
           原信上确实只有一个人——那正是这次要治的病。 */}
       {replyTo && book && !book.found && (
         <div className="rcp-warn">
-          账本里找不到你回的那封信（{book.why || '可能还没同步到'}），
-          所以摆不出原信上还有谁。要回给别人的话，去 Gmail 那边确认一下。
+          {t('账本里找不到你回的那封信（{why}），', { why: book.why || t('可能还没同步到') })}
+          {' '}{t('所以摆不出原信上还有谁。要回给别人的话，去 Gmail 那边确认一下。')}
         </div>
       )}
       {!replyTo && (
-        <div className="rcp-m">这是新起的一封，不是回信 —— 没有原信名单可对。</div>
+        <div className="rcp-m">{t('这是新起的一封，不是回信 —— 没有原信名单可对。')}</div>
       )}
     </div>
   )
