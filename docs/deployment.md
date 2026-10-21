@@ -103,3 +103,9 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 发布目录 /home/fairwind/releases/letter-tags-20261021，manifest.json记录哈希，rollback/tag.js备份；空闲后重启，health正常。回滚：python3 /home/fairwind/releases/letter-tags-20261021/publish.py rollback。
 - 精确恢复用户指出的一条既有回复：从原文提取meta.letter，保留meta.state_move与完整邮件内容；事务预演回滚后比对原值提交。原始数据仅本地备份，未纳入Git。正式页面确认卡片正文、修改/发送/存草稿箱按钮；未发送邮件。
 - GitHub：基于已核对与线上基线一致的production-backup/2026-10-15，分支codex/production-chat-fixes-20261020记录本次tag修复和前一项mailbox初始化修复。线上无Git目录，使用隔离clone推送，不覆盖旧checkout。
+
+2026-10-21（洛杉矶）：修复加入通讯录重复邮箱失败。
+- 实时正式 pa_upsert_contact 新建路径原先无条件 insert；联系人已存在而地址仍待认领时，adoptPerson 再次新建触发 contacts_email_uniq。
+- 仅变更该函数：按唯一索引(owner, lower(email))冲突时不写入，返回当前owner的原联系人供后续认领流程继续；不覆盖原资料，不改变编辑冲突行为，保留security invoker/RLS。无需后端重启。
+- 正式authenticated权限事务测试：新建、大小写/空格重复、资料保留、编辑碰撞拒绝、两个账号隔离、无邮箱新建均通过，测试写入全部回滚。发布前比对原定义，提交后比对新定义；截图中已有联系人重复调用返回原ID和原姓名。
+- 可审查SQL、原定义及测试部署脚本：fixes/2026-10-21-contact-unique/。GitHub提交只含源码与文档，不含用户记录或凭据。回滚核对当前定义后执行baseline.sql，不删除联系人。
