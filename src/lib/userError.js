@@ -20,6 +20,7 @@ export function safeErrorDetail(value) {
 
 // 正则里的中文是拿来认后台/服务商报的中文错误的，不翻；给人看的两句走 t()，用到时才取（模块加载时语言还没定）。
 const rules = [
+  ['contact_exists', /contacts_email_uniq/i, () => t('这个邮箱已在通讯录中'), () => t('请在人际管理中按邮箱找到已有联系人。若刚才是在添加新人，请刷新列表后重试；若是在修改邮箱，请使用其他邮箱，或保留已有联系人。')],
   ['quota', /insufficient_quota|credit balance|billing|quota.*exceed|余额|额度.*(不足|用完)/i, () => t('模型额度不足'), () => t('服务商拒绝了这次模型请求。请检查所选账号的余额或订阅额度，补充额度或在设置中切换模型来源后再试。')],
   ['auth', /401|invalid.*(?:key|token)|(?:key|token).*(?:invalid|expired)|authentication|unauthorized|invalid_grant|jwt.*expired|令牌.*(?:失效|过期)|未登录/i, () => t('授权已失效或凭据不正确'), () => t('请重新登录对应服务；如果使用 API key 或订阅令牌，请到设置中重新填写并保存。MCP 令牌换过后，也需要更新 AI 工具里的连接配置。')],
   ['denied', /403|forbidden|permission|EACCES|EPERM|row.level.security|权限/i, () => t('没有完成这项操作的权限'), () => t('请检查账号或文件夹的访问权限。在线服务的权限需要管理员开通；本机文件请选择可读写的目录。')],

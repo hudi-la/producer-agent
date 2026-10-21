@@ -109,3 +109,8 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 仅变更该函数：按唯一索引(owner, lower(email))冲突时不写入，返回当前owner的原联系人供后续认领流程继续；不覆盖原资料，不改变编辑冲突行为，保留security invoker/RLS。无需后端重启。
 - 正式authenticated权限事务测试：新建、大小写/空格重复、资料保留、编辑碰撞拒绝、两个账号隔离、无邮箱新建均通过，测试写入全部回滚。发布前比对原定义，提交后比对新定义；截图中已有联系人重复调用返回原ID和原姓名。
 - 可审查SQL、原定义及测试部署脚本：fixes/2026-10-21-contact-unique/。GitHub提交只含源码与文档，不含用户记录或凭据。回滚核对当前定义后执行baseline.sql，不删除联系人。
+
+2026-10-21（洛杉矶）：联系人邮箱重复的友好提示。
+- userError 对 contacts_email_uniq 显示「这个邮箱已在通讯录中」，说明按邮箱查找、添加时刷新重试、编辑时使用其他邮箱或保留已有联系人。原始错误保留在折叠诊断中。补英文翻译。
+- 3项已有错误提示测试通过，hosted构建通过；发布目录 /home/fairwind/releases/contact-message-20261021，manifest.json及rollback保存两个源码基线与HTML，旧assets保留；纯前端，无后端重启。正式HTML与发布一致。
+- 回滚恢复该目录rollback/src内两文件及rollback/dist/index.html。正常重复添加仍由数据库幂等逻辑处理。

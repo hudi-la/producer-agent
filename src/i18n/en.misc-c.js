@@ -1,5 +1,7 @@
 // src/i18n/en.misc-c.js —— 铃铛(通知面板)、卡片里的对话、档案层零碎。待合并进 en.js。
 export default {
+  '这个邮箱已在通讯录中': 'This email is already in your contacts',
+  '请在人际管理中按邮箱找到已有联系人。若刚才是在添加新人，请刷新列表后重试；若是在修改邮箱，请使用其他邮箱，或保留已有联系人。': 'Find the existing contact by email in People. If you were adding a new contact, refresh the list and try again. If you were changing an email, use a different address or keep the existing contact.',
   '模型连接失效，邮件筛选已暂停。请到设置重新连接模型。已完成的进度保留，连接恢复后会自动继续。': 'Your model connection is invalid. Mail screening is paused. Reconnect your model in Settings. Saved progress is kept and screening will resume automatically.',
   '模型暂时未能完成筛选。已完成的进度保留，稍后会自动重试；持续失败请检查模型设置。': 'The model could not complete screening. Saved progress is kept and we will retry shortly. Check model settings if this continues.',
   '筛选暂停：模型连接失效': 'Screening paused: reconnect your model',
