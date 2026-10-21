@@ -88,3 +88,18 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 未执行真实模型回答评测，未发送邮件、创建草稿或修改聊天记录。尚未引入摘要/截断，因此完整原文增加上下文长度；这两张卡的动态prompt分别约186223/92039字符。
 - 发布目录 /home/fairwind/releases/context-20261014，manifest.json记录两个运行文件前后哈希，rollback/brain/prompt.js备份原源码，pa_brain_context.sql备份原数据库函数。
 - 回滚：先检查当前函数仍为本次版本，运行本地 node fixes/2026-10-14-context/database.mjs rollback；然后 ssh 执行 python3 /home/fairwind/releases/context-20261014/publish.py rollback。脚本校验源码哈希并要求无活动子进程/请求，再恢复原prompt、移除本次新增模块并重启；不删除业务数据。
+
+2026-10-20（洛杉矶）：修复卡片聊天邮件工具初始化崩溃。
+- 基于实时线上 brain/server.js，仅将 mailboxServer 从未导入的 createSdkMcpServer/tool 改为已有 toSdkServer/defineTool；保留只读 handler、参数及用户绑定，同时提供其他模型引擎需要的 __specs。
+- 本地补丁与回归检查：fixes/2026-10-20-mailbox-init/。真实安装 SDK 下复现旧 ReferenceError；修复后工具初始化、模型工具定义、参数校验、搜索/读取转发及 reader 隔离验证通过。未调用真实模型或真实邮箱。
+- 发布目录 /home/fairwind/releases/mailbox-init-20261021/，manifest.json 保存前后哈希，rollback/server.js 保存旧文件；publish.py 支持 publish/rollback。等待活动模型任务结束、无8788活动连接后发布并重启一次；正式域名 /health ok=true，服务 active/running、NRestarts=0，线上文件与测试候选一致。
+- 修复后 server.js SHA256：3ce0ea6d2a2fb310936bc6d0a122843ee3602b982ef95bd4a96ac24c2db12cd1。无数据库或前端变更；真实聊天端到端验收待用户重试。
+- 回滚：python3 /home/fairwind/releases/mailbox-init-20261021/publish.py rollback（核对源码哈希并检查空闲后恢复和重启）。
+
+2026-10-20（洛杉矶）：修复邮件草稿与提醒同时输出时邮件卡片缺失。
+- 根因：takeTag 对标记后整个尾部 JSON.parse，LETTER 后跟 STATE/MEMO 时失败；随后提醒被剥离，邮件裸 JSON 留在消息中。
+- 只更新正式 brain/tag.js：按引号、转义及括号深度读取一个完整 JSON 值，保留后续标记及文字；损坏输入仍保留原文。
+- 本地和服务器47项邮件、表单、状态及标签测试通过，新增 LETTER/STATE/MEMO 六种顺序、转义及损坏相邻标记覆盖。
+- 发布目录 /home/fairwind/releases/letter-tags-20261021，manifest.json记录哈希，rollback/tag.js备份；空闲后重启，health正常。回滚：python3 /home/fairwind/releases/letter-tags-20261021/publish.py rollback。
+- 精确恢复用户指出的一条既有回复：从原文提取meta.letter，保留meta.state_move与完整邮件内容；事务预演回滚后比对原值提交。原始数据仅本地备份，未纳入Git。正式页面确认卡片正文、修改/发送/存草稿箱按钮；未发送邮件。
+- GitHub：基于已核对与线上基线一致的production-backup/2026-10-15，分支codex/production-chat-fixes-20261020记录本次tag修复和前一项mailbox初始化修复。线上无Git目录，使用隔离clone推送，不覆盖旧checkout。

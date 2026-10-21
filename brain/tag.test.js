@@ -50,3 +50,27 @@ test('clean1：空白一律变 null', () => {
   assert.equal(clean1(null), null)
   assert.equal(clean1(' 有字 '), '有字')
 })
+
+import { extractLetter } from './letter.js'
+import { extractForm } from './form.js'
+import { peelEnvelopes } from './stateMove.js'
+test('chat pipeline: letter and reminder survive either envelope order', () => {
+ const letter = {to:'a@example.com',subject:'Visit',body:'Hi\nQuoted "text", braces { } and slash \\ end'}
+ const state = {move:'wait',awaiting:'Reply',due:'2026-10-28',why:'Waiting'}
+ const memo = {to:'person',text:'A note'}
+ const tags = [`[[LETTER]] ${JSON.stringify(letter)}`,`[[STATE]] ${JSON.stringify(state)}`,`[[MEMO]] ${JSON.stringify(memo)}`]
+ for (const order of [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]]) {
+  const one=extractLetter('Intro\n\n'+order.map(i=>tags[i]).join('\n\n'))
+  const two=extractForm(one.clean)
+  const three=peelEnvelopes(two.clean,{today:'2026-10-20'})
+  assert.equal(one.letter.body,letter.body)
+  assert.equal(three.move.due,state.due)
+  assert.equal(three.memo.text,memo.text)
+  assert.equal(three.clean,'Intro')
+ }
+})
+test('preserve prose and malformed adjacent envelopes',()=>{
+ const r=takeTag('Intro\n[[LETTER]] {"body":"safe"}\nAfter\n[[STATE]] {','LETTER')
+ assert.deepEqual(r.data,{body:'safe'})
+ assert.equal(r.clean,'Intro\n\nAfter\n[[STATE]] {')
+})

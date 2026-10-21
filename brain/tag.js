@@ -42,8 +42,29 @@ export function takeTag(text, name) {
   if (at < 0) return { clean: src.trim(), data: null }
 
   try {
-    const data = JSON.parse(src.slice(at + tag.length).trim())
-    return { clean: src.slice(0, at).trim(), data }
+    // A reply can contain LETTER + STATE/MEMO/FORM. Parse just this
+    // JSON object, preserving every following envelope and prose segment.
+    const start = at + tag.length
+    const tail = src.slice(start)
+    let depth = 0, quoted = false, escaped = false, end = -1
+    for (let i = 0; i < tail.length; i++) {
+      const c = tail[i]
+      if (quoted) {
+        if (escaped) escaped = false
+        else if (c === '\\') escaped = true
+        else if (c === '"') quoted = false
+        continue
+      }
+      if (c === '"') quoted = true
+      else if (c === '{' || c === '[') depth++
+      else if (c === '}' || c === ']') {
+        depth--
+        if (depth === 0) { end = i + 1; break }
+      }
+    }
+    const data = JSON.parse(end < 0 ? tail.trim() : tail.slice(0, end).trim())
+    const suffix = end < 0 ? '' : tail.slice(end).trim()
+    return { clean: [src.slice(0, at).trim(), suffix].filter(Boolean).join('\n\n'), data }
   } catch (_) {
     // 剁不得：尾巴里可能装着整封信
     return { clean: src.trim(), data: null }
