@@ -108,6 +108,7 @@ export function brainClient(base, fetchImpl = (...a) => globalThis.fetch(...a)) 
       install: (target) => post('/mcp/targets', { target }),
     },
     settings: {
+      usage: (days = 30) => request(`/settings/usage?days=${days}`),
       async get() { return request(`/settings`) },
       set: (patch) => post('/settings', patch),
       rotateMcpToken: () => post('/settings/mcp-token/rotate', {}),

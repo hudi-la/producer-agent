@@ -138,3 +138,10 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 发布目录 /home/fairwind/releases/multi-letter-20261022；manifest 记录八个文件前后哈希，rollback 备份旧文件和 HTML。检查无活动请求/子进程后重启一次，health 正常；正式 HTML 和 App-YWKbBOvl.js 与构建一致。无数据库变更、邮件发送或用户数据写入。
 - 回滚：python3 /home/fairwind/releases/multi-letter-20261022/publish.py rollback，检查基线及空闲后恢复源码/HTML 并重启；保留旧 assets。
 - GitHub 分支 codex/multiple-letter-cards-20261021，发布目录 git-commit.txt 记录实际提交。
+
+2026-10-21 (Los Angeles): Settings usage monitor.
+- Built from current production source. Account-scoped daily counters cover the shared think entry point, including background tasks. Persist calls, failures, input/output/cache tokens without prompts or credentials; atomic JSON in tenant dataDir, UTC days, one-year retention. One model task counts as one call, including internal tool exchanges. Recording begins on activation; failed calls may lack token data. Provider quotas and bills are not inferred.
+- Settings card supports 7/30/90 days, daily trend/details, model totals, refresh, loading/error/empty states and Chinese/English.
+- 20 counter, cache accounting, persistence, authentication/isolation, period and settings/client regressions passed; hosted build passed. No paid model call used for testing.
+- Release: /home/fairwind/releases/usage-20261022. Manifest verifies source baseline; rollback preserves prior source/HTML. Existing assets retained. Idle check before restart. Rollback: python3 /home/fairwind/releases/usage-20261022/publish.py rollback; usage records retained.
+- GitHub: codex/usage-monitor-20261021; release git-commit.txt maps deployed source to commit.

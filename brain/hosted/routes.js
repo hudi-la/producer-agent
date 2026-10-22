@@ -1,3 +1,4 @@
+import { usageSummary } from '../usage.js'
 // brain/hosted/routes.js —— 托管配置下按人的那几条路(设计稿 2026-10-02 六.2)。
 //
 // 本机版把这些放在 settings.json 和数据目录里(local/routes.js);托管把同样的东西放进库里那个人的
@@ -60,8 +61,17 @@ export async function handleHostedRoute(req, res, ctx) {
   const p = url.pathname
   const t = currentTenant()
   // 没带身份的只能看静态文件;别的路 server.js 已经拦了(401),这里再守一道
-  const needsMe = (req.method === 'GET' && p === '/me') || p === '/settings' || p === '/setup' || p.startsWith('/claude/') || p.startsWith('/chatgpt/') || p === '/judgments/files' || p.startsWith('/backup/') || p === '/settings/mcp-token/rotate' || p.startsWith('/gmail/')
+  const needsMe = (req.method === 'GET' && p === '/me') || p === '/settings/usage' || p === '/settings' || p === '/setup' || p.startsWith('/claude/') || p.startsWith('/chatgpt/') || p === '/judgments/files' || p.startsWith('/backup/') || p === '/settings/mcp-token/rotate' || p.startsWith('/gmail/')
   if (needsMe && !t) { json(res, 401, { error: '请先登录 / sign in first' }); return true }
+
+  if (req.method === 'GET' && p === '/settings/usage') {
+    res.setHeader('Cache-Control', 'no-store')
+    const days = Number(url.searchParams.get('days') || 30)
+    if (![7, 30, 90].includes(days)) { json(res, 400, { error: 'Invalid period' }); return true }
+    try { json(res, 200, usageSummary(t.dataDir, days)) }
+    catch { json(res, 503, { error: 'Usage counters unavailable' }) }
+    return true
+  }
 
   const auth = ctx.chatgptAuth || { status: chatgptStatus, login: (dir, options) => chatgptLogin(dir, undefined, { ...options, deviceCode: true }) }
   // Recheck the actual per-user credentials; never trust a browser-supplied connected flag.

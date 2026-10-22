@@ -1,3 +1,4 @@
+import UsageCard from './UsageCard.jsx'
 import { GoogleCalendarSettings } from './GoogleCalendar.jsx'
 import ErrorNotice from './ErrorNotice.jsx'
 import { errorText } from '../lib/userError.js'
@@ -37,6 +38,7 @@ export default function SettingsPage() {
         {!cur ? (!asked && <Spin />) : <>
           <LangCard lang={cur.lang || getLang() || 'zh'} />
           <ModelCard cur={cur} reload={load} />
+          {import.meta.env.VITE_HOSTED === '1' && <UsageCard />}
           {local ? <LocalMcpCard /> : <HostedMcpCard token={cur.mcpToken || ''} onRotated={load} />}
           <BackupCard local={local} backupDir={cur.backupDir || ''} reload={load} />
           {local && <MachineCard email={cur.email || ''} reload={load} />}
