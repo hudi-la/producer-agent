@@ -1,3 +1,4 @@
+import { matchesArtifact } from '../lib/messageLetters.js'
 import { useModules } from '../lib/ModulesContext.jsx'
 import { t } from '../i18n/index.js'
 import ErrorNotice from './ErrorNotice.jsx'
@@ -9,7 +10,7 @@ import { checkRules } from '../lib/rules.js'
 import Md from './Md.jsx'
 import Recipients from './Recipients.jsx'
 
-export default function ArtifactCard({ letter, form, messageId, owner, items = [], onAdopted, existing, editorOpen = false }) {
+export default function ArtifactCard({ letter, form, messageId, artifactIndex = 0, owner, items = [], onAdopted, existing, editorOpen = false }) {
   const mods = useModules()
   const [saved, setSaved] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -18,7 +19,7 @@ export default function ArtifactCard({ letter, form, messageId, owner, items = [
   const [confirming, setConfirming] = useState(false)
   const [status, setStatus] = useState('')
   const [discardedOverride, setDiscardedOverride] = useState(null)
-  const d = existing || items.find(x => x.meta?.artifact_message_id === messageId) || saved
+  const d = existing || items.find(x => matchesArtifact(x, messageId, artifactIndex)) || saved
   const email = d ? d.kind === 'email' : !!letter
   const title = d?.title || letter?.subject || form?.title
   const body = d?.body ?? letter?.body
@@ -31,7 +32,7 @@ export default function ArtifactCard({ letter, form, messageId, owner, items = [
     if (lock.current || editorOpen || final) return
     lock.current = true; setBusy(true); setErr('')
     try {
-      const current = d || await artifactRequest('/artifact', owner, { message_id: messageId })
+      const current = d || await artifactRequest('/artifact', owner, { message_id: messageId, artifact_index: artifactIndex })
       setSaved(current)
       if (action === 'discard' || action === 'restore') {
         const updated = await setArtifactDiscarded(current.id, action === 'discard')

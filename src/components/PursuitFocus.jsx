@@ -1,3 +1,4 @@
+import { messageLetters } from '../lib/messageLetters.js'
 import ErrorNotice from './ErrorNotice.jsx'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchMessages, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
@@ -218,16 +219,16 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
           onStart={onStartEdit} onCancel={onCancelEdit} onResay={onResay}
         />
       ) : (
-        <div className="bubble md"><Md>{m.content}</Md></div>
+        <div className="bubble md"><Md>{messageLetters(m).clean}</Md></div>
       )}
       {/* 它写的是一封信 —— 紧跟在气泡后面摆一张卡，点一下就落进右栏产出。
           在这之前这封信只能靠你选中、复制、切去 Gmail 粘贴。 */}
-      {m.meta?.letter && (
+      {messageLetters(m).letters.map(({ letter, index }) => (
         <LetterCard
-          letter={m.meta.letter}
+          key={index} letter={letter} artifactIndex={index}
           owner={owner} onAdopted={onAdopted} messageId={m.id} items={items} editorOpen={editorOpen}
         />
-      )}
+      ))}
       {/* 它填的是一张申请表 —— 一格一个字数上限，那些上限就是这张卡的意义。
           复制走的话上限会丢，你到提交前一刻才发现某格超了。 */}
       {m.meta?.form && (

@@ -130,3 +130,11 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - SQL 和浏览器验证脚本位于 fixes/2026-10-22-discard-draft/。验证脚本用 node 执行，需 Playwright（可通过 NODE_PATH 指定）和 Chrome。
 - 回滚：校验当前文件仍匹配 manifest.after 后恢复 rollback/src 下三个文件及原子恢复 rollback/dist/index.html。新增 RPC 和用户放弃标记可保留，避免丢失新状态。
 - GitHub 分支 codex/discard-email-draft-20261021；服务器 git-commit.txt 记录实际发布提交。
+
+2026-10-21（洛杉矶）：多封邮件回复的独立卡片修复。
+- 原先 extractLetter 只摘最后一个 LETTER，前面的信封残留在正文，产出也只按消息 ID 关联。新增共享解析器逐封提取完整信封，新回复保存全部 letters，兼容原 meta.letter。
+- 卡片和联系人聊天均显示全部邮件；已有“正文残留信封 + meta.letter”自动恢复，未重写历史消息。最后一封保持 artifact_index=0（兼容已有产出），其他邮件使用独立索引；编辑、Gmail 草稿、发送和放弃各自关联对应产出，锁按消息及索引区分。
+- 截图对应正式消息只读验证为两张独立收件人卡片，展示正文无 LETTER 标记。29 项解析、索引、历史兼容、翻译及产出回归通过；浏览器验证新增卡片请求携带索引，放弃/恢复和失败处理通过；hosted 构建及 server.js 语法通过。
+- 发布目录 /home/fairwind/releases/multi-letter-20261022；manifest 记录八个文件前后哈希，rollback 备份旧文件和 HTML。检查无活动请求/子进程后重启一次，health 正常；正式 HTML 和 App-YWKbBOvl.js 与构建一致。无数据库变更、邮件发送或用户数据写入。
+- 回滚：python3 /home/fairwind/releases/multi-letter-20261022/publish.py rollback，检查基线及空闲后恢复源码/HTML 并重启；保留旧 assets。
+- GitHub 分支 codex/multiple-letter-cards-20261021，发布目录 git-commit.txt 记录实际提交。

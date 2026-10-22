@@ -1,3 +1,4 @@
+import { messageLetters } from '../lib/messageLetters.js'
 import { reportError } from '../lib/reportError.js'
 import ArtifactEditor from './ArtifactEditor.jsx'
 import ArtifactCard from './ArtifactCard.jsx'
@@ -509,17 +510,17 @@ export default function PersonFocus({
                           onResay={resay}
                         />
                       ) : (
-                        <div className="bubble md"><Md>{m.content}</Md></div>
+                        <div className="bubble md"><Md>{messageLetters(m).clean}</Md></div>
                       )}
                       {/* 它写的是一封信。在这之前这一栏的信只能靠你选中、复制、
                           切去 Gmail 粘贴——右栏那句「它写的草稿会出现在这儿」
                           从来没兑现过，因为模型根本没有建产出的口。 */}
-                      {m.meta?.letter && (
+                      {messageLetters(m).letters.map(({ letter, index }) => (
                         <LetterCard
-                          letter={m.meta.letter}
+                          key={index} letter={letter} artifactIndex={index}
                           owner={{ contactId: c.id }} messageId={m.id} items={dels} editorOpen={!!selectedArtifact} onAdopted={async id => { await reload(); if (id) setArtifactId(id) }}
                         />
-                      )}
+                      ))}
                       {m.meta?.form && (
                         <FormCard
                           form={m.meta.form}

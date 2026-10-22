@@ -46,7 +46,7 @@ import { buildStudioSystem, buildStudioUser } from './studio.js'
 // 从一次「想」里挑出给人看的那一段：动工具之前说的都是工作稿。
 import { foldReply } from './reply.js'
 // 它写完一封信会在末尾报一声。摘出来存进 meta，正文里不留那行机器读的字。
-import { extractLetter } from './letter.js'
+import { extractLetters as extractLetter } from './letter.js'
 // 填完一张表也报一声。逐格的字数闸靠它带过来——那是申请表的要害。
 import { extractForm } from './form.js'
 import { extractStateMove, peelEnvelopes, moveLine, memoLine, localToday } from './stateMove.js'
@@ -89,7 +89,7 @@ import { makeGmailConnect } from './mail/webauth.js'
 import { gmailToolsServer, OWN_GMAIL_TOOLS, GMAIL_SERVER } from './mail/tools.js'
 import { gmailFor } from './mail/gmail.js'
 import { boundMailReader } from './mail/search.js'
-import { artifactFields, artifactRunsFor } from './artifacts.js'
+import { artifactFields, artifactRunsFor, matchesArtifact } from './artifacts.js'
 import { sendLetter, assertSameMailbox } from './mail/send.js'
 import { saveDraft } from './mail/draft.js'
 import { recordSent } from './send-record.js'
@@ -804,6 +804,7 @@ async function handleChat(body, onEvent = null) {
     ...(notes?.length ? { notes } : {}),
     ...(recovered ? { recovered: true } : {}),
     ...(letter ? { letter } : {}),
+    ...(one.letters.length > 1 ? { letters: one.letters } : {}),
     ...(form ? { form } : {}),
     ...(mv ? { state_move: { ...mv, line: moveLine(mv) } } : {}),
     ...(memo ? { memo: { ...memo, line: memoLine(memo) } } : {}),
@@ -901,14 +902,16 @@ async function handleArtifact(body) {
   const artifactRuns = artifactRunsFor(tenant())
   const owner = ownerOf(body)
   if (!owner || owner.kind === 'studio' || !body.message_id) throw new Error('需要产出的所属对话和消息')
-  const key = `${owner.kind}:${owner.id}:${body.message_id}`
+  const index = body.artifact_index ?? 0
+  if (!Number.isInteger(index) || index < 0) throw new Error('Invalid artifact index')
+  const key = `${owner.kind}:${owner.id}:${body.message_id}:${index}`
   if (artifactRuns.has(key)) return artifactRuns.get(key)
   const run = (async () => {
     const ctx = await loadOwnerContext(owner)
-    const existing = (ctx.raw.deliverables || []).find(d => d.meta?.artifact_message_id === body.message_id)
+    const existing = (ctx.raw.deliverables || []).find(d => matchesArtifact(d, body.message_id, index))
     if (existing) return existing
     const message = ctx.msgs.find(m => m.id === body.message_id && m.role === 'producer')
-    const fields = artifactFields(message)
+    const fields = artifactFields(message, index)
     const { data, error } = await db.rpc(owner.kind === 'contact' ? 'pa_upsert_contact_deliverable' : 'pa_upsert_deliverable', {
       ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }), ...fields,
     })
@@ -1670,6 +1673,7 @@ async function timerPass({ cap = TIMER_CAP } = {}) {
       const mvx = extractStateMove(one.clean, { today: localToday(ctx.profile?.data?.tz) })
       const bubble = await addMessage(owner, 'producer', mvx.clean, 'message', {
         ...(one.letter ? { letter: one.letter } : {}),
+        ...(one.letters.length > 1 ? { letters: one.letters } : {}),
         ...(mvx.move ? { state_move: { ...mvx.move, line: moveLine(mvx.move) } } : {}),
         timer: { key: timerKey(r), state: r.state },
       })

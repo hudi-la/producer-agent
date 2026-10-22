@@ -1,3 +1,4 @@
+import { parseLetters } from '../src/lib/messageLetters.js'
 import { takeTag, clean1 } from './tag.js'
 
 // 「这段回复是一封信」的信封。
@@ -56,4 +57,9 @@ export function extractLetter(text) {
       thread_id: clean1(j?.thread_id),
     },
   }
+}
+
+export function extractLetters(text) {
+  const result = parseLetters(text)
+  return { ...result, letter: result.letters.at(-1) || null }
 }
