@@ -1,12 +1,23 @@
-// 卡上「该干什么」那一行。
+// 卡上的**日期**。只剩日期。
 //
-// 以前这行是 next_touch_at 一个字段算出来的，而那个字段被拿来装四种意思，
-// 所以说出来的话经常是错的。现在每种意思有自己的字段，这里只负责一件事：
-// 挑出**最该现在看见的那一条**，一张卡只显示一行。
+// 这儿原来还有个 actionLine()——「该干什么」那一行，三档优先级：
+// Fairwind 提的下一步 > 快开放 > 该碰一下了。整个删了，理由分三层：
 //
-// 顺序是有理由的：具体的待办 > 快开放 > 该主动碰。
-// 截止倒计时不在这儿——它跟着截止那行走（见 deadlineLine），
-// 因为「截止 8/7」和「还剩 3 天」是同一件事的两种说法，拆成两行是重复。
+//   · `next_action` **已经没人写了**：写它的消化环节（读新信 → 作废过期
+//     待办 → 提新的下一步）随 runRefresh 一起删掉了。留着就是一行永远
+//     不会更新的字，比空着更坏。
+//   · 「该碰一下了」是**系统替你判**「这事该动了」。新规矩里这类判断归你：
+//     你觉得该动，自己点亮「待处理」那个标签。
+//   · 「N 天起开放」是**事实**，所以它留下来了——但不再包装成「该干什么」，
+//     而是跟截止并排，作为日期显示（openLine）。
+//
+// voidedAction / doneAction 一起走了：它们是 next_action 的附属物。
+// 库里那几个字段和 RPC 都留着不动——以后要不要重做「Fairwind 提下一步」
+// 是另一场讨论，删列会让那场讨论失去材料。
+//
+// 设计稿：docs/specs/2026-08-12-four-signals-design.md
+
+import { t } from '../i18n/index.js'
 
 const startOfToday = () => {
   const d = new Date()
@@ -24,53 +35,56 @@ export function daysFromToday(dateStr) {
   return Math.round((d - startOfToday()) / 86400000)
 }
 
-const MD = (dateStr) => {
+/** 'YYYY-MM-DD' → '8月12日'。 */
+export const MD = (dateStr) => {
   const d = asDate(dateStr)
-  return d ? `${d.getMonth() + 1}月${d.getDate()}日` : ''
+  return d ? t('{m}月{d}日', { m: d.getMonth() + 1, d: d.getDate() }) : ''
 }
 
-/** 快到期的门槛。再远就不算「急」，免得天天有一堆卡在喊。 */
+/**
+ * 快到期的门槛。
+ *
+ * **这是现在唯一还留着的系统判断**，而且只服务一件事：顶栏那个「紧急」开关。
+ * 卡上的截止仍然照常显示原文，urgent 只决定标不标红、进不进那个筛选。
+ * 这个门槛该是多少、甚至该不该有，是下一场讨论。
+ */
 const SOON_DAYS = 14
 
 /**
  * 截止那一行。原文永远显示（"spring 2027" 这种要保留），
  * 只有能算出日期、而且确实近了，才追加倒计时并标红。
  */
+/**
+ * 交出去之后，截止就不再是待办了。
+ *
+ * 真事：Stanford 那条你早就移到「发出&提交」，通知栏还在喊「截止 · 今天」，
+ * 「紧急」筛选里也还在。病根是这个函数从第一行到最后一行只看日期，
+ * 一个字没提阶段——**它把「有截止日期」当成了「还没交」。**
+ *
+ * 「移卡这件事情本身也是包括判断的」：你把卡移过去，就是你说了这件事做完了。
+ */
+// watch（持续关注）**有意不在**这个名单里：它是「先收着」，不是「办完了」——
+// 截止对它还有意义（可能哪天要投），封面照旧显示。
+const 交出去了 = (p) => ['sent', 'replying', 'won', 'paused'].includes(p.stage)
+
 export function deadlineLine(p) {
   if (!p.deadline && !p.deadline_at) return null
   const text = p.deadline || MD(p.deadline_at)
   const n = daysFromToday(p.deadline_at)
-  if (n === null || n > SOON_DAYS) return { text: `截止 ${text}`, urgent: false }
-  if (n < 0) return { text: `截止 ${text} · 已过`, urgent: true, over: true }
-  if (n === 0) return { text: `截止 ${text} · 今天`, urgent: true }
-  return { text: `截止 ${text} · 还剩 ${n} 天`, urgent: true }
+  // 日期照常显示（那是事实），但不再算「急」——急的意思是「你还得赶」。
+  if (交出去了(p)) return { text: t('截止 {text}', { text }), urgent: false }
+  if (n === null || n > SOON_DAYS) return { text: t('截止 {text}', { text }), urgent: false }
+  if (n < 0) return { text: t('截止 {text} · 已过', { text }), urgent: true, over: true }
+  if (n === 0) return { text: t('截止 {text} · 今天', { text }), urgent: true }
+  return { text: t('截止 {text} · 还剩 {n} 天', { text, n }), urgent: true }
 }
 
 /**
- * 「该干什么」那一行。返回 null = 现在没有该你动的事，卡上就别说话。
- * tick 不为空表示这一行可以勾掉：'action' 走 pa_set_action_done，'touch' 走 pa_mark_touched。
+ * 开放那一行。有开始日期就显示——**这是确定的信息，不替你判急不急**。
+ * 已经开放了就不说了：那时候「开放」不是新闻。
  */
-export function actionLine(p) {
-  // ① 具体的待办最优先——它是唯一说得出「做什么」的
-  if (p.next_action && !p.next_action_done_at) {
-    return { text: p.next_action, tick: 'action', urgent: true }
-  }
-  // ② 还没开放：说清楚是在等它开门，不是等你动手
-  const opens = daysFromToday(p.opens_at)
-  if (opens !== null && opens > 0) {
-    return { text: `${MD(p.opens_at)}起开放 · 还有 ${opens} 天`, tick: null, urgent: false }
-  }
-  // ③ 到了你自己定的「该碰一下」的日子（无截止的冷外联专用）
-  const touch = daysFromToday(p.next_touch_at)
-  if (touch !== null && touch <= 0) {
-    return { text: '该碰一下了', tick: 'touch', urgent: true }
-  }
-  return null
-}
-
-/** 已经勾掉的待办，详情页用来显示「✓ …… · 8月4日完成」。 */
-export function doneAction(p) {
-  if (!p.next_action || !p.next_action_done_at) return null
-  const d = new Date(p.next_action_done_at)
-  return { text: p.next_action, at: `${d.getMonth() + 1}月${d.getDate()}日` }
+export function openLine(p) {
+  const n = daysFromToday(p.opens_at)
+  if (n === null || n <= 0) return null
+  return { text: t('{d}起开放 · 还有 {n} 天', { d: MD(p.opens_at), n }) }
 }

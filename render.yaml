@@ -1,0 +1,48 @@
+# Candidate only. Creating this service incurs compute + disk charges.
+# Do not apply until the owner approves the current Render price.
+services:
+  - type: web
+    name: fairwind-migration
+    runtime: node
+    # Owner approved US$26/month total including the 1 GB persistent disk.
+    plan: 1c-2g
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: npm ci --no-audit --no-fund && npm ci --prefix brain --no-audit --no-fund && npm run build
+    startCommand: node scripts/start-render.mjs
+    healthCheckPath: /health
+    disk:
+      name: fairwind-state
+      mountPath: /var/data/fairwind
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24.9.0
+      - key: NODE_ENV
+        value: production
+      - key: FAIRWIND_DEPLOYMENT_STATE
+        value: standby
+      - key: FAIRWIND_CUTOVER_CONFIRMED
+        value: 'false'
+      - key: FAIRWIND_MODE
+        value: hosted
+      - key: FAIRWIND_DATA_DIR
+        value: /var/data/fairwind
+      - key: VITE_HOSTED
+        value: '1'
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: BRAIN_ORIGIN
+        value: https://fairwind.hudiworks.com

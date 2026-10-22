@@ -1,0 +1,16 @@
+# 加进公司机器上已有的 Caddyfile(他们的站点块之外)。证书 Caddy 自己办。
+# 脑子自己服务前端产物,所以只有这一条。
+fairwind.<域名> {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8788 {
+		# 找机会一轮几分钟,流式回复要等得起
+		transport http {
+			read_timeout 10m
+			write_timeout 10m
+		}
+	}
+	# 备份 zip 可能一两个 GB
+	request_body {
+		max_size 4GB
+	}
+}

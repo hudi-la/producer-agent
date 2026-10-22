@@ -2,6 +2,23 @@ node_modules/
 dist/
 .env
 .env.local
+.env.*
+!.env.example
+brain/users/
+brain/error-logs/
+data/
+reports/
+*.pem
+*.key
 .DS_Store
 *.log
 .playwright-mcp/
+
+# Gmail 的钥匙：能读你全部邮件，永远不进仓库
+brain/.mail-tokens.json
+
+# 学员的登录会话:等于你的登录态,同样永远不进仓库
+brain/.supabase-session.json
+
+# 字节码构建产物（packaging/build-brain.mjs）
+brain/dist/

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { brainClient } from './brainClient.js'
 
 // 两个后端在哪、通不通。
 //
@@ -6,13 +7,59 @@ import { createClient } from '@supabase/supabase-js'
 // 「通不通」这件事没有一个统一的说法，所以界面只能笼统显示「种子数据」。
 // 现在集中在这儿，好让出问题时能说清是哪儿出的问题。
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+// import.meta.env 是 Vite 注进来的，`node --test` 里没有这东西——不兜的话，
+// 任何 import 到这儿的模块一进测试就崩在第 9 行，于是「碰库的模块一律测不了」。
+// 兜住之后 supa 是 null，跟「没填 .env.local」同一条路，测试里正好当没连库使。
+const env = import.meta.env || {}
 
-export const supa = url && anon ? createClient(url, anon) : null
+// 本机模式(VITE_DB_MODE=local,2026-09-16):前端和 brain 同源,supa 是打到 brain 的客户端,
+// 同一个表面;云端模式:今天的样子,一个字不变。DB_MODE 只有这一处在算。
+export const DB_MODE = env.VITE_DB_MODE === 'local' ? 'local'
+  : (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY ? 'cloud' : 'none')
+
+// 本机版和托管版(VITE_HOSTED=1,2026-10-03)的页面都是脑子自己发出来的,同源;只有他自己的个人版开发时是 5173 页面 + 8788 脑子
+export const BRAIN = env.VITE_BRAIN_URL
+  || ((DB_MODE === 'local' || env.VITE_HOSTED === '1') && typeof location !== 'undefined' ? location.origin : 'http://localhost:8788')
+
+export const supa = DB_MODE === 'local' ? brainClient(BRAIN)
+  : DB_MODE === 'cloud' ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY) : null
 export const DB_CONFIGURED = !!supa
 
-export const BRAIN = import.meta.env.VITE_BRAIN_URL || 'http://localhost:8788'
+/**
+ * 调脑子的唯一入口(2026-10-02 起)。云端 / 托管配置下自动带上登录凭证——脑子按它认人(RLS 按人生效);
+ * 本机配置同源、没有登录这回事,头上什么都不加。路径给 '/xxx' 或整个 URL 都行。
+ */
+export async function authHeaders() {
+  if (DB_MODE !== 'cloud' || !supa) return {}
+  try {
+    const { data } = await supa.auth.getSession()
+    const t = data?.session?.access_token
+    return t ? { authorization: `Bearer ${t}` } : {}
+  } catch (_) { return {} }
+}
+export async function brainFetch(input, init = {}) {
+  const url = typeof input === 'string' && input.startsWith('/') ? `${BRAIN}${input}` : input
+  const h = await authHeaders()
+  return fetch(url, { ...init, headers: { ...h, ...(init.headers || {}) } })
+}
+
+/**
+ * 脑子那几条「人的设置」路(/me /settings /judgments/* /claude/* /chatgpt/*),三种配置一个表面:
+ * 本机就是 supa 自己(brainClient);云端 / 托管是同一个 brainClient,底下走 brainFetch 带凭证;
+ * 演示模式没有脑子,null。设置页、判据、模型来源那几块只认这个,不再直接摸 supa.settings。
+ */
+export const brainApi = DB_MODE === 'local' ? supa : DB_MODE === 'cloud' ? brainClient(BRAIN, brainFetch) : null
+
+// 「我是谁」(auth.uid):托管配置下桶的 key 要以它开头(D10)。本机 / 演示没有这回事 → null。
+// 问一次就记住;换了人(登出再登)就清。
+let OWNER = null
+if (DB_MODE === 'cloud' && supa) { try { supa.auth.onAuthStateChange(() => { OWNER = null }) } catch (_) {} }
+export async function currentOwnerId() {
+  if (DB_MODE !== 'cloud' || !supa) return null
+  if (OWNER) return OWNER
+  try { const { data } = await supa.auth.getUser(); OWNER = data?.user?.id || null } catch (_) { OWNER = null }
+  return OWNER
+}
 
 /** 退回种子数据的原因。null = 没退，看到的是真数据。 */
 export const FELL_BACK = {
@@ -23,22 +70,25 @@ export const FELL_BACK = {
 
 /**
  * Fairwind 的脑子（本机 sidecar）醒着没有。
- * 它没醒 = 待批准的卡不会被自动读透，也没法对话——但数据仍是真的，
+ * 它没醒 = 新机会的卡不会被自动读透，也没法对话——但数据仍是真的，
  * 所以这跟「看到假数据」是两种严重程度，界面上要分开说。
  */
 // 脑子是你手动 `npm run brain` 起的常驻进程。改了它的代码不重启，它就一直跑旧的，
 // 而界面完全看不出来——这已经害过一次：把「讲懂」改成后台扫之后，前端触发器删了、
 // 后台扫描没跑起来，整整一天没有一张新卡被读过，谁也没发现。
 // 所以两边各存一个日期，对不上就提示重启。改 brain/server.js 的行为时两处一起改。
-export const BRAIN_BUILD = '2026-08-05'
+export const BRAIN_BUILD = '2026-10-14-release-candidate'
 
 export async function checkBrain() {
   try {
-    const res = await fetch(`${BRAIN}/health`, { method: 'GET' })
-    if (!res.ok) return { up: false, stale: false }
+    // 带上登录身份:线上后台按人记收信进度,不带身份问到的是一份空的(2026-10-07 测试账号连上 Gmail,右下角小窗不出来就是这个)
+    const res = await brainFetch(`${BRAIN}/health`, { method: 'GET' })
+    if (!res.ok) return { up: false, stale: false, mail: null }
     const body = await res.json().catch(() => ({}))
-    return { up: true, stale: body.build !== BRAIN_BUILD }
+    // mail = 邮件那一轮的状态。**收信只发生在脑子里**，所以脑子没开
+    // 就等于没人在收信——这件事必须让界面说出来，不能静默。
+    return { up: true, stale: body.build !== BRAIN_BUILD, mail: body.mail || null, version: body.version || null, update: body.update || null }
   } catch (_) {
-    return { up: false, stale: false }
+    return { up: false, stale: false, mail: null }
   }
 }
