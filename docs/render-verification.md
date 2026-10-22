@@ -15,7 +15,7 @@ Date: 2026-10-21 Pacific. **Standby deployment; not production acceptance.**
 - Old server source fingerprint matches the migration snapshot for server.js,
   Calendar service and both lockfiles.
 
-## Full legacy suite — NOT all green
+## Full legacy suite and repaired regression checks
 
 After dependency installation completed, with Node 24.18.0 and
 --experimental-test-module-mocks: **790 passed / 802 total; 12 failed**.
@@ -25,9 +25,24 @@ After dependency installation completed, with Node 24.18.0 and
 - 1 frontend artifact test mocks backends.js without the `supa` export required
   by its imports.
 
-These source/test files are copied from the running server, not changed by the
-migration adapter. Do not hide these failures or claim complete business
-verification. Their exact causes and production relevance still need review.
+The original 12 failures have now been investigated. Ten prompt expectations
+predated the separation of email/history/drafts and the updated persona. Tests
+now preserve the independent legacy static-prefix comparison and check the new
+source-separated context invariants. Four dedicated context-history tests cover
+mail evidence, chronology, missing evidence and untrusted external instructions.
+The Gmail test now asserts the intentional missing-scope message and preservation
+of the original provider error as `cause`. The artifacts mock now supplies the
+imported Supabase client; a regression checks discard/restore RPC arguments.
+These are test repairs, not twelve production behavior fixes.
+
+The local Node 24.18.0 runner additionally hit a child-process serialization error
+in the callback test file. The same complete suite on the old production runtime,
+Node 24.9.0, passed **823/823**. After adding two migration acceptance guard tests,
+the final run passed **825/825**, with no skipped tests (16.14 seconds).
+Command: `FAIRWIND_LANG=zh npm exec --yes --package=node@24.9.0 -- node
+--experimental-test-module-mocks --test` followed by the globs in package.json.
+Final log: `/tmp/fairwind-migration-final-tests.log` (local, not committed).
+Passing fixture tests is not authenticated production acceptance.
 Raw local log: /tmp/fairwind-migration-complete-tests.log (not committed).
 
 Earlier exploratory runs occurred during interrupted/incomplete dependency
@@ -62,13 +77,61 @@ installation and/or without the module-mocking flag. They are superseded by the
 - Dashboard: https://dashboard.render.com/web/srv-dbcpchavcj2c73fe55dg
 - Candidate: https://fairwind-migration.onrender.com
 
-## Awaiting
+## Runtime compatibility and real backend checks
 
-- Durable state inventory and transfer.
-- Dedicated-account authenticated end-to-end checks and restart tests.
+- Render's native runtime SSH shell reported Node 24.22.1, unlike the old
+  production Node 24.9.0, and had no `expect` binary for Claude subscription login.
+  Switched the same paid candidate service to a Docker image pinning Node 24.9.0
+  and installing Debian's `expect`; compute and disk plans are unchanged.
+- The backend imports shared `src/lib` modules. Docker includes these and checks
+  the real imports during build, not just the compiled frontend.
+- Candidate commit `7bf8769`, deploy `dep-dbcpsitk3hvs739q6450`, is live in
+  **standby**. SSH verified Node 24.9.0, expect 5.45.4, UID 1000 (non-root),
+  persistent disk access and shared source modules.
+- Added an operator-only acceptance mode: hosted, loopback bind, explicit owner
+  allowlist, audited GET routes only, no browser assets/OAuth callbacks/MCP,
+  no scheduled mail/scout/model workers. Existing tenant JWT authentication stays
+  required. `/me` does not localize/write the seed task in this mode.
+- Real secondary backend process on Render: **11/11 HTTP assertions passed**;
+  unauthenticated and invalid-token access rejected; business POSTs, callbacks
+  and UI blocked. Waited beyond initial 0/5/8-second scheduling deadlines and
+  confirmed no background loops scheduled. Actual expect PTY probe passed.
+  Script: `scripts/acceptance-smoke.mjs`. Model calls: 0.
+- On the actual Linux Render instance, the focused prompt/context, Gmail callback,
+  Claude-auth, Calendar, tenant isolation and deployment checks passed **77/77**
+  with Node 24.9.0 (3.08 seconds). These use fixtures, not real Google writes.
+- Public candidate `/health` is 200 with businessReady=false; `/` is deliberately
+  503. These public responses verify standby isolation, not business readiness.
+- Compared 483 original source files against the live DO installation: no
+  differences from the migration source snapshot at the time of the check.
+
+## Durable state preparation
+
+The live process uses `/var/lib/fairwind`, not `brain/users`. Initial private
+backup: 310 files, 185,256,131 bytes. The archive is about 26 MiB, stored with
+mode 0600 outside Git. Extracted-state aggregate SHA-256:
+`fb017ce488c7449f8997efe9fde44bb0b9d88dc8a8f7ec0e048d18bd6fcd8209`.
+Archive SHA-256:
+`f6fa35d491c97773db3a39c8553e36d026571be2b152d939a8e948e8522e2b2a`.
+
+SCP/rsync transfers were interrupted; partial destination files must not count
+as successful migration. The fallback transfers hashed chunks over verified SSH
+and checks the complete archive before it may be extracted for acceptance.
+This is an initial online copy only. Final cutover still requires draining the
+old service and a fresh consistent snapshot, including SQLite state/WAL files.
+
+## Awaiting business acceptance and cutover
+
+- Complete destination hash verification and restart persistence checks.
+- Owner-account authenticated end-to-end checks. User approved own-account
+  isolation and model cost up to US$1; actual model calls so far: zero. No emails
+  sent or real Calendar events created/modified. Browser login still pending.
 - Final maintenance/cutover plan and domain switch; old workers must stop before
   new live workers start. No production DNS/service changes made.
 
 Render dashboard confirms 2 GB compute $25/month and disk $0.25/GB/month.
 Selected candidate: 1 GB disk, total base $25.25/month; user approved $26/month.
 The paid candidate service has now been created within the approved budget.
+
+DigitalOcean dependencies and conditional cleanup list are in
+`docs/digitalocean-retention-inventory.md`. No DigitalOcean resources were deleted.
