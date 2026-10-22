@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test 'src/lib/*.test.js' 'src/i18n/*.test.js' 'brain/*.test.js' 'brain/engine/*.test.js' 'brain/mail/*.test.js' 'brain/local/*.test.js' 'brain/backup/*.test.js'",
+    "test": "node --experimental-test-module-mocks --test 'src/lib/*.test.js' 'src/i18n/*.test.js' 'brain/*.test.js' 'brain/engine/*.test.js' 'brain/mail/*.test.js' 'brain/local/*.test.js' 'brain/backup/*.test.js' 'brain/calendar/*.test.js' 'scripts/*.test.mjs'",
     "brain": "npm start --prefix brain",
     "setup": "node scripts/setup.mjs",
     "fairwind": "node scripts/fairwind.mjs",

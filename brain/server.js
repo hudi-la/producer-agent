@@ -4,6 +4,8 @@ import { webClient as calendarClient } from './mail/auth.js'
 import { google as calendarGoogle } from 'googleapis'
 import { createErrorLog, createDiagnosticsHandler, observeRequest } from './errorLog.js'
 import { ERROR_LOG_RELEASE } from './errorEvents.js'
+import { acceptanceConfig, acceptanceRequestAllowed } from './acceptance.js'
+const ACCEPTANCE = acceptanceConfig()
 // Fairwind 的脑子 —— 跑在本机的 sidecar，挂 Claude 订阅（不烧 API）。
 //
 // 前端 POST /chat → ①你的话先落库 ②读这条线的全部往来拼成上下文
@@ -1844,7 +1846,7 @@ async function calendarRound() {
     }
   } finally { calendarRunning = false }
 }
-if (HOSTED) setInterval(() => { void calendarRound().catch(() => {}) }, 5 * 60000).unref()
+if (HOSTED && !ACCEPTANCE.enabled) setInterval(() => { void calendarRound().catch(() => {}) }, 5 * 60000).unref()
 async function calendarCallback(req, res) {
   const u = new URL(req.url, 'http://localhost')
   let result = 'connected'
@@ -1855,6 +1857,7 @@ async function calendarCallback(req, res) {
 
 /** 连上之后马上替他收第一轮(回填 + 收信),不等五分钟那一拍。后台跑,不拦回调 */
 function kickMail(owner) {
+  if (ACCEPTANCE.enabled) return
   ;(async () => {
     HOSTED.invalidate(owner)                 // 新钥匙刚进库:下次读设置要重拉
     const t = await HOSTED.forOwner(owner)
@@ -2202,10 +2205,13 @@ const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 const allowOrigin = (o) => (o && (LOCAL.test(o) || o === ORIGIN) ? o : ORIGIN)
 
 const errorLog = createErrorLog({ dir: pathJoin(process.env.FAIRWIND_DATA_DIR || process.cwd(), 'error-logs') })
-setInterval(() => { void errorLog.prune() }, 3600000).unref()
-void errorLog.prune()
+if (!ACCEPTANCE.enabled) {
+  setInterval(() => { void errorLog.prune() }, 3600000).unref()
+  void errorLog.prune()
+}
 const handleDiagnostics = createDiagnosticsHandler({ log: errorLog, allowOrigin: (o) => Boolean(o && (o === ORIGIN || (!HOSTED && LOCAL.test(o)))) })
 const server = http.createServer(async (req, res) => {
+  if (ACCEPTANCE.enabled && !acceptanceRequestAllowed(req.method, req.url)) return send(res, 403, { error: 'migration_read_only' })
   const origin = req.headers.origin
   res.setHeader('access-control-allow-origin', allowOrigin(origin))
   res.setHeader('vary', 'origin')
@@ -2238,10 +2244,12 @@ const server = http.createServer(async (req, res) => {
     const open = req.method === 'GET' && (path === '/health' || path === '/mcp-guide' || path === '/' || /\.[a-z0-9]+$/i.test(path))
     if (open) {
       const t = path === '/health' ? await HOSTED.fromRequest(req).catch(() => null) : null
+      if (ACCEPTANCE.enabled && t && t.owner !== ACCEPTANCE.owner) return send(res, 403, { error: 'migration_owner_not_allowed' })
       return await (t ? withTenant(t, () => dispatch(bindRequest(req, t), res, origin)) : dispatch(req, res, origin))
     }
     const t = await HOSTED.fromRequest(req)
     if (!t) return send(res, 401, { error: '请先登录 / sign in first' })
+    if (ACCEPTANCE.enabled && t.owner !== ACCEPTANCE.owner) return send(res, 403, { error: 'migration_owner_not_allowed' })
     return await withTenant(t, () => dispatch(bindRequest(req, t), res, origin))
   } catch (e) {
     console.error('  ✗ 认人没成:' + e.message)
@@ -2254,7 +2262,7 @@ async function dispatch(req, res, origin) {
   // 本机模式的那几条路(/me /setup /db/* /files/* 和静态 dist/)。云端模式 LOCAL_MODE 是 null,一律跳过
   if (LOCAL_MODE && await handleLocalRoute(req, res, { db, mode: DB_MODE, ...LOCAL_MODE })) return
   // 托管的那几条(/me /settings /judgments/files /claude/* 和静态 dist/)
-  if (HOSTED && await handleHostedRoute(req, res, { hosted: HOSTED, distDir: DIST_DIR, gmail: GMAIL_CONNECT, kickMail })) return
+  if (HOSTED && await handleHostedRoute(req, res, { hosted: HOSTED, distDir: DIST_DIR, gmail: GMAIL_CONNECT, kickMail, readOnly: ACCEPTANCE.enabled })) return
   // 他自己的个人版(service 配置):前端在云端配置下也会问 /me 定语言——应一声,别 404
   if (!LOCAL_MODE && !HOSTED && req.method === 'GET' && req.url === '/me') return send(res, 200, { mode: DB_MODE, ready: true, lang: 'zh', user: null })
 
@@ -2706,6 +2714,7 @@ async function mailRound() {
 // 云端模式三个永远开着——功能只增不减。
 const timers = {}
 function applyTimers() {
+  if (ACCEPTANCE.enabled) return
   // 托管:三个循环永远开着——每个人开没开机会线、连没连 Gmail,在循环里按人看(2026-10-06 起邮件也开)
   const want = HOSTED ? { sweepBriefs: true, scoutPass: true, mailLoop: true }
     : { sweepBriefs: isEnabled(tenant().modules, 'pursuits'), scoutPass: isEnabled(tenant().modules, 'pursuits'), mailLoop: isEnabled(tenant().modules, 'mail') }

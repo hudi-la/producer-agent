@@ -1,0 +1,16 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.log
+dist
+brain/dist
+brain/users
+brain/error-logs
+brain/.mail-tokens.json
+brain/.supabase-session.json
+data
+reports
+.DS_Store

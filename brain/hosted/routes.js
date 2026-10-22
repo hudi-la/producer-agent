@@ -72,7 +72,7 @@ export async function handleHostedRoute(req, res, ctx) {
 
   if (req.method === 'GET' && p === '/me') {
     const s = t.settings
-    try { await localizeSeedTask(t) } catch (e) { console.warn('  出厂任务换语言没成:' + e.message) }
+    if (!ctx.readOnly) try { await localizeSeedTask(t) } catch (e) { console.warn('  出厂任务换语言没成:' + e.message) }
     json(res, 200, { mode: 'hosted', ready: Boolean(readyOf(s)), onboarded: s.onboarded === true, lang: s.lang === 'zh' ? 'zh' : 'en', user: { id: t.owner, email: t.email } })
     return true
   }

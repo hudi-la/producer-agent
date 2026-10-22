@@ -4,7 +4,9 @@ import http from 'node:http'
 import { waitForCode } from './auth.js'
 
 const PORT = Number(process.env.GMAIL_CALLBACK_PORT || 8789)
-const hit = (path) => fetch(`http://localhost:${PORT}${path}`).then((r) => r.text())
+// These tests restart the callback listener on the same port. Do not reuse an
+// undici connection to the previous listener (intermittent ECONNRESET under load).
+const hit = (path) => hitKeepAlive(path, false)
 
 /** 像浏览器那样请求：keep-alive，回完不主动断开。 */
 function hitKeepAlive(path, agent) {
@@ -49,6 +51,7 @@ test('闲杂请求不打断授权：手动访问过一次之后，照样能收�
 // 判据是**必须在几秒内 resolve**，不是「最终会 resolve」。
 test('浏览器保着长连接也要能收工，不能卡死', async () => {
   const agent = new http.Agent({ keepAlive: true, maxSockets: 1 })
+  let timeout
   try {
     const waiting = waitForCode()
     await hitKeepAlive('/', agent)                       // 先来一发闲杂的，连接留着
@@ -56,10 +59,11 @@ test('浏览器保着长连接也要能收工，不能卡死', async () => {
 
     const code = await Promise.race([
       waiting,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('卡住了：5 秒没 resolve')), 5000)),
+      new Promise((_, rej) => { timeout = setTimeout(() => rej(new Error('卡住了：5 秒没 resolve')), 5000) }),
     ])
     assert.equal(code, 'KEEPALIVE_CODE')
   } finally {
+    clearTimeout(timeout)
     agent.destroy()
   }
 })
@@ -81,9 +85,13 @@ test('403 限流不是授权掉了;真的掉了要把 Google 的原话带出来'
   const api = (status, reason, message) => Object.assign(new Error('x'), { response: { status, data: { error: { code: status, message, errors: [{ reason }] } } } })
   const rl = api(403, 'userRateLimitExceeded', 'User-rate limit exceeded')
   assert.equal(asAuthErrorIfItIs(rl), rl)
-  const denied = asAuthErrorIfItIs(api(403, 'insufficientPermissions', 'Request had insufficient authentication scopes.'))
+  const scopeError = api(403, 'insufficientPermissions', 'Request had insufficient authentication scopes.')
+  const denied = asAuthErrorIfItIs(scopeError)
   assert.ok(denied instanceof MAE)
-  assert.match(denied.message, /insufficientPermissions/)
+  // UI intentionally explains missing scopes rather than claiming all auth is lost.
+  assert.match(denied.message, /未授予此操作所需权限/)
+  assert.equal(denied.cause, scopeError) // Raw provider evidence remains available for diagnostics.
+  assert.doesNotMatch(denied.message, /授权掉了/)
   assert.doesNotMatch(denied.message, /object Object/)
   const grant = asAuthErrorIfItIs(Object.assign(new Error('x'), { response: { status: 400, data: { error: 'invalid_grant' } } }))
   assert.match(grant.message, /invalid_grant/)

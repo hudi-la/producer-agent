@@ -3,14 +3,13 @@
 services:
   - type: web
     name: fairwind-migration
-    runtime: node
+    runtime: docker
     # Owner approved US$26/month total including the 1 GB persistent disk.
     plan: 1c-2g
     numInstances: 1
     autoDeployTrigger: off
-    # NODE_ENV=production still needs dev dependencies during the Vite build.
-    buildCommand: npm ci --include=dev --no-audit --no-fund && npm ci --prefix brain --no-audit --no-fund && npm run build
-    startCommand: node scripts/start-render.mjs
+    # Docker pins Node and installs expect, required by existing Claude login.
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     disk:
       name: fairwind-state
