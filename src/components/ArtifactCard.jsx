@@ -2,7 +2,7 @@ import { useModules } from '../lib/ModulesContext.jsx'
 import { t } from '../i18n/index.js'
 import ErrorNotice from './ErrorNotice.jsx'
 import React, { useRef, useState } from 'react'
-import { artifactRequest } from '../lib/artifacts.js'
+import { artifactRequest, setArtifactDiscarded } from '../lib/artifacts.js'
 import { sendLetterNow } from '../lib/letters.js'
 import { setFinal } from '../lib/deliverables.js'
 import { checkRules } from '../lib/rules.js'
@@ -17,6 +17,7 @@ export default function ArtifactCard({ letter, form, messageId, owner, items = [
   const [err, setErr] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [status, setStatus] = useState('')
+  const [discardedOverride, setDiscardedOverride] = useState(null)
   const d = existing || items.find(x => x.meta?.artifact_message_id === messageId) || saved
   const email = d ? d.kind === 'email' : !!letter
   const title = d?.title || letter?.subject || form?.title
@@ -25,13 +26,18 @@ export default function ArtifactCard({ letter, form, messageId, owner, items = [
   const fields = d?.rules?.fields || form?.fields || []
   const { allOk } = checkRules(d?.rules || {}, body, d?.meta || {}, { needsBody: email })
   const final = d?.status === 'final' || status === 'sent'
+  const discarded = !final && (discardedOverride ?? d?.meta?.artifact_discarded)
   async function go(action) {
-    if (lock.current) return
+    if (lock.current || editorOpen || final) return
     lock.current = true; setBusy(true); setErr('')
     try {
       const current = d || await artifactRequest('/artifact', owner, { message_id: messageId })
       setSaved(current)
-      if (action === 'edit') await onAdopted?.(current.id)
+      if (action === 'discard' || action === 'restore') {
+        const updated = await setArtifactDiscarded(current.id, action === 'discard')
+        setSaved(updated); setDiscardedOverride(action === 'discard'); setConfirming(false)
+        await onAdopted?.()
+      } else if (action === 'edit') await onAdopted?.(current.id)
       else if (action === 'prepare') { setConfirming(true); await onAdopted?.() }
       else if (action === 'send') {
         await sendLetterNow(owner, current.id)
@@ -45,6 +51,13 @@ export default function ArtifactCard({ letter, form, messageId, owner, items = [
     } catch (e) { setErr(e) }
     finally { lock.current = false; setBusy(false) }
   }
+  if (discarded) return <div className="lcard artifact-card">
+    <div className="lcard-h"><span className="lcard-tag">{t('邮件')}</span><span>{t('已放弃草稿')}</span></div>
+    <div className="lcard-sub">{title}</div>
+    {d?.meta?.gmail_draft_id && <p className="pf-note">{t('Gmail 草稿箱中的副本仍保留，可前往 Gmail 删除。')}</p>}
+    {err && <ErrorNotice error={err} context={t('恢复草稿')} />}
+    <button className="b" disabled={busy || editorOpen} onClick={() => go('restore')}>{t('恢复草稿')}</button>
+  </div>
   return <div className="lcard artifact-card">
     <div className="lcard-h"><span className="lcard-tag">{email ? t('邮件') : fields.length ? t('申请表') : t('文档')}</span>
       <span>{final ? t('已完成') : status === 'draft' ? t('已存入 Gmail 草稿箱') : status === 'copied' ? t('已复制') : d?.meta?.gmail_draft_id ? t('在 Gmail 草稿箱') : t('草稿')}</span></div>
@@ -64,6 +77,7 @@ export default function ArtifactCard({ letter, form, messageId, owner, items = [
       <button className="b" disabled={busy || editorOpen} onClick={() => go('edit')}>{t('修改')}</button>
       {email && mods.mail && <><button className="b primary" disabled={busy || editorOpen} onClick={() => go('prepare')}>{t('发送')}</button>
         <button className="b" disabled={busy || editorOpen} onClick={() => go('draft')}>{t('存草稿箱')}</button></>}
+      {email && <button className="b" disabled={busy || editorOpen} onClick={() => go('discard')}>{t('放弃草稿')}</button>}
       {!email && d && <button className="b" disabled={busy || editorOpen || !allOk} onClick={() => go('final')}>{t('定稿')}</button>}
       {busy && <span role="status">{t('处理中…')}</span>}
     </div>}

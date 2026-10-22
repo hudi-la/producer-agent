@@ -1,4 +1,8 @@
 export default {
+  "放弃草稿": "Discard draft",
+  "已放弃草稿": "Draft discarded",
+  "恢复草稿": "Restore draft",
+  "Gmail 草稿箱中的副本仍保留，可前往 Gmail 删除。": "The copy in Gmail drafts is still there. You can delete it in Gmail.",
   "{n} 词": "{n} words", "{n} 字符": "{n} characters",
   "邮件": "Email",
   "申请表": "Application form",

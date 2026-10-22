@@ -121,3 +121,12 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 发布目录 /home/fairwind/releases/notification-header-20261022；manifest.json 记录源码前后哈希，rollback 保存原样式与 HTML。纯前端，无服务重启或数据库改动；旧 assets 保留。
 - 回滚：核对当前样式与 manifest 的 after 相同后，恢复 rollback/src/styles.css 和 rollback/dist/index.html（HTML 原子替换）。
 - GitHub 分支 codex/notification-header-20261021；本条文档所在提交对应发布代码，服务器 git-commit.txt 保存提交号。
+
+2026-10-21（洛杉矶）：内联邮件卡支持放弃与恢复草稿。
+- 新增“放弃草稿”，成功后收起正文并显示“已放弃草稿”和“恢复草稿”；刷新保留状态。已完成邮件不显示入口，右栏编辑及请求中禁用操作。保存失败保留原卡片并显示错误。
+- 新增 security invoker RPC pa_set_artifact_discarded(uuid,boolean)，按 RLS 归属检查、行锁及 draft/email 检查更新 meta.artifact_discarded；保留正文、收件人和消息关联。Gmail 副本保留并明确提示，不发送或删除 Gmail 邮件。
+- 卡片/联系人归属、重复放弃、恢复、内容保留、跨账号拒绝及已完成保护均在正式库 authenticated 回滚事务验证；未改真实用户草稿。浏览器组件交互及失败路径通过，5 项产出/翻译测试通过，hosted 构建通过。
+- 发布目录 /home/fairwind/releases/discard-draft-20261022，manifest 保存三个前端文件哈希，rollback 保存旧源码与 HTML；无需后端重启。正式 HTML 和 App-CNug1sXq.js 与构建逐字节一致。
+- SQL 和浏览器验证脚本位于 fixes/2026-10-22-discard-draft/。验证脚本用 node 执行，需 Playwright（可通过 NODE_PATH 指定）和 Chrome。
+- 回滚：校验当前文件仍匹配 manifest.after 后恢复 rollback/src 下三个文件及原子恢复 rollback/dist/index.html。新增 RPC 和用户放弃标记可保留，避免丢失新状态。
+- GitHub 分支 codex/discard-email-draft-20261021；服务器 git-commit.txt 记录实际发布提交。
