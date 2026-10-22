@@ -23,9 +23,13 @@ RUN npm run build
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app/brain ./brain
+COPY --from=build --chown=node:node /app/src ./src
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/scripts ./scripts
 COPY --from=build --chown=node:node /app/package.json ./package.json
 RUN mkdir -p /home/node/.ssh && chown node:node /home/node/.ssh && chmod 700 /home/node/.ssh
+# The backend shares parsers/model defaults with src/lib; a frontend-only dist
+# is insufficient. Fail the image build before deployment if these imports break.
+RUN node --input-type=module -e "await import('./brain/letter.js'); await import('./brain/engine/index.js'); await import('./brain/artifacts.js')"
 USER node
 CMD ["node", "scripts/start-render.mjs"]
