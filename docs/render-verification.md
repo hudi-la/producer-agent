@@ -1,6 +1,8 @@
 # Migration verification status
 
-Date: 2026-10-21 Pacific. **Standby deployment; not production acceptance.**
+Date: 2026-10-21 Pacific. **Standby deployment; isolated account acceptance passed, production cutover pending.**
+
+Current takeover instructions: [Hudi/Codex handoff](fairwind-render-handoff.md).
 
 ## Passed
 
@@ -103,7 +105,9 @@ installation and/or without the module-mocking flag. They are superseded by the
 - Public candidate `/health` is 200 with businessReady=false; `/` is deliberately
   503. These public responses verify standby isolation, not business readiness.
 - Compared 483 original source files against the live DO installation: no
-  differences from the migration source snapshot at the time of the check.
+  differences at that earlier check. A later comparison found new usage-metering
+  changes in four files plus dependencies on new modules. That later finding
+  supersedes source parity; reconcile before cutover (see handoff).
 
 ## Durable state preparation
 
@@ -120,14 +124,38 @@ and checks the complete archive before it may be extracted for acceptance.
 This is an initial online copy only. Final cutover still requires draining the
 old service and a fresh consistent snapshot, including SQLite state/WAL files.
 
-## Awaiting business acceptance and cutover
+## Completed persistence and isolated account acceptance
 
-- Complete destination hash verification and restart persistence checks.
-- Owner-account authenticated end-to-end checks. User approved own-account
-  isolation and model cost up to US$1; actual model calls so far: zero. No emails
-  sent or real Calendar events created/modified. Browser login still pending.
-- Final maintenance/cutover plan and domain switch; old workers must stop before
-  new live workers start. No production DNS/service changes made.
+- Verified archive `/var/data/fairwind/verified-state-f6fa35d491c97773.tar.gz`
+  (26,812,155 bytes) against the SHA-256 above. Extracted into
+  `/var/data/fairwind/acceptance-initial-20261021`, 310 files / 185,256,131 bytes.
+  An actual Render restart preserved the same aggregate state hash.
+- IMPORTANT: `/var/data/fairwind/users` at the disk root is still a partial copy
+  from an interrupted earlier transfer. Do not activate live against that root
+  until final verified state is installed. The isolated acceptance copy is valid.
+- Explicitly authorized existing Di Hu account: 13 read-only checks passed;
+  account-scoped Supabase views returned profile=1, pursuits=137, contacts=262,
+  entries=61. Authenticated GET /me, /settings, /modules, /calendar/status and
+  /judgments/files succeeded. Gmail token refresh/profile/message-list and
+  Calendar token refresh/calendar-list succeeded without external writes.
+- `scripts/acceptance-account.mjs --model` added one Claude SDK subprocess probe:
+  14 checks passed, returned MIGRATION_OK, tools disabled, reported cost
+  US$0.001539 (approved ceiling US$1). This is not full frontend/model-streaming
+  acceptance. Test auth session signed out; secondary backend stopped.
+- No mail sent or Calendar event created/modified. Public candidate remains
+  standby and business workers remain disabled.
+- Temporary Render SSH key `fairwind-migration-temporary-20261021` removed at
+  handoff; dashboard showed No authorized SSH keys. Active migration SSH closed.
+
+## Still required before cutover
+
+- Reconcile later live usage-metering changes and new files, then rerun tests.
+- Drain/stop only old Fairwind and transfer a fresh consistent final snapshot.
+- Hudi must supply authorized access to hudiworks.com DNS. Render custom domain
+  is registered but unverified; current Marvin Cloudflare account lacks the zone.
+- Formal-host browser login, TLS, model streaming and live-worker verification.
+  Old and new workers must never run together. No production DNS/service change
+  has been made; DigitalOcean remains untouched.
 
 Render dashboard confirms 2 GB compute $25/month and disk $0.25/GB/month.
 Selected candidate: 1 GB disk, total base $25.25/month; user approved $26/month.

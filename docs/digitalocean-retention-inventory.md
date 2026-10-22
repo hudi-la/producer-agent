@@ -37,9 +37,11 @@
 
 Docker 实测：9 个容器均运行；14 个卷均被引用；4 个镜像均在使用；没有发现可直接清理的 dangling 卷或镜像。不要照搬 `docker system df` 的 reclaimable 列执行 prune。
 
-## 账号级资源仍需核对
+## 账号级资源盘点与范围
 
-现有 DigitalOcean API 凭证返回 HTTP 401，网页停在登录页。因此本清单不覆盖账号内其他 Droplet、独立块存储、快照、备份计划、负载均衡器、托管数据库或 Reserved IP。不能据此断言这些资源不存在。
+登录后已切到有实际资源的 **My Team**（另一个 MGHD 团队为空），网页显示一台 `agentist-erp` Droplet，8 GB / 160 GB、SFO3。已查看的独立 Volumes、Volume Snapshots、Droplet Snapshots、Reserved IP、Load Balancers 页面均无资源；Droplet 没有启用自动备份。以上仅为本次查看时的状态，不是永久保证。
+
+托管数据库、Apps、Spaces、Registry、GPU 等其他类别尚未完成账号级核对，不能据此断言不存在。现有 DigitalOcean API 凭证仍返回 HTTP 401。最终删除主机之前需要补齐盘点，且先独立保留并验证恢复备份。
 
 两个域名 `fairwind.hudiworks.com` 和 `erp.agentist.org` 当前均解析到 `64.23.225.65`。Fairwind 的 DNS 在 Cloudflare；本次没有修改 DNS。
 

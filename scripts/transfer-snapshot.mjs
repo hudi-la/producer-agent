@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
-const [archive, identity, knownHosts] = process.argv.slice(2)
-if (!archive || !identity || !knownHosts) throw new Error('Usage: transfer-snapshot.mjs ARCHIVE IDENTITY KNOWN_HOSTS')
+const [archive, identity, knownHosts, resume = '1'] = process.argv.slice(2)
+if (!archive || !identity || !knownHosts) throw new Error('Usage: transfer-snapshot.mjs ARCHIVE IDENTITY KNOWN_HOSTS [FIRST_CHUNK]')
 const bytes = readFileSync(archive)
 const sha = x => createHash('sha256').update(x).digest('hex')
 const expected = sha(bytes)
@@ -15,6 +15,8 @@ const remote = `const fs=require('fs'),crypto=require('crypto');require('readlin
 const command = 'node -e ' + "'" + remote.replaceAll("'", "'\\''") + "'"
 const args = ['-i', identity, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'UserKnownHostsFile=' + knownHosts, 'srv-dbcpchavcj2c73fe55dg@ssh.oregon.render.com', command]
 const size = 1024 * 1024
+const firstChunk = Number(resume)
+if (!Number.isSafeInteger(firstChunk) || firstChunk < 1 || firstChunk > Math.ceil(bytes.length / size)) throw new Error('Invalid resume chunk')
 // One SSH connection avoids repeated gateway handshakes/rate limits. Wait for
 // each acknowledgment before sending the next chunk (bounded backpressure).
 const child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'] })
@@ -30,7 +32,9 @@ function ack() {
     lines.once('line', onLine); child.once('exit', onExit)
   })
 }
-try { for (let offset = 0; offset < bytes.length; offset += size) {
+// Resume only after an observed acknowledgment. Final whole-file SHA-256 also
+// validates every retained prefix chunk, so a stale partial file cannot pass.
+try { for (let offset = (firstChunk - 1) * size; offset < bytes.length; offset += size) {
   const chunk = bytes.subarray(offset, offset + size), last = offset + size >= bytes.length
   const input = JSON.stringify({ path: remotePath, data: chunk.toString('base64'), offset, sha: sha(chunk), total: bytes.length, last, expected })
   const reply = ack(); child.stdin.write(input + '\n'); const result = await reply
