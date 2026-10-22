@@ -7,6 +7,10 @@ dist/
 brain/users/
 brain/error-logs/
 data/
+# UI schema is source code, not tenant data. Keep the exception narrow.
+!/src/data/
+/src/data/*
+!/src/data/schema.js
 reports/
 *.pem
 *.key
