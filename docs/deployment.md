@@ -145,3 +145,11 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 20 counter, cache accounting, persistence, authentication/isolation, period and settings/client regressions passed; hosted build passed. No paid model call used for testing.
 - Release: /home/fairwind/releases/usage-20261022. Manifest verifies source baseline; rollback preserves prior source/HTML. Existing assets retained. Idle check before restart. Rollback: python3 /home/fairwind/releases/usage-20261022/publish.py rollback; usage records retained.
 - GitHub: codex/usage-monitor-20261021; release git-commit.txt maps deployed source to commit.
+
+
+2026-10-22（洛杉矶）：MCP 设置连接信息分区。
+- 地址与令牌各自支持一键复制；中间提供简短连接指令，保留 Authorization: Bearer；原迁移指令移到底部并标注线下版老用户。
+- 基于实时线上两个文件：SettingsPage.jsx、en.js；hosted 构建、四个复制按钮实际内容及本次翻译键检查通过。全站漏翻检查仍报告已有 UsageCard 文案，未扩大修改范围。
+- 发布目录 /home/fairwind/releases/mcp-settings-20261022，manifest 保存源码哈希、rollback 保存原源码和 HTML；纯前端，无后端重启或令牌变更。
+- 回滚：python3 发布目录/publish.py rollback（核对当前源码后恢复原源码与 HTML，保留旧 assets）。
+- GitHub 分支 codex/mcp-settings-copy-20261022；发布目录 git-commit.txt 记录对应提交。
