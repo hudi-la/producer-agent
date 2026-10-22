@@ -8,7 +8,8 @@ services:
     plan: 1c-2g
     numInstances: 1
     autoDeployTrigger: off
-    buildCommand: npm ci --no-audit --no-fund && npm ci --prefix brain --no-audit --no-fund && npm run build
+    # NODE_ENV=production still needs dev dependencies during the Vite build.
+    buildCommand: npm ci --include=dev --no-audit --no-fund && npm ci --prefix brain --no-audit --no-fund && npm run build
     startCommand: node scripts/start-render.mjs
     healthCheckPath: /health
     disk:
