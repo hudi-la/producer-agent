@@ -1617,6 +1617,10 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
               阴影，这块板子就没有边，像是字直接印在页面上。 */
            background: var(--paper-2);
            box-shadow: var(--shadow); }
+/* Keep panel actions visible while its notification list scrolls. */
+.npanel > .nhead { position: sticky; top: -10px; z-index: 2;
+                  margin: -10px -12px 0; padding: 10px 12px 0;
+                  background: var(--paper-2); }
 .nhead   { display: flex; align-items: baseline; gap: 8px; }
 .nhead h2 { font-size: 14px; margin: 0 0 6px; }
 .nhead .sp { flex: 1; }

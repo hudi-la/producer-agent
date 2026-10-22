@@ -114,3 +114,10 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - userError 对 contacts_email_uniq 显示「这个邮箱已在通讯录中」，说明按邮箱查找、添加时刷新重试、编辑时使用其他邮箱或保留已有联系人。原始错误保留在折叠诊断中。补英文翻译。
 - 3项已有错误提示测试通过，hosted构建通过；发布目录 /home/fairwind/releases/contact-message-20261021，manifest.json及rollback保存两个源码基线与HTML，旧assets保留；纯前端，无后端重启。正式HTML与发布一致。
 - 回滚恢复该目录rollback/src内两文件及rollback/dist/index.html。正常重复添加仍由数据库幂等逻辑处理。
+
+2026-10-21（洛杉矶）：消息面板标题栏吸顶。
+- 基于实时正式 src/styles.css，只新增 .npanel > .nhead sticky 样式，保持标题、气泡开关及关闭按钮在列表滚动时可见，不透明背景遮住下方内容。
+- 390px / 1280px 浏览器验证列表顶部、中间、底部按钮可见且可点击关闭；hosted 构建通过。
+- 发布目录 /home/fairwind/releases/notification-header-20261022；manifest.json 记录源码前后哈希，rollback 保存原样式与 HTML。纯前端，无服务重启或数据库改动；旧 assets 保留。
+- 回滚：核对当前样式与 manifest 的 after 相同后，恢复 rollback/src/styles.css 和 rollback/dist/index.html（HTML 原子替换）。
+- GitHub 分支 codex/notification-header-20261021；本条文档所在提交对应发布代码，服务器 git-commit.txt 保存提交号。
