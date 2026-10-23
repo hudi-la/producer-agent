@@ -1,5 +1,19 @@
 # Fairwind 正式站点与发布
 
+## 当前正式部署：Render（2026-10-23）
+
+正式地址仍为 https://fairwind.hudiworks.com/，现已切到 Render `fairwind-migration`（parallight，Oregon，服务 `srv-dbcpchavcj2c73fe55dg`）。下方 DigitalOcean 发布流程仅作历史参考，不可再直接用于正式发布。
+
+- 实际生产提交：`717b0a6beb28d00114f56f1ea498f9105cd2a1c5`，已推送 GitHub `codex/render-migration`。
+- 实际生产部署：`dep-dbdv4sfb9u1s73bkm22g`；2026-10-23 16:49 PDT 启动 live。自动部署关闭，后续通过 Render 手动部署经核实的提交；不可从旧本地 checkout 整库覆盖。
+- 运行：Docker Node 24.9.0，1 CPU / 2 GB，持久磁盘 1 GB；`FAIRWIND_DATA_DIR=/var/data/fairwind`，`FAIRWIND_DEPLOYMENT_STATE=live`，`FAIRWIND_CUTOVER_CONFIRMED=true`。Supabase 仍为原项目；凭据只留服务配置。
+- Cloudflare：`fairwind` 为 DNS only 的 CNAME，指向 `fairwind-migration.onrender.com`，TTL Auto。Render 域名 Verified、Certificate Issued；正式 HTTPS 验证通过。
+- 旧 DO `fairwind.service` 已停止且 disabled，不能与 Render 同时开启。DO 主机、ERP、Caddy、LLM Lab 及其他服务保留。
+- 最终一致性快照：DO `/home/fairwind/releases/render-cutover-20261023b/`；Render `/var/data/fairwind/cutover-20261023b/`。归档 SHA-256 `a3dbd03b6428ad23c9fb6c713b0c67aa6daabd891cb6eeadf938f6056dcffe24`；345 文件，185,712,226 字节，25 个 SQLite 完整性检查通过。旧残缺状态隔离在 `/var/data/fairwind/quarantine-pre-cutover-20261023b/`。
+- 服务器端验收通过；Chrome 报 ERR_BLOCKED_BY_CLIENT，浏览器最终验收待用户手动确认。本轮未追加计费模型探针，等待用户单独确认 $0.50 上限；不声称完整流式模型交互已验收。
+- 回滚必须先把 Render 改回 standby/false 并确认业务后台已停；核对并回迁切换后的新本地状态，再恢复旧 DNS A `64.23.225.65`，恢复 DO 发布目录的 `Caddyfile.before`（或执行该目录 `cutover.py restore-proxy`），最后 `sudo systemctl enable --now fairwind.service`。不能恢复过期 Supabase 备份。
+- 临时 SSH 授权和详细验收记录见 [Render 接管记录](render-takeover-20261023.md)。SSH 直连曾反复重置，经原 DO 的 ProxyJump + SFTP 完成传输；不要把私钥放进服务器或 Git。
+
 用户确认的正式站点是 https://fairwind.hudiworks.com/ 。时间线入口为 https://fairwind.hudiworks.com/?a=ledger 。
 在本项目中，用户说“上线 / 发布”，默认指这个正式站点，不是 localhost，也不需要再次询问地址。
 
