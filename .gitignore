@@ -26,3 +26,7 @@ brain/.supabase-session.json
 
 # 字节码构建产物（packaging/build-brain.mjs）
 brain/dist/
+# MCP bridge is executable source, not tenant state.
+!/packaging/data/
+/packaging/data/*
+!/packaging/data/mcp-bridge.cjs

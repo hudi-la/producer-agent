@@ -1,3 +1,4 @@
+import { recordUsage } from './usage.js'
 import { createCalendarService } from './calendar/service.js'
 import { handleCalendarRoute, calendarRows } from './calendar/routes.js'
 import { webClient as calendarClient } from './mail/auth.js'
@@ -577,7 +578,21 @@ async function thinkViaCompat(cfg, prompt, tools, system, abortController, mcpSe
   return { text, usage, notes, recovered }
 }
 
-async function think(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null, maxTurns = 20, tier = GOOD) {
+async function think(...args) {
+  const t = currentTenant()
+  const provider = t?.settings?.provider || 'claude-key'
+  const tier = args[7] || GOOD
+  const model = providerConfig(tier)?.model || modelFor(tier) || 'SDK'
+  let result
+  try { result = await thinkUnmetered(...args); return result }
+  finally {
+    if (t?.dataDir) {
+      try { recordUsage(t.dataDir, { provider, model, usage: result?.usage, failed: !result }) }
+      catch { console.warn('Usage counters could not be saved') }
+    }
+  }
+}
+async function thinkUnmetered(prompt, tools = READ_TOOLS, system = null, abortController = null, mcpServers = null, onEvent = null, maxTurns = 20, tier = GOOD) {
   // 英文版:每一次调模型都带上「给 ta 看的一律英文」(2026-10-08)。原来只有聊天和判断那两套系统提示词带,
   // 认人、写摘要、找机会、认领这些格子各有各的提示词,英文学员拿到的是中文。放在最底下,一处管全部
   if (outputLang() === 'en' && typeof prompt === 'string' && !prompt.includes('**Language:')) prompt += LANG_RULE()

@@ -1,3 +1,4 @@
+import UsageCard from './UsageCard.jsx'
 import { GoogleCalendarSettings } from './GoogleCalendar.jsx'
 import ErrorNotice from './ErrorNotice.jsx'
 import { errorText } from '../lib/userError.js'
@@ -37,6 +38,7 @@ export default function SettingsPage() {
         {!cur ? (!asked && <Spin />) : <>
           <LangCard lang={cur.lang || getLang() || 'zh'} />
           <ModelCard cur={cur} reload={load} />
+          {import.meta.env.VITE_HOSTED === '1' && <UsageCard />}
           {local ? <LocalMcpCard /> : <HostedMcpCard token={cur.mcpToken || ''} onRotated={load} />}
           <BackupCard local={local} backupDir={cur.backupDir || ''} reload={load} />
           {local && <MachineCard email={cur.email || ''} reload={load} />}
@@ -289,7 +291,8 @@ function HostedMcpCard({ token, onRotated }) {
   // 地址按脑子的来(托管下脑子直接服务页面,跟页面同源;他自己那份前端和脑子可能不在一个域)
   const b = new URL(BRAIN)
   const url = `${b.protocol}//${b.host}/mcp`
-  const ask = t('帮我把 Fairwind 接进你的 MCP 配置：名字叫 fairwind，类型是 streamable HTTP，地址 {url}，每次请求都带请求头 Authorization: Bearer {token}。已经有叫 fairwind 的就换成这个。另外，Codex、Claude Code（各个范围都看一遍）、Claude 桌面版、Gemini CLI 的配置里如果还有叫 fairwind、指向 localhost 的旧设置，也一并换成上面这个——我已经不用本机版了。改之前先备份原来的配置；改完告诉我要不要重启你才能用上。', { url, token: token || t('<令牌>') })
+  const legacyAsk = t('帮我把 Fairwind 接进你的 MCP 配置：名字叫 fairwind，类型是 streamable HTTP，地址 {url}，每次请求都带请求头 Authorization: Bearer {token}。已经有叫 fairwind 的就换成这个。另外，Codex、Claude Code（各个范围都看一遍）、Claude 桌面版、Gemini CLI 的配置里如果还有叫 fairwind、指向 localhost 的旧设置，也一并换成上面这个——我已经不用本机版了。改之前先备份原来的配置；改完告诉我要不要重启你才能用上。', { url, token: token || t('<令牌>') })
+  const ask = t('帮我把 Fairwind 接进你的 MCP 配置：名字叫 fairwind，类型是 streamable HTTP，地址 {url}，每次请求都带请求头 Authorization: Bearer {token}。', { url, token: token || t('<令牌>') })
   const rotate = async () => {
     setBusy(true); setMsg({ msg: '', bad: false })
     try {
@@ -302,6 +305,10 @@ function HostedMcpCard({ token, onRotated }) {
   return (
     <Card title={t('接给你的 AI 工具')} desc={t('让它能读写你的档案和机会卡——比如"读我的网站，把作品填进来"。')} aside={<GuideLink base={BRAIN} />}>
       <div className="set-stack">
+        <small className="set-hint">{t('MCP server 地址')}</small>
+        <CmdBox cmd={url} wrap />
+        <small className="set-hint">{t('MCP 连接令牌')}</small>
+        <CmdBox cmd={token || t('<令牌>')} wrap />
         <small className="set-hint">{t('把下面这段话原样粘给 Codex 或 Claude Code，它会自己接好。')}</small>
         <CmdBox cmd={ask} wrap />
         <div className="set-warn">
@@ -309,7 +316,8 @@ function HostedMcpCard({ token, onRotated }) {
           <button type="button" className="set-quiet" disabled={busy} onClick={rotate}>{busy ? <><Spin />{t('在换…')}</> : t('换一串')}</button>
         </div>
         <Note {...msg} />
-        <small className="set-hint">{t('用过本机版？在本机版设置里点「下载我的备份」，再到这页下面的「备份」点「用备份恢复…」，档案和机会卡就搬过来了。趁线上还没填东西时做——恢复会换掉线上现有的内容。')}</small>
+        <small className="set-hint">{t('如果你是用过线下版的老用户，请用下面这段话。')}</small>
+        <CmdBox cmd={legacyAsk} wrap />
       </div>
     </Card>
   )

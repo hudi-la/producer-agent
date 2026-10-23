@@ -14,9 +14,11 @@ import { gmailFor, currentHistoryId, listIds, getMetadata, historySince } from '
 import { readFile, mkdir, writeFile, rename, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { currentTenant } from '../tenant.js'
-import { classify, mineSet } from './addr.js'
+import { classify, mineSet, headerMap, parseAddr } from './addr.js'
 import { db, myAccounts, putHeaders, setCursor } from './store.js'
 import { client as authClient, whoami } from './auth.js'
+
+import { mailEvidence } from './evidence.js'
 
 const BATCH = 500          // 一次往库里塞多少行
 
@@ -38,12 +40,23 @@ async function accountFor(me, accounts) {
 }
 
 /** 一批 Gmail message → 一批 mail_headers 行。认不出的整封丢掉并计数。 */
-function toRows(msgs, accountId, mine) {
+async function toRows(msgs, accountId, mine) {
   const rows = []
   let dropped = 0
   for (const m of msgs) {
     const r = m && classify(m, mine)
-    if (!r) { dropped++; continue }
+    if (!r) {
+      if (m?.id) {
+        const from = parseAddr(headerMap(m.payload?.headers).from)
+        const direction = mineSet(mine).has(from?.email) ? 'out' : 'in'
+        const reason = mailEvidence(m, direction)
+        if (reason !== 'verified') {
+          const { error } = await db().rpc('pa_retract_unsent_mail', { p_gmail_message_id: m.id, p_reason: reason })
+          if (error) throw new Error('纠正未发送邮件失败：' + error.message)
+        }
+      }
+      dropped++; continue
+    }
     rows.push({ ...r, account_id: accountId })
   }
   return { rows, dropped }
@@ -82,7 +95,7 @@ export async function auditPass({ log = console.log } = {}) {
   const gmail = gmailFor(await authClient())
   let gone = 0
   const msgs = await getMetadata(gmail, list, { onGone: (n) => { gone = n } })
-  const { rows } = toRows(msgs, accounts[0].id, mine)
+  const { rows } = await toRows(msgs, accounts[0].id, mine)
   if (rows.length) await putHeaders(rows)
   log(`  ↳ 补核标签：${rows.length} 封写了审计${gone ? `，${gone} 封 Gmail 里已没有` : ''}`)
   return { audited: rows.length, gone }
@@ -130,7 +143,7 @@ export async function backfill({ q = '-in:chats', log = console.log, onProgress 
   onProgress({ phase: 'fetching', done: checkpoint.offset, total: ids.length, since })
   for (let start = checkpoint.offset; start < ids.length; start += 200) {
     const msgs = await getMetadata(gmail, ids.slice(start, start + 200))
-    const { rows, dropped } = toRows(msgs, acct.id, mine)
+    const { rows, dropped } = await toRows(msgs, acct.id, mine)
     checkpoint.written += await flush(rows, log)
     checkpoint.parsed += rows.length; checkpoint.dropped += dropped
     checkpoint.offset = Math.min(start + 200, ids.length)
@@ -190,7 +203,7 @@ export async function incremental({ fallbackWindow = '30d', log = console.log } 
   const msgs = await getMetadata(gmail, ids, {
     onGone: (n) => log(`  ↳ ${n} 封在 Gmail 里已经不存在了，跳过`),
   })
-  const { rows, dropped } = toRows(msgs, acct.id, mine)
+  const { rows, dropped } = await toRows(msgs, acct.id, mine)
   const written = await flush(rows, log)
   await setCursor(acct.id, historyId)
 
