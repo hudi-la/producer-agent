@@ -162,3 +162,12 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 发布目录 /home/fairwind/releases/scheduled-mail-20261023；manifest.json 记录两文件基线及发布哈希，rollback 保留原文件。发布时核对基线、无活动请求/子进程后重启一次，health正常。无前端构建或数据库函数变更。
 - 代码回滚：python3 /home/fairwind/releases/scheduled-mail-20261023/publish.py rollback。数据恢复应先检查 Gmail 当前状态和后续真实发送记录，再按私有备份恢复，避免覆盖新状态。
 - GitHub 分支 codex/scheduled-mail-state-20261023；服务器 git-commit.txt 记录实际发布提交。
+
+2026-10-23（洛杉矶）：邮件归档证据核验与 Rice 历史记录纠正。
+- 以实时线上 adopt.js/sync.js 为基线。归档前读取 Gmail 当前标签，DRAFT 或无 SENT 的发件不进入摘要/邮件卡。读取失败保留待重试并报告归档失败，不把缺失正文描述成空白邮件；读取成功但无可用正文时显示明确说明，不调用摘要模型。摘要提示禁止从批内其他信推断重复发送或再次联系。
+- 新增 security invoker RPC pa_retract_unsent_mail，只处理 authenticated 当前账号。同步遇到未发送状态时保留原文、软撤回旧邮件及 arrival，释放 Gmail 去重键并移除派生信头；仅当联系人最近联系日期来自被撤回邮件时回算。未来真实 SENT 事件可正常重新入库。不凭404断言历史邮件从未发送。
+- 新增函数源码：ops/migrations/20261023_retract_unsent_mail.sql。真实 authenticated 回滚事务验证原文保留、重复调用、视图隐藏、后续 SENT 入库、跨账号隔离和匿名无权执行。服务器64项目标回归通过；未调用真实模型或发送邮件。
+- Rice 卡片：Gmail 再次确认旧版为 DRAFT。另一旧ID返回404且没有已发送凭据，按 unavailable_unverified 保留并撤下错误往来；保留唯一真实发送记录，摘要移除“再次”暗示。修正前事务预演、私有备份，修正后用户权限视图仅一封真实邮件和对应通知。Gmail未更改。未执行全邮箱历史扫描。
+- 发布目录 /home/fairwind/releases/mail-evidence-20261023；manifest记录五个运行/测试文件的基线和发布哈希，rollback保存旧源码。新增函数先发布；后端在基线和空闲检查通过后更新并重启。无前端变更。
+- 代码回滚：python3 /home/fairwind/releases/mail-evidence-20261023/publish.py rollback。新增RPC可保留。用户记录恢复须先比对私有备份及后续真实发送，不能覆盖新状态；备份不纳入Git。
+- GitHub分支 codex/mail-evidence-20261023；服务器git-commit.txt记录实际发布提交。
