@@ -37,3 +37,19 @@ install verified state without using partial root users directory; activate only
 Render, switch/verify formal domain, authentication, streaming and background jobs.
 Keep DigitalOcean and all unrelated services. See fairwind-render-handoff.md for
 full cutover and rollback sequence. No production change or final snapshot yet.
+
+## Resumed dashboard access
+
+Fresh Chrome tabs restored functional browser control. Cloudflare account visibly
+contains hudiworks.com. Fairwind has one A record, 64.23.225.65, DNS only, TTL Auto;
+no conflicting Fairwind AAAA/CNAME. Original record saved locally for rollback.
+Render auto-deploy verified Off. Manually deployed exact commit
+717b0a6beb28d00114f56f1ea498f9105cd2a1c5 at 2026-10-23 16:25:41 PDT;
+deployment dep-dbdupt3ncjis73dj0dcg succeeded in 2m00s. Startup logs confirm
+standby with business workers disabled. Public health confirms standby.
+
+Render account has no SSH public keys. Generated a local temporary Ed25519 key
+named fairwind-migration-hudi-20261023; public fingerprint
+SHA256:Grilw2/JbZc61ZqQTlmtb62F+a9t65+4Q8ZhB6M1WvY. Addition awaits user's explicit
+access confirmation; not registered yet. Private key remains outside repository.
+No DNS change, old-service stop, final-state copy or production activation yet.
