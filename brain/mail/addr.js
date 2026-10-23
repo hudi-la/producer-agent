@@ -199,8 +199,8 @@ export function classify(msg, mine) {
 
   const direction = my.has(from.email) ? 'out' : 'in'
   // 我发的，但 Gmail 没给 SENT —— 还没发出去（定时发送在队列里排着）。
-  // 只在拿得到标签时才拦：老数据和测试桩没有 labelIds，不该被误伤。
-  if (direction === 'out' && labels && !labels.includes('SENT')) return null
+  // Gmail 对无标签的定时邮件可能省略 labelIds；缺少标签不是已发送的证明。
+  if (direction === 'out' && !labels?.includes('SENT')) return null
   const counterpart = direction === 'in'
     ? from.email
     : ([...to, ...cc].map((a) => a.email).find((e) => !my.has(e)) || from.email)

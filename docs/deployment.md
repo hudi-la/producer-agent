@@ -153,3 +153,12 @@ MCP 从 15 个扩展到 51 个工具，完整说明见 [MCP 用户内容](mcp-wo
 - 发布目录 /home/fairwind/releases/mcp-settings-20261022，manifest 保存源码哈希、rollback 保存原源码和 HTML；纯前端，无后端重启或令牌变更。
 - 回滚：python3 发布目录/publish.py rollback（核对当前源码后恢复原源码与 HTML，保留旧 assets）。
 - GitHub 分支 codex/mcp-settings-copy-20261022；发布目录 git-commit.txt 记录对应提交。
+
+2026-10-23（洛杉矶）：定时邮件不再误记为已发送。
+- Gmail 对没有标签的定时邮件会省略 labelIds；classify 原先为兼容旧数据允许缺失标签的发件邮件入库。现在所有发件邮件必须有明确 SENT 标签，DRAFT 仍排除；无标签的归档来信仍正常接收。
+- 基于实时正式 brain/mail/addr.js，只发布分类器及测试。服务器50项分类和 Gmail history 标签事件测试通过，覆盖缺字段/null/空数组/错误类型、草稿及真正发送后的再次分类。
+- 用户指出的定时邮件已通过 Gmail in:scheduled 只读核实。对该账号的错误邮件及 arrival 做保留原文的软撤回，原 Gmail ID 保存在 meta 并释放去重键；移除对应派生信头，使真正发送后能正常重新同步。联系人最近联系日期从未来日期恢复到最近真实往来日期。先事务预演回滚再应用；没有改 Gmail 定时安排或发送邮件。
+- 修正范围仅用户指出账号和邮件；完整恢复备份仅保存在本地 private-repair-backup.json，未加入 Git。未触及另一账号记录。未声称已验收未来真实发送。
+- 发布目录 /home/fairwind/releases/scheduled-mail-20261023；manifest.json 记录两文件基线及发布哈希，rollback 保留原文件。发布时核对基线、无活动请求/子进程后重启一次，health正常。无前端构建或数据库函数变更。
+- 代码回滚：python3 /home/fairwind/releases/scheduled-mail-20261023/publish.py rollback。数据恢复应先检查 Gmail 当前状态和后续真实发送记录，再按私有备份恢复，避免覆盖新状态。
+- GitHub 分支 codex/scheduled-mail-state-20261023；服务器 git-commit.txt 记录实际发布提交。

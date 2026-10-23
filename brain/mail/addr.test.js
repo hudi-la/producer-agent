@@ -124,23 +124,23 @@ test('他发来的：对面是 From，方向是 in', () => {
 })
 
 test('我发出的：对面是 To 里第一个不是我的，方向是 out', () => {
-  const r = classify(msg({ From: `HuDi <${ME}>`, To: 'Zoe <zoe@x.org>' }), [ME])
+  const r = classify(msg({ From: `HuDi <${ME}>`, To: 'Zoe <zoe@x.org>' }, { labelIds: ['SENT'] }), [ME])
   assert.equal(r.direction, 'out')
   assert.equal(r.counterpart_email, 'zoe@x.org')
 })
 
 test('我发出、To 里带上我自己：跳过我，取真正的对面', () => {
-  const r = classify(msg({ From: ME, To: `${ME}, zoe@x.org` }), [ME])
+  const r = classify(msg({ From: ME, To: `${ME}, zoe@x.org` }, { labelIds: ['SENT'] }), [ME])
   assert.equal(r.counterpart_email, 'zoe@x.org')
 })
 
 test('To 里没有别人就看 Cc', () => {
-  const r = classify(msg({ From: ME, To: ME, Cc: 'zoe@x.org' }), [ME])
+  const r = classify(msg({ From: ME, To: ME, Cc: 'zoe@x.org' }, { labelIds: ['SENT'] }), [ME])
   assert.equal(r.counterpart_email, 'zoe@x.org')
 })
 
 test('我发给我自己：对面就是我，不炸', () => {
-  const r = classify(msg({ From: ME, To: ME }), [ME])
+  const r = classify(msg({ From: ME, To: ME }, { labelIds: ['SENT'] }), [ME])
   assert.equal(r.direction, 'out')
   assert.equal(r.counterpart_email, ME)
 })
@@ -148,7 +148,7 @@ test('我发给我自己：对面就是我，不炸', () => {
 // 这条是「结构现在做，线以后接」那个判断的护身符：
 // 判据是「不是我**任何一个**地址的那一方」，不是「不是主号」。
 test('多邮箱：两个地址都算我，都不当对面', () => {
-  const r = classify(msg({ From: `HuDi <${ME2}>`, To: `${ME}, zoe@x.org` }), [ME, ME2])
+  const r = classify(msg({ From: `HuDi <${ME2}>`, To: `${ME}, zoe@x.org` }, { labelIds: ['SENT'] }), [ME, ME2])
   assert.equal(r.direction, 'out')
   assert.equal(r.counterpart_email, 'zoe@x.org')
 
@@ -270,3 +270,19 @@ test('没署名的地址不出现在署名表里——不编名字', () => {
     { 'b@x.org': 'B' })
   assert.deepEqual(namesOf([]), {})
 })
+
+for (const labelIds of [undefined, null, [], 'SENT', ['IMPORTANT']]) {
+  test(`发件缺少明确 SENT 标签不入库：${JSON.stringify(labelIds)}`, () => {
+    const scheduled = msg({ From: ME, To: 'professor@example.edu' }, { labelIds });
+    assert.equal(classify(scheduled, [ME]), null);
+    // 同一邮件真正发送后，标签事件必须允许它首次进入账本。
+    scheduled.labelIds = ['SENT'];
+    assert.equal(classify(scheduled, [ME]).direction, 'out');
+  });
+}
+test('Gmail 完全省略 labelIds 的定时邮件不入库，归档来信仍可读', () => {
+  const scheduled = msg({ From: ME, To: 'professor@example.edu' });
+  assert.equal(Object.hasOwn(scheduled, 'labelIds'), false);
+  assert.equal(classify(scheduled, [ME]), null);
+  assert.equal(classify(msg({ From: 'professor@example.edu', To: ME }), [ME]).direction, 'in');
+});
