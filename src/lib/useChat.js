@@ -11,17 +11,16 @@ import { t } from '../i18n/index.js'
  * 一份，于是同一件事有两份实现：一份修好了另一份没有，而不一致的地方
  * 谁也发现不了（两处都能正常发一句话，差别只在出错那几条路上）。
  *
- * 现在只有这一份。两处的差别全部收在参数里：
+ * 机会线与书桌复用此 hook；联系人页面目前仍有独立编排。参数：
  *   owner       {kind,id} 或机会线的 id 字符串。发给谁，chat.js 的 ownerBody 认
  *   reload()    重读整条往来。失败兜底要用它判「我的话到底存没存上」
  *   rewind(id)  撤这条和它之后的（库那头）
- *   offline     脑子没开时走的另一条路。不传 = 直接报错（书桌就没有这条路：
- *               它没有「记一笔」这回事，脑子没开就是说不了话）
+ *   聊天始终请求聊天服务。健康检查不能改变用户操作，也不能将聊天写成笔记。
  *
  * 返回的 msgs 由调用方自己渲染 —— 机会线要画信卡、笔卡、邮件锚点，
  * 书桌一个都不画。那部分差别太大，不该塞进同一个组件里。
  */
-export function useChat({ owner, reload, rewind, offline = null }) {
+export function useChat({ owner, reload, rewind }) {
   const [msgs, setMsgs] = useState([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -37,20 +36,6 @@ export function useChat({ owner, reload, rewind, offline = null }) {
     const txt = (said ?? text).trim()
     if (!txt || busy) return
 
-    if (offline && !offline.up) {
-      if (said == null) setText('')
-      setErr(null)
-      try {
-        await offline.note(txt)
-        const rows = await reload()
-        if (rows) setMsgs(rows)
-      } catch (e) {
-        setErr(t('没记上：') + (e?.message || e))
-        if (said == null) setText((cur) => cur || txt)
-      }
-      return
-    }
-
     if (said == null) setText('')
     setErr(null)
     setBusy(true)
@@ -58,6 +43,7 @@ export function useChat({ owner, reload, rewind, offline = null }) {
     // 想完了才返回，那时候早没得停了。
     const runId = crypto.randomUUID()
     runIdRef.current = runId
+    const knownIds = new Set(msgs.map(m => m.id))
     const tmp = { id: 'tmp-' + Date.now(), role: 'artist', kind: 'message', content: txt }
     setMsgs((m) => [...m, tmp])
     let landedMine = null
@@ -86,7 +72,7 @@ export function useChat({ owner, reload, rewind, offline = null }) {
       //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
       let rows = null
       try { rows = await reload() } catch { /* Keep the original failure and the user's input. */ }
-      const landed = rows?.some((m) => m.role === 'artist' && m.content === txt)
+      const landed = landedMine || rows?.some((m) => !knownIds.has(m.id) && m.role === 'artist' && m.content === txt)
       if (rows) setMsgs(rows)
       else setMsgs((m) => m.filter((x) => x.id !== tmp.id))
       if (!landed) {
@@ -101,7 +87,7 @@ export function useChat({ owner, reload, rewind, offline = null }) {
       runIdRef.current = null
       void aborted
     }
-  }, [text, busy, owner, reload, offline, onLive, resetLive])
+  }, [text, msgs, busy, owner, reload, onLive, resetLive])
 
   /**
    * 重说：撤掉这句和它之后的对话，然后把改完的这句照常发出去。

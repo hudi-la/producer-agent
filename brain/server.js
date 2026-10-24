@@ -1,3 +1,4 @@
+import { persistRejudgment } from './rejudge-record.js'
 import { recordUsage } from './usage.js'
 import { createCalendarService } from './calendar/service.js'
 import { handleCalendarRoute, calendarRows } from './calendar/routes.js'
@@ -1469,28 +1470,14 @@ async function rejudgeThese(want) {
     // 没判出来的**不推水位** —— 下次再判。绝不许假装判过了。
     if (!v) continue
 
-    // 日期和出处成对才写；两个都 null = 把旧的那条作废掉
-    // （它已经过期了，而这段交流没有约定新的）。
-    const { error: te } = await db.rpc('pa_set_next_touch', {
-      p_kind: w.kind, p_id: w.id, p_at: v.touch, p_why: v.why,
-    })
-    if (!te && v.touch) touched++
-
-    // 最后那封来信要不要回，顺手落进 letter_verdicts（跟 triage 同一张表）
-    if (w.last_in_id) {
-      await db.rpc('pa_judge_letter', {
-        p_gmail_message_id: w.last_in_id, p_needs_reply: v.needs_reply,
-        p_not_before: null, p_why: v.reply_why,
-      })
+    // Only advance the snapshot watermark after every dependent write succeeds.
+    try {
+      await persistRejudgment(db, w, v)
+      judged++
+      if (v.touch) touched++
+    } catch (e) {
+      console.warn('重判未完成，保留重试：' + e.message)
     }
-
-    // 「上次碰」也是从信推出来的派生值，同样会跟事实分叉。重判到谁就重算谁。
-    await db.rpc('pa_recompute_touch', { p_kind: w.kind, p_id: w.id })
-
-    const { data } = await db.rpc('pa_mark_judged', {
-      p_kind: w.kind, p_id: w.id, p_upto: w.upto || new Date().toISOString(),
-    })
-    if (data) judged++
   }
   const out = { judged, failed: want.length - judged, touched }
   console.log(`  \u21b3 ${JSON.stringify(out)}`)

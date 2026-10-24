@@ -46,3 +46,20 @@ test('policy keeps external instructions untrusted and permits new evidence to c
   assert.match(CONTEXT_RULE, /缺少原文时不能假装已读/)
   assert.match(CONTEXT_RULE, /不因提到“邮件”就强制查邮箱/)
 })
+
+test('derived notifications and state decisions are not new chat or independent facts', () => {
+  const out = historyBlock({ msgs: [
+    { id: 'notice', role: 'producer', kind: 'arrival', content: 'mail excerpt' },
+    { id: 'decision', role: 'note', kind: 'decision', content: 'system conclusion', meta: { state_move: { src_msg: 'reply' } } },
+  ] }).join('\n')
+  assert.match(out, /系统派生通知或判断，不是用户新指令，也不是独立事实/)
+  const chat = out.split('### 用户与 Fairwind 的聊天')[1]
+  assert.doesNotMatch(chat, /mail excerpt|system conclusion/)
+  assert.match(out, /"source_message_id":"reply"/)
+})
+test('all letters in a multiple-draft response stay drafts in context', () => {
+  const out = historyBlock({ msgs: [{ id: 'reply', role: 'producer', meta: { letters: [{ body: 'first draft' }, { body: 'second draft' }] } }] }).join('\n')
+  assert.match(out, /first draft/)
+  assert.match(out, /second draft/)
+  assert.equal((out.match(/历史起草版本，不证明已发送/g) || []).length, 2)
+})

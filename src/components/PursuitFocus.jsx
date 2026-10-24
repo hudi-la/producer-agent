@@ -1,7 +1,7 @@
 import { messageLetters } from '../lib/messageLetters.js'
 import ErrorNotice from './ErrorNotice.jsx'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMessages, rewindChat, addPursuitNote, fetchPursuitDetail } from '../lib/chat.js'
+import { fetchMessages, rewindChat, fetchPursuitDetail } from '../lib/chat.js'
 import { useChat } from '../lib/useChat.js'
 import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
@@ -250,7 +250,7 @@ export default function PursuitFocus({
   pursuit: p, messages, variant = 'page', onBack, onMove, onSetBall,
   // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
   onDesk = false, onToggleDesk,
-  // 脑子开没开（App 每轮问 /health）。没开 = 输入框直接记笔，不聊天（0125）。
+  // 健康检查只影响连接提示，不能改变发送意图。
   brainUp = true,
 }) {
   const inDrawer = variant === 'drawer'
@@ -262,9 +262,7 @@ export default function PursuitFocus({
     owner: p.id,
     reload: () => fetchMessages(p.id),
     rewind: rewindChat,
-    // 脑子没开：这句直接记成一笔（不是聊天），走浏览器直连；脑子醒了由盲格子判。
-    // 「记一笔」按钮 2026-09-11 退场了 —— 脑子醒着时说什么该记成什么由它判（0125）。
-    offline: { up: brainUp, note: (t) => addPursuitNote(p.id, t) },
+
   })
   const { msgs, setMsgs, text, setText, err, setErr, editId, setEditId, live, act, runIdRef } = chat
   const thinking = chat.busy
@@ -450,7 +448,6 @@ export default function PursuitFocus({
   //   · 你自己开口 = 你要看它回什么，所以不管刚才翻到哪儿，这一下重新贴底
   //   · 终止了要把「这条就停在这儿」记下来，好让 stalled 那句话不冤枉它
   async function send(said) {
-    if (said == null && !brainUp) return chat.send(said)   // 记笔那条路不动滚动
     stick.current = true
     const r = await chat.send(said)
     if (r?.aborted && r.you) setStoppedId(r.you.id)
@@ -559,7 +556,7 @@ export default function PursuitFocus({
           value={text}
           disabled={busy}
           placeholder={busy ? t('Fairwind 在想……（想完会自动出现，你不用守着）')
-            : !brainUp ? t('脑子没开：这句会直接记成一笔，不是聊天')
+            : !brainUp ? t('连接暂时不可用，可以重试发送；失败会保留你的话')
             : t('一起想点什么…… Fairwind 带着这条线的全部往来，你不用重讲')}
           onChange={(e) => { setText(e.target.value); if (err) setErr(null) }}
           onKeyDown={(e) => {

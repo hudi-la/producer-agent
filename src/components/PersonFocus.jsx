@@ -182,14 +182,6 @@ export default function PersonFocus({
   const say = async (said) => {
     const line = (said ?? text).trim()
     if (!line || busy) return
-    // 脑子没开：这句直接记成一笔（不是聊天），脑子醒了由盲格子判（0125）
-    if (!brainUp) {
-      setBusy('talk'); if (said == null) setText('')
-      try { await logNote(c.id, line); await reload(); onChanged?.() }
-      catch (err) { reportError(t('没记上：') + err.message); if (said == null) setText((cur) => cur || line) }
-      finally { setBusy(null) }
-      return
-    }
     setBusy('talk'); if (said == null) setText('')
     // run_id 不是给「终止」用的（这一栏没有终止按钮），是给「你把页面关了」用的：
     // 脑子那边靠它把没人等的那一次掐掉。
@@ -199,12 +191,14 @@ export default function PersonFocus({
     // 这一栏原来是 await 完再 reload()，于是**你自己发的那句要等它想完才出现**
     // ——十几秒里屏幕上只有三个点，你连自己按没按下去都不知道。
     // 机会线那边一直是乐观插入的，这儿是漏了。
+    const knownIds = new Set((msgs || []).map(m => m.id))
+    let landedMine = null
     const tmp = { id: 'tmp-' + Date.now(), role: 'artist', content: line, created_at: new Date().toISOString() }
     setMsgs((m) => [...(m || []), tmp])
     try {
       await sayToContactStream(c.id, line, runId, (e) => {
         // 落库了就把临时那条换成真的（带真 id、真时间），免得等下 reload 撞出两条
-        if (e.t === 'mine') setMsgs((m) => (m || []).map((x) => (x.id === tmp.id ? e.row : x)))
+        if (e.t === 'mine') { landedMine = e.row; setMsgs((m) => (m || []).map((x) => (x.id === tmp.id ? e.row : x))) }
         else onLive(e)
       })
       await reload()
@@ -212,8 +206,9 @@ export default function PersonFocus({
       // 脑子是先存你的话、再去想的，所以失败有两种：
       //   连不上 → 一个字都没存 → 把话还回输入框，别让你白打
       //   存了但想崩了 → 话已经在库里 → 不能还，还了你再发一次就重了
-      const rows = await fetchContactMessages(c.id)
-      const landed = rows?.some((m) => m.role === 'artist' && m.content === line)
+      let rows = null
+      try { rows = await fetchContactMessages(c.id) } catch { /* Preserve the original error and input. */ }
+      const landed = landedMine || rows?.some((m) => !knownIds.has(m.id) && m.role === 'artist' && m.content === line)
       if (rows) setMsgs(rows)
       else setMsgs((m) => (m || []).filter((x) => x.id !== tmp.id))
       if (!landed) setText((cur) => cur || line)   // 期间你要是又打了别的，就别覆盖
@@ -574,7 +569,7 @@ export default function PersonFocus({
                 disabled={busy === 'talk'}
                 placeholder={busy === 'talk'
                   ? t('Fairwind 在想……（想完会自动出现，你不用守着）')
-                  : !brainUp ? t('脑子没开：这句会直接记成一笔，不是聊天')
+                  : !brainUp ? t('连接暂时不可用，可以重试发送；失败会保留你的话')
                   : t('一起想点什么…… Fairwind 带着这个人的全部往来，你不用重讲')}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
