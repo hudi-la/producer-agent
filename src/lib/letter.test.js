@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { saidThisTime, GIST_CAP, isLetter, isExchange } from './letter.js'
+import { saidThisTime, GIST_CAP, isLetter, isExchange, isContactTalk } from './letter.js'
 
 test('Gmail 的 > 引用砍掉', () => {
   assert.equal(saidThisTime('Thanks!\n\n> old stuff\n> more old'), 'Thanks!')
@@ -87,4 +87,15 @@ test('往来 = 真信 + 你手记的；草稿不算', () => {
   assert.equal(isExchange({ kind: 'meet' }), true)
   assert.equal(isExchange({ kind: 'gmail_draft', gmail_message_id: 'x' }), false)
   assert.equal(isExchange({ kind: 'message' }), false)
+})
+
+test('contact chat excludes sent-mail excerpts while retaining the original draft', () => {
+  const draft = { id: 'draft', role: 'producer', kind: 'message', meta: { letter: { body: 'Complete letter' } } }
+  const mail = { id: 'sent', role: 'artist', kind: 'email', gmail_message_id: 'gmail-sent' }
+  const arrival = { id: 'notice', role: 'producer', kind: 'arrival', content: 'Hi Kiko, partial', meta: { dir: 'out', msg_id: mail.id } }
+  assert.deepEqual([draft, mail, arrival].filter(isContactTalk), [draft])
+  assert.equal(isExchange(mail), true)
+  assert.equal(isContactTalk({ ...arrival, meta: { dir: 'in' } }), false)
+  assert.equal(isContactTalk({ role: 'artist', kind: 'message' }), true)
+  assert.equal(isContactTalk({ role: 'note', kind: 'meet' }), false)
 })

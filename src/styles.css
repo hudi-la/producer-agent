@@ -2386,26 +2386,19 @@ aside.drawer:has(.artifact-editor) { width: min(1200px, 96vw); }
 .focus.drawer:has(.artifact-editor) .composer-dock { left: 0; transform: none; margin-left: var(--focus-pad); width: calc(100% - 480px - 2 * var(--focus-pad)); }
 @media (max-width: 700px) { .focus.drawer:has(.artifact-editor) .composer-dock { display: none; } }
 
-/* Inline deliverables share the conversation width and have a distinct document surface. */
+/* Quiet document surface: a subtle tint, not a pending-action signal. */
 .lcard.artifact-card {
   width: 100%; max-width: none; min-width: 0;
-  padding: 16px 18px; border: 1px solid #A9C3BE; border-left: 4px solid #54867D;
-  background: #E5EFEB; color: var(--ink); border-radius: 10px;
+  padding: 16px 18px; border: 1px solid var(--line-2);
+  background: color-mix(in srgb, var(--paper-2) 96%, #789087); color: var(--ink); border-radius: 10px;
   overflow-wrap: anywhere;
 }
-.artifact-card .lcard-h { color: #476C64; gap: 10px; }
-.artifact-card .lcard-tag { color: #315F55; background: #CFDFD8; padding: 3px 8px; border-radius: 5px; }
+.artifact-card .lcard-h { color: var(--ink-2); gap: 10px; }
+.artifact-card .lcard-tag { color: var(--ink-2); background: color-mix(in srgb, var(--paper-2) 90%, #789087); padding: 3px 8px; border-radius: 5px; }
 .artifact-card .lcard-sub { font-size: 14px; margin: 10px 0 8px; }
 .artifact-card .lcard-to { color: var(--ink-2); margin-bottom: 12px; }
-.artifact-card .lcard-body { padding: 14px 16px; background: #F5F9F6; border: 1px solid #CCDDD6; border-radius: 7px; }
-.artifact-card .artifact-actions { padding-top: 12px; border-top: 1px solid #BBD0C7; }
-@media (prefers-color-scheme: dark) {
-  .lcard.artifact-card { background: #202E2A; border-color: #4C6A60; border-left-color: #89B9A7; }
-  .artifact-card .lcard-h { color: #B5D3C7; }
-  .artifact-card .lcard-tag { color: #D5E9DF; background: #354C42; }
-  .artifact-card .lcard-body { background: #19231F; border-color: #3D554B; }
-  .artifact-card .artifact-actions { border-color: #4C6A60; }
-}
+.artifact-card .lcard-body { padding: 14px 16px; background: color-mix(in srgb, var(--paper-2) 70%, var(--paper)); border: 1px solid var(--line); border-radius: 7px; }
+.artifact-card .artifact-actions { padding-top: 12px; border-top: 1px solid var(--line); }
 @media (max-width: 640px) {
   .lcard.artifact-card { padding: 12px; }
   .artifact-card .lcard-body { padding: 12px; }

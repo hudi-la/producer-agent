@@ -75,3 +75,9 @@ export const isLetter = (m) => m?.kind === 'email'
 /** 往来里该显示的：真信 + 你手记的那些。草稿哪儿都不算。 */
 export const isExchange = (m) =>
   isLetter(m) || m?.role === 'note' || m?.kind === 'meet'
+
+/** Mail arrivals are notification excerpts, not a new assistant reply.
+ * Real mail and notes remain in the contact's correspondence column. */
+export function isContactTalk(m) {
+  return !m.gmail_message_id && m.role !== 'note' && m.kind !== 'arrival' && !isLetter(m)
+}

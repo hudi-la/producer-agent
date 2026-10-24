@@ -13,7 +13,7 @@ import DeskToggle from './DeskToggle.jsx'
 import { useGrow } from '../lib/useGrow.js'
 import { MailList } from './Mail.jsx'
 import { useModules } from '../lib/ModulesContext.jsx'
-import { isLetter, isExchange } from '../lib/letter.js'
+import { isLetter, isExchange, isContactTalk } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
@@ -147,7 +147,7 @@ export default function PersonFocus({
   // 它给你写回信的时候，这两种材料的分量不一样。
   const emails = mails.filter(isLetter)
   const notes  = mails.filter((m) => m.role === 'note')
-  const talk  = (msgs || []).filter((m) => !m.gmail_message_id && m.role !== 'note')
+  const talk  = (msgs || []).filter(isContactTalk)
 
   // 「上次碰」光有日期是没用的。「8/10 · 你记的一笔」等于没说——
   // 你想知道的是**上次到底发生了啥**：哪封信说了什么、那次见面聊了什么。
