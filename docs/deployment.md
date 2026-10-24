@@ -7,8 +7,8 @@
 
 正式地址仍为 https://fairwind.hudiworks.com/，现已切到 Render `fairwind-migration`（parallight，Oregon，服务 `srv-dbcpchavcj2c73fe55dg`）。下方 DigitalOcean 发布流程仅作历史参考，不可再直接用于正式发布。
 
-- 实际生产提交：`2b27093e78dc97ffe6893d4f35383117de88ab7b`，已推送 GitHub `codex/quiet-drafts-20261023`。2026-10-23 20:30 PDT 恢复收发通知并共用原邮件卡组件，保留低对比草稿样式；此前基线为 `717b0a6`。
-- 实际生产部署：`dep-dbe2cl7avr4c739rnc80`；2026-10-23 20:30 PDT 发起并成功 live。自动部署关闭，后续通过 Render 手动部署经核实的提交；不可从旧本地 checkout 整库覆盖。
+- 实际生产提交：`e79a51cb8bf569687340d50eb86056919ed86160`，已推送 GitHub `codex/quiet-drafts-20261023`。2026-10-23 20:46 PDT 发布聊天意图、上下文来源与判断水位基础修复；保留前版通知及草稿样式。
+- 实际生产部署：`dep-dbe2k8hsrm7s73degoj0`；2026-10-23 20:46 PDT 发起并成功 live。自动部署关闭，后续通过 Render 手动部署经核实的提交；不可从旧本地 checkout 整库覆盖。
 - 运行：Docker Node 24.9.0，1 CPU / 2 GB，持久磁盘 1 GB；`FAIRWIND_DATA_DIR=/var/data/fairwind`，`FAIRWIND_DEPLOYMENT_STATE=live`，`FAIRWIND_CUTOVER_CONFIRMED=true`。Supabase 仍为原项目；凭据只留服务配置。
 - Cloudflare：`fairwind` 为 DNS only 的 CNAME，指向 `fairwind-migration.onrender.com`，TTL Auto。Render 域名 Verified、Certificate Issued；正式 HTTPS 验证通过。
 - 旧 DO `fairwind.service` 已停止且 disabled，不能与 Render 同时开启。DO 主机、ERP、Caddy、LLM Lab 及其他服务保留。
@@ -48,3 +48,5 @@
 2026-10-08：Google 日历独立授权及读写接入，详见 [Google 日历](google-calendar.md)。
 发布目录：`/home/fairwind/releases/google-calendar-20261008-nXNz6X/`，包含基线、构建及 rollback。
 此版本有后端变更，已重启 fairwind 服务；39 项相关测试通过。
+
+2026-10-23 20:46 PDT：全系统架构审计及基础修复。857项回归、hosted构建通过；移除两处聊天转笔记降级，派生记录独立标源，判断依赖写失败不推进水位。提交 e79a51c 已推送，Render dep-dbe2k8hsrm7s73degoj0 成功 live；正式 health/首页/新bundle及登录页面验证通过。无数据库迁移或历史数据写入；提醒投影、发送账本与定时任务迁移尚未完成。详见 [审计报告](architecture-audit-20261023.md)。
