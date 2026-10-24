@@ -1,7 +1,7 @@
 import { reportError } from './reportError.js'
 import { errorText } from './userError.js'
 // 分工：
-//  · 读 + 「你自己改自己卡上的字段」(stage / ball) —— 浏览器直连，走 anon。
+//  · 读 + 「你自己改自己卡上的字段」(stage) —— 浏览器直连，走 anon。
 //    后者靠 security definer 函数，能改的列是写死的，anon 拿不到别的写权限。
 //  · 「 Fairwind 去想」(chat / brief) —— 走本机 sidecar，因为那需要 service_role
 //    往往来历史里写消息，且要跑 agent。
@@ -190,7 +190,7 @@ export { NoStream }
 /**
  * 「重说」：把你点的那句和它之后的对话撤掉。返回撤了几条。
  *
- * 走浏览器直连，跟 setBall / setStage 一路 —— 这是**你在整理自己的对话**，
+ * 走浏览器直连，跟 setStage 一路 —— 这是**你在整理自己的对话**，
  * 脑子开没开不该影响你撤掉自己说错的话。
  *
  * 撤掉的话库里还在（打了 deleted_at 的标），只是读面全部滤掉：界面看不见，
@@ -230,24 +230,9 @@ export async function stopThinking(runId) {
 
 // ── 你自己的动作：不经过 sidecar ────────────────────────────────
 // 打标签、拖卡片是你在整理自己的看板，跟 AI 想不想得动没关系。这两个走
-// security definer 函数直连数据库——只能改 stage / ball 两列，别的碰不到。
+// security definer 函数直连数据库——只能改 stage 一列，别的碰不到。
 // 好处：sidecar 开不开、是不是最新的，都不影响你整理看板。
 
-/**
- * 改「球在谁那边」那个标：'me' 待处理 / 'them' 等回复 / null 两个都不亮
- * （点已经亮着的那个 = 灭掉，传 null 进来）。
- *
- * **这个标只有你能改。** 原来库里有一套「你手动定的能撑到下一件真事发生，
- * 之后 Fairwind 重新接管」的规则——它会把你的判断悄悄改回去，而你不会收到
- * 任何通知。整套删了（0058）：系统只报事实（新来信、红点、日期），
- * 「该不该我动」是判断，判断归你。
- */
-export async function setBall(pursuitId, ball) {
-  if (!supa) throw new Error(t('没连上数据库（检查 .env.local 里的 VITE_SUPABASE_*）'))
-  const { error } = await supa.rpc('pa_set_ball', { p_pursuit_id: pursuitId, p_ball: ball ?? null })
-  if (error) throw new Error(error.message)
-  return { ok: true, ball: ball ?? null }
-}
 
 /**
  * 勾掉 / 取消勾「下一步」。

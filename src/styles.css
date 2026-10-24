@@ -808,24 +808,8 @@ textarea.inl-in { max-height: 65vh; overflow-y: auto; }
 /* ── 球在谁那边 ──
    放在标题上方、当卡片的第一行——因为「现在该谁动」比标题更早需要被看见。
    待处理用暖色（要你动），等回复用灰（不用管）。手动钉住的加一个小点区分。 */
-.pc-ball { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px;
-  letter-spacing: .04em; margin-bottom: 7px; }
-.pc-ball .bd { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.pc-ball.me { color: var(--accent); font-weight: 600; }
-.pc-ball.me .bd { background: var(--accent); }
-.pc-ball.them { color: var(--ink-3); }
-.pc-ball.them .bd { background: var(--line-2); }
 
 /* 详情页顶栏的手动开关：三档 自动 / 待处理 / 等回复 */
-.ballsw { display: inline-flex; border: 1px solid var(--line-2); border-radius: 9px;
-  overflow: hidden; background: var(--paper-2); margin-right: 14px; }
-.bsw { font: inherit; font-size: 12px; padding: 5px 11px; border: none; background: transparent;
-  color: var(--ink-3); cursor: pointer; border-right: 1px solid var(--line); }
-.bsw:last-child { border-right: none; }
-.bsw:hover { color: var(--ink-2); }
-.bsw.on { color: var(--ink); background: var(--paper-3); font-weight: 600; }
-.bsw.on.me { color: var(--accent); }
-.bsw:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* ── 一叠：同一次造卡任务的一批，默认折着。首页只递一件事——「这儿有一叠」。 ── */
 .stack { position: relative; margin-bottom: 10px; }

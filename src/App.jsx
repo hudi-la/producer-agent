@@ -5,7 +5,7 @@ import { loadLibrary } from './lib/loadLibrary.js'
 import { loadPursuits } from './lib/loadPursuits.js'
 import { loadTasks } from './lib/loadTasks.js'
 import { loadProfile, ProfileContext, PROFILE_FALLBACK } from './lib/profile.js'
-import { setStage, setBall, setJot, sendMessage, markSeen as markSeenDb, markContactSeen as markContactSeenDb } from './lib/chat.js'
+import { setStage, setJot, sendMessage, markSeen as markSeenDb, markContactSeen as markContactSeenDb } from './lib/chat.js'
 import Pipeline from './components/Pipeline.jsx'
 import PursuitFocus from './components/PursuitFocus.jsx'
 import Library from './components/Library.jsx'
@@ -654,19 +654,6 @@ export default function App() {
     }
   }
 
-  // 改球权那个标。同样先乐观更新，写失败回滚 + 提示。
-  // ball_eff 是库算出来的「球在谁那边」，界面读的就是它——乐观更新得连它一起改，
-  // 不然点完标不动，看着像没生效。
-  const markBall = async (id, ball) => {
-    const prev = pl.pursuits
-    setPl({ ...pl, pursuits: prev.map((p) => (p.id === id ? { ...p, ball, ball_eff: ball } : p)) })
-    try {
-      await setBall(id, ball)
-    } catch (e) {
-      setPl({ ...pl, pursuits: prev })
-      reportError(t('球权没保存：') + e.message)
-    }
-  }
 
   // 勾的是 key（'pursuit:xxx' / 'contact:xxx'），不是裸 id —— 看板勾的是线、
   // 🔔 里可能勾到人，一摞里两种都有，光凭 id 到了群发那步分不出该发给谁。
@@ -869,7 +856,7 @@ export default function App() {
               /* 从一条线上点相关的人 → 开成旁边一格。两边本来是断的：
                  线上看得到往来，却点不进那个人是谁。 */
               onOpenPerson={(c) => openOnDesk('contact', c.id)}
-              onBack={() => setArea('pursue')} onMove={moveCard} onSetBall={markBall} />
+              onBack={() => setArea('pursue')} onMove={moveCard} />
           )
           if (cur.name === 'person') return (
             <PersonFocus brainUp={brain ? brain.up : true} key={cur.person.id} person={cur.person} variant="page"
@@ -979,7 +966,7 @@ export default function App() {
             <PursuitFocus brainUp={brain ? brain.up : true} key={view.pursuit.id} variant="drawer" pursuit={openedPursuit}
               messages={pl.messagesByPursuit[view.pursuit.id]}
               onOpenPerson={(c) => { setArea('people'); openPerson(c) }}
-              onBack={closeDrawer} onMove={moveCard} onSetBall={markBall}
+              onBack={closeDrawer} onMove={moveCard}
               onDesk={onDeskKey(drawerKey)} onToggleDesk={(el) => deskPress('pursuit', view.pursuit.id, el, openedPursuit.title)} />
           ) : view.name === 'person' ? (
             <PersonFocus brainUp={brain ? brain.up : true} key={view.person.id} variant="drawer" person={openedPerson}

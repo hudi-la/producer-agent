@@ -1,7 +1,6 @@
 import { key as qKey } from '../lib/queue.js'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useGrow } from '../lib/useGrow.js'
-import { BALL_LABEL, ballOf } from '../lib/ball.js'
 import { deadlineLine, openLine } from '../lib/nextAction.js'
 import { goldLine } from '../lib/stateText.js'
 import { heldLabel, useProfile } from '../lib/profile.js'
@@ -111,7 +110,6 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
   const dim = p.stage === 'paused' || !p.eligible
   // 这张是哪一摊撒出去的 —— 决定底色偏哪一点。只有冷外联那几摊有，见 lib/batchTint.js
   const tint = slotOf(p, tints)
-  const ball = ballOf(p)
   // 截止日期是「投递窗口」的事实 —— 线走到发出&提交之后它的任务就完成了，
   // 封面上留着只会跟真正活着的状态行（金色那行「在等什么」）抢注意力。
   // 真例：Stanford 已交，封面还喊着「截止 8/18」；CultureHub 谈成了，
@@ -155,12 +153,6 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
       {/* 卡角上的记号：这张今天挑了。跟顶栏数字、抽屉那颗开关一起翻面——
           关了抽屉回到看板，一眼看得出挑了哪几张、还没挑哪几张。 */}
       {onDesk && <span className="pc-desk" aria-label={t('在展开的卡片区')}>{t('在展开的卡片区')}</span>}
-      {/* 你自己点的标签。系统不动它——点亮了就一直亮着，直到你再点。 */}
-      {ball && (
-        <div className={'pc-ball ' + ball}>
-          <span className="bd" aria-hidden="true" />{BALL_LABEL[ball]}
-        </div>
-      )}
       {/* 从来没点开过的卡挂个「新」。点开 → markSeen → 灭，跟红点同一个机制。
           scout 每周撒进来的那几张就靠它认：你还没看过的一眼能挑出来。 */}
       <div className="pc-t">{isFresh(p) && <span className="pc-fresh" aria-label={t('还没点开过')}>{t('新')}</span>}{p.title}</div>
@@ -199,7 +191,6 @@ function PCard({ p, st, audit, tints, onOpen, onDragStart, onJot, unseen, pickin
 // 一叠：同一个造卡任务造出来的一批，默认折着，只递一件事——「这儿有一叠，22 张」。
 function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen, picking, picked, onPick, states, audit, tints, desk }) {
   // 折着的时候只报一个数：这一叠里有几张在等你动。比「几张该跟进」更接近你要问的那句话。
-  const mine = items.filter((p) => ballOf(p) === 'me').length
   const anyUnseen = items.some((p) => unseen?.has(p.id))
   const fresh = items.filter(isFresh).length   // 折着的时候也得知道里面有几张没点开过
   // 「找 workshop 机构 · 15 张」那种场景，冷邮件本来就是一批一批起的——
@@ -239,7 +230,7 @@ function Stack({ name, items, open, onToggle, onOpen, onDragStart, onJot, unseen
         <span className="stack-txt">
           <span className="stack-n">{name || t('一批机构')}</span>
           <span className="stack-c">
-            {t('{n} 张', { n: items.length })}{fresh ? t(' · {n} 张新', { n: fresh }) : ''}{mine ? t(' · {n} 张待处理', { n: mine }) : ''}
+            {t('{n} 张', { n: items.length })}{fresh ? t(' · {n} 张新', { n: fresh }) : ''}
             {picking && hit ? t(' · 已选 {n}', { n: hit }) : ''}
           </span>
         </span>

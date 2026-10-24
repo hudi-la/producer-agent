@@ -3,7 +3,6 @@ import ErrorNotice from './ErrorNotice.jsx'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchMessages, rewindChat, fetchPursuitDetail } from '../lib/chat.js'
 import { useChat } from '../lib/useChat.js'
-import { BALL_STATES, ballOf } from '../lib/ball.js'
 import { dropFrom } from '../lib/rewind.js'
 import { md } from '../lib/when.js'
 import { arrivalMail } from '../lib/letter.js'
@@ -254,7 +253,7 @@ function emptyText(stage) {
 // 整页才会长出抽屉装不下的部分。
 export default function PursuitFocus({
   onOpenPerson,
-  pursuit: p, messages, variant = 'page', onBack, onMove, onSetBall,
+  pursuit: p, messages, variant = 'page', onBack, onMove,
   // 抽屉头上那颗开关：这张在不在桌上（见 DeskToggle）。
   onDesk = false, onToggleDesk,
   // 健康检查只影响连接提示，不能改变发送意图。
@@ -277,7 +276,6 @@ export default function PursuitFocus({
   const [stage, setStageLocal] = useState(p.stage)
   // 球权本地先动，写库由 App 负责回滚。装的是「球在谁那边」这个答案本身，
   // 不是「你有没有手动改过」——后者不是你要看的东西。
-  const [ball, setBallLocal] = useState(ballOf(p))
 
   // 匹配理由和关系记忆。看板不再搬这两段长文（0115：72 张卡每次都搬，
   // 占看板下载量一半，而卡片一个字都不显示），改成打开哪一张才拉哪一张。
@@ -341,7 +339,6 @@ export default function PursuitFocus({
     let alive = true
     setMsgs(messages || [])
     setStageLocal(p.stage)
-    setBallLocal(ballOf(p))
     setErr(null)
     setEditId(null)   // 换了条线，上一条上改到一半的那句跟着收掉
     fetchMessages(p.id).then((rows) => {
@@ -612,26 +609,7 @@ export default function PursuitFocus({
           {inDrawer && mods.mail && <DeskToggle on={onDesk} onToggle={onToggleDesk} />}
         </div>
         <div className="ft-ctl">
-        {/* 截止跟球权站一起：一个是这条线唯一的死线，一个是它唯一的开关 */}
         <Deadline p={p} />
-        {/* **你自己点的标签**，系统不再往里插手。
-            点已经亮着的那个 = 灭掉，回到「一个都不点」。 */}
-        <div className="ballsw" role="group" aria-label={t('球在谁那边')}>
-          {BALL_STATES.map(([v, label]) => (
-            <button
-              key={v}
-              type="button"
-              className={'bsw ' + v + (ball === v ? ' on' : '')}
-              aria-pressed={ball === v}
-              onClick={() => {
-                const next = ball === v ? null : v      // 再点一下灭掉
-                setBallLocal(next); onSetBall?.(p.id, next)
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
         <label className="stg-lbl">{t('阶段')}
           <select
             className="stg-sel"

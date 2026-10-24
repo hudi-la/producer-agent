@@ -894,16 +894,6 @@ async function handleStage(body) {
   return { ok: true, pursuit_id, stage }
 }
 
-// 用户手动标「球在谁那边」：me = 待处理 / them = 等回复 / null = 回到自动判断。
-// 同样只是「你」的动作——Fairwind 够不到这个口，它只有 WebSearch/WebFetch。
-async function handleBall(body) {
-  const { pursuit_id, ball } = body
-  if (!pursuit_id) throw new Error('要有 pursuit_id')
-  if (ball != null && ball !== 'me' && ball !== 'them') throw new Error('ball 只能是 me / them / null')
-  const { error } = await db.rpc('pa_set_ball', { p_pursuit_id: pursuit_id, p_ball: ball ?? null })
-  if (error) throw new Error('改球权失败：' + error.message)
-  return { ok: true, pursuit_id, ball: ball ?? null }
-}
 
 // 讲懂：Fairwind 去官方渠道核实，写一段 brief 进这条线，并把核实到的
 // 链接/截止/资格回填到卡上。幂等——已经有 brief 就不重做。
@@ -2234,22 +2224,6 @@ async function dispatch(req, res, origin) {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ 移卡 ${body.pursuit_id} → ${body.stage}`)
         send(res, 200, await handleStage(body))
-      } catch (err) {
-        console.error('✗', err.message)
-        send(res, 500, { error: err.message })
-      }
-    })
-    return
-  }
-
-  if (req.method === 'POST' && req.url === '/ball') {
-    let raw = ''
-    req.on('data', (c) => (raw += c))
-    req.on('end', async () => {
-      try {
-        const body = JSON.parse(raw || '{}')
-        console.log(`\n→ 球权 ${body.pursuit_id} → ${body.ball ?? '自动'}`)
-        send(res, 200, await handleBall(body))
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })
