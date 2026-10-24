@@ -333,23 +333,6 @@ ${收尾(`${F_GIST},${F_RESOLVE},${F_MEET},${F_REPLY}`)}` },
 这封是见面后的跟进吗（resolves=true + resolves_why）？它自己又在等对方什么
 （awaiting + wait_days）？
 ${收尾(`${F_GIST},${F_RESOLVE},${F_WAIT}`)}` },
-
-  // handleChat 专用：你在卡里回答「见得怎么样」。判一件事：见成了没有。
-  // 见成了 → 你的回答本身会被存成一条 kind='meet' 的笔（那才是事实），
-  // 后面的 48 小时信、回谢介绍人都从那条笔自己长出来。
-  YOUR_ANSWER: { ask: (answer, state) => `他刚在卡里回答「见面怎么样」：
-
-「${String(answer).slice(0, 500)}」
-
-（之前约的是：${state?.what || '一次见面'}）
-
-一个问题：**见成了吗？**
-· 见成了 → met=true，gist=一句话记下聊了什么
-· 没见成 / 取消了 → met=false；他说了改约的时间就给 meet_at
-· 他答的是别的事，看不出来 → met=null
-
-**最后一行**单独输出，别的什么都不要加：
-[[TAG]] {"met":true|false|null,"gist":"聊了什么，一句话","meet_at":"YYYY-MM-DDTHH:mm"|null}` },
 }
 
 // 谢介绍人：挂在介绍人身上，等你动手。关法是 contacts.intro_thanked_at
@@ -392,25 +375,13 @@ TRANSITIONS.OWE_MEETING_NOTE = {
 // server.js / replay.js 里调 cell.ask() 的地方一个不改。
 // 同一格永远是同一个对象(OWE_* 借 IDLE 的格子,测试按引用比),所以包过的缓存起来;
 // 纯规则格没有 ask,原样给。
+// DEBRIEF 的格子只属于 DEBRIEF（不跟别的状态共用对象），所以按格子缓存时把 state 一起记住没有歧义。
 const WRAPPED = new WeakMap()
 export const cellFor = (state, ev) => {
   const c = TRANSITIONS[state]?.[ev]
   if (!c) return null
   if (typeof c.ask !== 'function') return c
-  if (!WRAPPED.has(c)) WRAPPED.set(c, { ...c, ask: (...a) => c.ask(...a).replace(JUDGMENTS_SLOT, judgmentsFor(ev)) })
+  const key = state === 'DEBRIEF' ? 'DEBRIEF' : ''
+  if (!WRAPPED.has(c)) WRAPPED.set(c, { ...c, ask: (...a) => c.ask(...a).replace(JUDGMENTS_SLOT, judgmentsFor(ev, key || null)) })
   return WRAPPED.get(c)
-}
-
-/** DEBRIEF 的回答判「见成了吗」：met / gist / meet_at 三个字段，成对规矩同上。 */
-export function parseMet(text) {
-  const { data } = takeTag(text, 'TAG')
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
-  const met = data.met === true ? true : data.met === false ? false : null
-  let meet = null
-  if (typeof data.meet_at === 'string' && data.meet_at.trim()) {
-    const s = data.meet_at.trim()
-    if (ISO_DAY.test(s)) meet = `${s}T12:00:00`
-    else if (!Number.isNaN(Date.parse(s))) meet = s
-  }
-  return { met, gist: clean1(data.gist), meet_at: meet }
 }

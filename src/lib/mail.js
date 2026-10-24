@@ -1,4 +1,4 @@
-import { supa, BRAIN, brainFetch } from './backends.js'
+import { supa, BRAIN, brainFetch, selectAll } from './backends.js'
 import { t } from '../i18n/index.js'
 
 // 全局邮件同步的前端侧。
@@ -15,14 +15,6 @@ const rpc = async (fn, args) => {
   const { data, error } = await supa.rpc(fn, args)
   if (error) throw new Error(error.message)
   return data
-}
-
-/** 等你点头的：它判定是业务相关的真人或机构信箱，还没进通讯录。 */
-export async function fetchGreetable() {
-  if (!supa) return null
-  const { data, error } = await supa.from('v_pa_greetable').select('*')
-  if (error) throw new Error(error.message)
-  return data || []
 }
 
 /**
@@ -54,7 +46,7 @@ export async function searchArchive(q, limit = 40) {
 /** 档案柜的家底：判掉了多少、各是什么。搜之前先让你知道规模。 */
 export async function archiveTally() {
   if (!supa) return null
-  const { data, error } = await supa.from('v_pa_verdict_archive').select('verdict')
+  const { data, error } = await selectAll(() => supa.from('v_pa_verdict_archive').select('verdict,email').order('email'))
   if (error) throw new Error(error.message)
   const t = { person: 0, shared_box: 0, bulk: 0, machine: 0, unsure: 0 }
   for (const r of data || []) t[r.verdict] = (t[r.verdict] || 0) + 1

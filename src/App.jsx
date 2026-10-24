@@ -32,8 +32,7 @@ import SayTo from './components/SayTo.jsx'
 import { loadQueue, saveQueue, normalize, enqueue, done as queueDone, select as queueSelect, inQueue, key as qKey, keyOf, parseKey } from './lib/queue.js'
 import { deskTabs, deskView, autoOpen } from './lib/desk.js'
 import { flyTo } from './lib/fly.js'
-import { refreshPursuit } from './lib/refresh.js'
-import { loadNotifications, markHandled, rescheduleWait, triage, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
+import { loadNotifications, markHandled, rescheduleWait, rejudge, REJUDGE_BATCH } from './lib/notifications.js'
 import { migrateCueOff } from './lib/cueoffMigrate.js'
 import DeskTabs from './components/DeskTabs.jsx'
 import MailState from './components/MailState.jsx'
@@ -363,13 +362,12 @@ export default function App() {
   }
 
   // 「接着判」：积压还没化开的时候手动催一把。
-  // 走的是跟收信循环同一条路（brain 的 rejudgeThese / triageThese）。
+  // 走的是跟收信循环同一条路（brain 的 rejudgeThese）。
   const judgeMore = async () => {
     setJudging(true)
     try {
       let out = notes
       if (out?.stale?.length) { await rejudge(out.stale.slice(0, REJUDGE_BATCH)); out = await pullNotes() }
-      else if (out?.unjudged?.length) { await triage(out.unjudged.slice(0, 20)); await pullNotes() }
     } catch (e) { reportError(e, t('模型判断未完成')) } finally { setJudging(false) }
   }
 

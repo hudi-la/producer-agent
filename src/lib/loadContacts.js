@@ -1,4 +1,4 @@
-import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
+import { supa, DB_CONFIGURED, FELL_BACK, selectAll } from './backends.js'
 
 // 人这一层的读面。
 //
@@ -21,9 +21,9 @@ const empty = (reason, detail) => ({
 export async function loadContacts() {
   if (!DB_CONFIGURED) return empty(FELL_BACK.NO_CONFIG)
   try {
-    const { data: contacts, error: ce } = await supa
+    const { data: contacts, error: ce } = await selectAll(() => supa
       .from('v_pa_contacts').select('*')
-      .order('last_touch_at', { ascending: false, nullsFirst: false })
+      .order('last_touch_at', { ascending: false, nullsFirst: false }).order('id'))
     if (ce) return empty(FELL_BACK.QUERY_FAILED, ce.message)
     // 通讯录空着**不能就此返回**(2026-10-08):原来这里一看没人就直接回空,后面「等你点头的新联系人」
     // 根本没去查——新用户通讯录一定是空的,于是收完信判出的 116 个人一个都看不见。照常往下查,最后再标空
@@ -49,7 +49,7 @@ export async function loadContacts() {
     // 停用的地址和离开了的机构**都留着**：旧地址是历史往来的钥匙，
     // 而「她以前在 CultureHub」正是那四封信为什么是她的的原因。
     const [{ data: emails }, { data: orgs }] = await Promise.all([
-      supa.from('v_pa_contact_emails').select('*'),
+      selectAll(() => supa.from('v_pa_contact_emails').select('*').order('contact_id').order('email')),
       supa.from('v_pa_contact_orgs').select('*'),
     ])
     const byC = (rows, sort) => {
@@ -70,12 +70,12 @@ export async function loadContacts() {
       .from('v_pa_orgs').select('*').order('mail_count', { ascending: false })
 
     // 还不认识的地址 —— 加人的真入口。系统自己发现有陌生地址在跟你写信。
-    const { data: strangers } = await supa.from('v_pa_unknown_senders').select('*')
+    const { data: strangers } = await selectAll(() => supa.from('v_pa_unknown_senders').select('*').order('email'))
 
     // 0121 端出来的：被抄送在某条线上、但跟线上的人不同机构，或看不出是人还是信箱的
     // 那些地址。它们自己一封信都没发过，所以 v_pa_unknown_senders 里没有；理由（谁在
     // 哪条线抄送的）在判定表里，端出来时带着，名片一键就能加。
-    const { data: greet } = await supa.from('v_pa_greetable').select('*')
+    const { data: greet } = await selectAll(() => supa.from('v_pa_greetable').select('*').order('email'))
     const seen = new Set((strangers || []).map((r) => String(r.email).toLowerCase()))
     const copied = (greet || [])
       .filter((r) => /抄送|也发给了|回信/.test(r.why || '') && !seen.has(String(r.email).toLowerCase()))

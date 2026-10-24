@@ -1,7 +1,7 @@
 import { reportError } from './reportError.js'
 import { errorText } from './userError.js'
 import { t } from '../i18n/index.js'
-import { supa, BRAIN, brainFetch } from './backends.js'
+import { supa, BRAIN, brainFetch, selectAll } from './backends.js'
 import { streamChat, NoStream } from './chat.js'
 
 // 人这一层的写口。分工跟 chat.js 一模一样：
@@ -74,7 +74,7 @@ export const markIntroThanked = (contactId) =>
  */
 export async function fetchUnknownSenders() {
   if (!supa) return []
-  const { data, error } = await supa.from('v_pa_unknown_senders').select('*')
+  const { data, error } = await selectAll(() => supa.from('v_pa_unknown_senders').select('*').order('email'))
   if (error) reportError(error, t('读取联系人或往来失败')); return error ? [] : (data || [])
 }
 
@@ -127,7 +127,7 @@ const post = async (path, body) => {
       body: JSON.stringify(body),
     })
   } catch (_) {
-    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
+    throw new Error(t('服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。'))
   }
   const out = await res.json().catch(() => ({}))
   if (!res.ok || out?.error) throw new Error(errorText(out?.error) || t('脑子出错了（{status}）', { status: res.status }))

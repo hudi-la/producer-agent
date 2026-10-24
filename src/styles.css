@@ -2403,3 +2403,19 @@ aside.drawer:has(.artifact-editor) { width: min(1200px, 96vw); }
   .lcard.artifact-card { padding: 12px; }
   .artifact-card .lcard-body { padding: 12px; }
 }
+
+/* 「信到了」那条细线（2026-10-24）：一行小字，夹在对话里，点开才是整封信 */
+.arrline { margin: 6px 0; }
+.arrline-row { display: flex; align-items: baseline; gap: 6px; width: 100%; min-width: 0;
+  background: none; border: 0; border-top: 1px solid var(--line); padding: 5px 2px 0;
+  font: inherit; font-size: 11.5px; color: var(--ink-3); text-align: left; cursor: pointer; }
+.arrline.in .arrline-row { border-top-color: var(--accent); }
+.arrline-row:hover { color: var(--ink-2); }
+.arrline-mark { opacity: .6; flex: none; }
+.arrline-who { flex: none; color: var(--ink-2); }
+.arrline-when { flex: none; }
+.arrline-gist { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.arrline .arrival { margin-top: 6px; }
+
+/* 提醒「建议」卡：没落地，虚线框 */
+.scard-proposal { border-style: dashed; }

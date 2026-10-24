@@ -10,10 +10,7 @@ export async function persistRejudgment(db, subject, verdict) {
   }
   const key = { p_kind: subject.kind, p_id: subject.id }
   await call('pa_set_next_touch', { ...key, p_at: verdict.touch, p_why: verdict.why })
-  if (subject.last_in_id) await call('pa_judge_letter', {
-    p_gmail_message_id: subject.last_in_id, p_needs_reply: verdict.needs_reply,
-    p_not_before: null, p_why: verdict.reply_why,
-  })
+  // 2026-10-24：不再写 letter_verdicts（「要不要回」只由状态机判，见 server.js judgePass）
   await call('pa_recompute_touch', key)
   const marked = await call('pa_mark_judged', { ...key, p_upto: subject.upto })
   if (!marked) throw new Error('Judgment watermark was not saved')

@@ -1,4 +1,4 @@
-import { supa, DB_CONFIGURED, FELL_BACK } from './backends.js'
+import { supa, DB_CONFIGURED, FELL_BACK, selectAll } from './backends.js'
 import { t } from '../i18n/index.js'
 
 // 机会池 = 他那张 Excel 搬进库之后的样子。
@@ -114,8 +114,8 @@ export async function loadPool() {
   try {
     // 一次最多 1000 行是 PostgREST 的默认封顶，而且它不报错。池子真长到那个数
     // 得改成分页 —— 现在 82 行，先把上限写出来，别让它变成静默截断。
-    const { data, error } = await supa
-      .from('v_pa_opportunities').select('*').limit(1000)
+    const { data, error } = await selectAll(() => supa
+      .from('v_pa_opportunities').select('*').order('id'))
     if (error) return seed(FELL_BACK.QUERY_FAILED, error.message)
     return { rows: data || [], source: 'live', reason: null }
   } catch (e) {

@@ -227,6 +227,11 @@ function Acts({ d, allOk, onErr, onChanged, pursuitId }) {
     )
   }
 
+  // 发出去了、只是记账没跟上的（2026-10-24）：不再给发送键，防同一封发两遍
+  if (d.meta?.sent_gmail_id) {
+    return <div className="dv-acts"><span className="dv-why">{t('已于 {at} 发出 · 记录稍后从 Gmail「已发送」补上', { at: String(d.meta.sent_at || '').slice(0, 10) })}</span></div>
+  }
+
   const canSend = allOk && to.length > 0 && !busy
   return (
     <>

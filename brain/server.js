@@ -54,8 +54,8 @@ import { extractLetters as extractLetter } from './letter.js'
 // 填完一张表也报一声。逐格的字数闸靠它带过来——那是申请表的要害。
 import { extractForm } from './form.js'
 import { extractStateMove, peelEnvelopes, moveLine, memoLine, localToday } from './stateMove.js'
+import { gateStateMove, gateMemo } from './decisions.js'
 
-import { parseTriage, triagePrompt } from './triage.js'
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor } from './judge.js'
 import { modelFor, GOOD, CHEAP } from './models.js'
@@ -186,6 +186,19 @@ async function connect() {
 
 // ── 上下文：Fairwind 开工前先想起这条线的一切 ──────────────────────────
 
+// 提醒栏那一行（v_pa_state）。0129 把它塞进了 pa_brain_context，0135 用旧函数体把它盖掉了，
+// 于是聊天时 Fairwind 一直看不到提醒栏、以为「这条线不等任何事」（2026-10-24 体检查到）。
+// 上下文函数带了就用它的；没带就自己读一次视图——不靠迁移顺序，库修没修好都对。
+async function stateOf(kind, id, fromRpc) {
+  if (fromRpc !== undefined) return fromRpc || null
+  try {
+    const { data, error } = await db.from('v_pa_state').select('*')
+      .eq('subject_kind', kind).eq('subject_id', id).maybeSingle()
+    if (error) { console.warn('  ⚠️ 读提醒栏失败：' + error.message); return null }
+    return data || null
+  } catch (e) { console.warn('  ⚠️ 读提醒栏失败：' + e.message); return null }
+}
+
 async function loadContext(pursuitId) {
   const { data, error } = await db.rpc('pa_brain_context', { p_pursuit_id: pursuitId })
   if (error) throw new Error('读上下文失败：' + error.message)
@@ -197,7 +210,7 @@ async function loadContext(pursuitId) {
     profile: data.profile || null,
     // 语气五格（0115 起 RPC 会带；老库没有这个键 = null = 全用默认，一个字不变）
     voice: data.voice || null,
-    state: data.state || null,     // 提醒栏那一行（0123），没有就是 IDLE
+    state: await stateOf('pursuit', pursuitId, data.state),     // 提醒栏那一行，没有就是 IDLE
     // 0027 之后上下文里还有产出和邮件线索。它们不进对话 prompt（那是另一套用法），
     // 但 /gmail-draft 和 /sync 要照着它们干活，所以整包留在这儿。
     raw: data,
@@ -234,7 +247,7 @@ async function loadPersonContext(contactId) {
     entries: data.entries || [],
     profile: data.profile || null,
     voice: data.voice || null,
-    state: data.state || null,     // 提醒栏那一行（0123），没有就是 IDLE
+    state: await stateOf('contact', contactId, data.state),     // 提醒栏那一行，没有就是 IDLE
     raw: data,
   }
 }
@@ -815,6 +828,12 @@ async function handleChat(body, onEvent = null) {
   const form = two.form
   const mv = three.move
   const memo = three.memo
+  // 落地前过闸门（brain/decisions.js）：声称「已发出」却查不到真信的只提议、等你采纳；
+  // 你这句是问句时，笔的正文不用问句、记忆不记。判在写气泡之前，结论随气泡一起存下。
+  const gMove = gateStateMove({ move: mv, source: 'chat', userText: mine.content, msgs: ctx.msgs })
+  const gMemo = gateMemo({ memo, userText: mine.content })
+  if (mv && !gMove.apply) console.log(`  · 提醒只提议、没落地（${gMove.reason}）：${moveLine(mv)}`)
+  if (memo && !gMemo.apply) console.log(`  · 记忆没记（${gMemo.reason}）`)
 
   // 工作稿存进 meta：不摆在她眼前、不进下一轮 prompt，但一个字都没销毁，
   // 查得回来。recovered 也记一笔——那条回复是拿工作稿顶上的，将来看日志得认得出。
@@ -824,14 +843,33 @@ async function handleChat(body, onEvent = null) {
     ...(letter ? { letter } : {}),
     ...(one.letters.length > 1 ? { letters: one.letters } : {}),
     ...(form ? { form } : {}),
-    ...(mv ? { state_move: { ...mv, line: moveLine(mv) } } : {}),
-    ...(memo ? { memo: { ...memo, line: memoLine(memo) } } : {}),
+    ...(mv ? { state_move: { ...mv, line: moveLine(mv), ...(gMove.apply ? {} : { proposed: true, gate: gMove.reason }) } } : {}),
+    ...(memo ? { memo: { ...memo, line: memoLine(memo), ...(gMemo.apply ? {} : { skipped: gMemo.reason }) } } : {}),
   }
   const theirs = await addMessage(owner, 'producer', shown, 'message',
     Object.keys(extra).length ? extra : null)
-  if (mv) await applyStateMove(owner, mv, theirs, mine.content)   // 笔的正文 = 你刚说的那句
-  if (memo) await applyMemo(owner, memo, theirs)
+  // 落地前过闸门（brain/decisions.js）：声称「已发出」却查不到真信的只提议；
+  // 你这句是问句时，笔的正文不用问句、记忆不记。
+  if (mv && gMove.apply) await applyStateMove(owner, mv, theirs, gMove.noteText)
+  if (memo && gMemo.apply) await applyMemo(owner, memo, theirs)
   return { mine, reply: theirs }
+}
+
+// 采纳一条建议（后台提的，或闸门拦下的）：按的是你的手，这时才真的落地。
+// 气泡 id 是钥匙；拨法从气泡 meta 里原样取，不信任浏览器传来的内容。
+async function handleAdoptStateMove(body) {
+  const owner = ownerOf(body)
+  if (!owner || owner.kind === 'studio' || !body.message_id) throw new Error('要有 pursuit_id 或 contact_id，外加 message_id')
+  const ctx = await loadOwnerContext(owner)
+  const bubble = ctx.msgs.find((m) => m.id === body.message_id && m.role === 'producer')
+  const sm = bubble?.meta?.state_move
+  if (!sm?.move) throw new Error('这条消息上没有提醒建议')
+  if (sm.applied) return { ok: true, already: true, note_id: sm.note_id || null }
+  const today = localToday(ctx.profile?.data?.tz)
+  if (sm.due && sm.due <= today) throw new Error(`这条建议的到点日（${sm.due}）已经过了，在聊天里重新说一句再改`)
+  const note = await applyStateMove(owner, sm, bubble, null)
+  if (!note) throw new Error('提醒没改成，看日志')
+  return { ok: true, note_id: note }
 }
 
 // 终止：把那一次正在想的活掐掉。找不到就说找不到——可能已经想完了，
@@ -1004,6 +1042,7 @@ async function handleSendMail(body) {
   if (!d) throw new Error(owner.kind === 'contact' ? '这个人名下没有这份产出' : '这条线上没有这份产出')
   if (d.kind !== 'email') throw new Error('这份产出不是一封信，发不了')
   if (d.status === 'final') throw new Error('已定稿的不走这条路')
+  if (d.meta?.sent_gmail_id) throw new Error(`这封已经在 ${String(d.meta.sent_at || '').slice(0, 10)} 发出过了，不再重发`)
   if (!d.body?.trim()) throw new Error('正文是空的，没东西可发')
 
   // 收件人是一份名单（0071）。老产出里存的是单个字符串，两种都认——
@@ -1016,8 +1055,10 @@ async function handleSendMail(body) {
   if (!to.length) throw new Error('这份产出上没有收件人——在页面上勾一个再发')
 
   // 用错身份发出去的信连道歉都没处发，所以这一条拦在真发之前。
+  // 线上每个人连的就是他自己选的那个 Gmail，那就是发件身份；档案里填的邮箱常是别名
+  // （alum 地址、工作地址），拿它去拦只会让人发不出信（2026-10-24）。只在旧本机模式下还拦。
   const me = await whoami()
-  assertSameMailbox(me.address, mailboxOf(ctx.profile))
+  if (!HOSTED) assertSameMailbox(me.address, mailboxOf(ctx.profile))
 
   const replyTo = d.meta?.reply_to || null
   const sent = await sendLetter({
@@ -1040,7 +1081,9 @@ async function handleSendMail(body) {
   const { data: accts } = await db.from('v_pa_mail_accounts').select('id,address')
   const acct = (accts || []).find((a) => String(a.address || '').toLowerCase() === me.address)
 
-  await recordSent(db, {
+  // 信已经出去了。下面记账要是失败，**绝不能报「发送失败」**——那会让你再按一次，同一封信发两遍。
+  // 重试一次；还不成，就在产出上标「已发出」（防重发），回 ok + 一句提醒，下次收信从「已发送」里补账。
+  const record = () => recordSent(db, {
     ownerKind: owner.kind === 'contact' ? 'contact' : 'pursuit',
     ownerId: owner.id,
     deliverableId: deliverable_id,
@@ -1055,91 +1098,25 @@ async function handleSendMail(body) {
     replyTo,
     refs: replyTo ? [replyTo] : null,
   })
+  let recordErr = null
+  for (let i = 0; i < 2; i++) {
+    try { await record(); recordErr = null; break }
+    catch (e) { recordErr = e; console.warn(`  ⚠️ 信已发出，记账第 ${i + 1} 次没成：${e.message}`); await new Promise((r) => setTimeout(r, 800)) }
+  }
+  if (recordErr) {
+    const meta = { ...(d.meta || {}), sent_gmail_id: sent.id, sent_thread_id: sent.threadId, sent_at: new Date().toISOString() }
+    const { error } = await db.rpc(owner.kind === 'contact' ? 'pa_upsert_contact_deliverable' : 'pa_upsert_deliverable', {
+      ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }),
+      p_id: deliverable_id, p_kind: d.kind, p_title: d.title, p_meta: meta,
+    })
+    if (error) console.error('  ✗ 标「已发出」也没成：' + error.message)
+    return { ok: true, id: sent.id, thread_id: sent.threadId, recorded: false,
+      warning: '信已经发出去了。系统里的记录稍后会从 Gmail「已发送」补上，不要再按一次。' }
+  }
 
-  return { ok: true, id: sent.id, thread_id: sent.threadId }
+  return { ok: true, id: sent.id, thread_id: sent.threadId, recorded: true }
 }
 
-// 按线收信：只拉这条线登记过的 thread，永远不遍历信箱。
-//
-// 顺序要紧：**先落原文，后写摘要**。第一步是机械的，不会因为脑子没开就丢信；
-// 摘要失败了行还在，界面显示原文首段。反过来做的话，模型一挂那封信就永远不存在。
-// 认领：这条线该去 Gmail 里跟哪几串。
-//
-// 库里已有的信自己就带着答案——每条 pursuit_messages 都存了 gmail_message_id，
-// 而 Gmail 的 get_message 能从 message id 反查出它属于哪个 thread。
-// 所以「这条线有 5 封信，却说没处可收」这种矛盾根本不该出现：
-// 有信就有串，让它自己接上，不用你去贴链接。
-//
-// 一条线只会走一次（认领完就落进 producer.pursuit_threads 了）。
-async function ensureThreads(owner, ctx) {
-  const o = asOwner(owner)
-  const have = (ctx.raw.threads || []).map((t) => t.gmail_thread_id)
-
-  // ── 人：他有哪几条往来，**查账本，不问模型** ──
-  //
-  // 0027 立过「只拉登记过的 thread，永远不遍历信箱」。那条对**机会线**是对的：
-  // 一条线就那么几串往来，登记完就够了。
-  //
-  // 对**人**是错的，而且错得很难发现。Stacy 就栽在这儿：库里认领了 4 条 thread，
-  // 她三个地址下实际有 20 条。漏掉的里面有一条是**正在进行的对话**——
-  // 她 8/10 刚回过信，而名片上写着「上次碰 7/2」。信没丢，是从来没进来过，
-  // 于是那个日期在撒谎，比空着更坏。
-  //
-  // 但补的办法**不是让模型去 Gmail 搜**（我第一版就是这么写的，错了）。
-  // mail_headers 是纯 HTTP 抓来的全量信头账本，答案早就在库里：
-  // 他有哪些地址 → contact_emails，那些地址出现在哪些 thread → mail_headers。
-  // 一次 join 就完了。**找信是机械活，一次模型都不该花。**
-  if (o.kind === 'contact') {
-    const { data: ids, error } = await db.rpc('pa_contact_thread_ids', { p_contact_id: o.id })
-    if (error) { console.warn('  ⚠️ 查账本失败：' + error.message); return have }
-    const fresh = (ids || []).filter((t) => t && !have.includes(t))
-    for (const t of fresh) {
-      await db.rpc('pa_claim_contact_thread', { p_contact_id: o.id, p_thread_id: t })
-    }
-    if (fresh.length) console.log(`  ↳ 账本里翻出 ${fresh.length} 条没登记过的往来（没花模型）`)
-    return [...have, ...fresh]
-  }
-
-  // ── 机会线：照旧。登记过就不再找。 ──
-  if (have.length) return have
-
-  const known = ctx.msgs.filter((m) => m.gmail_message_id).map((m) => m.gmail_message_id)
-  if (!known.length) return []
-
-  // 线上:脑子自己就能问 Gmail「这封属于哪串」,纯 HTTP,一次模型都不花
-  if (HOSTED) {
-    const gmail = gmailFor(await mailClient())
-    const ids = []
-    for (const id of known) {
-      try { const { data } = await gmail.users.messages.get({ userId: 'me', id, format: 'minimal' }); if (data.threadId && !ids.includes(data.threadId)) ids.push(data.threadId) }
-      catch (e) { console.warn(`  ⚠️ 查 ${id} 属于哪串没成:${e.message}`) }
-    }
-    for (const t of ids) await db.rpc('pa_link_thread', { p_pursuit_id: o.id, p_thread_id: t, p_added_by: 'fairwind' })
-    return ids
-  }
-
-  const { text } = await think(
-    `查这些 Gmail message 各属于哪个 thread（用 mcp__claude_ai_Gmail__get_message，读 threadId 就行，别读正文）：
-${known.join(', ')}
-
-去重后，**最后一行**单独输出，别的什么都不要加：
-[[THREADS]] {"thread_ids":["…"]}`,
-    GMAIL_TOOLS,
-    ctx.profile,
-    null, null, null, 20, CHEAP,
-  )
-  const m = text.match(/\[\[THREADS\]\]\s*(\{[\s\S]*?\})\s*$/)
-  let ids = []
-  try { ids = m ? (JSON.parse(m[1]).thread_ids || []) : [] } catch (_) { ids = [] }
-  for (const t of ids) {
-    if (o.kind === 'contact') {
-      await db.rpc('pa_claim_contact_thread', { p_contact_id: o.id, p_thread_id: t })
-    } else {
-      await db.rpc('pa_link_thread', { p_pursuit_id: o.id, p_thread_id: t, p_added_by: 'fairwind' })
-    }
-  }
-  return ids
-}
 
 // ── 这个地址是谁 ───────────────────────────────────────────────
 //
@@ -1255,104 +1232,6 @@ ${(known || []).flatMap((k) => k.mailboxes || []).join(', ') || '（还没有）
   return { email, ...who }
 }
 
-async function handleSync(body) {
-  const owner = ownerOf(body)
-  if (!owner) throw new Error('要有 pursuit_id 或 contact_id')
-
-  const ctx = await loadOwnerContext(owner)
-  const threads = await ensureThreads(owner, ctx)
-  if (!threads.length) {
-    // 真的无处可收：一封信都没有，所以连反查的线头都没有。
-    // 说清楚是「还没有往来」，别让它看起来像「查过了，没有新信」——那两件事天差地别。
-    return { ok: true, threads: 0, added: 0,
-      note: owner.kind === 'contact'
-        ? '这个人还没认领任何邮件往来，所以没处可收。在名片上认领一条，或者起草一封发出去。'
-        : '这条线还没有任何邮件往来，所以没处可收。起草一封发出去，它就接上了。' }
-  }
-
-  const known = ctx.msgs.filter((m) => m.gmail_message_id).map((m) => m.gmail_message_id)
-  const G = await gmailKit(ctx.profile)
-  const { text } = await think(
-    `读这几个 Gmail thread（用 ${G.n.thread}），把**还没入库**的邮件抓出来。
-
-thread：${threads.join(', ')}
-库里已有的 message id（这些跳过）：${known.join(', ') || '（一封都没有）'}
-
-对每一封新的，给我：
-· id           Gmail message id
-· role         "org"（对方发的）或 "artist"（${artistOf(ctx.profile)} 发的）
-· at           ISO 时间，真实发信时间
-· subject/from
-· counterpart   **对面那个地址**（纯地址，不要名字不要尖括号）。
-                他发来的信 = From 那个；你发出去的信 = To 那个。
-                一句话：**永远不是 ${mailboxOf(ctx.profile) || '你自己'}**。
-                这一栏是归属的唯一判据——没有它，这封信就只能靠猜是谁的，
-                而猜正是 0033 犯过的错（Stacy 的告别信被记到了别人卡上）。
-· raw          正文纯文本（**原样**，不要摘、不要改）
-· summary      一句中文摘要，说清这封信要什么或给了什么
-
-**最后一行**单独输出，别的什么都不要加：
-[[MAIL]] {"messages":[{"id":"…","role":"org","at":"…","subject":"…","from":"…","counterpart":"…","raw":"…","summary":"…"}]}
-一封新的都没有就输出 [[MAIL]] {"messages":[]}`,
-    G.tools,
-    ctx.profile,
-    null, G.servers, null, 20, CHEAP,
-  )
-
-  const m = text.match(/\[\[MAIL\]\]\s*(\{[\s\S]*\})\s*$/)
-  let parsed = null
-  try { parsed = m ? JSON.parse(m[1]) : null } catch (_) { parsed = null }
-  if (!parsed) throw new Error('收信回来的格式不对，没敢往库里写')
-
-  let added = 0
-  let addedIn = 0
-  // 入库走 pa_add_mail：**brain 不判断这封信是谁的**，它只把信头照抄进来，
-  // 归属由那个函数查 contact_emails / org_mailboxes 算出来。
-  //
-  // 这是 0033 那个 bug 的结构性药方。当时的判据是「这条线挂了谁，信就都是谁的」，
-  // 于是 Mattie 名下 13 封里只有 1 封真是她的。判据只能是信头上的地址。
-  //
-  // 认不出来的地址也照样入库（0043 放宽了约束）——它会出现在
-  // 「还不认识的地址」里等你认，那不叫无主，叫待认领。为了守一条护栏
-  // 把信丢在门外，本末倒置。
-  let unknown = 0
-  for (const mail of parsed.messages || []) {
-    if (!mail?.id || !mail?.role) continue
-    const cp = String(mail.counterpart || '').trim().toLowerCase()
-    if (!cp.includes('@')) {
-      // 没给地址就不写——宁可这一封没进来，也不要它进来之后归错人。
-      console.warn(`  ⚠️ ${mail.id} 没报对面地址，这封先不入库`)
-      continue
-    }
-    const { data, error } = await db.rpc('pa_add_mail', {
-      p_gmail_message_id: mail.id,
-      p_counterpart: cp,
-      p_role: mail.role === 'artist' ? 'artist' : 'org',
-      p_content: mail.summary || (mail.raw || '').slice(0, 200),
-      // 收一条**线**的信就挂那条线；收一个**人**的信没有线可挂，
-      // 归属完全由地址决定（他自己那几封会认到他头上）。
-      p_pursuit_id: owner.kind === 'pursuit' ? owner.id : null,
-      p_body_raw: mail.raw || null,
-      p_meta: { subject: mail.subject || null, from_name: mail.from || null },
-      p_created_at: mail.at || null,
-    })
-    if (error) { console.warn('  ⚠️ 一封没写进去：' + error.message); continue }
-    if (data?.owner === 'unknown') unknown++
-    if (data?.inserted) { added++; if (mail.role !== 'artist') addedIn++ }
-  }
-  for (const t of threads) {
-    if (owner.kind === 'contact') {
-      await db.rpc('pa_touch_contact_thread', { p_contact_id: owner.id, p_thread_id: t, p_history_id: null })
-    } else {
-      await db.rpc('pa_touch_thread', { p_pursuit_id: owner.id, p_thread_id: t, p_history_id: null })
-    }
-  }
-  // addedIn = 对方来的那几封。你自己发的信收录进档案不该惊动你——你知道你发过。
-  // 前端拿它当过卡判据 1，added 仍是总数（进度和日志用）。
-  // unknown = 这一轮里地址还没登记的那几封，它们会出现在「还不认识的地址」等你认。
-  if (unknown) console.log(`  ↳ 其中 ${unknown} 封的地址还不认识，去人际管理页认一下`)
-  return { ok: true, threads: threads.length, added, addedIn, unknown }
-}
 
 // ── 更新最新信息：收信 → （收到了才）消化 ─────────────────────
 //
@@ -1470,7 +1349,8 @@ async function rejudgeThese(want) {
     // 没判出来的**不推水位** —— 下次再判。绝不许假装判过了。
     if (!v) continue
 
-    // Only advance the snapshot watermark after every dependent write succeeds.
+    // 依赖的写全部成功才推进水位（persistRejudgment）。2026-10-24 起不再写 letter_verdicts：
+    // 「要不要回」只由状态机判，这里只管「下一个时间点」。
     try {
       await persistRejudgment(db, w, v)
       judged++
@@ -1480,29 +1360,6 @@ async function rejudgeThese(want) {
     }
   }
   const out = { judged, failed: want.length - judged, touched }
-  console.log(`  \u21b3 ${JSON.stringify(out)}`)
-  return out
-}
-
-/** 判一批信「要不要回」。跟重判一样，路由和循环共用。 */
-async function triageThese(ids) {
-  if (!ids?.length) return { judged: 0, failed: 0 }
-  const { data: letters, error: le } = await db.rpc('pa_letters_for_triage', { p_ids: ids })
-  if (le) throw new Error('取信失败：' + le.message)
-  if (!letters?.length) return { judged: 0, failed: 0 }
-
-  const t = new Date().toLocaleTimeString('zh-CN')
-  console.log(`\n→ ${t} 判 ${letters.length} 封信要不要回`)
-  const { text } = await think(triagePrompt(letters), [], await judgeSystem(), null, null, null, 1, CHEAP)
-  let judged = 0
-  for (const v of parseTriage(text)) {
-    const { data } = await db.rpc('pa_judge_letter', {
-      p_gmail_message_id: v.id, p_needs_reply: v.needs_reply,
-      p_not_before: v.not_before, p_why: v.why,
-    })
-    if (data) judged++
-  }
-  const out = { judged, failed: letters.length - judged }
   console.log(`  \u21b3 ${JSON.stringify(out)}`)
   return out
 }
@@ -1675,13 +1532,14 @@ async function timerPass({ cap = TIMER_CAP } = {}) {
       const one = extractLetter(reply)
       // 到点给的法子也能顺手拨提醒（0123）：「打电话，等到 9/12」= wait
       const mvx = extractStateMove(one.clean, { today: localToday(ctx.profile?.data?.tz) })
-      const bubble = await addMessage(owner, 'producer', mvx.clean, 'message', {
+      // 后台到点时你不在场：它提的提醒改动一律只是建议，气泡下画「采纳」卡，你按了才落地。
+      // 体检查到它 13 次把「我起草了跟进信」当成「已发出跟进」去推后提醒，到点就不响了。
+      await addMessage(owner, 'producer', mvx.clean, 'message', {
         ...(one.letter ? { letter: one.letter } : {}),
         ...(one.letters.length > 1 ? { letters: one.letters } : {}),
-        ...(mvx.move ? { state_move: { ...mvx.move, line: moveLine(mvx.move) } } : {}),
+        ...(mvx.move ? { state_move: { ...mvx.move, line: moveLine(mvx.move), proposed: true, gate: 'background' } } : {}),
         timer: { key: timerKey(r), state: r.state },
       })
-      if (mvx.move) await applyStateMove(owner, mvx.move, bubble)
       acted++
     } catch (err) { console.error(`  ✗ ${r.subject_name} 这条没动成：${err.message}`) }
   }
@@ -1700,100 +1558,29 @@ async function timerPass({ cap = TIMER_CAP } = {}) {
 // 不该拿它换。**
 const BATCH_CAP = 30
 
-async function judgePass({ subjects = BATCH_CAP, letters = 20 } = {}) {
-  const out = { rejudged: 0, triaged: 0 }
-  let stale = [], ids = []
+// 2026-10-24：「判信要不要回」（triage → letter_verdicts）退役。它跟状态机（message_tags）
+// 对同一封信各判一份，123 封里 62 封结论相反，而结果早已没有任何界面在读；
+// 取待判的那个查询（pa_letters_to_triage）是全库累计最耗时的一条。「要不要回」只剩状态机一份。
+async function judgePass({ subjects = BATCH_CAP } = {}) {
+  const out = { rejudged: 0 }
+  let stale = []
   try {
     ;({ data: stale } = await db.rpc('pa_stale_subjects', { p_days: 30, p_limit: subjects }))
-    ;({ data: ids } = await db.rpc('pa_letters_to_triage', { p_limit: letters }))
   } catch (err) { console.error('✗ 取待判：', err.message); return out }
 
   try { if (stale?.length) out.rejudged = (await rejudgeThese(stale)).judged }
   catch (err) { console.error('✗ 重判：', err.message) }
-  try { if (ids?.length) out.triaged = (await triageThese(ids)).judged }
-  catch (err) { console.error('✗ 判信：', err.message) }
   return out
 }
 
+// 「更新」只剩人那一支（纯账本，不过模型）。机会线那一支 2026-10-24 删了：页面早就不调它，
+// 它却会让模型去 Gmail 读信、再改卡上的待办（next_action）——又一只没人看得见的改状态的手。
+// 机会线的新信由后台每 5 分钟统一收，判断走状态机。
 async function handleRefresh(body) {
   const owner = ownerOf(body)
   if (!owner) throw new Error('要有 pursuit_id 或 contact_id')
   if (owner.kind === 'contact') return handlePersonRefresh(owner.id)
-  const pursuit_id = owner.id
-
-  const sync = await handleSync({ pursuit_id })
-  if (!sync.added) {
-    // 没有新信 = 没有新事实 = 不惊动任何东西
-    return { ...sync, voided: false, proposed: false }
-  }
-
-  // 重新拉上下文——刚收的信要在里面。
-  // loadContext 返回的键叫 p（不是 pursuit）；0029 之后 pa_brain_context 的
-  // select p.* 自动带上三列新字段，msgs 是整行（含库内 id）。
-  const ctx = await loadContext(pursuit_id)
-  const p = ctx.p
-  const fresh = ctx.msgs.filter((m) => m.kind === 'email').slice(-sync.added - 3)
-  const cur = p.next_action && !p.next_action_done_at && !p.next_action_void_at
-    ? p.next_action : null
-
-  const { text } = await think(
-    `这条机会线刚收到 ${sync.added} 封新信。两个问题，只答有依据的：
-
-【现在卡上的待办】${cur ? `「${cur}」` : '（没有）'}
-【近期往来（含新信）】
-${fresh.map((m) => `${m.created_at?.slice(0, 10) || '?'} ${m.role === 'artist' ? artistOf(ctx.profile) : (m.meta?.from_name || '对方')}：${m.content}`).join('\n')}
-【截止】${p.deadline_at || p.deadline || '无'}　【该碰日】${p.next_touch_at || '无'}
-
-问题一：新信有没有让卡上那条待办**过期**？（比如「没回就催」而对方回了。）
-过期了就指认是哪封信，说一句人话的理由。没过期、或根本没待办，就 null。
-
-问题二：读完新信，这条线**现在**该干什么？必须能指着某封信或某个日期说出依据。
-说不出依据就 null——宁可不说，也不猜。凑数的话比空着更坏。
-如果该干的事有明确日子（比如信里约了 8/12 回复），给 touch 一个 YYYY-MM-DD。
-
-**最后一行**单独输出，别的什么都不要加：
-[[DIGEST]] {"void": {"msg_id": "<作废依据那封信的库内 id，从上面往来里没有就用最新那封的 gmail id 对应行>", "reason": "…"} | null, "next": {"action": "一句话，20 字内", "basis": "依据（哪封信/哪个日期）", "touch": "YYYY-MM-DD 或 null"} | null}`,
-    READ_TOOLS,
-    ctx.profile,
-  )
-
-  const m = text.match(/\[\[DIGEST\]\]\s*(\{[\s\S]*\})\s*$/)
-  let digest = null
-  try { digest = m ? JSON.parse(m[1]) : null } catch (_) { digest = null }
-  if (!digest) {
-    // 消化失败不吞掉收信成果——信已经在库里了，只是没消化。说实话。
-    return { ...sync, voided: false, proposed: false, note: '信收下了，但这次没消化成（格式不对）' }
-  }
-
-  let voided = false
-  if (digest.void?.reason) {
-    // msg_id 由库校验（必须是这条线上的消息）。模型给的 id 不可靠时，
-    // 退回「这次新收的最后一封」——作废的依据就是这批新信。
-    const fallback = ctx.msgs.filter((x) => x.kind === 'email').at(-1)?.id || null
-    const msgId = ctx.msgs.some((x) => x.id === digest.void.msg_id) ? digest.void.msg_id : fallback
-    const { data } = await db.rpc('pa_void_next_action', {
-      p_pursuit_id: pursuit_id, p_msg_id: msgId, p_reason: digest.void.reason,
-    })
-    voided = Boolean(data?.voided)
-    if (voided) await addMessage(pursuit_id, 'producer',
-      `卡上那条「${cur}」作废了——${digest.void.reason}`)
-  }
-
-  let proposed = false
-  if (digest.next?.action && digest.next?.basis) {   // 没依据的提案连库都不碰
-    const { data } = await db.rpc('pa_propose_next_action', {
-      p_pursuit_id: pursuit_id,
-      p_action: digest.next.action,
-      p_touch: digest.next.touch || null,
-    })
-    proposed = Boolean(data?.written)
-    if (proposed) await addMessage(pursuit_id, 'producer',
-      `我看下一步该：${digest.next.action}（依据：${digest.next.basis}）——不对就改掉，认了就勾。`)
-  }
-
-  // touch = 提案自带的行动日。前端拿它判断「现在就能动」还是「到日子再说」——
-  // 带未来日子的提案只写卡不进队（Paperbark 那次 8-6 就吵 8-12 的事，就是缺这个）。
-  return { ...sync, voided, proposed, touch: (proposed && digest.next?.touch) || null }
+  return { ok: true, added: 0, retired: true, note: '机会线的新信由后台每 5 分钟自动收，不用手动更新。' }
 }
 
 // ── 后台先读 ───────────────────────────────────────────────────
@@ -2423,6 +2210,22 @@ async function dispatch(req, res, origin) {
     return
   }
 
+  if (req.method === 'POST' && req.url === '/state-move/adopt') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(raw || '{}')
+        console.log(`\n→ 采纳提醒建议 ${body.message_id}`)
+        send(res, 200, await handleAdoptStateMove(body))
+      } catch (err) {
+        console.error('✗', err.message)
+        send(res, 500, { error: err.message })
+      }
+    })
+    return
+  }
+
   if (req.method === 'POST' && req.url === '/stage') {
     let raw = ''
     req.on('data', (c) => (raw += c))
@@ -2509,7 +2312,7 @@ async function dispatch(req, res, origin) {
     return
   }
 
-  if (req.method === 'POST' && (req.url === '/artifact' || req.url === '/gmail-draft' || req.url === '/sync' || req.url === '/refresh')) {
+  if (req.method === 'POST' && (req.url === '/artifact' || req.url === '/gmail-draft' || req.url === '/refresh')) {
     const isDraft = req.url === '/gmail-draft'
     const isRefresh = req.url === '/refresh'
     let raw = ''
@@ -2518,7 +2321,7 @@ async function dispatch(req, res, origin) {
       try {
         const body = JSON.parse(raw || '{}')
         console.log(`\n→ ${new Date().toLocaleTimeString('zh-CN')} ${isDraft ? '放草稿箱' : isRefresh ? '更新' : '收信'} ${body.contact_id ? `人 ${body.contact_id}` : body.pursuit_id}`)
-        const out = req.url === '/artifact' ? await handleArtifact(body) : isDraft ? await handleGmailDraft(body) : isRefresh ? await handleRefresh(body) : await handleSync(body)
+        const out = req.url === '/artifact' ? await handleArtifact(body) : isDraft ? await handleGmailDraft(body) : await handleRefresh(body)
         console.log(`  ↳ ${JSON.stringify(req.url === '/artifact' ? { id: out.id, kind: out.kind } : out)}`)
         send(res, 200, out)
       } catch (err) {
@@ -2583,14 +2386,8 @@ async function dispatch(req, res, origin) {
     req.on('data', (c) => (raw += c))
     req.on('end', async () => {
       try {
-        const ids = (JSON.parse(raw || '{}').ids || []).filter((x) => typeof x === 'string')
-        if (!ids.length) return send(res, 200, { judged: 0, failed: 0 })
-
-        // 走 RPC 不走 db.from：**producer schema 没进 Exposed schemas**
-        // （第 60 行那条规矩）。直接 from('pursuit_messages') 打的是
-        // public 里那张不存在的表，回空数组还不报错 —— 长成「这批没什么
-        // 可判的」，是最难查的那种失败形态。
-        send(res, 200, await triageThese(ids))
+        // 退役（2026-10-24）：老页面可能还在点名，回一个空结果，不再花模型钱。
+        return send(res, 200, { judged: 0, failed: 0, retired: true })
       } catch (err) {
         console.error('✗', err.message)
         send(res, 500, { error: err.message })

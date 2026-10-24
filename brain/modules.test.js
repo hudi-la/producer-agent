@@ -37,7 +37,7 @@ test('路由归属(2026-09-16 server.js 里的全部路由)', () => {
     ['/health', 'core'], ['/mcp', 'core'], ['/me', 'core'], ['/db/rpc/x', 'core'], ['/db/from', 'core'], ['/files/a%2Fb', 'core'], ['/modules', 'core'], ['/setup', 'core'], ['/', 'core'], ['/assets/index-abc.js', 'core'],
     ['/chat', 'profile'], ['/chat/stream', 'profile'], ['/chat/stop', 'profile'], ['/judgments/preview', 'profile'],
     ['/stage', 'pursuits'], ['/ball', 'pursuits'], ['/brief', 'pursuits'], ['/subjects/rejudge', 'pursuits'], ['/something-new', 'pursuits'],
-    ['/mail/sync', 'mail'], ['/mail/adopt', 'mail'], ['/mail/send', 'mail'], ['/gmail-draft', 'mail'], ['/sync', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/carry', 'mail'], ['/letters/triage', 'mail'],
+    ['/mail/sync', 'mail'], ['/mail/adopt', 'mail'], ['/mail/send', 'mail'], ['/gmail-draft', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/carry', 'mail'], ['/letters/triage', 'mail'],
   ]) assert.equal(moduleOf(u), m, u)
   assert.equal(isEnabled({ profile: true, pursuits: false, mail: false }, 'core'), true)
   assert.equal(isEnabled({ profile: true, pursuits: false, mail: false }, 'profile'), true)

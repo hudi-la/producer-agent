@@ -40,7 +40,7 @@ export function setModules({ dataDir, mode }, patch) {
 const ROUTE_MODULE = [
   ['/health', 'core'], ['/mcp', 'core'], ['/mcp-guide', 'core'], ['/me', 'core'], ['/setup', 'core'], ['/modules', 'core'], ['/db/', 'core'], ['/files/', 'core'],
   ['/chat', 'profile'], ['/judgments/', 'profile'],   // 判据文档是人的东西,机会线关着也能看、能开关
-  ['/mail/', 'mail'], ['/gmail-draft', 'mail'], ['/sync', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/', 'mail'], ['/letters/', 'mail'],
+  ['/mail/', 'mail'], ['/gmail-draft', 'mail'], ['/refresh', 'mail'], ['/identify', 'mail'], ['/mailbox/', 'mail'], ['/letters/', 'mail'],
 ]
 export function moduleOf(url) {
   const p = url.split('?')[0]

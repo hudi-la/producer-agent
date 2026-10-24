@@ -21,7 +21,8 @@ const B = '0000000b-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 //   pa_briefs_due_all       脑子跨所有人找要读的新机会(0155;只读,只授 service_role)
 //   pa_owner_of_mcp_token   查 MCP 令牌是谁的——查的时候还没有身份(0156;只读,只授 service_role)
 //   pa_mail_due_all         脑子跨所有人找连了 Gmail 的人去收信(0162;只读,只授 service_role)
-const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token', 'pa_mail_due_all'])
+//   pa_member_secrets_for   脑子替某个人读他的密钥(0169;只读,只授 service_role——浏览器会话从此拿不到密钥原文)
+const DEFINER_ALLOWLIST = new Set(['pa_tasks_due_all', 'pa_briefs_due_all', 'pa_owner_of_mcp_token', 'pa_mail_due_all', 'pa_member_secrets_for'])
 
 const PA_FUNCTIONS = `
   select p.proname as name, p.oid::regprocedure::text as sig, p.prosecdef as definer,
@@ -182,13 +183,17 @@ test('Gmail:各连各的;pa_set_gmail 只动自己那一行,pa_mail_due_all 只�
     assert.equal(pub.modules.mail, true)
     assert.ok(!('gmail_refresh_token' in pub), '页面那支不许带钥匙')
 
-    await asUser(pg, A, async () => {
-      const { rows: [{ s }] } = await pg.query(`select public.pa_member_secrets() as s`)
+    // 0169:钥匙只在服务端读(pa_member_secrets_for),浏览器会话连自己的原文也拿不到了
+    {
+      const { rows: [{ s }] } = await pg.query(`select public.pa_member_secrets_for($1) as s`, [A])
       assert.equal(s.gmail_refresh_token, 'rt-a')
+      const { rows: [{ s: sb }] } = await pg.query(`select public.pa_member_secrets_for($1) as s`, [B])
+      assert.equal(sb?.gmail_refresh_token ?? null, null, 'B 那一行没有 A 的钥匙')
+    }
+    await asUser(pg, A, async () => {
+      await assert.rejects(pg.query(`select public.pa_member_secrets() as s`), /permission denied/)
     })
     await asUser(pg, B, async () => {
-      const { rows: [{ s }] } = await pg.query(`select public.pa_member_secrets() as s`)
-      assert.equal(s?.gmail_refresh_token ?? null, null, 'B 看不见 A 的钥匙')
       await assert.rejects(pg.query(`select public.pa_set_gmail('b@gmail.com', null)`), /要么都给/)
     })
 

@@ -166,6 +166,13 @@ function writeTokens(t) {
 export async function client() {
   const t = hostedTenant()
   if (t) return clientForTenant(t)
+  // 线上进程里走到这儿 = 这次调用没带上「是谁」。原来会退回本机那份全站共用的令牌文件，
+  // 报出来的是「得重新授权」——像是你的授权掉了，其实是代码漏了租户上下文。说实话（2026-10-24）。
+  if (process.env.FAIRWIND_MODE === 'hosted') {
+    const e = new Error('内部错误：这次 Gmail 调用没有带上账号身份（不是你的授权掉了）/ Internal error: missing account context')
+    e.name = 'MailContextError'
+    throw e
+  }
   const c = newClient()
   const saved = readTokens()
   if (!saved.refresh_token) {

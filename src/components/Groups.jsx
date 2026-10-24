@@ -96,7 +96,7 @@ export default function Groups({ rows = [], onDone }) {
       } catch (e) {
         bad++
         if (e.needsAuth) { setErr(`${e.message}——${e.fix || t('重新授权一次')}`); break }
-        if (/fetch|Failed to fetch|ECONNREFUSED/i.test(String(e.message))) { setErr(t('脑子没开（npm run brain），收人要它去 Gmail 拉正文')); break }
+        if (/fetch|Failed to fetch|ECONNREFUSED/i.test(String(e.message))) { setErr(t('服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。')); break }
       }
     }
     setRun(null); setBusy(null)

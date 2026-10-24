@@ -159,7 +159,7 @@ export function makeHosted({ url, anon, service, createClient, dataRoot = '', tt
     let settings, judgments
     if (hit && now() - hit.at < ttlMs) ({ settings, judgments } = hit)
     else {
-      settings = await loadSettings(db)
+      settings = await loadSettings(db, { owner, service })
       judgments = docsFromRows(await loadJudgments(db))
       settingsCache.set(owner, { at: now(), settings, judgments })
     }
@@ -216,7 +216,15 @@ export function makeHosted({ url, anon, service, createClient, dataRoot = '', tt
   return { fromRequest, forOwner, forMcpToken, invalidate, _caches: { settingsCache, sessionCache, jwtCache } }
 }
 
-async function defaultLoadSettings(db) {
+// 密钥（模型 key、Claude 登录、Gmail 长期令牌、MCP 令牌）只该在服务端读（2026-10-24）。
+// 先走只给 service_role 的 pa_member_secrets_for(owner)；库里还没有这个函数（迁移 0169 没执行）
+// 就退回老的 pa_member_secrets——那个函数登录后的浏览器会话也调得动，0169 会把它收回。
+async function defaultLoadSettings(db, { owner, service } = {}) {
+  if (service && owner && typeof service.rpc === 'function') {
+    const r = await service.rpc('pa_member_secrets_for', { p_owner: owner })
+    const row = Array.isArray(r?.data) ? r.data[0] : r?.data
+    if (!r?.error && row) return settingsFromRow(row)
+  }
   const { data, error } = await db.rpc('pa_member_secrets')
   if (error) throw new Error('读不到你的设置:' + error.message)
   const row = Array.isArray(data) ? data[0] : data

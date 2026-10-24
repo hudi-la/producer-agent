@@ -30,6 +30,6 @@ COPY --from=build --chown=node:node /app/package.json ./package.json
 RUN mkdir -p /home/node/.ssh && chown node:node /home/node/.ssh && chmod 700 /home/node/.ssh
 # The backend shares parsers/model defaults with src/lib; a frontend-only dist
 # is insufficient. Fail the image build before deployment if these imports break.
-RUN node --input-type=module -e "await import('./brain/letter.js'); await import('./brain/engine/index.js'); await import('./brain/artifacts.js')"
+RUN node --input-type=module -e "await import('./brain/letter.js'); await import('./brain/engine/index.js'); await import('./brain/artifacts.js'); await import('./brain/contextHistory.js'); await import('./brain/decisions.js')"
 USER node
 CMD ["node", "scripts/start-render.mjs"]

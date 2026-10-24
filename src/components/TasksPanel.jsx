@@ -208,7 +208,7 @@ export default function TasksPanel({ tasks, open, onClose, brain = null, tz, onC
         </div>
 
         {brain && !brainUp && (
-          <div className="tk-warn">{t('脑子没开——到点的任务不会跑。另开一个终端跑 ')}<code>npm run brain</code>{t('，开了会立刻补跑。')}</div>
+          <div className="tk-warn">{t('服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。')}</div>
         )}
         {flipErr && <ErrorNotice error={flipErr} />}
 

@@ -8,11 +8,13 @@ import { dropFrom } from '../lib/rewind.js'
 import { md } from '../lib/when.js'
 import { arrivalMail } from '../lib/letter.js'
 import MailNotice from './MailNotice.jsx'
+import ArrivalLine from './ArrivalLine.jsx'
+import { kindOf, judgedText } from '../lib/messageKinds.js'
 import SayBubble from './Resay.jsx'
 import Veil from './Veil.jsx'
 
 import {
-  fetchDeliverables, fetchAttachments, setFinal, syncMail,
+  fetchDeliverables, fetchAttachments, setFinal,
   uploadAttachment, attachmentUrl, deleteAttachment,
 } from '../lib/deliverables.js'
 import Dossier from './Dossier.jsx'
@@ -122,15 +124,20 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
   // 备注不是谁在说话。role='note' 是这条线上的一笔记录（线下发生的事、一个决定），
   // 原来它也走「其余一律显示 Fairwind」那条路，于是你自己记的事看起来像 Fairwind 说的。
   // 真信单独一种长相，跟商量分开。见 Letter 上面那段。
-  if (m.kind === 'arrival') return <MailNotice m={arrivalMail(m, msgs)} />
+  // 「信到了」告知：信本身已经作为一张信卡在对话里了，就不再画影子；找不到那封信才画一条细线。
+  if (m.kind === 'arrival') {
+    const mail = arrivalMail(m, msgs)
+    if (!mail.meta?.notification_excerpt && msgs.some((x) => x.id === mail.id && x.kind === 'email')) return null
+    return <ArrivalLine m={mail} />
+  }
   if (m.kind === 'email') {
     return <MailNotice m={m} />
   }
   if (m.role === 'note') {
     return (
-      <div id={'msg-' + m.id} className="notecard">
-        <span className="ntag">{m.kind === 'decision' ? t('决定') : m.kind === 'memo' ? t('记忆') : m.kind === 'meet' ? t('见面') : t('备注')}</span>
-        <div className="md"><Md>{m.content}</Md></div>
+      <div id={'msg-' + m.id} className={'notecard' + (kindOf(m) === 'decision_fw' ? ' judged' : '')}>
+        <span className="ntag">{kindOf(m) === 'decision_fw' ? t('Fairwind 的判断') : m.kind === 'decision' ? t('决定') : m.kind === 'memo' ? t('记忆') : m.kind === 'meet' ? t('见面') : t('备注')}</span>
+        <div className="md"><Md>{kindOf(m) === 'decision_fw' ? judgedText(m, (w) => t('凭什么：{why}', { why: w })) : m.content}</Md></div>
       </div>
     )
   }
@@ -195,8 +202,8 @@ function Message({ m, msgs, editing, canEdit, onStartEdit, onCancelEdit, onResay
       )}
       {/* 它在聊天里改了提醒（0123）—— 出现的时候已经改完了，卡上只有【撤回】。
           只画落上了的（applied）：没落上的，日志里有原因，界面不画一张骗人的卡。 */}
-      {m.meta?.state_move?.applied && (
-        <StateMoveCard msgId={m.id} move={m.meta.state_move} />
+      {(m.meta?.state_move?.applied || m.meta?.state_move?.proposed) && (
+        <StateMoveCard msgId={m.id} move={m.meta.state_move} owner={owner} onUndone={onAdopted} />
       )}
       {m.meta?.memo?.applied && (
         <MemoCard msgId={m.id} memo={m.meta.memo} />
@@ -234,7 +241,7 @@ function PromotedAnchor({ m, title }) {
 
 function emptyText(stage) {
   // 新机会的卡本该在后台就读透了。还空着 = 脑子没开，或刚进来还没轮到。
-  if (stage === 'pending') return t('Fairwind 还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。')
+  if (stage === 'pending') return t('Fairwind 还没读这条——稍等一会儿就有了。')
   if (stage === 'matching') return t('你批准了——接下来我们一起挑用哪件作品，再往下写。')
   return t('这条机会线还没有往来。我这就开始。')
 }

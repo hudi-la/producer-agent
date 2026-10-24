@@ -22,9 +22,15 @@ async function freshWithTwoUsers() {
   await registerLocalUser(pg, { id: A, email: 'a@test.local' })
   await registerLocalUser(pg, { id: B, email: 'b@test.local' })
   await assumeUser(pg)
+  // 0169 起密钥原文只给服务端:这里用超级用户代替 service_role 读,读完切回 authenticated
+  const secretsOf = async (uid) => {
+    await pg.exec('reset role')
+    try { return (await pg.query('select pa_member_secrets_for($1) as s', [uid])).rows[0].s }
+    finally { await pg.exec('set role authenticated') }
+  }
   const as = (uid) => setLocalUid(pg, uid)
   const one = async (sql, params) => (await pg.query(sql, params)).rows[0]
-  return { pg, dir, as, one, close: async () => { await pg.close(); rmSync(dir, { recursive: true, force: true }) } }
+  return { pg, dir, as, one, secretsOf, close: async () => { await pg.close(); rmSync(dir, { recursive: true, force: true }) } }
 }
 
 test('member_settings:注册即有一行;pa_member_settings 遮 key、pa_member_secrets 给全串;B 看不见 A 的', async () => {
@@ -54,8 +60,9 @@ test('member_settings:注册即有一行;pa_member_settings 遮 key、pa_member_
     // 只改传了的字段:provider 没传,还是出厂值
     assert.equal(again.provider, 'claude-key')
 
-    // 全串只在 pa_member_secrets
-    const secrets = (await db.one('select pa_member_secrets() as s')).s
+    // 全串只在服务端那支(0169 起 pa_member_secrets_for;浏览器会话调不到)
+    const secrets = await db.secretsOf(A)
+    await assert.rejects(db.pg.query('select pa_member_secrets() as s'), /permission denied/)
     assert.equal(secrets.api_key, A_KEY)
     assert.equal(secrets.mcp_token, seeded.mcp_token)
 
@@ -66,7 +73,7 @@ test('member_settings:注册即有一行;pa_member_settings 遮 key、pa_member_
     assert.equal(upd.openai_key_set, true); assert.equal(upd.openai_key_hint, 'zzzzzz')
     assert.equal(upd.model, 'gpt-5')
     assert.equal(upd.api_key_set, false); assert.equal(upd.api_key_hint, '')
-    assert.equal((await db.one('select pa_member_secrets() as s')).s.api_key, null)
+    assert.equal((await db.secretsOf(A)).api_key, null)
     // mcp_token 不能从 p 里改
     const sneaky = (await db.one('select pa_set_member_settings($1::jsonb) as s', [JSON.stringify({ mcp_token: 'hijack' })])).s
     assert.equal(sneaky.mcp_token, seeded.mcp_token)
@@ -76,7 +83,7 @@ test('member_settings:注册即有一行;pa_member_settings 遮 key、pa_member_
     const bs = (await db.one('select pa_member_settings() as s')).s
     assert.ok(bs); assert.equal(bs.api_key_set, false); assert.equal(bs.openai_key_set, false)
     assert.notEqual(bs.mcp_token, seeded.mcp_token)
-    const bsec = (await db.one('select pa_member_secrets() as s')).s
+    const bsec = await db.secretsOf(B)
     assert.ok(!JSON.stringify(bsec).includes(A_KEY)); assert.ok(!JSON.stringify(bsec).includes('zzzzzz'))
     assert.equal(bsec.api_key, null)
     // 直读表也只有自己一行
@@ -126,7 +133,7 @@ test('judgment_docs:A 存两篇,B 一篇都看不见;A 删一篇剩一篇', asyn
 test('0150 / 0151 新加的 pa_*:全是 invoker,anon 一个都调不了;两张表 RLS 开着、policy 在', async () => {
   const db = await freshWithTwoUsers()
   try {
-    const names = ['pa_member_settings', 'pa_set_member_settings', 'pa_rotate_mcp_token', 'pa_member_secrets',
+    const names = ['pa_member_settings', 'pa_set_member_settings', 'pa_rotate_mcp_token',
       'pa_judgment_docs', 'pa_set_judgment_doc', 'pa_drop_judgment_doc']
     const { rows } = await db.pg.query(`
       select p.proname as name, p.prosecdef as definer,

@@ -96,7 +96,7 @@ export async function sendMessage(owner, text, meta, runId) {
       body: JSON.stringify({ ...ownerBody(owner), text, ...(meta ? { meta } : {}), ...(runId ? { run_id: runId } : {}) }),
     })
   } catch (_) {
-    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
+    throw new Error(t('服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。'))
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(errorText(body.error) || t('脑子出错了（{status}）', { status: res.status }))
@@ -131,7 +131,7 @@ export async function streamChat(body, onEvent) {
       body: JSON.stringify(body),
     })
   } catch (_) {
-    throw new Error(t('Fairwind 的脑子没开 —— 另开一个终端跑 npm run brain'))
+    throw new Error(t('服务器那边暂时没应,过一会儿刷新再试;一直这样就告诉 Hu Di。'))
   }
   if (res.status === 404) throw new NoStream()
   if (!res.ok) {

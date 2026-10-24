@@ -144,7 +144,7 @@ test('没有 body_raw 用 content 顶上', () => {
 // ── Task 6 补的格子：DEBRIEF 和 OWE_* ────────────────────────
 
 test('DEBRIEF 三个 event 的格子都在；OWE_* 借用 IDLE 的格子', () => {
-  for (const e of ['NOTE', 'THEIR_LETTER', 'MY_LETTER', 'YOUR_ANSWER'])
+  for (const e of ['NOTE', 'THEIR_LETTER', 'MY_LETTER'])
     assert.ok(cellFor('DEBRIEF', e), `DEBRIEF x ${e} 缺了`)
   assert.ok(cellFor('OWE_THANKS', 'MY_LETTER'))
   assert.equal(cellFor('OWE_MEETING_NOTE', 'MY_LETTER'), cellFor('IDLE', 'MY_LETTER'))
@@ -159,16 +159,6 @@ test('OWE_THANKS x MY_LETTER 问「谢过了吗」，顺带也算一句谢', () 
   assert.match(p, /顺带一句也算/)
 })
 
-test('parseMet：见成了 / 没见成改约 / 看不出来', () => {
-  const { parseMet } = mod
-  assert.deepEqual(parseMet('x\n[[TAG]] {"met":true,"gist":"聊了预算"}'),
-    { met: true, gist: '聊了预算', meet_at: null })
-  const re = parseMet('x\n[[TAG]] {"met":false,"meet_at":"2026-09-18"}')
-  assert.equal(re.met, false)
-  assert.equal(re.meet_at, '2026-09-18T12:00:00')
-  assert.equal(parseMet('x\n[[TAG]] {"met":"maybe"}').met, null)
-  assert.equal(parseMet('没标记'), null)
-})
 
 // 2026-09-06 Tom 那封信：「Let's aim for Friday the 11th or Saturday the 12th.
 // I'll let you know which day works best for me...」——收进来了、判过了、
@@ -187,4 +177,16 @@ test('WAITING_REPLY x THEIR_LETTER：这封信自己的三件事无条件问，�
   assert.match(p, /要你回吗/)
   assert.match(p, /meet_at/)
   assert.match(p, /awaiting/)
+})
+
+test('「见面之后.md」拼进见面已过（DEBRIEF）的格子，别的格子不带', async () => {
+  const { _setDocs } = await import('./judgments.js')
+  _setDocs({ YOUR_ANSWER: '见完一律记聊了什么', NOTE: '手记口味' })
+  try {
+    const fact = { kind: 'note', role: 'note', subject_name: 'Kirk', content: '见完了', recent: [] }
+    const d = cellFor('DEBRIEF', 'NOTE').ask(fact, { what: '9/10 见面' })
+    assert.match(d, /见完一律记聊了什么/); assert.match(d, /手记口味/)
+    const i = cellFor('IDLE', 'NOTE').ask(fact, null)
+    assert.doesNotMatch(i, /见完一律记聊了什么/); assert.match(i, /手记口味/)
+  } finally { _setDocs({}) }
 })

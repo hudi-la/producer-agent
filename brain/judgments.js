@@ -85,12 +85,16 @@ export function setJudgmentsEnabled(on) { ENABLED = Boolean(on) }
 export function judgmentsEnabled() { return enabledNow() }
 export function hasJudgments() { return enabledNow() && Object.keys(docsNow()).length > 0 }
 
-/** 这一格该拼进去的文字。开关关着或没写 = 空串。 */
-export function judgmentsFor(ev) {
+/**
+ * 这一格该拼进去的文字。开关关着或没写 = 空串。
+ * state 传进来时：见面时间已过（DEBRIEF）的那几格，额外带上「见面之后.md」。
+ * （2026-10-24：原来这份文档挂在一个早已不用的格子 YOUR_ANSWER 上，设置页能改、改了不生效。）
+ */
+export function judgmentsFor(ev, state = null) {
   if (!enabledNow() || SUPPRESS) return ''
   const D = docsNow()
-  const parts = [D['*'], D[ev]].filter(Boolean)
-  return parts.length ? `\n【${ev === 'YOUR_ANSWER' ? '见面之后' : ev === 'MY_LETTER' ? '我发出的信' : ev === 'NOTE' ? '手记' : ev === 'THEIR_LETTER' ? '对方来信' : ev},我的判据】\n${parts.join('\n\n')}\n` : ''
+  const parts = [D['*'], D[ev], state === 'DEBRIEF' ? D.YOUR_ANSWER : null].filter(Boolean)
+  return parts.length ? `\n【${state === 'DEBRIEF' ? '见面之后 · ' : ''}${ev === 'MY_LETTER' ? '我发出的信' : ev === 'NOTE' ? '手记' : ev === 'THEIR_LETTER' ? '对方来信' : ev},我的判据】\n${parts.join('\n\n')}\n` : ''
 }
 
 /** 测试用:直接塞文档,不读盘。 */

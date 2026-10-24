@@ -26,7 +26,9 @@ export default function ArtifactCard({ letter, form, messageId, artifactIndex = 
   const to = d?.meta?.to || letter?.to
   const fields = d?.rules?.fields || form?.fields || []
   const { allOk } = checkRules(d?.rules || {}, body, d?.meta || {}, { needsBody: email })
-  const final = d?.status === 'final' || status === 'sent'
+  // 发出去了但记账没跟上的那种（2026-10-24）：产出上带着 sent_gmail_id，也算完成，绝不再给发送键
+  const final = d?.status === 'final' || status === 'sent' || Boolean(d?.meta?.sent_gmail_id)
+  const [note, setNote] = useState('')
   const discarded = !final && (discardedOverride ?? d?.meta?.artifact_discarded)
   async function go(action) {
     if (lock.current || editorOpen || final) return
@@ -41,8 +43,10 @@ export default function ArtifactCard({ letter, form, messageId, artifactIndex = 
       } else if (action === 'edit') await onAdopted?.(current.id)
       else if (action === 'prepare') { setConfirming(true); await onAdopted?.() }
       else if (action === 'send') {
-        await sendLetterNow(owner, current.id)
-        setStatus('sent'); setConfirming(false); await onAdopted?.()
+        const out = await sendLetterNow(owner, current.id)
+        setStatus('sent'); setConfirming(false)
+        if (out?.recorded === false) setNote(t('信已经发出去了。系统里的记录稍后会从 Gmail「已发送」补上，不要再按一次。'))
+        await onAdopted?.()
       } else if (action === 'final') {
         await setFinal(current.id, true); setSaved({ ...current, status: 'final' }); await onAdopted?.()
       } else {
@@ -61,7 +65,7 @@ export default function ArtifactCard({ letter, form, messageId, artifactIndex = 
   </div>
   return <div className="lcard artifact-card">
     <div className="lcard-h"><span className="lcard-tag">{email ? t('邮件') : fields.length ? t('申请表') : t('文档')}</span>
-      <span>{final ? t('已完成') : status === 'draft' ? t('已存入 Gmail 草稿箱') : status === 'copied' ? t('已复制') : d?.meta?.gmail_draft_id ? t('在 Gmail 草稿箱') : t('草稿')}</span></div>
+      <span>{d?.meta?.sent_gmail_id || status === 'sent' ? t('已发出') : final ? t('已完成') : status === 'draft' ? t('已存入 Gmail 草稿箱') : status === 'copied' ? t('已复制') : d?.meta?.gmail_draft_id ? t('在 Gmail 草稿箱') : t('草稿')}</span></div>
     <div className="lcard-sub">{title}</div>
     {email && <div className="lcard-to">{t('收件人：')}{Array.isArray(to) ? to.join(', ') : to}</div>}
     {body && <div className="lcard-body md"><Md>{body}</Md></div>}
@@ -73,6 +77,7 @@ export default function ArtifactCard({ letter, form, messageId, artifactIndex = 
       catch { setErr(t('复制失败，请选中文本复制')) }
     }}>{t('复制内容')}</button>}
     {editorOpen && <p className="pf-note">{t('先保存或取消右栏的修改，再操作产出。')}</p>}
+    {note && <p className="pf-note">{note}</p>}
     {err && <ErrorNotice error={err} context={t('保存更改')} />}
     {!final && <div className="artifact-actions">
       <button className="b" disabled={busy || editorOpen} onClick={() => go('edit')}>{t('修改')}</button>

@@ -72,9 +72,9 @@ ${(s.mails || []).map(一封).join('\n') || '    （没有往来）'}`
  * 一次判一批。量按**对象数**走（几十个），不按信数（几千封）。
  */
 export function rejudgePrompt(subjects) {
-  return `下面是 ${subjects.length} 条线 / 个人的近况。每一条只答两个问题。
+  return `下面是 ${subjects.length} 条线 / 个人的近况。每一条只答一个问题。
 
-问题一：**这段交流里，有没有约定下一个该碰的时间点？**
+**这段交流里，有没有约定下一个该碰的时间点？**
 有就给 YYYY-MM-DD，并把**依据的原话**抄下来当出处。
 
 **模糊的锚点也要落成一个具体日子。** 这是最要紧的一条：
@@ -95,12 +95,8 @@ export function rejudgePrompt(subjects) {
 **「现在在哪一栏」也是判断的一部分**：已经在「发出&提交」或更后面的，
 说明这件事你做完了，多半不需要再定一个催的日子。
 
-问题二：**最后那封对方来的信，需要你回吗？**
-需要回 = 里面有等你答的事。不需要回 = 客套收尾、单纯确认、通知类的告知。
-你已经回过了，也算不需要回。**拿不准就算需要回。**
-
 ${subjects.map(一条).join('\n\n')}
 
 **最后一行**单独输出，别的什么都不要加：
-[[REJUDGE]] [{"id":"<上面那个 id>","touch":"YYYY-MM-DD"|null,"why":"依据的原话，20 字内"|null,"needs_reply":true|false,"reply_why":"一句话"}]`
+[[REJUDGE]] [{"id":"<上面那个 id>","touch":"YYYY-MM-DD"|null,"why":"依据的原话，20 字内"|null}]`
 }

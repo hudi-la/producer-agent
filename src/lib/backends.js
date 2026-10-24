@@ -92,3 +92,21 @@ export async function checkBrain() {
     return { up: false, stale: false, mail: null }
   }
 }
+
+/**
+ * 读全一张视图（2026-10-24）。Supabase 的接口一次最多回 1000 行，超出的**静默丢掉、不报错**——
+ * 线上已经有人的地址判定档案到了 1465 行。build 每次返回一个新的查询（带好 select / 过滤 / 排序），
+ * 这里按 1000 一页往后翻，直到某页不满。返回形状跟单次查询一样：{ data, error }。
+ */
+export async function selectAll(build, { page = 1000, cap = 50000 } = {}) {
+  const first = build()
+  if (typeof first?.range !== 'function') return await first
+  let out = []
+  for (let from = 0; from < cap; from += page) {
+    const { data, error } = await (from === 0 ? first : build()).range(from, from + page - 1)
+    if (error) return { data: null, error }
+    out = out.concat(data || [])
+    if (!data || data.length < page) break
+  }
+  return { data: out, error: null }
+}

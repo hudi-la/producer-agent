@@ -1,4 +1,4 @@
-import { supa, DB_CONFIGURED, FELL_BACK, BRAIN, brainFetch } from './backends.js'
+import { supa, DB_CONFIGURED, FELL_BACK, BRAIN, brainFetch, selectAll } from './backends.js'
 import { BUMP_WAIT } from './cues.js'
 import { day as dayOf } from './when.js'
 
@@ -117,11 +117,6 @@ export function layer(items, today = new Date()) {
            todo: [...hand, ...old].sort(新的在上面) }
 }
 
-/**
- * 邮件类的东西归线不归人 —— 跟 cues.js 里那条同一个判据。
- * 「被判为不用回的」也是邮件类的，所以也得压，不然一封信在人和线上各列一条。
- */
-const 归了线 = (f) => f.subject_kind === 'contact' && Boolean(f.mail_on_line)
 
 const empty = (reason, detail) => ({
   due: [], waiting: [],
@@ -137,22 +132,11 @@ const empty = (reason, detail) => ({
 export async function loadNotifications() {
   if (!DB_CONFIGURED) return empty(FELL_BACK.NO_CONFIG)
   try {
-    const { data: facts, error: fe } = await supa.from('v_pa_cue_facts').select('*')
+    const { data: facts, error: fe } = await selectAll(() => supa.from('v_pa_cue_facts').select('*').order('subject_kind').order('subject_id'))
     if (fe) return empty(FELL_BACK.QUERY_FAILED, fe.message)
 
-    const ids = [...new Set((facts || []).map((f) => f.last_in_id).filter(Boolean))]
-    // 判决只为「还有哪些没判过」服务（triage 的排队口径）；cue_marks 不再读 ——
-    // 面板上已经没有靠记号藏行的地方了。
-    // 下面三条原来都没解构 error（2026-08-21 之前）——查询失败时 data 是
-    // undefined，被 `|| []` 兜成空数组，面板显示「没有事要办」，跟真没事
-    // 长得一模一样。限额打爆那天就是这么静默的。失败必须走 QUERY_FAILED，
-    // 让界面说「拉不下来」，别替库编一个「一切安好」。
-    const { data: verdicts, error: ve } = ids.length
-      ? await supa.from('v_pa_letter_verdicts').select('*').in('gmail_message_id', ids)
-      : { data: [], error: null }
-    if (ve) return empty(FELL_BACK.QUERY_FAILED, ve.message)
-    const vOf = Object.fromEntries((verdicts || []).map((v) => [v.gmail_message_id, v]))
-
+    // 「这封要不要回」的旧判决（letter_verdicts）2026-10-24 退役：它跟状态机各判一份、结论常相反，
+    // 面板早就不用它了。要不要回只看下面的 state。
     // state 那一半：该动的 / 等待，全是库里现算的（0094/0098）。
     // 旧的五种由头（cues.js 那套）不再进面板 —— 它们的信息都并进了 state。
     const { data: states, error: se } = await supa.from('v_pa_state').select('*')
@@ -168,27 +152,6 @@ export async function loadNotifications() {
     if (ue) return empty(FELL_BACK.QUERY_FAILED, ue.message)
 
     const today = new Date()
-    // 「被判为不用回的」那层从面板退役了（2026-08-20，他拍的）：
-    // 它让人「总觉得要对一下，很疲惫」，而且问的是错粒度的问题 ——
-    // 「这封要不要回」只答半句，另外半句（线在等什么）在状态机里。
-    // 数据一条没删（letter_verdicts 都在）；错判的发现走看板的「挂出来」
-    // 视图：没有气泡的活跃卡 = 该起疑的安静线。
-    // 还没判过的那些 —— 交给 triage() 判一批。
-    //
-    // **只判球真在你手上的那几封。** 一开始写成「凡是最后一封来信都判」，
-    // 真跑下来四封全白判了：Kirk / Mattie / Sarah 三条你早回过了
-    // （last_out_at 晚于 last_in_at），球不在你手上，那封信要不要回
-    // 根本不会被问到。
-    //
-    // 加上这个闸之后，量锁在「此刻有几件事等你回」上——个位数，
-    // 不是「你有多少个对象」（几十），更不是「你收过多少封信」（几千）。
-    const 球在你手上 = (f) =>
-      f.last_in_id && !归了线(f) &&
-      (!f.last_out_at || new Date(f.last_out_at) <= new Date(f.last_in_at))
-    const unjudged = (facts || [])
-      .filter((f) => 球在你手上(f) && !vOf[f.last_in_id])
-      .map((f) => f.last_in_id)
-
     // 脏了的：最后一件事（信 / 你记的一笔 / **移卡**）晚于上次重判的水位。
     // 「脏不脏」是库里算出来的（v_pa_cue_facts.stale），不是这儿存的标记
     // ——存的会跟事实分叉。
@@ -211,7 +174,7 @@ export async function loadNotifications() {
 
     return { ...splitStates(rows),
              unclaimed: unclaimed || 0,
-             unjudged: [...new Set(unjudged)], stale,
+             unjudged: [], stale,
              source: 'live', reason: null }
   } catch (e) {
     return empty(FELL_BACK.QUERY_FAILED, e.message)
@@ -269,21 +232,3 @@ export async function rejudge(subjects) {
 /** 一批判多少个。按对象数，不按信数。 */
 export const REJUDGE_BATCH = 12
 
-/**
- * 判一批信要不要回。
- * **判不成不抛** —— 最坏是这一批当作「要回」，多吵你几条，不丢东西。
- */
-export async function triage(ids) {
-  if (!ids?.length) return { judged: 0, failed: 0 }
-  try {
-    const r = await brainFetch(`${BRAIN}/letters/triage`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ids }),
-    })
-    const out = await r.json().catch(() => null)
-    if (!r.ok || !out || out.error) return { judged: 0, failed: ids.length }
-    return out
-  } catch (_) {
-    return { judged: 0, failed: ids.length }
-  }
-}

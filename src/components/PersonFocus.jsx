@@ -1,4 +1,5 @@
-import MailNotice from './MailNotice.jsx'
+import ArrivalLine from './ArrivalLine.jsx'
+import { kindOf, judgedText } from '../lib/messageKinds.js'
 import { messageLetters } from '../lib/messageLetters.js'
 import { reportError } from '../lib/reportError.js'
 import ArtifactEditor from './ArtifactEditor.jsx'
@@ -81,6 +82,9 @@ function Cell({ label, value, placeholder, onSave, type = 'text', multiline = fa
   )
 }
 
+// 判断笔在列表里显示「它判了什么、凭什么」，你当时那句话作为引用
+const asJudged = (m) => ({ ...m, content: judgedText(m, (w) => t('凭什么：{why}', { why: w })) })
+
 export default function PersonFocus({
   person, onBack, onChanged, onOpenPursuit,
   // 两种装法：page 是桌上那格（整页三栏），drawer 是通讯录旁边划出来的抽屉
@@ -147,7 +151,9 @@ export default function PersonFocus({
   // 邮件是有凭据的（库里有原文），我记的是你的记忆（只有你那一句）。
   // 它给你写回信的时候，这两种材料的分量不一样。
   const emails = mails.filter(isLetter)
-  const notes  = mails.filter((m) => m.role === 'note')
+  // 你亲手记的 vs Fairwind 拨提醒时记下的判断：分开放，别让它的推断冒充你记的事（2026-10-24）
+  const notes  = mails.filter((m) => m.role === 'note' && kindOf(m) !== 'decision_fw')
+  const judged = mails.filter((m) => kindOf(m) === 'decision_fw')
   const talk  = (msgs || []).filter(isContactTalk)
 
   // 「上次碰」光有日期是没用的。「8/10 · 你记的一笔」等于没说——
@@ -446,6 +452,12 @@ export default function PersonFocus({
                     : <p className="empty">{t('当面聊了、通了电话、微信说了——在中栏记一条，它会长在这儿。')}</p>}
                 </Pool>
 
+                {judged.length > 0 && (
+                  <Pool title={t('Fairwind 的判断')} count={t('{n} 条', { n: judged.length })} defaultOpen={false}>
+                    <MailList items={judged.map(asJudged)} head={3} />
+                  </Pool>
+                )}
+
                 {mods.mail && <div className="pf-field">
                   <input placeholder={t('贴 Gmail thread id')} value={claim}
                          onChange={(e) => setClaim(e.target.value)} />
@@ -483,14 +495,14 @@ export default function PersonFocus({
 
               {talk.length ? (
                 talk.map((m) => {
-                  if (m.kind === 'arrival') return <MailNotice key={m.id} m={arrivalMail(m, msgs)} />
+                  if (m.kind === 'arrival') return <ArrivalLine key={m.id} m={arrivalMail(m, msgs)} />
                   // 谁在说话得说准，跟机会线那边一个判据。
                   const mine = m.role === 'artist'
                   const isNote = m.role === 'note'
                   return (
                     <div key={m.id} className={'msg' + (mine ? ' you' : isNote ? ' note' : ' producer')}>
                       <span className="who">
-                        {isNote ? (m.kind === 'memo' ? t('记住的一句') : t('你记的一次接触')) : mine ? t('你') : 'Fairwind'}
+                        {isNote ? (kindOf(m) === 'decision_fw' ? t('Fairwind 的判断') : m.kind === 'memo' ? t('记住的一句') : t('你记的一次接触')) : mine ? t('你') : 'Fairwind'}
                         <span className="viamail"> · {md(m.created_at)}</span>
                       </span>
                       {/* 库里存的是 markdown。不渲的话「**这一类事**」在页面上
@@ -524,8 +536,8 @@ export default function PersonFocus({
                           owner={{ contactId: c.id }} messageId={m.id} items={dels} editorOpen={!!selectedArtifact} onAdopted={async id => { await reload(); if (id) setArtifactId(id) }}
                         />
                       )}
-                      {m.meta?.state_move?.applied && (
-                        <StateMoveCard msgId={m.id} move={m.meta.state_move} onUndone={reload} />
+                      {(m.meta?.state_move?.applied || m.meta?.state_move?.proposed) && (
+                        <StateMoveCard msgId={m.id} move={m.meta.state_move} owner={{ contactId: c.id }} onUndone={reload} />
                       )}
                       {m.meta?.memo?.applied && (
                         <MemoCard msgId={m.id} memo={m.meta.memo} onUndone={async () => { await reload(); onChanged?.() }} />

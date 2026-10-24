@@ -19,6 +19,7 @@ export default {
   ' · 同时发给了 {n} 条线': ' · also sent to {n} pursuits', '你发了一封': 'You sent one', '看左栏 ↖': 'See left column ↖',
   'Fairwind 起了一版 → 成了右栏的《{title}》': 'Fairwind drafted one → now "{title}" in the right column',
   'Fairwind 还没读这条——脑子开着的话稍等一会儿就有了（没开就跑 npm run brain）。': "Fairwind hasn't read this one yet — if the brain is running it'll show up shortly (if not, run npm run brain).",
+  'Fairwind 还没读这条——稍等一会儿就有了。': "Fairwind hasn't read this one yet — it'll show up shortly.",
   '你批准了——接下来我们一起挑用哪件作品，再往下写。': "You approved it — next we pick which work to use, then keep writing.",
   '这条机会线还没有往来。我这就开始。': "Nothing on this pursuit yet. I'll get started.",
   '这份只有登记没有字节（多半是早年的空行）': 'This one is registered but has no bytes (probably an old empty row)',
@@ -63,6 +64,12 @@ export default {
   '＋ 挂一个人上来': '＋ Attach someone', '搜人名、机构，或机构信箱地址': 'Search by name, organization, or org mailbox address', '算了': 'Never mind',
   '没搜到。还没进通讯录的人，先去人际管理那边认一下。': "No match. If they're not in your contacts yet, identify them under People first.",
   // ── 提醒改了那张小卡（StateMoveCard） ──
+  '建议改提醒': 'Suggested reminder change', '采纳': 'Apply', '改着……': 'Applying…',
+  '后台到点时提的，你不在场，等你看过再改': 'Suggested by a background check while you were away — review before applying',
+  '理由里说「已发出」，但邮件记录里没找到这封信': 'The reason says it was sent, but no such email is in the mail record',
+  'Fairwind 的判断': "Fairwind's judgment", '已发出': 'Sent',
+  '信已经发出去了。系统里的记录稍后会从 Gmail「已发送」补上，不要再按一次。': "The email has been sent. The record will be filled in from Gmail's Sent folder shortly — don't press send again.",
+  '已于 {at} 发出 · 记录稍后从 Gmail「已发送」补上': "Sent on {at} · the record will be filled in from Gmail's Sent folder",
   '撤回了 —— 提醒长回去了': 'Undone — the reminder is back', '提醒改成了': 'Reminder changed', '凭什么：{why}': 'Because: {why}',
   '撤着……': 'Undoing…', '撤回': 'Undo',
   // ── lib/deliverables ──
