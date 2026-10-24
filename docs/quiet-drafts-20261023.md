@@ -41,3 +41,11 @@ full excerpt with an ellipsis, and expandable original. Never infer sending
 from draft similarity. Missing linked originals retain a labeled excerpt.
 Pursuit notification rows use the same renderer. Quiet draft styling remains.
 26 regression tests and hosted build pass. No data writes or email sends.
+
+Correction published 2026-10-23 20:30 PDT: commit
+2b27093e78dc97ffe6893d4f35383117de88ab7b, Render deployment
+dep-dbe2cl7avr4c739rnc80, succeeded / Live. Production health ok.
+Authenticated contact page verified incoming “Kiko Thomas 来信” and outgoing
+“你发出” cards; latest outgoing notice expands the complete original through
+the closing signature and collapses correctly. No mail or database writes.
+Rollback code to 4120087 only if necessary (that version hides notifications).
