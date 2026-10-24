@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { saidThisTime, GIST_CAP, isLetter, isExchange, isContactTalk } from './letter.js'
+import { saidThisTime, GIST_CAP, isLetter, isExchange, isContactTalk, arrivalMail } from './letter.js'
 
 test('Gmail 的 > 引用砍掉', () => {
   assert.equal(saidThisTime('Thanks!\n\n> old stuff\n> more old'), 'Thanks!')
@@ -89,13 +89,24 @@ test('往来 = 真信 + 你手记的；草稿不算', () => {
   assert.equal(isExchange({ kind: 'message' }), false)
 })
 
-test('contact chat excludes sent-mail excerpts while retaining the original draft', () => {
+test('contact timeline retains notifications for separate mail rendering', () => {
   const draft = { id: 'draft', role: 'producer', kind: 'message', meta: { letter: { body: 'Complete letter' } } }
   const mail = { id: 'sent', role: 'artist', kind: 'email', gmail_message_id: 'gmail-sent' }
   const arrival = { id: 'notice', role: 'producer', kind: 'arrival', content: 'Hi Kiko, partial', meta: { dir: 'out', msg_id: mail.id } }
-  assert.deepEqual([draft, mail, arrival].filter(isContactTalk), [draft])
+  assert.deepEqual([draft, mail, arrival].filter(isContactTalk), [draft, arrival])
   assert.equal(isExchange(mail), true)
-  assert.equal(isContactTalk({ ...arrival, meta: { dir: 'in' } }), false)
+  assert.equal(isContactTalk({ ...arrival, meta: { dir: 'in' } }), true)
   assert.equal(isContactTalk({ role: 'artist', kind: 'message' }), true)
   assert.equal(isContactTalk({ role: 'note', kind: 'meet' }), false)
+})
+
+test('arrival uses the linked full mail and its real sender, not the producer role', () => {
+  const mail = {id:'mail',kind:'email',role:'artist',body_raw:'Full sent letter',gmail_message_id:'g'}
+  const notice = {kind:'arrival',role:'producer',content:'Partial',meta:{msg_id:'mail',dir:'out'}}
+  assert.equal(arrivalMail(notice,[mail]),mail)
+  assert.equal(arrivalMail({...notice,meta:{gmail_message_id:'g'}},[mail]),mail)
+  assert.equal(arrivalMail(notice,[]).role,'artist')
+  assert.equal(arrivalMail({...notice,meta:{dir:'in',who:'Sender'}},[]).role,'org')
+  assert.equal(arrivalMail(notice,[]).meta.notification_excerpt,true)
+  assert.equal(arrivalMail(notice,[{id:'mail',kind:'draft',body_raw:'Unsent'}]).body_raw,'')
 })

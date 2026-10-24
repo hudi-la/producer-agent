@@ -1,3 +1,4 @@
+import MailNotice from './MailNotice.jsx'
 import { messageLetters } from '../lib/messageLetters.js'
 import { reportError } from '../lib/reportError.js'
 import ArtifactEditor from './ArtifactEditor.jsx'
@@ -13,7 +14,7 @@ import DeskToggle from './DeskToggle.jsx'
 import { useGrow } from '../lib/useGrow.js'
 import { MailList } from './Mail.jsx'
 import { useModules } from '../lib/ModulesContext.jsx'
-import { isLetter, isExchange, isContactTalk } from '../lib/letter.js'
+import { isLetter, isExchange, isContactTalk, arrivalMail } from '../lib/letter.js'
 // 它写完一封信，对话里那条就渲染成一张信卡——点一下落进右栏「要发的信」。
 import LetterCard from './LetterCard.jsx'
 // 它填的是一张申请表——同一个路子，收进产出之后一格一格改。
@@ -487,6 +488,7 @@ export default function PersonFocus({
 
               {talk.length ? (
                 talk.map((m) => {
+                  if (m.kind === 'arrival') return <MailNotice key={m.id} m={arrivalMail(m, msgs)} />
                   // 谁在说话得说准，跟机会线那边一个判据。
                   const mine = m.role === 'artist'
                   const isNote = m.role === 'note'

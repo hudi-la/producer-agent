@@ -30,3 +30,14 @@ Authenticated production browser confirms the truncated arrival is absent from
 contact chat, original draft remains, and sent correspondence is still visible.
 Actual dark-theme document styling verified in the production page.
 A brief 502 during container replacement resolved when deployment became Live.
+
+## Correction: retain notifications using the established mail card
+
+The user wants to retain incoming/outgoing notices. Hiding arrivals was an
+incorrect interpretation. Restore them in contact chat through a shared
+MailNotice component extracted from the existing pursuit Letter renderer.
+Resolve the arrival's exact linked mail ID (or Gmail ID) to show its sender,
+full excerpt with an ellipsis, and expandable original. Never infer sending
+from draft similarity. Missing linked originals retain a labeled excerpt.
+Pursuit notification rows use the same renderer. Quiet draft styling remains.
+26 regression tests and hosted build pass. No data writes or email sends.

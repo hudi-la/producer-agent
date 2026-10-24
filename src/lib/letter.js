@@ -76,8 +76,16 @@ export const isLetter = (m) => m?.kind === 'email'
 export const isExchange = (m) =>
   isLetter(m) || m?.role === 'note' || m?.kind === 'meet'
 
-/** Mail arrivals are notification excerpts, not a new assistant reply.
- * Real mail and notes remain in the contact's correspondence column. */
+/** Contact timeline includes notifications; real mail and notes also live in correspondence. */
 export function isContactTalk(m) {
-  return !m.gmail_message_id && m.role !== 'note' && m.kind !== 'arrival' && !isLetter(m)
+  return !m.gmail_message_id && m.role !== 'note' && !isLetter(m)
+}
+
+/** Resolve notifications to their actual mail, never to a similar-looking draft. */
+export function arrivalMail(notice, messages = []) {
+  const mail = (messages || []).find(m => isLetter(m) &&
+    (m.id === notice.meta?.msg_id || (notice.meta?.gmail_message_id && m.gmail_message_id === notice.meta.gmail_message_id)))
+  if (mail) return mail
+  return { ...notice, kind: 'email', role: notice.meta?.dir === 'out' ? 'artist' : 'org',
+    body_raw: '', meta: { ...notice.meta, from_name: notice.meta?.who, notification_excerpt: true } }
 }
