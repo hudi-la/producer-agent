@@ -1,7 +1,7 @@
 -- 0169 · 被覆盖掉的功能合回来，密钥只给服务端（2026-10-24 体检）
 --
--- ⚠️ 执行顺序：**先上线 2026-10-24 那版后端**（它会优先调 pa_member_secrets_for，
---    读不到才退回老函数），**再跑这支**。反过来跑，老后端读不到设置，全员掉线。
+-- 这一支对新旧后端都安全，可以先于发布执行（2026-10-24 已先执行）。
+-- 收回浏览器读取密钥原文的那一步拆到了 0170：那一步必须等新后端上线之后再跑。
 --
 -- 一、两个上下文函数带回「提醒栏」（state）。
 --     0129 加的，0135（另一条分支上更早写的，重编号后排到了 0129 后面）用旧函数体整个盖掉了。
@@ -12,9 +12,8 @@
 --     信头构建（brain/mail/addr.js）一直在传 names，写库这一步把它丢了，
 --     于是「抄送的人自动进门」每次都得回头去 Gmail 再拿一次署名。
 --
--- 三、密钥只给服务端。pa_member_secrets 返回模型 key、Claude 登录令牌、Gmail 长期令牌、MCP 令牌的原文，
---     任何登录后的浏览器会话都调得动（只能拿到自己的）。新开 pa_member_secrets_for(owner) 只给 service_role，
---     老函数收回 authenticated 的执行权。
+-- 三、密钥只给服务端（第一半）：新开 pa_member_secrets_for(owner)，只给 service_role。
+--     新后端优先用它。老函数 pa_member_secrets 收回 authenticated 的执行权在 0170。
 --
 -- 四、安全检查器报的 7 个函数补上固定的 search_path。
 
@@ -221,7 +220,6 @@ $$;
 revoke all on function public.pa_member_secrets_for(uuid) from public, anon, authenticated;
 grant execute on function public.pa_member_secrets_for(uuid) to service_role;
 
-revoke execute on function public.pa_member_secrets() from authenticated;
 
 -- ── 四 ────────────────────────────────────────────────────────
 
