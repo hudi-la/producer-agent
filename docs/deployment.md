@@ -7,8 +7,8 @@
 
 正式地址仍为 https://fairwind.hudiworks.com/，现已切到 Render `fairwind-migration`（parallight，Oregon，服务 `srv-dbcpchavcj2c73fe55dg`）。下方 DigitalOcean 发布流程仅作历史参考，不可再直接用于正式发布。
 
-- 实际生产提交：`e79a51cb8bf569687340d50eb86056919ed86160`，已推送 GitHub `codex/quiet-drafts-20261023`。2026-10-23 20:46 PDT 发布聊天意图、上下文来源与判断水位基础修复；保留前版通知及草稿样式。
-- 实际生产部署：`dep-dbe2k8hsrm7s73degoj0`；2026-10-23 20:46 PDT 发起并成功 live。自动部署关闭，后续通过 Render 手动部署经核实的提交；不可从旧本地 checkout 整库覆盖。
+- 实际生产提交：`9f1202f70db55bda238164ecbbdc10f3222f1d7d`，GitHub 分支 `fix/decision-core-20261024`。2026-10-24 21:52 PDT 发布决策核心修复（闸门、消息类型表、提醒栏上下文、发信防重发、球权标签撤下等），基于 e79a51c。
+- 实际生产部署：`dep-dbeomagm7kps73eikgi0`；2026-10-24 21:52 PDT 经 Render「Deploy a specific commit」发起，1m31s 后 live。上一版 `dep-dbe2k8hsrm7s73degoj0`（e79a51c）可用 Rollback 回退。自动部署关闭。
 - 运行：Docker Node 24.9.0，1 CPU / 2 GB，持久磁盘 1 GB；`FAIRWIND_DATA_DIR=/var/data/fairwind`，`FAIRWIND_DEPLOYMENT_STATE=live`，`FAIRWIND_CUTOVER_CONFIRMED=true`。Supabase 仍为原项目；凭据只留服务配置。
 - Cloudflare：`fairwind` 为 DNS only 的 CNAME，指向 `fairwind-migration.onrender.com`，TTL Auto。Render 域名 Verified、Certificate Issued；正式 HTTPS 验证通过。
 - 旧 DO `fairwind.service` 已停止且 disabled，不能与 Render 同时开启。DO 主机、ERP、Caddy、LLM Lab 及其他服务保留。
@@ -53,4 +53,5 @@
 
 2026-10-24：决策核心修复（分支 `fix/decision-core-20261024`，提交 538f459，基于 e79a51c；866 项测试通过）。**代码尚未发布**：Chrome 扩展未连接、本机无 Render 凭据。
 数据库迁移 0169 已在线上执行（Supabase MCP）：上下文函数带回 state、信头写入带回 names、新增只给 service_role 的 pa_member_secrets_for、7 个函数固定 search_path。执行前逐字核对了线上旧定义；执行后以 Di Hu 会话验证上下文 state 与 v_pa_state 一致，原有权限不变。0169 对新旧后端都安全。
-**待办，顺序不可颠倒**：① Render 手动部署 538f459（或更新）；② 部署验证通过后再执行 0170（收回 authenticated 对 pa_member_secrets 的执行权）。先跑 0170 会让旧后端读不到任何人的设置。
+已完成：① 9f1202f 部署 live（dep-dbeomagm7kps73eikgi0）；/health 200，正式首页新 bundle、看板与设置页（Gmail 已连接、判据、日历、找机会任务）在 Chrome 中正常加载。② 部署后 90 秒内 pa_member_secrets_for 调用 8→42、旧 pa_member_secrets 调用不再增长，确认新后端已切换；随后执行 0170：authenticated 不再能执行 pa_member_secrets，service_role 照旧。未做：真实发信、计费模型对话探针。
+回滚注意：若回退到 e79a51c，必须先恢复 `grant execute on function public.pa_member_secrets() to authenticated;`，否则旧后端读不到设置。
