@@ -55,6 +55,7 @@ import { extractLetters as extractLetter } from './letter.js'
 import { extractForm } from './form.js'
 import { extractStateMove, peelEnvelopes, moveLine, memoLine, localToday } from './stateMove.js'
 import { gateStateMove, gateMemo } from './decisions.js'
+import { findReplyTarget, looksLikeReply } from './mail/replyTarget.js'
 
 import { parseRejudge, rejudgePrompt } from './rejudge.js'
 import { eventOf, parseTag, cellFor } from './judge.js'
@@ -958,6 +959,9 @@ async function handleArtifact(body) {
     if (existing) return existing
     const message = ctx.msgs.find(m => m.id === body.message_id && m.role === 'producer')
     const fields = artifactFields(message, index)
+    if (fields.p_kind === 'email' && !fields.p_meta?.reply_to) {
+      fields.p_meta = await ensureReplyTarget(owner, { kind: 'email', title: fields.p_title, meta: fields.p_meta })
+    }
     const { data, error } = await db.rpc(owner.kind === 'contact' ? 'pa_upsert_contact_deliverable' : 'pa_upsert_deliverable', {
       ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }), ...fields,
     })
@@ -966,6 +970,32 @@ async function handleArtifact(body) {
   })()
   artifactRuns.set(key, run)
   try { return await run } finally { artifactRuns.delete(key) }
+}
+
+// 这封信是在回复哪一封：按邮件记录判，不靠模型填（2026-10-26，见 mail/replyTarget.js）。
+// 产出上已经有就不动；没有就去信头账本找，找到了写回产出。
+// strict=true（发送前）：标题像回信、却找不到原信 → 拦下，不当成新信发出去。
+async function ensureReplyTarget(owner, d, { strict = false } = {}) {
+  if (d.kind !== 'email' || d.meta?.reply_to) return d.meta || {}
+  let hit = null
+  try { hit = await findReplyTarget(db, { to: d.meta?.to, subject: d.title }) }
+  catch (e) { if (strict && looksLikeReply(d.title)) throw e; console.warn('  ⚠️ ' + e.message) }
+  if (!hit) {
+    if (strict && looksLikeReply(d.title)) {
+      throw new Error(`标题是回信（${d.title}），但邮件记录里找不到收件人发来的同主题原信。发出去会是一封不挂在原来往来里的新信——先确认收件人和主题，或者改掉标题里的「Re:」再发。`)
+    }
+    return d.meta || {}
+  }
+  const meta = { ...(d.meta || {}), reply_to: hit.reply_to, thread_id: hit.thread_id || d.meta?.thread_id || null }
+  if (d.id) {
+    const { error } = await db.rpc(owner.kind === 'contact' ? 'pa_upsert_contact_deliverable' : 'pa_upsert_deliverable', {
+      ...(owner.kind === 'contact' ? { p_contact_id: owner.id } : { p_pursuit_id: owner.id }),
+      p_id: d.id, p_kind: d.kind, p_title: d.title, p_meta: meta,
+    })
+    if (error) console.warn('  ⚠️ 回复对象没写回产出：' + error.message)
+  }
+  console.log(`  · 认出是回复：${d.title} → ${hit.gmail_message_id || hit.reply_to}`)
+  return meta
 }
 
 async function handleGmailDraft(body) {
@@ -980,8 +1010,9 @@ async function handleGmailDraft(body) {
   if (!d.body?.trim()) throw new Error('正文是空的，没东西可放')
 
   if (d.kind !== 'email') throw new Error('只有邮件产出可以放进 Gmail 草稿箱')
+  d.meta = await ensureReplyTarget(owner, d)   // 是回信就挂进原来那串（按邮件记录判）
   const me = await whoami()
-  assertSameMailbox(me.address, mailboxOf(ctx.profile))
+  if (!HOSTED) assertSameMailbox(me.address, mailboxOf(ctx.profile))
   const info = await saveDraft({
     gmail: gmailFor(await mailClient()), from: me.address, fromName: artistOf(ctx.profile),
     to: d.meta?.to, cc: d.meta?.cc, subject: d.title, body: d.body,
@@ -1034,6 +1065,8 @@ async function handleSendMail(body) {
   if (d.status === 'final') throw new Error('已定稿的不走这条路')
   if (d.meta?.sent_gmail_id) throw new Error(`这封已经在 ${String(d.meta.sent_at || '').slice(0, 10)} 发出过了，不再重发`)
   if (!d.body?.trim()) throw new Error('正文是空的，没东西可发')
+  // 是回信就接在原来那串里；标题是 Re: 却找不到原信，拦下，不当新信发出去
+  d.meta = await ensureReplyTarget(owner, d, { strict: true })
 
   // 收件人是一份名单（0071）。老产出里存的是单个字符串，两种都认——
   // 不认的话，改之前收进产出的那几封信一封都发不出去。
