@@ -54,3 +54,12 @@
 2026-10-24：决策核心修复（分支 `fix/decision-core-20261024`，提交 538f459，基于 e79a51c；866 项测试通过）。**代码尚未发布**：Chrome 扩展未连接、本机无 Render 凭据。
 数据库迁移 0169 已在线上执行（Supabase MCP）：上下文函数带回 state、信头写入带回 names、新增只给 service_role 的 pa_member_secrets_for、7 个函数固定 search_path。执行前逐字核对了线上旧定义；执行后以 Di Hu 会话验证上下文 state 与 v_pa_state 一致，原有权限不变。0169 对新旧后端都安全。
 **待办，顺序不可颠倒**：① Render 手动部署 538f459（或更新）；② 部署验证通过后再执行 0170（收回 authenticated 对 pa_member_secrets 的执行权）。先跑 0170 会让旧后端读不到任何人的设置。
+
+## 2026-10-29 无障碍发布
+
+- 正式基线：Render 上实际运行的 `9f1202f70db55bda238164ecbbdc10f3222f1d7d`，不是旧默认分支。
+- 发布源码：`e905e19b52bb59b754a0463a40b84aab4777def0`，已推送 GitHub `codex/accessibility-20261028`。
+- Render：`dep-dbhtmjnb9u1s73avgpsg`，2026-10-29 16:49 PDT 显示 Deploy succeeded / Live。
+- 范围：跳转主要内容、导航状态、可见焦点、减少动画、对比度、聊天标签、语言标记、四类弹窗的焦点循环与退出恢复。无后端或数据库变更。
+- 验证：hosted 构建、3 项 i18n 检查、弹窗初始焦点 / 正反 Tab 循环 / Escape / 触发按钮焦点恢复检查通过；正式首页返回新版 CSS `index-fmm5iBZ2.css`。
+- 回滚：在同一 Render 服务回滚到 `dep-dbeomagm7kps73eikgi0`（9f1202f）；不启动旧 DO 服务，不回滚数据库。
