@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../lib/useDialogFocus.js'
 import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { useGrow } from '../lib/useGrow.js'
@@ -178,6 +179,7 @@ function Report({ text, past = false }) {
 }
 
 export default function TasksPanel({ tasks, open, onClose, brain = null, tz, onChanged }) {
+  const dialogRef = useDialogFocus(open, onClose)
   const [openId, setOpenId] = useState(null)
   const [flipping, setFlipping] = useState(null)
   const [flipErr, setFlipErr] = useState(null)
@@ -201,7 +203,7 @@ export default function TasksPanel({ tasks, open, onClose, brain = null, tz, onC
   return (
     <>
       <div className={'ov-scrim' + (open ? ' on' : '')} onClick={onClose} aria-hidden="true" />
-      <div className={'taskmodal' + (open ? ' open' : '')} role="dialog" aria-label={t('造卡任务')} aria-hidden={!open}>
+      <div className={'taskmodal' + (open ? ' open' : '')} ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('造卡任务')} aria-hidden={!open} inert={!open ? "" : undefined}>
         <div className="tm-head">
           <h3>{t('造卡任务')}</h3>
           <button className="btn" onClick={onClose}>{t('收起')}</button>

@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../lib/useDialogFocus.js'
 import { useEffect, useState } from 'react'
 import { stateLine, whyLine } from '../lib/stateText.js'
 import { key as qKey } from '../lib/queue.js'
@@ -127,6 +128,7 @@ function MailAge({ mail }) {
 
 export default function Notifications({ data, mail, judging, onJudgeMore, onHandled, onReschedule, onOpen, onGoPeople, onAudit, auditOn, onClose,
                                        picking = false, picked, onPick }) {
+  const dialogRef = useDialogFocus(true, onClose)
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', onKey)
@@ -138,7 +140,7 @@ export default function Notifications({ data, mail, judging, onJudgeMore, onHand
   const 待判 = stale.length + (stale.length ? 0 : unjudged.length)
 
   return (
-    <div className="npanel" role="dialog" aria-label={t('消息')}>
+    <div className="npanel" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('消息')}>
       <header className="nhead">
         {/* 「消息」不叫「该动的」：这块板子装的不全是催你动的东西——
             等待那一层是「在等别人」。

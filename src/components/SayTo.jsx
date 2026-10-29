@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../lib/useDialogFocus.js'
 import React, { useRef, useState } from 'react'
 import { useGrow } from '../lib/useGrow.js'
 import { t } from '../i18n/index.js'
@@ -8,6 +9,7 @@ import { t } from '../i18n/index.js'
 // 「起草邮件」只是今天想得到的一种，明天你可能想让 15 条线各自去查一下
 // 对方最近有没有新动向。指令是开放的，按钮是封闭的。
 export default function SayTo({ n, onSend, onCancel }) {
+  const dialogRef = useDialogFocus(true, onCancel)
   const [text, setText] = useState('')
   const said = text.trim()
   const ta = useRef(null)
@@ -16,13 +18,13 @@ export default function SayTo({ n, onSend, onCancel }) {
   return (
     <>
       <div className="ov-scrim on" onClick={onCancel} aria-hidden="true" />
-      <div className="sayto" role="dialog" aria-label={t('对选中的 {n} 条线说一句', { n })}>
+      <div className="sayto" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('对选中的 {n} 条线说一句', { n })}>
         <h3 className="sayto-t">{t('对选中的 {n} 条线说一句', { n })}</h3>
         {/* 说清楚它会怎么落地——这句话会写进每条线的对话，是不可撤销的记录 */}
         <p className="sayto-s">{t('同一句话分别说给每条线，各答各的（它们的料不一样）。这句会记进每条线的对话，标明是群发。')}</p>
         <textarea
           ref={ta}
-          className="sayto-in"
+          className="sayto-in" aria-label={t("聊天消息")}
           value={text}
           autoFocus
           rows={4}

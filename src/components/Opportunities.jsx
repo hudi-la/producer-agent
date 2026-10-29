@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../lib/useDialogFocus.js'
 import ErrorNotice from './ErrorNotice.jsx'
 import React, { useEffect, useMemo, useState } from 'react'
 import {
@@ -80,6 +81,7 @@ function Row({ o, busy, onPick, onDrop, onUndrop }) {
 
 export default function Opportunities({ open, onClose, pool, onChanged, lastRun }) {
   const [lane, setLane] = useState('open')
+  const dialogRef = useDialogFocus(open, onClose)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(null)
   const [err, setErr] = useState(null)
@@ -112,7 +114,7 @@ export default function Opportunities({ open, onClose, pool, onChanged, lastRun 
   return (
     <>
       <div className={'ov-scrim' + (open ? ' on' : '')} onClick={onClose} aria-hidden="true" />
-      <div className={'opmodal' + (open ? ' open' : '')} role="dialog" aria-label={t('机会池')} aria-hidden={!open}>
+      <div className={'opmodal' + (open ? ' open' : '')} ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('机会池')} aria-hidden={!open} inert={!open ? "" : undefined}>
         <div className="tm-head">
           <h3>{t('机会池 · {n} 行', { n: c.all })}</h3>
           <button className="btn" onClick={onClose}>{t('收起')}</button>
