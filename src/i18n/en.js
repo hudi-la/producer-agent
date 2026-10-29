@@ -13,6 +13,8 @@ import uiTimeline from './en.ui-timeline.js'
 import uiMisc from './en.ui-misc.js'
 
 const base = {
+  "聊天消息": "Chat message",
+  "跳到主要内容": "Skip to main content",
   "刚去 ChatGPT 开启了设备码登录权限？": "Just enabled device code login in ChatGPT?",
   "开启权限后还没有连接成功。请回到这里点下面的按钮，获取新的验证码，再打开 ChatGPT 登录页面输入新验证码并授权。": "Enabling permission does not finish connecting. Return here and click the button below to get a new code. Then open the ChatGPT sign-in page, enter the new code and authorize.",
   "已开启权限，重新连接 ChatGPT": "Permission enabled \u2014 reconnect ChatGPT",

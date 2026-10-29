@@ -8,7 +8,10 @@ import en from './en.js'
 const DICTS = { zh: null, en }
 let LANG = 'zh'
 
-export function setLang(l) { LANG = DICTS[l] === undefined ? 'zh' : l }
+export function setLang(l) {
+  LANG = DICTS[l] === undefined ? 'zh' : l
+  if (typeof document !== 'undefined') document.documentElement.lang = LANG
+}
 export function getLang() { return LANG }
 
 /** t('中文原文') / t('已有 {n} 条', { n }) */

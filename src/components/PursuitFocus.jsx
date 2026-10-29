@@ -554,6 +554,7 @@ export default function PursuitFocus({
             isComposing 那句不能删——中文输入法选词时也会敲 Enter，
             不挡的话你选个词就把半句话发出去了。 */}
         <textarea
+          aria-label={t("聊天消息")}
           ref={taRef}
           className="ph"
           rows={1}

@@ -730,6 +730,7 @@ export default function App() {
    <ProfileContext.Provider value={profile}>
    <VeilContext.Provider value={veiled}>
     <div className={'wrap' + (yielding ? ' drawered' : '')}>
+      <a className="skip-link" href="#main-content" onClick={(e) => { e.preventDefault(); const main = document.getElementById("main-content"); const target = main?.querySelector("button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex='0']"); target?.focus() }}>{t("跳到主要内容")}</a>
       <header className="app-top" ref={setTopEl}>
         <div className="brand"><Mark /><span className="name">Fairwind</span></div>
         <nav className="areas" aria-label={t('主区')}>
@@ -738,6 +739,7 @@ export default function App() {
               key={key}
               ref={key === 'desk' ? deskBtnRef : undefined}
               className={'area' + (area === key ? ' on' : '')}
+              aria-current={area === key ? 'page' : undefined}
               onClick={() => { setArea(key); if (view.name !== 'home') closeDrawer() }}
             >
               {label}
@@ -841,6 +843,7 @@ export default function App() {
                   onClose={(k) => setQueue((q) => queueDone(q, k))} />
       )}
 
+      <div id="main-content" role="main" tabIndex={-1} className="main-landmark">
       {area === 'desk' ? (
         (() => {
           const cur = deskView(queue, deskData)
@@ -982,6 +985,8 @@ export default function App() {
           )}
         </aside>
       )}
+
+      </div>
 
       {/* 一条都没勾就没有「对选中的 0 条线」这回事 —— 干脆不摆 */}
       {sayOpen && picked.size > 0 && (

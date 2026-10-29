@@ -574,6 +574,7 @@ export default function PersonFocus({
                 Enter，不挡的话你选个词就把半句话发出去了。 */}
             <div className="composer">
               <textarea
+          aria-label={t("聊天消息")}
                 ref={taRef}
                 className="ph"
                 rows={1}

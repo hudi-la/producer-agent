@@ -10,10 +10,10 @@ import { t } from '../i18n/index.js'
 // 读了就灭——所以你一眼看得出这一排里哪个是新的。
 export default function DeskTabs({ tabs, at, unread = new Set(), onPick, onClose }) {
   return (
-    <div className="subbar desk-tabs" role="tablist" aria-label={t('桌上开着的')}>
+    <div className="subbar desk-tabs" role="group" aria-label={t('桌上开着的')}>
       {tabs.map((tab) => (
         <div key={tab.k} className={'dtab' + (tab.k === at ? ' on' : '')} role="presentation">
-          <button type="button" role="tab" aria-selected={tab.k === at} className="dtab-t" onClick={() => onPick(tab.k)}>
+          <button type="button" aria-pressed={tab.k === at} className="dtab-t" onClick={() => onPick(tab.k)}>
             <span className={'dtab-k ' + tab.kind + (unread.has(tab.k) ? ' new' : '')}
                   aria-label={unread.has(tab.k) ? t('Fairwind 回复了') : undefined}
                   aria-hidden={unread.has(tab.k) ? undefined : 'true'} />
