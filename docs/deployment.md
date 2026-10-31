@@ -64,3 +64,8 @@
 - 范围：跳转主要内容、导航状态、可见焦点、减少动画、对比度、聊天标签、语言标记、四类弹窗的焦点循环与退出恢复。无后端或数据库变更。
 - 验证：hosted 构建、3 项 i18n 检查、弹窗初始焦点 / 正反 Tab 循环 / Escape / 触发按钮焦点恢复检查通过；正式首页返回新版 CSS `index-fmm5iBZ2.css`。
 - 回滚：在同一 Render 服务回滚到 `dep-dbeomagm7kps73eikgi0`（9f1202f）；不启动旧 DO 服务，不回滚数据库。
+
+## 2026-10-30 回信按邮件记录认（待部署）
+
+- 代码：GitHub `fix/reply-from-ledger-20261030`，提交 `47c3160`（含 `6e1b156`），基于线上 `7f79239`（无障碍发布 e905e19 之后）。869 项测试、hosted 构建通过。**尚未部署**：Render 部署被 Claude Code 权限检查拦下，需用户手动在 Render「Deploy a specific commit」部署 `47c3160`，或放行后由 agent 部署。无数据库迁移。
+- 数据（已执行，经用户同意）：Megha「Re: Show Invitation」草稿（deliverable 11634755）补上 reply_to 与 thread_id，指向她 10/26 来信；撤回 7 条后台把起草当已发出的提醒改动（CultureHub ×4、Tom Leeser ×2、Stacy ×1），笔软删、标签清除，可恢复。撤回后三条线当前提醒不变（CultureHub 现为 NEEDS_REPLY，由 Mattie 新来信决定；Tom、Stacy 当前无提醒）。
