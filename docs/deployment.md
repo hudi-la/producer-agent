@@ -63,3 +63,17 @@
 - 范围：跳转主要内容、导航状态、可见焦点、减少动画、对比度、聊天标签、语言标记、四类弹窗的焦点循环与退出恢复。无后端或数据库变更。
 - 验证：hosted 构建、3 项 i18n 检查、弹窗初始焦点 / 正反 Tab 循环 / Escape / 触发按钮焦点恢复检查通过；正式首页返回新版 CSS `index-fmm5iBZ2.css`。
 - 回滚：在同一 Render 服务回滚到 `dep-dbeomagm7kps73eikgi0`（9f1202f）；不启动旧 DO 服务，不回滚数据库。
+
+
+## 2026-11-01：卡片附件复用文档抽屉（已发布）
+
+- 正式站：https://fairwind.hudiworks.com/ 。Render 服务 `srv-dbcpchavcj2c73fe55dg`。
+- 实际发布代码：`3f856ea8e57f1ebb4ca141a498d8600db5fe21f7`，已推送 `https://github.com/hudi-la/producer-agent.git` 的 `codex/attachment-drawer-20261101`；远端 SHA 已用 ls-remote 核实。
+- 实际部署：`dep-dbjcl8rbc2fs73ceipng`，Render 指定提交手动部署；2026-11-01 05:15:36 UTC 日志确认 live，页面显示 Deploy succeeded。未改变服务配置分支或自动部署设置。
+- 发布前核对当前 live 为 `e905e19b52bb59b754a0463a40b84aab4777def0` / `dep-dbhtmjnb9u1s73avgpsg`。修复基线 `7f79239` 与该 live 提交仅差部署文档；新获取的 `fix/reply-from-ledger-20261030` 等待发布分支未混入。后端、Docker、依赖和数据库均无本次改动。
+- 卡片附件使用现有 ArtifactEditor 抽屉只读模式，UTF-8 文本、禁脚本 HTML 隔离预览、下载、加载/错误/重试；切换附件保持已挂载编辑器的未保存内容。
+- 本地完整测试 871/871 通过、VITE_HOSTED=1 构建通过、diff --check 通过。浏览器组件验证和 390/768 像素窄屏记录见 qa/README.md。
+- 生产首页、health(ok=true)、入口 JS/CSS 和 App chunk 全部 HTTP 200。入口 `index-B_VYHNs7.js`，应用 `App-BlIGXOga.js`，样式 `index-bSCB0PYs.css`；实际资源包含 UTF-8 解码和空 sandbox。
+- 已登录正式 Chrome：Processing 两个真实附件均在抽屉打开，TXT 中文正常，HTML 正常显示“Processing Fellowship 2027 提交内容与证明”和提交成功记录，HTML iframe sandbox 为空（禁脚本）。未更改原附件、重新提交申请或放宽权限。生产切换期短暂 502 后恢复，最终根路径 200。
+- iOS 真机验收留待用户现场测试；不能将桌面窄屏模拟称为 iOS 已通过。测试私有样本不在 Git 或发布产物内。
+- 如需代码回滚：Render 手动部署前版 `e905e19b52bb59b754a0463a40b84aab4777def0`；本次无需数据回滚。发布记录后续 commit 只含文档，实际运行版本仍以以上 3f856ea 为准。
