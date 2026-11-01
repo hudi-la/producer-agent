@@ -260,5 +260,13 @@ const usage = {
   "失败 {failed} 次；{measured} 次有返回用量。缓存读取已包含在输入中。": "{failed} failed; {measured} returned usage. Cached input is included in input tokens."
 }
 export default {
+  '下载': 'Download',
+  '这份附件没有可读取的文件': 'This attachment has no readable file',
+  '附件读取失败（HTTP {status}），请重试': 'Could not read attachment (HTTP {status}). Please retry.',
+  '正在加载附件…': 'Loading attachment…',
+  '重新加载': 'Reload',
+  '直接打开原文件': 'Open original file',
+  '此文件暂不支持预览，请下载后打开。': 'Preview is unavailable for this file. Download it to open.',
+
   '连接暂时不可用，可以重试发送；失败会保留你的话': 'Connection unavailable. You can retry sending; your words will be kept if it fails.',
   ...usage, ...artifacts, ...googleCalendar, ...calendar, ...uiFocus, ...uiContacts, ...uiTimeline, ...uiMisc, ...a, ...b, ...c, ...extra, ...backup, ...base }

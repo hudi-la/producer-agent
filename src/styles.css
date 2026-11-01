@@ -2412,3 +2412,14 @@ aside.drawer:has(.artifact-editor) { width: min(1200px, 96vw); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 
 @media (prefers-color-scheme: dark) { :root { --focus-ring: #9bcaff; } }
+
+/* Attachment mode shares the existing document drawer. */
+.attachment-document { min-width: 0; }
+.attachment-document h3 { overflow-wrap: anywhere; }
+.attachment-document .artifact-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.attachment-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.6; }
+.attachment-document iframe { width: 100%; min-height: 60vh; border: 0; background: white; }
+.attachment-document img { max-width: 100%; height: auto; }
+@media (max-width: 900px) {
+  .focus.page .attachment-document { position: fixed; inset: var(--topbar-h, 56px) 0 0; z-index: 20; overflow-y: auto; }
+}

@@ -14,7 +14,7 @@ import Veil from './Veil.jsx'
 
 import {
   fetchDeliverables, fetchAttachments, setFinal,
-  uploadAttachment, attachmentUrl, deleteAttachment,
+  uploadAttachment, deleteAttachment,
 } from '../lib/deliverables.js'
 import Dossier from './Dossier.jsx'
 import ArtifactEditor from './ArtifactEditor.jsx'
@@ -307,7 +307,8 @@ export default function PursuitFocus({
   const threeCol = !inDrawer
   const [deliv, setDeliv] = useState([])
   const [artifactId, setArtifactId] = useState(null)
-  useEffect(() => setArtifactId(null), [p.id])
+  const [attachment, setAttachment] = useState(null)
+  useEffect(() => { setArtifactId(null); setAttachment(null) }, [p.id])
   const selectedArtifact = deliv.find(d => d.id === artifactId)
   const [atts, setAtts] = useState([])
 
@@ -403,15 +404,9 @@ export default function PursuitFocus({
     await reloadDeliv()
   }
 
-  // 私有桶，每次现拿一条 60 秒的签名链接。新标签页打开，不下载——
-  // PDF 直接在浏览器里看就行，不用先落到你的下载文件夹里。
-  async function openFile(a) {
-    try {
-      if (!a.storage_key) throw new Error(t('这份只有登记没有字节（多半是早年的空行）'))
-      window.open(await attachmentUrl(a.storage_key), '_blank', 'noopener')
-    } catch (e) {
-      setErr(e.message)
-    }
+  // 附件复用文档抽屉；保持已挂载的编辑器，关闭预览后恢复未保存内容。
+  function openFile(a) {
+    setAttachment(a)
   }
 
   async function dropFile(a) {
@@ -479,6 +474,9 @@ export default function PursuitFocus({
           <div className="fh">
             {/* 整页时事实搬去了左栏卷宗，这儿不再重复一遍；抽屉没有卷宗，照旧显示 */}
             {!threeCol && <Facts p={p} />}
+            {!threeCol && <details><summary>{t('附件')} · {atts.length}</summary>
+              {atts.map(a => <button className="b" key={a.id} onClick={() => openFile(a)}>{a.filename}</button>)}
+            </details>}
             {/* 「下一步」那一套（做完了 / 作废了 / 已碰过）都撤了：
                 写它的消化环节早就没了，留着就是三行永远不会更新的字。
                 库里字段没删——以后要不要重做那套是另一场讨论。 */}
@@ -489,7 +487,7 @@ export default function PursuitFocus({
           </div>
 
           {deliv.filter(d => !d.meta?.artifact_message_id && d.status === 'draft').map(d =>
-            <ArtifactCard key={d.id} existing={d} editorOpen={!!selectedArtifact} owner={{ pursuitId: p.id }}
+            <ArtifactCard key={d.id} existing={d} editorOpen={!!selectedArtifact || !!attachment} owner={{ pursuitId: p.id }}
               onAdopted={async id => { await reloadDeliv(); if (id) setArtifactId(id) }} />)}
           {msgs.length === 0 && !busy ? (
             <div className="empty-thread">{emptyText(p.stage)}</div>
@@ -507,7 +505,7 @@ export default function PursuitFocus({
                   <Message
                     m={m} msgs={msgs} key={m.id || i}
                     owner={{ pursuitId: p.id }}
-                    items={deliv} editorOpen={!!selectedArtifact} onAdopted={async (id) => { await reloadDeliv(); if (id) setArtifactId(id) }}
+                    items={deliv} editorOpen={!!selectedArtifact || !!attachment} onAdopted={async (id) => { await reloadDeliv(); if (id) setArtifactId(id) }}
                     editing={editId === m.id}
                     /* 在想的时候不给改：那会撤掉一条它还在写的回复 */
                     canEdit={!busy}
@@ -624,7 +622,7 @@ export default function PursuitFocus({
       </div>
 
       {threeCol ? (
-        <div className={"focus-cols" + (selectedArtifact ? "" : " without-editor")}>
+        <div className={"focus-cols" + (selectedArtifact || attachment ? "" : " without-editor")}>
           <aside className="fc-l">
             <Dossier
               p={p}
@@ -640,12 +638,14 @@ export default function PursuitFocus({
             />
           </aside>
           <div className="fc-m">{body}</div>
-          {selectedArtifact && <ArtifactEditor key={selectedArtifact.id} d={selectedArtifact}
+          {selectedArtifact && <ArtifactEditor key={selectedArtifact.id} d={selectedArtifact} hidden={!!attachment}
             onChanged={reloadDeliv} onClose={() => setArtifactId(null)} />}
+          {attachment && <ArtifactEditor key={attachment.id} attachment={attachment} onClose={() => setAttachment(null)} />}
 
         </div>
-      ) : <>{body}{selectedArtifact && <ArtifactEditor key={selectedArtifact.id} d={selectedArtifact}
-        onChanged={reloadDeliv} onClose={() => setArtifactId(null)} />}</>}
+      ) : <>{body}{selectedArtifact && <ArtifactEditor key={selectedArtifact.id} d={selectedArtifact} hidden={!!attachment}
+        onChanged={reloadDeliv} onClose={() => setArtifactId(null)} />}
+          {attachment && <ArtifactEditor key={attachment.id} attachment={attachment} onClose={() => setAttachment(null)} />}</>}
     </div>
   )
 }
